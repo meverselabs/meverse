@@ -1,6 +1,7 @@
 package encoding
 
 import (
+	"io"
 	"reflect"
 
 	"github.com/fletaio/fleta/common/hash"
@@ -35,9 +36,26 @@ func Register(value interface{}, enc encoderFunc, dec decoderFunc) {
 	})
 }
 
+// NewEncoder returns a Encoder
+func NewEncoder(w io.Writer) *Encoder {
+	return &Encoder{
+		Encoder: msgpack.NewEncoder(w),
+	}
+}
+
+// NewDecoder returns a Encoder
+func NewDecoder(r io.Reader) *Decoder {
+	return &Decoder{
+		Decoder: msgpack.NewDecoder(r),
+	}
+}
+
+// Encoder is a encoding data
 type Encoder struct {
 	*msgpack.Encoder
 }
+
+// Decoder is a decoding data
 type Decoder struct {
 	*msgpack.Decoder
 }

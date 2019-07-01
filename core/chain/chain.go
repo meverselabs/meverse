@@ -50,7 +50,7 @@ func (cn *Chain) Init() error {
 		IDMap[idx] = id
 	}
 	ctx := types.NewContext(cn.store)
-	if err := cn.consensus.Init(cn, newChainCommiter(cn), NewContextProcess(0, ctx)); err != nil {
+	if err := cn.consensus.Init(NewRegister(0), cn, newChainCommiter(cn), NewContextProcess(0, ctx)); err != nil {
 		return err
 	}
 	for i, p := range cn.processes {

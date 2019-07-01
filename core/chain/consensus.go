@@ -6,7 +6,7 @@ import (
 
 // Consensus is a interface of the chain Consensus
 type Consensus interface {
-	Init(cn *Chain, ct Committer, loader LoaderProcess) error
+	Init(reg *Register, cn *Chain, ct Committer, loader LoaderProcess) error
 	InitGenesis(ctp *ContextProcess) error
 	ValidateHeader(bh *types.Header) error
 	BeforeExecuteTransactions(b *types.Block, ctp *ContextProcess) error
