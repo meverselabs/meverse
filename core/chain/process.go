@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/core/types"
 )
 
@@ -8,9 +9,9 @@ import (
 type Process interface {
 	Version() string
 	Name() string
-	Init(reg *Register, cn *Chain, loader LoaderProcess) error
-	InitGenesis(ctp *ContextProcess) error
-	ValidateHeader(bh *types.Header) error
+	Init(reg *Register, cn *Chain) error
+	OnLoadChain(loader LoaderProcess) error
+	ValidateHeader(bh *types.Header, sigs []common.Signature) error
 	BeforeExecuteTransactions(b *types.Block, ctp *ContextProcess) error
 	AfterExecuteTransactions(b *types.Block, ctp *ContextProcess) error
 	ProcessReward(b *types.Block, ctp *ContextProcess) error
@@ -20,13 +21,13 @@ type Process interface {
 // ProcessBase is a base handler of the chain Process
 type ProcessBase struct{}
 
-// InitGenesis initializes genesis data
-func (p *ProcessBase) InitGenesis(ctp *ContextProcess) error {
+// OnLoadChain called when the chain loaded
+func (p *ProcessBase) OnLoadChain(loader LoaderProcess) error {
 	return nil
 }
 
 // ValidateHeader called when required to validate the header
-func (p *ProcessBase) ValidateHeader(bh *types.Header) error {
+func (p *ProcessBase) ValidateHeader(bh *types.Header, sigs []common.Signature) error {
 	return nil
 }
 

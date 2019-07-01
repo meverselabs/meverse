@@ -1,4 +1,4 @@
-package consensus
+package pof
 
 import "errors"
 
@@ -30,4 +30,7 @@ var (
 	ErrNotExistConsensusPolicy        = errors.New("not exist formulator policy")
 	ErrFormulatorCreationLimited      = errors.New("formulator creation limited")
 	ErrUnauthorizedTransaction        = errors.New("unauthorized transaction")
+	ErrInvalidObserverKey             = errors.New("invalid observer key")
+	ErrInvalidTopSignature            = errors.New("invalid top signature")
+	ErrInvalidSignatureCount          = errors.New("invalid signature count")
 )

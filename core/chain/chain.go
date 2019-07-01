@@ -17,6 +17,7 @@ type Chain struct {
 	sync.Mutex
 	store           *Store
 	consensus       Consensus
+	app             Application
 	processes       []Process
 	processIDMap    map[string]uint8
 	processIndexMap map[uint8]int
@@ -27,9 +28,10 @@ type Chain struct {
 }
 
 // NewChain returns a Chain
-func NewChain(consensus Consensus, store *Store) *Chain {
+func NewChain(consensus Consensus, app Application, store *Store) *Chain {
 	cn := &Chain{
 		consensus:       consensus,
+		app:             app,
 		store:           store,
 		processes:       []Process{},
 		processIDMap:    map[string]uint8{},
@@ -49,24 +51,27 @@ func (cn *Chain) Init() error {
 	for id, idx := range cn.processIndexMap {
 		IDMap[idx] = id
 	}
-	ctx := types.NewContext(cn.store)
-	if err := cn.consensus.Init(NewRegister(0), cn, newChainCommiter(cn), NewContextProcess(0, ctx)); err != nil {
-		return err
-	}
+
+	// Init
 	for i, p := range cn.processes {
-		if err := p.Init(NewRegister(IDMap[i]), cn, NewContextProcess(IDMap[i], ctx)); err != nil {
+		if err := p.Init(NewRegister(IDMap[i]), cn); err != nil {
 			return err
 		}
+	}
+	if err := cn.app.Init(NewRegister(255), cn); err != nil {
+		return err
+	}
+	if err := cn.consensus.Init(NewRegister(0), cn, newChainCommiter(cn)); err != nil {
+		return err
 	}
 
+	// InitGenesis
 	genesisContext := types.NewContext(types.NewEmptyLoader())
-	if err := cn.consensus.InitGenesis(NewContextProcess(0, genesisContext)); err != nil {
+	if err := cn.app.InitGenesis(NewContextProcess(255, genesisContext)); err != nil {
 		return err
 	}
-	for i, p := range cn.processes {
-		if err := p.InitGenesis(NewContextProcess(IDMap[i], genesisContext)); err != nil {
-			return err
-		}
+	if err := cn.consensus.InitGenesis(NewContextProcess(0, genesisContext)); err != nil {
+		return err
 	}
 	if genesisContext.StackSize() > 1 {
 		return ErrDirtyContext
@@ -86,6 +91,20 @@ func (cn *Chain) Init() error {
 		if GenesisHash != h {
 			return ErrInvalidGenesisHash
 		}
+	}
+
+	// OnLoadChain
+	ctx := types.NewContext(cn.store)
+	for i, p := range cn.processes {
+		if err := p.OnLoadChain(NewContextProcess(IDMap[i], ctx)); err != nil {
+			return err
+		}
+	}
+	if err := cn.app.OnLoadChain(NewContextProcess(255, ctx)); err != nil {
+		return err
+	}
+	if err := cn.consensus.OnLoadChain(NewContextProcess(0, ctx)); err != nil {
+		return err
 	}
 	return nil
 }
@@ -152,8 +171,8 @@ func (cn *Chain) MustAddProcess(id uint8, p Process) {
 	cn.Lock()
 	defer cn.Unlock()
 
-	if id == 0 {
-		panic(ErrZeroIDIsReservedForConsensus)
+	if id == 0 || id == 255 {
+		panic(ErrReservedID)
 	}
 	if _, has := cn.processIDMap[p.Name()]; has {
 		panic(ErrExistProcessName)
@@ -214,7 +233,7 @@ func (cn *Chain) ConnectBlock(b *types.Block) error {
 	cn.Lock()
 	defer cn.Unlock()
 
-	if err := cn.validateHeader(&b.Header); err != nil {
+	if err := cn.validateHeader(&b.Header, b.Signatures); err != nil {
 		return err
 	}
 
@@ -226,6 +245,24 @@ func (cn *Chain) ConnectBlock(b *types.Block) error {
 }
 
 func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context) error {
+	IDMap := map[int]uint8{}
+	for id, idx := range cn.processIndexMap {
+		IDMap[idx] = id
+	}
+
+	// OnSaveData
+	for i, p := range cn.processes {
+		if err := p.OnSaveData(b, NewContextProcess(IDMap[i], ctx)); err != nil {
+			return err
+		}
+	}
+	if err := cn.app.OnSaveData(b, NewContextProcess(255, ctx)); err != nil {
+		return err
+	}
+	if err := cn.consensus.OnSaveData(b, NewContextProcess(0, ctx)); err != nil {
+		return err
+	}
+
 	if b.Header.ContextHash != ctx.Hash() {
 		return ErrInvalidContextHash
 	}
@@ -252,33 +289,54 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 	for id, idx := range cn.processIndexMap {
 		IDMap[idx] = id
 	}
+
+	// BeforeExecuteTransactions
 	for i, p := range cn.processes {
 		if err := p.BeforeExecuteTransactions(b, NewContextProcess(IDMap[i], ctx)); err != nil {
 			return err
 		}
+	}
+	if err := cn.app.BeforeExecuteTransactions(b, NewContextProcess(255, ctx)); err != nil {
+		return err
+	}
+	if err := cn.consensus.BeforeExecuteTransactions(b, NewContextProcess(0, ctx)); err != nil {
+		return err
 	}
 	for i, tx := range b.Transactions {
 		if err := tx.Execute(ctx, uint16(i)); err != nil {
 			return err
 		}
 	}
+
+	// AfterExecuteTransactions
 	for i, p := range cn.processes {
 		if err := p.AfterExecuteTransactions(b, NewContextProcess(IDMap[i], ctx)); err != nil {
 			return err
 		}
 	}
-	if err := cn.consensus.ProcessReward(b, NewContextProcess(0, ctx)); err != nil {
+	if err := cn.app.AfterExecuteTransactions(b, NewContextProcess(255, ctx)); err != nil {
 		return err
 	}
+	if err := cn.consensus.AfterExecuteTransactions(b, NewContextProcess(0, ctx)); err != nil {
+		return err
+	}
+
+	// ProcessReward
 	for i, p := range cn.processes {
 		if err := p.ProcessReward(b, NewContextProcess(IDMap[i], ctx)); err != nil {
 			return err
 		}
 	}
+	if err := cn.app.ProcessReward(b, NewContextProcess(255, ctx)); err != nil {
+		return err
+	}
+	if err := cn.consensus.ProcessReward(b, NewContextProcess(0, ctx)); err != nil {
+		return err
+	}
 	return nil
 }
 
-func (cn *Chain) validateHeader(bh *types.Header) error {
+func (cn *Chain) validateHeader(bh *types.Header, sigs []common.Signature) error {
 	provider := cn.Provider()
 	if bh.Version > provider.Version() {
 		return ErrInvalidVersion
@@ -307,11 +365,11 @@ func (cn *Chain) validateHeader(bh *types.Header) error {
 	if bh.PrevHash != provider.LastHash() {
 		return ErrInvalidPrevHash
 	}
-	if err := cn.consensus.ValidateHeader(bh); err != nil {
+	if err := cn.consensus.ValidateHeader(bh, sigs); err != nil {
 		return err
 	}
 	for _, p := range cn.processes {
-		if err := p.ValidateHeader(bh); err != nil {
+		if err := p.ValidateHeader(bh, sigs); err != nil {
 			return err
 		}
 	}
@@ -341,7 +399,7 @@ func (cn *Chain) validateSignatures(b *types.Block, loader types.Loader) error {
 		go func(sidx int, txs []types.Transaction) {
 			defer wg.Done()
 			for q, tx := range txs {
-				sigs := b.Signatures[sidx+q]
+				sigs := b.TranactionSignatures[sidx+q]
 				TxHash := encoding.Hash(tx)
 				TxHashes[sidx+q+1] = TxHash
 

@@ -152,9 +152,9 @@ func (ctx *Context) CreateUTXO(id uint64, vout *TxOut) error {
 }
 
 // DeleteUTXO deletes the UTXO from the top snapshot
-func (ctx *Context) DeleteUTXO(id uint64) error {
+func (ctx *Context) DeleteUTXO(utxo *UTXO) error {
 	ctx.isLatestHash = false
-	return ctx.Top().DeleteUTXO(id)
+	return ctx.Top().DeleteUTXO(utxo)
 }
 
 // EmitEvent creates the event to the top snapshot
@@ -216,9 +216,9 @@ func (ctx *Context) Commit(sn int) {
 			top.AccountMap.Put(addr, acc)
 			return true
 		})
-		ctd.DeletedAccountMap.EachAll(func(addr common.Address, value bool) bool {
+		ctd.DeletedAccountMap.EachAll(func(addr common.Address, acc Account) bool {
 			top.AccountMap.Delete(addr)
-			top.DeletedAccountMap.Put(addr, value)
+			top.DeletedAccountMap.Put(addr, acc)
 			return true
 		})
 		ctd.AccountNameMap.EachAll(func(key string, addr common.Address) bool {
@@ -247,10 +247,10 @@ func (ctx *Context) Commit(sn int) {
 			top.CreatedUTXOMap.Put(id, vout)
 			return true
 		})
-		ctd.DeletedUTXOMap.EachAll(func(id uint64, value bool) bool {
+		ctd.DeletedUTXOMap.EachAll(func(id uint64, utxo *UTXO) bool {
 			top.UTXOMap.Delete(id)
 			top.CreatedUTXOMap.Delete(id)
-			top.DeletedUTXOMap.Put(id, value)
+			top.DeletedUTXOMap.Put(id, utxo)
 			return true
 		})
 		for _, v := range ctd.Events {

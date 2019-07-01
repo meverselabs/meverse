@@ -1,14 +1,16 @@
 package chain
 
 import (
+	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/core/types"
 )
 
 // Consensus is a interface of the chain Consensus
 type Consensus interface {
-	Init(reg *Register, cn *Chain, ct Committer, loader LoaderProcess) error
+	Init(reg *Register, cn *Chain, ct Committer) error
 	InitGenesis(ctp *ContextProcess) error
-	ValidateHeader(bh *types.Header) error
+	OnLoadChain(loader LoaderProcess) error
+	ValidateHeader(bh *types.Header, sigs []common.Signature) error
 	BeforeExecuteTransactions(b *types.Block, ctp *ContextProcess) error
 	AfterExecuteTransactions(b *types.Block, ctp *ContextProcess) error
 	ProcessReward(b *types.Block, ctp *ContextProcess) error
@@ -23,8 +25,13 @@ func (cs *ConsensusBase) InitGenesis(ctp *ContextProcess) error {
 	return nil
 }
 
+// OnLoadChain called when the chain loaded
+func (cs *ConsensusBase) OnLoadChain(loader LoaderProcess) error {
+	return nil
+}
+
 // ValidateHeader called when required to validate the header
-func (cs *ConsensusBase) ValidateHeader(bh *types.Header) error {
+func (cs *ConsensusBase) ValidateHeader(bh *types.Header, sigs []common.Signature) error {
 	return nil
 }
 

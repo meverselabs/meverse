@@ -881,7 +881,7 @@ func applyContextData(txn *badger.Txn, ctd *types.ContextData) error {
 	if inErr != nil {
 		return inErr
 	}
-	ctd.DeletedAccountMap.EachAll(func(addr common.Address, value bool) bool {
+	ctd.DeletedAccountMap.EachAll(func(addr common.Address, acc types.Account) bool {
 		if err := txn.Delete(toAccountKey(addr)); err != nil {
 			inErr = err
 			return false
@@ -969,7 +969,7 @@ func applyContextData(txn *badger.Txn, ctd *types.ContextData) error {
 	if inErr != nil {
 		return inErr
 	}
-	ctd.DeletedUTXOMap.EachAll(func(id uint64, value bool) bool {
+	ctd.DeletedUTXOMap.EachAll(func(id uint64, utxo *types.UTXO) bool {
 		if err := txn.Delete(toUTXOKey(id)); err != nil {
 			inErr = err
 			return false
@@ -996,6 +996,27 @@ func applyContextData(txn *badger.Txn, ctd *types.ContextData) error {
 		if err := txn.Set(toEventKey(types.MarshalID(ev.Height(), ev.Index(), ev.N())), buffer.Bytes()); err != nil {
 			return err
 		}
+	}
+
+	ctd.ProcessDataMap.EachAll(func(key string, value []byte) bool {
+		if err := txn.Set(toProcessDataKey(key), value); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
+	ctd.DeletedProcessDataMap.EachAll(func(key string, value bool) bool {
+		if err := txn.Delete(toProcessDataKey(key)); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
 	}
 	return nil
 }

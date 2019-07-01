@@ -27,10 +27,10 @@ func init() {
 				return err
 			}
 		}
-		if err := enc.EncodeArrayLen(len(item.Signatures)); err != nil {
+		if err := enc.EncodeArrayLen(len(item.TranactionSignatures)); err != nil {
 			return err
 		}
-		for _, sigs := range item.Signatures {
+		for _, sigs := range item.TranactionSignatures {
 			if err := enc.EncodeArrayLen(len(sigs)); err != nil {
 				return err
 			}
@@ -42,7 +42,7 @@ func init() {
 		}
 		return nil
 	}, func(dec *encoding.Decoder, rv reflect.Value) error {
-		item := Block{}
+		item := &Block{}
 		if err := dec.Decode(&item.Header); err != nil {
 			return err
 		}
@@ -81,15 +81,17 @@ func init() {
 				}
 				sigs = append(sigs, sig)
 			}
-			item.Signatures = append(item.Signatures, sigs)
+			item.TranactionSignatures = append(item.TranactionSignatures, sigs)
 		}
+		rv.Set(reflect.ValueOf(item).Elem())
 		return nil
 	})
 }
 
 // Block includes a block header and a block body
 type Block struct {
-	Header       Header
-	Transactions []Transaction        //MAXLEN : 65535
-	Signatures   [][]common.Signature //MAXLEN : 65536
+	Header               Header
+	Transactions         []Transaction        //MAXLEN : 65535
+	TranactionSignatures [][]common.Signature //MAXLEN : 65536
+	Signatures           []common.Signature   //MAXLEN : 255
 }

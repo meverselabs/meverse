@@ -7,6 +7,10 @@ require (
 	github.com/btcsuite/btcd v0.0.0-20190614013741-962a206e94e9
 	github.com/dgraph-io/badger v1.5.5
 	github.com/ethereum/go-ethereum v1.8.27
+	github.com/fletaio/common v0.0.0-20190611002515-b9de21aaa2ad // indirect
+	github.com/fletaio/core v0.0.0-20190618060323-4701ab309562
+	github.com/fletaio/framework v0.0.0-20190611001721-27cef4d23774 // indirect
+	github.com/fletaio/network v0.0.0-20190401100130-91d2fc4f149e // indirect
 	github.com/fsnotify/fsnotify v1.4.7
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/gorilla/sessions v1.1.3

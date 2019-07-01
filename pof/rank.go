@@ -1,14 +1,51 @@
-package consensus
+package pof
 
 import (
 	"bytes"
 	"encoding/binary"
-	"io"
+	"reflect"
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
-	"github.com/fletaio/fleta/common/util"
+	"github.com/fletaio/fleta/encoding"
 )
+
+func init() {
+	encoding.Register(Rank{}, func(enc *encoding.Encoder, rv reflect.Value) error {
+		item := rv.Interface().(Rank)
+		if err := enc.Encode(item.Address); err != nil {
+			return err
+		}
+		if err := enc.Encode(item.PublicHash); err != nil {
+			return err
+		}
+		if err := enc.EncodeUint32(item.phase); err != nil {
+			return err
+		}
+		if err := enc.Encode(item.hashSpace); err != nil {
+			return err
+		}
+		return nil
+	}, func(dec *encoding.Decoder, rv reflect.Value) error {
+		item := &Rank{}
+		if err := dec.Decode(&item.Address); err != nil {
+			return err
+		}
+		if err := dec.Decode(&item.PublicHash); err != nil {
+			return err
+		}
+		if v, err := dec.DecodeUint32(); err != nil {
+			return err
+		} else {
+			item.phase = v
+		}
+		if err := dec.Decode(&item.hashSpace); err != nil {
+			return err
+		}
+		rv.Set(reflect.ValueOf(item).Elem())
+		return nil
+	})
+}
 
 // Rank represents the rank information of the formulation account
 type Rank struct {
@@ -29,60 +66,6 @@ func NewRank(Address common.Address, PublicHash common.PublicHash, phase uint32,
 	copy(m.PublicHash[:], PublicHash[:])
 	m.update()
 	return m
-}
-
-// WriteTo is a serialization function
-func (rank *Rank) WriteTo(w io.Writer) (int64, error) {
-	var wrote int64
-	if n, err := rank.Address.WriteTo(w); err != nil {
-		return wrote, err
-	} else {
-		wrote += n
-	}
-	if n, err := rank.PublicHash.WriteTo(w); err != nil {
-		return wrote, err
-	} else {
-		wrote += n
-	}
-	if n, err := util.WriteUint32(w, rank.phase); err != nil {
-		return wrote, err
-	} else {
-		wrote += n
-	}
-	if n, err := rank.hashSpace.WriteTo(w); err != nil {
-		return wrote, err
-	} else {
-		wrote += n
-	}
-	return wrote, nil
-}
-
-// ReadFrom is a deserialization function
-func (rank *Rank) ReadFrom(r io.Reader) (int64, error) {
-	var read int64
-	if n, err := rank.Address.ReadFrom(r); err != nil {
-		return read, err
-	} else {
-		read += n
-	}
-	if n, err := rank.PublicHash.ReadFrom(r); err != nil {
-		return read, err
-	} else {
-		read += n
-	}
-	if v, n, err := util.ReadUint32(r); err != nil {
-		return read, err
-	} else {
-		read += n
-		rank.phase = v
-	}
-	if n, err := rank.hashSpace.ReadFrom(r); err != nil {
-		return read, err
-	} else {
-		read += n
-	}
-	rank.update()
-	return read, nil
 }
 
 // Clone returns the clonend value of it

@@ -127,8 +127,8 @@ func (ctp *ContextProcess) CreateUTXO(id uint64, vout *types.TxOut) error {
 }
 
 // DeleteUTXO deletes the UTXO from the top snapshot
-func (ctp *ContextProcess) DeleteUTXO(id uint64) error {
-	return ctp.ctx.DeleteUTXO(id)
+func (ctp *ContextProcess) DeleteUTXO(utxo *types.UTXO) error {
+	return ctp.ctx.DeleteUTXO(utxo)
 }
 
 // EmitEvent creates the event to the top snapshot

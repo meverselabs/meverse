@@ -8,13 +8,15 @@ import (
 	"github.com/fletaio/fleta/core/types"
 )
 
+// BlockCreator helps to create block
 type BlockCreator struct {
 	ctx      *types.Context
 	txHashes []hash.Hash256
 	b        *types.Block
 }
 
-func NewBlockCreator(cn *Chain) *BlockCreator {
+// NewBlockCreator returns a BlockCreator
+func NewBlockCreator(cn *Chain, ConsensusData []byte) *BlockCreator {
 	ctx := types.NewContext(cn.store)
 	bc := &BlockCreator{
 		ctx:      ctx,
@@ -25,10 +27,11 @@ func NewBlockCreator(cn *Chain) *BlockCreator {
 				Height:        ctx.TargetHeight(),
 				PrevHash:      ctx.LastHash(),
 				ContextHash:   ctx.Hash(),
-				ConsensusData: []byte{0},
+				ConsensusData: ConsensusData,
 			},
-			Transactions: []types.Transaction{},
-			Signatures:   [][]common.Signature{},
+			Transactions:         []types.Transaction{},
+			TranactionSignatures: [][]common.Signature{},
+			Signatures:           []common.Signature{},
 		},
 	}
 	return bc
@@ -43,12 +46,12 @@ func (bc *BlockCreator) AddTx(tx types.Transaction, sigs []common.Signature, sig
 		return err
 	}
 	bc.b.Transactions = append(bc.b.Transactions, tx)
-	bc.b.Signatures = append(bc.b.Signatures, sigs)
+	bc.b.TranactionSignatures = append(bc.b.TranactionSignatures, sigs)
 	return nil
 }
 
 // Finalize generates block that has transactions adds by AddTx
-func (bc *BlockCreator) Finalize() (*types.Block, error) {
+func (bc *BlockCreator) Finalize(Signatures []common.Signature) (*types.Block, error) {
 	LevelRootHash, err := BuildLevelRoot(bc.txHashes)
 	if err != nil {
 		return nil, err
@@ -59,5 +62,6 @@ func (bc *BlockCreator) Finalize() (*types.Block, error) {
 	}
 	bc.b.Header.Timestamp = now
 	bc.b.Header.LevelRootHash = LevelRootHash
+	bc.b.Signatures = Signatures
 	return bc.b, nil
 }

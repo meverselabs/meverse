@@ -27,7 +27,7 @@ type ContextData struct {
 	Parent                *ContextData
 	SeqMap                *AddressUint64Map
 	AccountMap            *AddressAccountMap
-	DeletedAccountMap     *AddressBoolMap
+	DeletedAccountMap     *AddressAccountMap
 	AccountNameMap        *StringAddressMap
 	DeletedAccountNameMap *StringBoolMap
 	AccountDataMap        *StringBytesMap
@@ -36,7 +36,7 @@ type ContextData struct {
 	DeletedProcessDataMap *StringBoolMap
 	UTXOMap               *Uint64UTXOMap
 	CreatedUTXOMap        *Uint64TxOutMap
-	DeletedUTXOMap        *Uint64BoolMap
+	DeletedUTXOMap        *Uint64UTXOMap
 	Events                []Event
 	EventN                uint16
 	isTop                 bool
@@ -53,7 +53,7 @@ func NewContextData(loader internalLoader, Parent *ContextData) *ContextData {
 		Parent:                Parent,
 		SeqMap:                NewAddressUint64Map(),
 		AccountMap:            NewAddressAccountMap(),
-		DeletedAccountMap:     NewAddressBoolMap(),
+		DeletedAccountMap:     NewAddressAccountMap(),
 		AccountNameMap:        NewStringAddressMap(),
 		DeletedAccountNameMap: NewStringBoolMap(),
 		AccountDataMap:        NewStringBytesMap(),
@@ -62,7 +62,7 @@ func NewContextData(loader internalLoader, Parent *ContextData) *ContextData {
 		DeletedProcessDataMap: NewStringBoolMap(),
 		UTXOMap:               NewUint64UTXOMap(),
 		CreatedUTXOMap:        NewUint64TxOutMap(),
-		DeletedUTXOMap:        NewUint64BoolMap(),
+		DeletedUTXOMap:        NewUint64UTXOMap(),
 		Events:                []Event{},
 		EventN:                EventN,
 		isTop:                 true,
@@ -225,7 +225,7 @@ func (ctd *ContextData) DeleteAccount(acc Account) error {
 	if _, err := ctd.Account(acc.Address()); err != nil {
 		return err
 	}
-	ctd.DeletedAccountMap.Put(acc.Address(), true)
+	ctd.DeletedAccountMap.Put(acc.Address(), acc)
 	ctd.DeletedAccountNameMap.Put(acc.Name(), true)
 	ctd.AccountMap.Delete(acc.Address())
 	ctd.AccountNameMap.Delete(acc.Name())
@@ -383,11 +383,11 @@ func (ctd *ContextData) CreateUTXO(id uint64, vout *TxOut) error {
 }
 
 // DeleteUTXO deletes the UTXO
-func (ctd *ContextData) DeleteUTXO(id uint64) error {
-	if _, err := ctd.UTXO(id); err != nil {
+func (ctd *ContextData) DeleteUTXO(utxo *UTXO) error {
+	if _, err := ctd.UTXO(utxo.ID()); err != nil {
 		return err
 	}
-	ctd.DeletedUTXOMap.Put(id, true)
+	ctd.DeletedUTXOMap.Put(utxo.ID(), utxo)
 	return nil
 }
 
@@ -502,7 +502,7 @@ func (ctd *ContextData) Hash() hash.Hash256 {
 	buffer.WriteString("AccountMap")
 	buffer.WriteString(encoding.Hash(ctd.AccountMap).String())
 	buffer.WriteString("DeletedAccountMap")
-	ctd.DeletedAccountMap.EachAll(func(addr common.Address, value bool) bool {
+	ctd.DeletedAccountMap.EachAll(func(addr common.Address, acc Account) bool {
 		buffer.Write(addr[:])
 		return true
 	})
@@ -525,7 +525,7 @@ func (ctd *ContextData) Hash() hash.Hash256 {
 	buffer.WriteString("CreatedUTXOMap")
 	buffer.WriteString(encoding.Hash(ctd.CreatedUTXOMap).String())
 	buffer.WriteString("DeletedUTXOMap")
-	ctd.DeletedUTXOMap.EachAll(func(key uint64, value bool) bool {
+	ctd.DeletedUTXOMap.EachAll(func(key uint64, utxo *UTXO) bool {
 		buffer.Write(util.Uint64ToBytes(key))
 		return true
 	})
@@ -568,7 +568,7 @@ func (ctd *ContextData) Dump() string {
 	})
 	buffer.WriteString("\n")
 	buffer.WriteString("DeletedAccountMap\n")
-	ctd.DeletedAccountMap.EachAll(func(addr common.Address, v bool) bool {
+	ctd.DeletedAccountMap.EachAll(func(addr common.Address, acc Account) bool {
 		buffer.WriteString(addr.String())
 		buffer.WriteString("\n")
 		return true
@@ -625,7 +625,7 @@ func (ctd *ContextData) Dump() string {
 	})
 	buffer.WriteString("\n")
 	buffer.WriteString("DeletedUTXOMap\n")
-	ctd.DeletedUTXOMap.EachAll(func(id uint64, value bool) bool {
+	ctd.DeletedUTXOMap.EachAll(func(id uint64, utxo *UTXO) bool {
 		buffer.WriteString(strconv.FormatUint(id, 10))
 		buffer.WriteString("\n")
 		return true

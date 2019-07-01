@@ -1,12 +1,17 @@
 package main // import "github.com/fletaio/fleta"
 
 import (
+	"bytes"
 	"log"
-	"time"
+	"sync"
 
-	"github.com/fletaio/fleta/common/hash"
-	"github.com/fletaio/fleta/core/chain"
+	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/amount"
 	"github.com/fletaio/fleta/core/types"
+
+	"github.com/fletaio/fleta/pof"
+
+	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/encoding"
 )
 
@@ -22,32 +27,40 @@ func test() error {
 		return err
 	}
 
-	cs := &Consensus{}
-	cn := chain.NewChain(cs, st)
+	ObserverKeyMap := types.NewPublicHashBoolMap()
+	ObserverKeyMap.Put(common.NewPublicHash(common.PublicKey{0, 1, 2, 3, 4}), true)
+	ObserverKeyMap.Put(common.NewPublicHash(common.PublicKey{1, 2, 3, 4, 5}), true)
+	ObserverKeyMap.Put(common.NewPublicHash(common.PublicKey{2, 3, 4, 5, 6}), true)
+	ObserverKeyMap.Put(common.NewPublicHash(common.PublicKey{3, 4, 5, 6, 7}), true)
+	ObserverKeyMap.Put(common.NewPublicHash(common.PublicKey{4, 5, 6, 7, 8}), true)
+	MaxBlocksPerFormulator := uint32(10)
+	cs := pof.NewConsensus(ObserverKeyMap, MaxBlocksPerFormulator)
+	app := &DApp{}
+	cn := chain.NewChain(cs, app, st)
 	if err := cn.Init(); err != nil {
 		return err
 	}
-	ctx := types.NewContext(cn.Loader())
-	TxHashes := []hash.Hash256{ctx.LastHash()}
-	LevelRootHash, err := chain.BuildLevelRoot(TxHashes)
-	if err != nil {
+
+	TimeoutCount := uint32(0)
+	Formulator := common.Address{0, 1, 2}
+	var buffer bytes.Buffer
+	enc := encoding.NewEncoder(&buffer)
+	if err := enc.EncodeUint32(TimeoutCount); err != nil {
 		return err
 	}
-	now := uint64(time.Now().UnixNano())
-	if now <= ctx.LastTimestamp() {
-		now = ctx.LastTimestamp() + 1
+	if err := enc.Encode(Formulator); err != nil {
+		return err
 	}
-
-	b := &types.Block{
-		Header: types.Header{
-			Version:       ctx.Version(),
-			Height:        ctx.TargetHeight(),
-			PrevHash:      ctx.LastHash(),
-			LevelRootHash: LevelRootHash,
-			ContextHash:   ctx.Hash(),
-			Timestamp:     now,
-			ConsensusData:          []byte{0},
-		},
+	bc := chain.NewBlockCreator(cn, buffer.Bytes())
+	Signatures := []common.Signature{
+		common.Signature{0},
+		common.Signature{1},
+		common.Signature{2},
+		common.Signature{3},
+	}
+	b, err := bc.Finalize(Signatures)
+	if err != nil {
+		return err
 	}
 	if err := cn.ConnectBlock(b); err != nil {
 		return err
@@ -62,14 +75,42 @@ func test() error {
 	return nil
 }
 
-type Consensus struct {
-	*chain.ConsensusBase
+// DApp is app
+type DApp struct {
+	sync.Mutex
+	*chain.ProcessBase
 	cn *chain.Chain
-	ct chain.Committer
 }
 
-func (cs *Consensus) Init(cn *chain.Chain, ct chain.Committer) error {
-	cs.cn = cn
-	cs.ct = ct
+// Name returns the name of the application
+func (app *DApp) Name() string {
+	return "Test DApp"
+}
+
+// Version returns the version of the application
+func (app *DApp) Version() string {
+	return "v0.0.1"
+}
+
+// Init initializes the consensus
+func (app *DApp) Init(reg *chain.Register, cn *chain.Chain) error {
+	app.cn = cn
+	return nil
+}
+
+// InitGenesis initializes genesis data
+func (app *DApp) InitGenesis(ctp *chain.ContextProcess) error {
+	app.Lock()
+	defer app.Unlock()
+	acc := &pof.FormulationAccount{
+		Address_:        common.NewAddress(common.NewCoordinate(ctp.TargetHeight(), 0), 0),
+		Name_:           "fleta.001",
+		FormulationType: pof.AlphaFormulatorType,
+		KeyHash:         common.PublicHash{0, 1, 2},
+		Amount:          amount.NewCoinAmount(0, 0),
+	}
+	if err := ctp.CreateAccount(acc); err != nil {
+		return err
+	}
 	return nil
 }

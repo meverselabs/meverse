@@ -19,5 +19,8 @@ func newChainCommiter(cn *Chain) *chainCommiter {
 }
 
 func (ct *chainCommiter) ConnectBlockWithContext(b *types.Block, ctx *types.Context) error {
+	ct.cn.Lock()
+	defer ct.cn.Unlock()
+
 	return ct.cn.connectBlockWithContext(b, ctx)
 }
