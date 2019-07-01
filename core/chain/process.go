@@ -14,6 +14,7 @@ type Process interface {
 	BeforeExecuteTransactions(b *types.Block, ctp *ContextProcess) error
 	AfterExecuteTransactions(b *types.Block, ctp *ContextProcess) error
 	ProcessReward(b *types.Block, ctp *ContextProcess) error
+	OnSaveData(b *types.Block, ctp *ContextProcess) error
 }
 
 // ProcessBase is a base handler of the chain Process
@@ -41,5 +42,10 @@ func (p *ProcessBase) AfterExecuteTransactions(cd *types.Block, ctp *ContextProc
 
 // ProcessReward called when required to process reward to the context
 func (p *ProcessBase) ProcessReward(b *types.Block, ctp *ContextProcess) error {
+	return nil
+}
+
+// OnSaveData called when the context of the block saved
+func (p *ProcessBase) OnSaveData(b *types.Block, ctp *ContextProcess) error {
 	return nil
 }

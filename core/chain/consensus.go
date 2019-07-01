@@ -12,6 +12,7 @@ type Consensus interface {
 	BeforeExecuteTransactions(b *types.Block, ctp *ContextProcess) error
 	AfterExecuteTransactions(b *types.Block, ctp *ContextProcess) error
 	ProcessReward(b *types.Block, ctp *ContextProcess) error
+	OnSaveData(b *types.Block, ctp *ContextProcess) error
 }
 
 // ConsensusBase is a base handler of the chain Consensus
@@ -39,5 +40,10 @@ func (cs *ConsensusBase) AfterExecuteTransactions(cd *types.Block, ctp *ContextP
 
 // ProcessReward called when required to process reward to the context
 func (cs *ConsensusBase) ProcessReward(b *types.Block, ctp *ContextProcess) error {
+	return nil
+}
+
+// OnSaveData called when the context of the block saved
+func (cs *ConsensusBase) OnSaveData(b *types.Block, ctp *ContextProcess) error {
 	return nil
 }
