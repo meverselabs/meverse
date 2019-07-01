@@ -21,6 +21,7 @@ type Chain struct {
 	processIDMap    map[string]uint8
 	processIndexMap map[uint8]int
 	services        []Service
+	serviceMap      map[string]Service
 	closeLock       sync.RWMutex
 	isClose         bool
 }
@@ -34,21 +35,9 @@ func NewChain(consensus Consensus, store *Store) *Chain {
 		processIDMap:    map[string]uint8{},
 		processIndexMap: map[uint8]int{},
 		services:        []Service{},
+		serviceMap:      map[string]Service{},
 	}
 	return cn
-}
-
-
-
-
-// Loader returns a state loader
-func (cn *Chain) Loader() types.Loader {
-	return cn.store
-}
-
-// Provider returns a chain provider
-func (cn *Chain) Provider() Provider {
-	return cn.store
 }
 
 // Init initializes the chain
@@ -60,21 +49,22 @@ func (cn *Chain) Init() error {
 	for id, idx := range cn.processIndexMap {
 		IDMap[idx] = id
 	}
-	if err := cn.consensus.Init(cn, newChainCommiter(cn)); err != nil {
+	ctx := types.NewContext(cn.store)
+	if err := cn.consensus.Init(cn, newChainCommiter(cn), NewContextProcess(0, ctx)); err != nil {
 		return err
 	}
 	for i, p := range cn.processes {
-		if err := p.Init(NewRegister(IDMap[i]), cn); err != nil {
+		if err := p.Init(NewRegister(IDMap[i]), cn, NewContextProcess(IDMap[i], ctx)); err != nil {
 			return err
 		}
 	}
 
 	genesisContext := types.NewContext(types.NewEmptyLoader())
-	if err := cn.consensus.InitGenesis(types.NewContextProcess(0, genesisContext)); err != nil {
+	if err := cn.consensus.InitGenesis(NewContextProcess(0, genesisContext)); err != nil {
 		return err
 	}
 	for i, p := range cn.processes {
-		if err := p.InitGenesis(types.NewContextProcess(IDMap[i], genesisContext)); err != nil {
+		if err := p.InitGenesis(NewContextProcess(IDMap[i], genesisContext)); err != nil {
 			return err
 		}
 	}
@@ -98,6 +88,11 @@ func (cn *Chain) Init() error {
 		}
 	}
 	return nil
+}
+
+// Provider returns a chain provider
+func (cn *Chain) Provider() Provider {
+	return cn.store
 }
 
 // Close terminates and cleans the chain
@@ -152,7 +147,7 @@ func (cn *Chain) ProcessByName(name string) (Process, error) {
 	return cn.processes[idx], nil
 }
 
-// MustAddProcess adds Process but panic when has the same name Process
+// MustAddProcess adds Process but panic when has the same name process
 func (cn *Chain) MustAddProcess(id uint8, p Process) {
 	cn.Lock()
 	defer cn.Unlock()
@@ -172,6 +167,42 @@ func (cn *Chain) MustAddProcess(id uint8, p Process) {
 	cn.processIndexMap[id] = idx
 }
 
+// Services returns services
+func (cn *Chain) Services() []Service {
+	cn.Lock()
+	defer cn.Unlock()
+
+	list := []Service{}
+	for _, s := range cn.services {
+		list = append(list, s)
+	}
+	return list
+}
+
+// ServiceByName returns the service by the name
+func (cn *Chain) ServiceByName(name string) (Service, error) {
+	cn.Lock()
+	defer cn.Unlock()
+
+	s, has := cn.serviceMap[name]
+	if !has {
+		return nil, ErrNotExistService
+	}
+	return s, nil
+}
+
+// MustAddService adds Service but panic when has the same name service
+func (cn *Chain) MustAddService(s Service) {
+	cn.Lock()
+	defer cn.Unlock()
+
+	if _, has := cn.serviceMap[s.Name()]; has {
+		panic(ErrExistServiceName)
+	}
+	cn.services = append(cn.services, s)
+	cn.serviceMap[s.Name()] = s
+}
+
 // ConnectBlock try to connect block to the chain
 func (cn *Chain) ConnectBlock(b *types.Block) error {
 	cn.closeLock.RLock()
@@ -187,7 +218,7 @@ func (cn *Chain) ConnectBlock(b *types.Block) error {
 		return err
 	}
 
-	ctx := types.NewContext(cn.Loader())
+	ctx := types.NewContext(cn.store)
 	if err := cn.executeBlockOnContext(b, ctx); err != nil {
 		return err
 	}
@@ -205,6 +236,11 @@ func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context) err
 	if err := cn.store.StoreBlock(b, top); err != nil {
 		return err
 	}
+	for _, s := range cn.services {
+		if err := s.OnBlockConnected(b, top.Events, ctx); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -217,7 +253,7 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 		IDMap[idx] = id
 	}
 	for i, p := range cn.processes {
-		if err := p.BeforeExecuteTransactions(b, types.NewContextProcess(IDMap[i], ctx)); err != nil {
+		if err := p.BeforeExecuteTransactions(b, NewContextProcess(IDMap[i], ctx)); err != nil {
 			return err
 		}
 	}
@@ -227,15 +263,15 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 		}
 	}
 	for i, p := range cn.processes {
-		if err := p.AfterExecuteTransactions(b, types.NewContextProcess(IDMap[i], ctx)); err != nil {
+		if err := p.AfterExecuteTransactions(b, NewContextProcess(IDMap[i], ctx)); err != nil {
 			return err
 		}
 	}
-	if err := cn.consensus.ProcessReward(b, types.NewContextProcess(0, ctx)); err != nil {
+	if err := cn.consensus.ProcessReward(b, NewContextProcess(0, ctx)); err != nil {
 		return err
 	}
 	for i, p := range cn.processes {
-		if err := p.ProcessReward(b, types.NewContextProcess(IDMap[i], ctx)); err != nil {
+		if err := p.ProcessReward(b, NewContextProcess(IDMap[i], ctx)); err != nil {
 			return err
 		}
 	}

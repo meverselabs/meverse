@@ -7,7 +7,7 @@ import (
 
 // Context is an intermediate in-memory state using the context data stack between blocks
 type Context struct {
-	loader          Loader
+	loader          internalLoader
 	genTargetHeight uint32
 	genLastHash     hash.Hash256
 	cache           *contextCache
@@ -17,7 +17,7 @@ type Context struct {
 }
 
 // NewContext returns a Context
-func NewContext(loader Loader) *Context {
+func NewContext(loader internalLoader) *Context {
 	ctx := &Context{
 		loader:          loader,
 		genTargetHeight: loader.TargetHeight(),

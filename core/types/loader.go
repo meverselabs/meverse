@@ -21,6 +21,10 @@ type Loader interface {
 	AccountDataKeys(addr common.Address, Prefix []byte) ([][]byte, error)
 	IsExistUTXO(id uint64) (bool, error)
 	UTXO(id uint64) (*UTXO, error)
+}
+
+type internalLoader interface {
+	Loader
 	ProcessData(pid uint8, name []byte) []byte
 	ProcessDataKeys(pid uint8, Prefix []byte) ([][]byte, error)
 }
@@ -30,7 +34,7 @@ type emptyLoader struct {
 }
 
 // NewEmptyLoader is used for generating genesis state
-func NewEmptyLoader() Loader {
+func NewEmptyLoader() internalLoader {
 	return &emptyLoader{}
 }
 

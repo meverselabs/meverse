@@ -23,7 +23,7 @@ func init() {
 
 // ContextData is a state data of the context
 type ContextData struct {
-	loader                Loader
+	loader                internalLoader
 	Parent                *ContextData
 	SeqMap                *AddressUint64Map
 	AccountMap            *AddressAccountMap
@@ -43,7 +43,7 @@ type ContextData struct {
 }
 
 // NewContextData returns a ContextData
-func NewContextData(loader Loader, Parent *ContextData) *ContextData {
+func NewContextData(loader internalLoader, Parent *ContextData) *ContextData {
 	var EventN uint16
 	if Parent != nil {
 		EventN = Parent.EventN

@@ -8,19 +8,19 @@ import (
 type Process interface {
 	Version() string
 	Name() string
-	Init(reg *Register, cn *Chain) error
-	InitGenesis(ctp *types.ContextProcess) error
+	Init(reg *Register, cn *Chain, loader LoaderProcess) error
+	InitGenesis(ctp *ContextProcess) error
 	ValidateHeader(bh *types.Header) error
-	BeforeExecuteTransactions(b *types.Block, ctp *types.ContextProcess) error
-	AfterExecuteTransactions(b *types.Block, ctp *types.ContextProcess) error
-	ProcessReward(b *types.Block, ctp *types.ContextProcess) error
+	BeforeExecuteTransactions(b *types.Block, ctp *ContextProcess) error
+	AfterExecuteTransactions(b *types.Block, ctp *ContextProcess) error
+	ProcessReward(b *types.Block, ctp *ContextProcess) error
 }
 
 // ProcessBase is a base handler of the chain Process
 type ProcessBase struct{}
 
 // InitGenesis initializes genesis data
-func (p *ProcessBase) InitGenesis(ctp *types.ContextProcess) error {
+func (p *ProcessBase) InitGenesis(ctp *ContextProcess) error {
 	return nil
 }
 
@@ -30,16 +30,16 @@ func (p *ProcessBase) ValidateHeader(bh *types.Header) error {
 }
 
 // BeforeExecuteTransactions called before processes transactions of the block
-func (p *ProcessBase) BeforeExecuteTransactions(cd *types.Block, ctp *types.ContextProcess) error {
+func (p *ProcessBase) BeforeExecuteTransactions(cd *types.Block, ctp *ContextProcess) error {
 	return nil
 }
 
 // AfterExecuteTransactions called after processes transactions of the block
-func (p *ProcessBase) AfterExecuteTransactions(cd *types.Block, ctp *types.ContextProcess) error {
+func (p *ProcessBase) AfterExecuteTransactions(cd *types.Block, ctp *ContextProcess) error {
 	return nil
 }
 
 // ProcessReward called when required to process reward to the context
-func (p *ProcessBase) ProcessReward(b *types.Block, ctp *types.ContextProcess) error {
+func (p *ProcessBase) ProcessReward(b *types.Block, ctp *ContextProcess) error {
 	return nil
 }
