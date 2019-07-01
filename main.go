@@ -52,16 +52,17 @@ func test() error {
 		return err
 	}
 	bc := chain.NewBlockCreator(cn, buffer.Bytes())
+	b, err := bc.Finalize()
+	if err != nil {
+		return err
+	}
 	Signatures := []common.Signature{
 		common.Signature{0},
 		common.Signature{1},
 		common.Signature{2},
 		common.Signature{3},
 	}
-	b, err := bc.Finalize(Signatures)
-	if err != nil {
-		return err
-	}
+	b.Signatures = Signatures
 	if err := cn.ConnectBlock(b); err != nil {
 		return err
 	}

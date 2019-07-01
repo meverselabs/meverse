@@ -51,7 +51,7 @@ func (bc *BlockCreator) AddTx(tx types.Transaction, sigs []common.Signature, sig
 }
 
 // Finalize generates block that has transactions adds by AddTx
-func (bc *BlockCreator) Finalize(Signatures []common.Signature) (*types.Block, error) {
+func (bc *BlockCreator) Finalize() (*types.Block, error) {
 	LevelRootHash, err := BuildLevelRoot(bc.txHashes)
 	if err != nil {
 		return nil, err
@@ -62,6 +62,5 @@ func (bc *BlockCreator) Finalize(Signatures []common.Signature) (*types.Block, e
 	}
 	bc.b.Header.Timestamp = now
 	bc.b.Header.LevelRootHash = LevelRootHash
-	bc.b.Signatures = Signatures
 	return bc.b, nil
 }
