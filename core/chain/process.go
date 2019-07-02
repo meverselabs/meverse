@@ -12,7 +12,7 @@ type Process interface {
 	Init(reg *Register, cn *Chain) error
 	OnLoadChain(loader LoaderProcess) error
 	ValidateHeader(bh *types.Header, sigs []common.Signature) error
-	BeforeExecuteTransactions(b *types.Block, ctp *ContextProcess) error
+	BeforeExecuteTransactions(ctp *ContextProcess) error
 	AfterExecuteTransactions(b *types.Block, ctp *ContextProcess) error
 	ProcessReward(b *types.Block, ctp *ContextProcess) error
 	OnSaveData(b *types.Block, ctp *ContextProcess) error
@@ -32,12 +32,12 @@ func (p *ProcessBase) ValidateHeader(bh *types.Header, sigs []common.Signature) 
 }
 
 // BeforeExecuteTransactions called before processes transactions of the block
-func (p *ProcessBase) BeforeExecuteTransactions(cd *types.Block, ctp *ContextProcess) error {
+func (p *ProcessBase) BeforeExecuteTransactions(ctp *ContextProcess) error {
 	return nil
 }
 
 // AfterExecuteTransactions called after processes transactions of the block
-func (p *ProcessBase) AfterExecuteTransactions(cd *types.Block, ctp *ContextProcess) error {
+func (p *ProcessBase) AfterExecuteTransactions(b *types.Block, ctp *ContextProcess) error {
 	return nil
 }
 

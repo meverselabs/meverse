@@ -99,6 +99,11 @@ func (cs *Consensus) ValidateHeader(bh *types.Header, sigs []common.Signature) e
 	if err != nil {
 		return err
 	}
+	var Formulator common.Address
+	if err := dec.Decode(&Formulator); err != nil {
+		return err
+	}
+
 	Top, err := cs.rt.TopRank(int(TimeoutCount))
 	if err != nil {
 		return err
@@ -113,24 +118,28 @@ func (cs *Consensus) ValidateHeader(bh *types.Header, sigs []common.Signature) e
 	if Top.PublicHash != pubhash {
 		return ErrInvalidTopSignature
 	}
-	return nil
-}
+	if Top.Address != Formulator {
+		return ErrInvalidTopAddress
+	}
 
-// BeforeExecuteTransactions called before processes transactions of the block
-func (cs *Consensus) BeforeExecuteTransactions(b *types.Block, ctp *chain.ContextProcess) error {
-	if len(b.Signatures) != cs.ObserverKeyMap.Len()/2+2 {
+	if len(sigs) != cs.ObserverKeyMap.Len()/2+2 {
 		return ErrInvalidSignatureCount
 	}
 	s := &ObserverSigned{
 		BlockSign: types.BlockSign{
-			HeaderHash:         encoding.Hash(b.Header),
-			GeneratorSignature: b.Signatures[0],
+			HeaderHash:         encoding.Hash(bh),
+			GeneratorSignature: sigs[0],
 		},
-		ObserverSignatures: b.Signatures[1:],
+		ObserverSignatures: sigs[1:],
 	}
 	if err := common.ValidateSignaturesMajority(encoding.Hash(s.BlockSign), s.ObserverSignatures, cs.keyMap); err != nil {
 		return err
 	}
+	return nil
+}
+
+// BeforeExecuteTransactions called before processes transactions of the block
+func (cs *Consensus) BeforeExecuteTransactions(ctp *chain.ContextProcess) error {
 	return nil
 }
 

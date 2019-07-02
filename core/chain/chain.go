@@ -250,6 +250,10 @@ func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context) err
 		IDMap[idx] = id
 	}
 
+	if b.Header.ContextHash != ctx.Hash() {
+		return ErrInvalidContextHash
+	}
+
 	// OnSaveData
 	for i, p := range cn.processes {
 		if err := p.OnSaveData(b, NewContextProcess(IDMap[i], ctx)); err != nil {
@@ -263,9 +267,6 @@ func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context) err
 		return err
 	}
 
-	if b.Header.ContextHash != ctx.Hash() {
-		return ErrInvalidContextHash
-	}
 	if ctx.StackSize() > 1 {
 		return ErrDirtyContext
 	}
@@ -292,16 +293,18 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 
 	// BeforeExecuteTransactions
 	for i, p := range cn.processes {
-		if err := p.BeforeExecuteTransactions(b, NewContextProcess(IDMap[i], ctx)); err != nil {
+		if err := p.BeforeExecuteTransactions(NewContextProcess(IDMap[i], ctx)); err != nil {
 			return err
 		}
 	}
-	if err := cn.app.BeforeExecuteTransactions(b, NewContextProcess(255, ctx)); err != nil {
+	if err := cn.app.BeforeExecuteTransactions(NewContextProcess(255, ctx)); err != nil {
 		return err
 	}
-	if err := cn.consensus.BeforeExecuteTransactions(b, NewContextProcess(0, ctx)); err != nil {
+	if err := cn.consensus.BeforeExecuteTransactions(NewContextProcess(0, ctx)); err != nil {
 		return err
 	}
+
+	// Execute Transctions
 	for i, tx := range b.Transactions {
 		if err := tx.Execute(ctx, uint16(i)); err != nil {
 			return err

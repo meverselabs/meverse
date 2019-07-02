@@ -32,5 +32,6 @@ var (
 	ErrUnauthorizedTransaction        = errors.New("unauthorized transaction")
 	ErrInvalidObserverKey             = errors.New("invalid observer key")
 	ErrInvalidTopSignature            = errors.New("invalid top signature")
+	ErrInvalidTopAddress              = errors.New("invalid top address")
 	ErrInvalidSignatureCount          = errors.New("invalid signature count")
 )
