@@ -34,4 +34,6 @@ var (
 	ErrInvalidTopSignature            = errors.New("invalid top signature")
 	ErrInvalidTopAddress              = errors.New("invalid top address")
 	ErrInvalidSignatureCount          = errors.New("invalid signature count")
+	ErrInvalidRewardData              = errors.New("invalid reward data")
+	ErrNotExistVault                  = errors.New("not exist vault")
 )

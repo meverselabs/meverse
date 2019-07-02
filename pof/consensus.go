@@ -5,37 +5,39 @@ import (
 	"sync"
 
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/amount"
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
+	"github.com/fletaio/fleta/process/vault"
 )
 
 // Consensus implements the proof of formulation algorithm
 type Consensus struct {
 	sync.Mutex
 	*chain.ConsensusBase
+	vault                  *vault.Vault
 	cn                     *chain.Chain
 	ct                     chain.Committer
-	rt                     *RankTable
 	MaxBlocksPerFormulator uint32
 	blocksBySameFormulator uint32
-	keyMap                 map[common.PublicHash]bool
-	ObserverKeyMap         *types.PublicHashBoolMap
+	observerKeyMap         *types.PublicHashBoolMap
+	rt                     *RankTable
+	policy                 *ConsensusPolicy
 }
 
 // NewConsensus returns a Consensus
-func NewConsensus(ObserverKeyMap *types.PublicHashBoolMap, MaxBlocksPerFormulator uint32) *Consensus {
-	KeyMap := map[common.PublicHash]bool{}
-	ObserverKeyMap.EachAll(func(pubhash common.PublicHash, value bool) bool {
-		KeyMap[pubhash] = true
-		return true
-	})
+func NewConsensus(policy *ConsensusPolicy, MaxBlocksPerFormulator uint32, ObserverKeys []common.PublicHash) *Consensus {
+	ObserverKeyMap := types.NewPublicHashBoolMap()
+	for _, pubhash := range ObserverKeys {
+		ObserverKeyMap.Put(pubhash.Clone(), true)
+	}
 	cs := &Consensus{
-		rt:                     NewRankTable(),
 		MaxBlocksPerFormulator: MaxBlocksPerFormulator,
-		keyMap:                 KeyMap,
-		ObserverKeyMap:         ObserverKeyMap,
+		observerKeyMap:         ObserverKeyMap,
+		rt:                     NewRankTable(),
+		policy:                 policy,
 	}
 	return cs
 }
@@ -45,6 +47,15 @@ func (cs *Consensus) Init(reg *chain.Register, cn *chain.Chain, ct chain.Committ
 	cs.cn = cn
 	cs.ct = ct
 	reg.RegisterAccount(1, &FormulationAccount{})
+	p, err := cn.ProcessByName("fleta.vault")
+	if err != nil {
+		return ErrNotExistVault
+	}
+	if v, is := p.(*vault.Vault); !is {
+		return ErrNotExistVault
+	} else {
+		cs.vault = v
+	}
 	return nil
 }
 
@@ -81,32 +92,75 @@ func (cs *Consensus) InitGenesis(ctp *chain.ContextProcess) error {
 		return err
 	}
 	ctp.SetProcessData([]byte("state"), SaveData)
+
+	rd := newRewardData()
+	data, err := encoding.Marshal(&rd)
+	if err != nil {
+		return err
+	}
+	ctp.SetProcessData([]byte("reward"), data)
 	return nil
 }
 
 // OnLoadChain called when the chain loaded
 func (cs *Consensus) OnLoadChain(loader chain.LoaderProcess) error {
-	if err := cs.loadFromSaveData(loader.ProcessData([]byte("state"))); err != nil {
+	cs.Lock()
+	defer cs.Unlock()
+
+	dec := encoding.NewDecoder(bytes.NewReader(loader.ProcessData([]byte("state"))))
+	if v, err := dec.DecodeUint32(); err != nil {
+		return err
+	} else {
+		if cs.MaxBlocksPerFormulator != v {
+			return ErrInvalidMaxBlocksPerFormulator
+		}
+	}
+	ObserverKeyMap := types.NewPublicHashBoolMap()
+	if err := dec.Decode(&ObserverKeyMap); err != nil {
+		return err
+	} else {
+		if ObserverKeyMap.Len() != cs.observerKeyMap.Len() {
+			return ErrInvalidObserverKey
+		}
+		var inErr error
+		ObserverKeyMap.EachAll(func(pubhash common.PublicHash, value bool) bool {
+			if !cs.observerKeyMap.Has(pubhash) {
+				inErr = ErrInvalidObserverKey
+				return false
+			}
+			return true
+		})
+		if inErr != nil {
+			return inErr
+		}
+	}
+	if v, err := dec.DecodeUint32(); err != nil {
+		return err
+	} else {
+		cs.blocksBySameFormulator = v
+	}
+	if err := dec.Decode(&cs.rt); err != nil {
+		return err
+	}
+	if err := dec.Decode(&cs.policy); err != nil {
 		return err
 	}
 	return nil
 }
 
-// ValidateHeader called when required to validate the header
-func (cs *Consensus) ValidateHeader(bh *types.Header, sigs []common.Signature) error {
-	dec := encoding.NewDecoder(bytes.NewReader(bh.ConsensusData))
-	TimeoutCount, err := dec.DecodeUint16()
+// ValidateSignature called when required to validate signatures
+func (cs *Consensus) ValidateSignature(bh *types.Header, sigs []common.Signature) error {
+	TimeoutCount, Formulator, err := cs.decodeConsensusData(bh.ConsensusData)
 	if err != nil {
-		return err
-	}
-	var Formulator common.Address
-	if err := dec.Decode(&Formulator); err != nil {
 		return err
 	}
 
 	Top, err := cs.rt.TopRank(int(TimeoutCount))
 	if err != nil {
 		return err
+	}
+	if Top.Address != Formulator {
+		return ErrInvalidTopAddress
 	}
 
 	GeneratorSignature := sigs[0]
@@ -118,11 +172,8 @@ func (cs *Consensus) ValidateHeader(bh *types.Header, sigs []common.Signature) e
 	if Top.PublicHash != pubhash {
 		return ErrInvalidTopSignature
 	}
-	if Top.Address != Formulator {
-		return ErrInvalidTopAddress
-	}
 
-	if len(sigs) != cs.ObserverKeyMap.Len()/2+2 {
+	if len(sigs) != cs.observerKeyMap.Len()/2+2 {
 		return ErrInvalidSignatureCount
 	}
 	s := &ObserverSigned{
@@ -132,19 +183,153 @@ func (cs *Consensus) ValidateHeader(bh *types.Header, sigs []common.Signature) e
 		},
 		ObserverSignatures: sigs[1:],
 	}
-	if err := common.ValidateSignaturesMajority(encoding.Hash(s.BlockSign), s.ObserverSignatures, cs.keyMap); err != nil {
+
+	KeyMap := map[common.PublicHash]bool{}
+	cs.observerKeyMap.EachAll(func(pubhash common.PublicHash, value bool) bool {
+		KeyMap[pubhash] = true
+		return true
+	})
+	if err := common.ValidateSignaturesMajority(encoding.Hash(s.BlockSign), s.ObserverSignatures, KeyMap); err != nil {
 		return err
 	}
 	return nil
 }
 
-// BeforeExecuteTransactions called before processes transactions of the block
-func (cs *Consensus) BeforeExecuteTransactions(ctp *chain.ContextProcess) error {
-	return nil
-}
+// ProcessReward called when required to process reward to the context
+func (cs *Consensus) ProcessReward(b *types.Block, ctp *chain.ContextProcess) error {
+	_, Formulator, err := cs.decodeConsensusData(b.Header.ConsensusData)
+	if err != nil {
+		return err
+	}
+	rd := newRewardData()
+	if bs := ctp.ProcessData([]byte("reward")); len(bs) == 0 {
+		return ErrInvalidRewardData
+	} else if err := encoding.Unmarshal(bs, &rd); err != nil {
+		return err
+	}
+	if true {
+		acc, err := ctp.Account(Formulator)
+		if err != nil {
+			return err
+		}
 
-// AfterExecuteTransactions called after processes transactions of the block
-func (cs *Consensus) AfterExecuteTransactions(b *types.Block, ctp *chain.ContextProcess) error {
+		frAcc, is := acc.(*FormulationAccount)
+		if !is {
+			return ErrInvalidAccountType
+		}
+		switch frAcc.FormulationType {
+		case AlphaFormulatorType:
+			rd.addRewardPower(Formulator, frAcc.Amount.MulC(int64(cs.policy.AlphaEfficiency1000)).DivC(1000))
+		case SigmaFormulatorType:
+			rd.addRewardPower(Formulator, frAcc.Amount.MulC(int64(cs.policy.SigmaEfficiency1000)).DivC(1000))
+		case OmegaFormulatorType:
+			rd.addRewardPower(Formulator, frAcc.Amount.MulC(int64(cs.policy.OmegaEfficiency1000)).DivC(1000))
+		case HyperFormulatorType:
+			PowerSum := frAcc.Amount.MulC(int64(cs.policy.HyperEfficiency1000)).DivC(1000)
+
+			keys, err := ctp.AccountDataKeys(Formulator, tagStaking)
+			if err != nil {
+				return err
+			}
+			for _, k := range keys {
+				if StakingAddress, is := fromStakingKey(k); is {
+					bs := ctp.AccountData(Formulator, k)
+					if len(bs) == 0 {
+						return ErrInvalidStakingAddress
+					}
+					StakingAmount := amount.NewAmountFromBytes(bs)
+
+					if _, err := ctp.Account(StakingAddress); err != nil {
+						if err != types.ErrNotExistAccount {
+							return err
+						}
+						rd.removeRewardPower(StakingAddress)
+					} else {
+						StakingPower := StakingAmount.MulC(int64(cs.policy.StakingEfficiency1000)).DivC(1000)
+						ComissionPower := StakingPower.MulC(int64(frAcc.Policy.CommissionRatio1000)).DivC(1000)
+
+						if bs := ctp.AccountData(Formulator, toAutoStakingKey(StakingAddress)); len(bs) > 0 && bs[0] == 1 {
+							rd.addStakingPower(Formulator, StakingAddress, StakingPower.Sub(ComissionPower))
+							PowerSum = PowerSum.Add(StakingPower)
+						} else {
+							rd.addRewardPower(StakingAddress, StakingPower.Sub(ComissionPower))
+							PowerSum = PowerSum.Add(ComissionPower)
+						}
+					}
+				}
+			}
+			rd.addRewardPower(Formulator, PowerSum)
+		default:
+			return ErrInvalidAccountType
+		}
+	}
+
+	if ctp.TargetHeight() >= rd.lastPaidHeight+cs.policy.PayRewardEveryBlocks {
+		TotalPower := amount.NewCoinAmount(0, 0)
+		rd.powerMap.EachAll(func(addr common.Address, PowerSum *amount.Amount) bool {
+			TotalPower = TotalPower.Add(PowerSum)
+			return true
+		})
+		TotalReward := cs.policy.RewardPerBlock.MulC(int64(ctp.TargetHeight() - rd.lastPaidHeight))
+		Ratio := TotalReward.Mul(amount.COIN).Div(TotalPower)
+		var inErr error
+		rd.powerMap.EachAll(func(RewardAddress common.Address, PowerSum *amount.Amount) bool {
+			acc, err := ctp.Account(RewardAddress)
+			if err != nil {
+				if err != types.ErrNotExistAccount {
+					inErr = err
+					return false
+				}
+			} else {
+				frAcc := acc.(*FormulationAccount)
+				if err := cs.cn.SwitchProcess(ctp, cs.vault, func(stp *chain.ContextProcess) error {
+					if err := cs.vault.AddBalance(stp, frAcc.Address(), PowerSum.Mul(Ratio).Div(amount.COIN)); err != nil {
+						return err
+					}
+					return nil
+				}); err != nil {
+					inErr = err
+					return false
+				}
+				//log.Println("AddBalance", frAcc.Address().String(), PowerSum.Mul(Ratio).Div(amount.COIN).String())
+			}
+			rd.removeRewardPower(RewardAddress)
+			return true
+		})
+		if inErr != nil {
+			return inErr
+		}
+
+		rd.stakingPowerMap.EachAll(func(HyperAddress common.Address, PowerMap *types.AddressAmountMap) bool {
+			PowerMap.EachAll(func(StakingAddress common.Address, PowerSum *amount.Amount) bool {
+				bs := ctp.AccountData(HyperAddress, toStakingKey(StakingAddress))
+				if len(bs) == 0 {
+					inErr = ErrInvalidStakingAddress
+					return false
+				}
+				StakingAmount := amount.NewAmountFromBytes(bs)
+				ctp.SetAccountData(HyperAddress, toStakingKey(StakingAddress), StakingAmount.Add(PowerSum.Mul(Ratio).Div(amount.COIN)).Bytes())
+				return true
+			})
+			if inErr != nil {
+				return false
+			}
+			return true
+		})
+		if inErr != nil {
+			return inErr
+		}
+		rd.stakingPowerMap = types.NewAddressAddressAmountMap()
+
+		//log.Println("Paid at", ctp.TargetHeight())
+		rd.lastPaidHeight = ctp.TargetHeight()
+	}
+
+	data, err := encoding.Marshal(&rd)
+	if err != nil {
+		return err
+	}
+	ctp.SetProcessData([]byte("reward"), data)
 	return nil
 }
 
@@ -155,8 +340,7 @@ func (cs *Consensus) OnSaveData(b *types.Block, ctp *chain.ContextProcess) error
 
 	HeaderHash := encoding.Hash(b.Header)
 
-	dec := encoding.NewDecoder(bytes.NewReader(b.Header.ConsensusData))
-	TimeoutCount, err := dec.DecodeUint16()
+	TimeoutCount, _, err := cs.decodeConsensusData(b.Header.ConsensusData)
 	if err != nil {
 		return err
 	}
@@ -204,9 +388,29 @@ func (cs *Consensus) OnSaveData(b *types.Block, ctp *chain.ContextProcess) error
 	return nil
 }
 
-// ProcessReward called when required to process reward to the context
-func (cs *Consensus) ProcessReward(b *types.Block, ctp *chain.ContextProcess) error {
-	return nil
+func (cs *Consensus) decodeConsensusData(ConsensusData []byte) (uint32, common.Address, error) {
+	dec := encoding.NewDecoder(bytes.NewReader(ConsensusData))
+	TimeoutCount, err := dec.DecodeUint32()
+	if err != nil {
+		return 0, common.Address{}, err
+	}
+	var Formulator common.Address
+	if err := dec.Decode(&Formulator); err != nil {
+		return 0, common.Address{}, err
+	}
+	return TimeoutCount, Formulator, nil
+}
+
+func (cs *Consensus) encodeConsensusData(TimeoutCount uint32, Formulator common.Address) ([]byte, error) {
+	var buffer bytes.Buffer
+	enc := encoding.NewEncoder(&buffer)
+	if err := enc.EncodeUint32(TimeoutCount); err != nil {
+		return nil, err
+	}
+	if err := enc.Encode(Formulator); err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
 }
 
 func (cs *Consensus) buildSaveData() ([]byte, error) {
@@ -215,56 +419,17 @@ func (cs *Consensus) buildSaveData() ([]byte, error) {
 	if err := enc.EncodeUint32(cs.MaxBlocksPerFormulator); err != nil {
 		return nil, err
 	}
+	if err := enc.Encode(cs.observerKeyMap); err != nil {
+		return nil, err
+	}
 	if err := enc.EncodeUint32(cs.blocksBySameFormulator); err != nil {
 		return nil, err
 	}
 	if err := enc.Encode(cs.rt); err != nil {
 		return nil, err
 	}
-	if err := enc.Encode(cs.ObserverKeyMap); err != nil {
+	if err := enc.Encode(cs.policy); err != nil {
 		return nil, err
 	}
 	return buffer.Bytes(), nil
-}
-
-func (cs *Consensus) loadFromSaveData(SaveData []byte) error {
-	cs.Lock()
-	defer cs.Unlock()
-
-	dec := encoding.NewDecoder(bytes.NewReader(SaveData))
-	if v, err := dec.DecodeUint32(); err != nil {
-		return err
-	} else {
-		if cs.MaxBlocksPerFormulator != v {
-			return ErrInvalidMaxBlocksPerFormulator
-		}
-	}
-	if v, err := dec.DecodeUint32(); err != nil {
-		return err
-	} else {
-		cs.blocksBySameFormulator = v
-	}
-	if err := dec.Decode(&cs.rt); err != nil {
-		return err
-	}
-	ObserverKeyMap := types.NewPublicHashBoolMap()
-	if err := dec.Decode(&ObserverKeyMap); err != nil {
-		return err
-	} else {
-		if ObserverKeyMap.Len() != cs.ObserverKeyMap.Len() {
-			return ErrInvalidObserverKey
-		}
-		var inErr error
-		ObserverKeyMap.EachAll(func(pubhash common.PublicHash, value bool) bool {
-			if !cs.ObserverKeyMap.Has(pubhash) {
-				inErr = ErrInvalidObserverKey
-				return false
-			}
-			return true
-		})
-		if inErr != nil {
-			return inErr
-		}
-	}
-	return nil
 }

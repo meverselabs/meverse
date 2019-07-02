@@ -10,6 +10,7 @@ import (
 	"github.com/fletaio/fleta/common/amount"
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/core/types"
+	"github.com/fletaio/fleta/process/vault"
 
 	"github.com/fletaio/fleta/pof"
 
@@ -50,11 +51,6 @@ func test() error {
 		}
 	}
 
-	ObserverKeyMap := types.NewPublicHashBoolMap()
-	for _, pubhash := range ObserverKeys {
-		ObserverKeyMap.Put(pubhash, true)
-	}
-
 	frstrs := []string{
 		"67066852dd6586fa8b473452a66c43f3ce17bd4ec409f1fff036a617bb38f063",
 	}
@@ -71,17 +67,38 @@ func test() error {
 	}
 
 	MaxBlocksPerFormulator := uint32(10)
-	cs := pof.NewConsensus(ObserverKeyMap, MaxBlocksPerFormulator)
+	policy := &pof.ConsensusPolicy{
+		RewardPerBlock:                amount.NewCoinAmount(0, 500000000000000000),
+		PayRewardEveryBlocks:          500,
+		FormulatorCreationLimitHeight: 1000,
+		AlphaCreationAmount:           amount.NewCoinAmount(1000, 0),
+		AlphaEfficiency1000:           1000,
+		AlphaUnlockRequiredBlocks:     1000,
+		SigmaRequiredAlphaBlocks:      1000,
+		SigmaRequiredAlphaCount:       4,
+		SigmaEfficiency1000:           1000,
+		SigmaUnlockRequiredBlocks:     1000,
+		OmegaRequiredSigmaBlocks:      1000,
+		OmegaRequiredSigmaCount:       2,
+		OmegaEfficiency1000:           1000,
+		OmegaUnlockRequiredBlocks:     1000,
+		HyperCreationAmount:           amount.NewCoinAmount(1000, 0),
+		HyperEfficiency1000:           1000,
+		HyperUnlockRequiredBlocks:     1000,
+		StakingEfficiency1000:         1000,
+	}
+	cs := pof.NewConsensus(policy, MaxBlocksPerFormulator, ObserverKeys)
 	app := &DApp{
 		frkey: frkeys[0],
 	}
 	cn := chain.NewChain(cs, app, st)
+	cn.MustAddProcess(1, vault.NewVault())
 	if err := cn.Init(); err != nil {
 		return err
 	}
 
 	TimeoutCount := uint32(0)
-	Formulator := common.NewAddress(common.NewCoordinate(0, 0), 0)
+	Formulator := common.NewAddress(0, 0, 0)
 	var buffer bytes.Buffer
 	enc := encoding.NewEncoder(&buffer)
 	if err := enc.EncodeUint32(TimeoutCount); err != nil {
@@ -100,6 +117,17 @@ func test() error {
 	}
 	bh := encoding.Hash(b.Header)
 	sig0, _ := frkeys[0].Sign(bh)
+	Signatures := []common.Signature{
+		sig0,
+	}
+	b.Signatures = Signatures
+
+	// TODO
+
+	// Header
+	// Context
+	// Signature[0]
+
 	bs := &types.BlockSign{
 		HeaderHash:         bh,
 		GeneratorSignature: sig0,
@@ -109,13 +137,10 @@ func test() error {
 	sig2, _ := obkeys[1].Sign(bsh)
 	sig3, _ := obkeys[2].Sign(bsh)
 
-	Signatures := []common.Signature{
-		sig0,
-		sig1,
-		sig2,
-		sig3,
-	}
-	b.Signatures = Signatures
+	b.Signatures = append(b.Signatures, sig1)
+	b.Signatures = append(b.Signatures, sig2)
+	b.Signatures = append(b.Signatures, sig3)
+
 	if err := cn.ConnectBlock(b); err != nil {
 		return err
 	}
@@ -158,11 +183,11 @@ func (app *DApp) InitGenesis(ctp *chain.ContextProcess) error {
 	app.Lock()
 	defer app.Unlock()
 	acc := &pof.FormulationAccount{
-		Address_:        common.NewAddress(common.NewCoordinate(0, 0), 0),
+		Address_:        common.NewAddress(0, 0, 0),
 		Name_:           "fleta.001",
 		FormulationType: pof.AlphaFormulatorType,
 		KeyHash:         common.NewPublicHash(app.frkey.PublicKey()),
-		Amount:          amount.NewCoinAmount(0, 0),
+		Amount:          amount.NewCoinAmount(1000, 0),
 	}
 	if err := ctp.CreateAccount(acc); err != nil {
 		return err

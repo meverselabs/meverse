@@ -28,6 +28,11 @@ func NewContext(loader internalLoader) *Context {
 	return ctx
 }
 
+// NewEmptyContext returns a EmptyContext
+func NewEmptyContext() *Context {
+	return NewContext(newEmptyLoader())
+}
+
 // Name returns the name of the chain
 func (ctx *Context) Name() string {
 	return ctx.loader.Name()

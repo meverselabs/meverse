@@ -4,23 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 
-	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
 )
-
-var gConsensusPolicyMap = map[uint64]*ConsensusPolicy{}
-
-func SetConsensusPolicy(chainCoord *common.Coordinate, pc *ConsensusPolicy) {
-	gConsensusPolicyMap[chainCoord.ID()] = pc
-}
-
-func GetConsensusPolicy(chainCoord *common.Coordinate) (*ConsensusPolicy, error) {
-	pc, has := gConsensusPolicyMap[chainCoord.ID()]
-	if !has {
-		return nil, ErrNotExistConsensusPolicy
-	}
-	return pc, nil
-}
 
 // ConsensusPolicy defines a staking policy user
 type ConsensusPolicy struct {

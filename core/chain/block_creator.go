@@ -54,9 +54,6 @@ func (bc *BlockCreator) Init() error {
 	if err := bc.cn.app.BeforeExecuteTransactions(NewContextProcess(255, bc.ctx)); err != nil {
 		return err
 	}
-	if err := bc.cn.consensus.BeforeExecuteTransactions(NewContextProcess(0, bc.ctx)); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -93,9 +90,6 @@ func (bc *BlockCreator) Finalize() (*types.Block, error) {
 		}
 	}
 	if err := bc.cn.app.AfterExecuteTransactions(bc.b, NewContextProcess(255, bc.ctx)); err != nil {
-		return nil, err
-	}
-	if err := bc.cn.consensus.AfterExecuteTransactions(bc.b, NewContextProcess(0, bc.ctx)); err != nil {
 		return nil, err
 	}
 

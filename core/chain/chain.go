@@ -15,6 +15,7 @@ import (
 // Chain manages the chain data using processes
 type Chain struct {
 	sync.Mutex
+	isInit          bool
 	store           *Store
 	consensus       Consensus
 	app             Application
@@ -66,7 +67,7 @@ func (cn *Chain) Init() error {
 	}
 
 	// InitGenesis
-	genesisContext := types.NewContext(types.NewEmptyLoader())
+	genesisContext := types.NewEmptyContext()
 	if err := cn.app.InitGenesis(NewContextProcess(255, genesisContext)); err != nil {
 		return err
 	}
@@ -106,6 +107,8 @@ func (cn *Chain) Init() error {
 	if err := cn.consensus.OnLoadChain(NewContextProcess(0, ctx)); err != nil {
 		return err
 	}
+
+	cn.isInit = true
 	return nil
 }
 
@@ -128,9 +131,6 @@ func (cn *Chain) Close() {
 
 // Processes returns processes
 func (cn *Chain) Processes() []Process {
-	cn.Lock()
-	defer cn.Unlock()
-
 	list := []Process{}
 	for _, p := range cn.processes {
 		list = append(list, p)
@@ -140,9 +140,6 @@ func (cn *Chain) Processes() []Process {
 
 // Process returns the process by the id
 func (cn *Chain) Process(id uint8) (Process, error) {
-	cn.Lock()
-	defer cn.Unlock()
-
 	idx, has := cn.processIndexMap[id]
 	if !has {
 		return nil, ErrNotExistProcess
@@ -152,9 +149,6 @@ func (cn *Chain) Process(id uint8) (Process, error) {
 
 // ProcessByName returns the process by the name
 func (cn *Chain) ProcessByName(name string) (Process, error) {
-	cn.Lock()
-	defer cn.Unlock()
-
 	id, has := cn.processIDMap[name]
 	if !has {
 		return nil, ErrNotExistProcess
@@ -168,9 +162,9 @@ func (cn *Chain) ProcessByName(name string) (Process, error) {
 
 // MustAddProcess adds Process but panic when has the same name process
 func (cn *Chain) MustAddProcess(id uint8, p Process) {
-	cn.Lock()
-	defer cn.Unlock()
-
+	if cn.isInit {
+		panic(ErrAddBeforeChainInit)
+	}
 	if id == 0 || id == 255 {
 		panic(ErrReservedID)
 	}
@@ -188,9 +182,6 @@ func (cn *Chain) MustAddProcess(id uint8, p Process) {
 
 // Services returns services
 func (cn *Chain) Services() []Service {
-	cn.Lock()
-	defer cn.Unlock()
-
 	list := []Service{}
 	for _, s := range cn.services {
 		list = append(list, s)
@@ -200,9 +191,6 @@ func (cn *Chain) Services() []Service {
 
 // ServiceByName returns the service by the name
 func (cn *Chain) ServiceByName(name string) (Service, error) {
-	cn.Lock()
-	defer cn.Unlock()
-
 	s, has := cn.serviceMap[name]
 	if !has {
 		return nil, ErrNotExistService
@@ -212,14 +200,26 @@ func (cn *Chain) ServiceByName(name string) (Service, error) {
 
 // MustAddService adds Service but panic when has the same name service
 func (cn *Chain) MustAddService(s Service) {
-	cn.Lock()
-	defer cn.Unlock()
-
+	if cn.isInit {
+		panic(ErrAddBeforeChainInit)
+	}
 	if _, has := cn.serviceMap[s.Name()]; has {
 		panic(ErrExistServiceName)
 	}
 	cn.services = append(cn.services, s)
 	cn.serviceMap[s.Name()] = s
+}
+
+// SwitchProcess changes the context process to the target process
+func (cn *Chain) SwitchProcess(ctp *ContextProcess, p Process, fn func(stp *ContextProcess) error) error {
+	id, has := cn.processIDMap[p.Name()]
+	if !has {
+		return ErrNotExistProcess
+	}
+	if err := fn(NewContextProcess(id, ctp.ctx)); err != nil {
+		return err
+	}
+	return nil
 }
 
 // ConnectBlock try to connect block to the chain
@@ -233,7 +233,10 @@ func (cn *Chain) ConnectBlock(b *types.Block) error {
 	cn.Lock()
 	defer cn.Unlock()
 
-	if err := cn.validateHeader(&b.Header, b.Signatures); err != nil {
+	if err := cn.validateHeader(&b.Header); err != nil {
+		return err
+	}
+	if err := cn.consensus.ValidateSignature(&b.Header, b.Signatures); err != nil {
 		return err
 	}
 
@@ -283,7 +286,7 @@ func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context) err
 }
 
 func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error {
-	if err := cn.validateSignatures(b, ctx); err != nil {
+	if err := cn.validateTransactionSignatures(b, ctx); err != nil {
 		return err
 	}
 	IDMap := map[int]uint8{}
@@ -298,9 +301,6 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 		}
 	}
 	if err := cn.app.BeforeExecuteTransactions(NewContextProcess(255, ctx)); err != nil {
-		return err
-	}
-	if err := cn.consensus.BeforeExecuteTransactions(NewContextProcess(0, ctx)); err != nil {
 		return err
 	}
 
@@ -320,9 +320,6 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 	if err := cn.app.AfterExecuteTransactions(b, NewContextProcess(255, ctx)); err != nil {
 		return err
 	}
-	if err := cn.consensus.AfterExecuteTransactions(b, NewContextProcess(0, ctx)); err != nil {
-		return err
-	}
 
 	// ProcessReward
 	for i, p := range cn.processes {
@@ -339,7 +336,7 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 	return nil
 }
 
-func (cn *Chain) validateHeader(bh *types.Header, sigs []common.Signature) error {
+func (cn *Chain) validateHeader(bh *types.Header) error {
 	provider := cn.Provider()
 	if bh.Version > provider.Version() {
 		return ErrInvalidVersion
@@ -368,18 +365,10 @@ func (cn *Chain) validateHeader(bh *types.Header, sigs []common.Signature) error
 	if bh.PrevHash != provider.LastHash() {
 		return ErrInvalidPrevHash
 	}
-	if err := cn.consensus.ValidateHeader(bh, sigs); err != nil {
-		return err
-	}
-	for _, p := range cn.processes {
-		if err := p.ValidateHeader(bh, sigs); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
-func (cn *Chain) validateSignatures(b *types.Block, loader types.Loader) error {
+func (cn *Chain) validateTransactionSignatures(b *types.Block, loader types.Loader) error {
 	var wg sync.WaitGroup
 	cpuCnt := runtime.NumCPU()
 	if len(b.Transactions) < 1000 {

@@ -30,11 +30,10 @@ type internalLoader interface {
 }
 
 type emptyLoader struct {
-	coord *common.Coordinate
 }
 
-// NewEmptyLoader is used for generating genesis state
-func NewEmptyLoader() internalLoader {
+// newEmptyLoader is used for generating genesis state
+func newEmptyLoader() internalLoader {
 	return &emptyLoader{}
 }
 

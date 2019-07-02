@@ -26,4 +26,5 @@ var (
 	ErrAlreadyGenesised     = errors.New("already genesised")
 	ErrDirtyContext         = errors.New("dirty context")
 	ErrReservedID           = errors.New("reserved id")
+	ErrAddBeforeChainInit   = errors.New("add before chain init")
 )

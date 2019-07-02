@@ -44,15 +44,18 @@ func (acc *FormulationAccount) Name() string {
 
 // Clone returns the clonend value of it
 func (acc *FormulationAccount) Clone() types.Account {
-	return &FormulationAccount{
+	c := &FormulationAccount{
 		Address_:        acc.Address_,
 		Name_:           acc.Name_,
 		FormulationType: acc.FormulationType,
 		KeyHash:         acc.KeyHash.Clone(),
 		Amount:          acc.Amount.Clone(),
-		StakingAmount:   acc.StakingAmount.Clone(),
-		Policy:          acc.Policy.Clone(),
 	}
+	if acc.FormulationType == HyperFormulatorType {
+		c.StakingAmount = acc.StakingAmount.Clone()
+		c.Policy = acc.Policy.Clone()
+	}
+	return c
 }
 
 // Validate validates account signers

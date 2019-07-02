@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 
+	"github.com/fletaio/fleta/common/util"
+
 	"github.com/mr-tron/base58/base58"
 )
 
@@ -14,11 +16,12 @@ const AddressSize = 14
 type Address [AddressSize]byte
 
 // NewAddress returns a Address by the AccountCoordinate, by the nonce
-func NewAddress(accCoord *Coordinate, nonce uint64) Address {
+func NewAddress(height uint32, index uint16, nonce uint64) Address {
 	var addr Address
-	copy(addr[:], accCoord.Bytes())
+	copy(addr[:], util.Uint32ToBytes(height))
+	copy(addr[4:], util.Uint16ToBytes(index))
 	if nonce > 0 {
-		binary.LittleEndian.PutUint64(addr[6:], nonce)
+		copy(addr[6:], util.Uint64ToBytes(nonce))
 	}
 	return addr
 }
