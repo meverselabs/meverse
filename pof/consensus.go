@@ -24,11 +24,11 @@ type Consensus struct {
 	blocksBySameFormulator uint32
 	observerKeyMap         *types.PublicHashBoolMap
 	rt                     *RankTable
-	policy                 *ConsensusPolicy
+	genesisPolicy          *ConsensusPolicy
 }
 
 // NewConsensus returns a Consensus
-func NewConsensus(policy *ConsensusPolicy, MaxBlocksPerFormulator uint32, ObserverKeys []common.PublicHash) *Consensus {
+func NewConsensus(genesisPolicy *ConsensusPolicy, MaxBlocksPerFormulator uint32, ObserverKeys []common.PublicHash) *Consensus {
 	ObserverKeyMap := types.NewPublicHashBoolMap()
 	for _, pubhash := range ObserverKeys {
 		ObserverKeyMap.Put(pubhash.Clone(), true)
@@ -37,7 +37,7 @@ func NewConsensus(policy *ConsensusPolicy, MaxBlocksPerFormulator uint32, Observ
 		MaxBlocksPerFormulator: MaxBlocksPerFormulator,
 		observerKeyMap:         ObserverKeyMap,
 		rt:                     NewRankTable(),
-		policy:                 policy,
+		genesisPolicy:          genesisPolicy,
 	}
 	return cs
 }
@@ -87,18 +87,24 @@ func (cs *Consensus) InitGenesis(ctp *chain.ContextProcess) error {
 		}
 		return true
 	})
-	SaveData, err := cs.buildSaveData()
-	if err != nil {
+	if data, err := cs.buildSaveData(); err != nil {
 		return err
+	} else {
+		ctp.SetProcessData([]byte("state"), data)
 	}
-	ctp.SetProcessData([]byte("state"), SaveData)
+
+	if data, err := encoding.Marshal(&cs.genesisPolicy); err != nil {
+		return err
+	} else {
+		ctp.SetProcessData([]byte("policy"), data)
+	}
 
 	rd := newRewardData()
-	data, err := encoding.Marshal(&rd)
-	if err != nil {
+	if data, err := encoding.Marshal(&rd); err != nil {
 		return err
+	} else {
+		ctp.SetProcessData([]byte("reward"), data)
 	}
-	ctp.SetProcessData([]byte("reward"), data)
 	return nil
 }
 
@@ -140,9 +146,6 @@ func (cs *Consensus) OnLoadChain(loader chain.LoaderProcess) error {
 		cs.blocksBySameFormulator = v
 	}
 	if err := dec.Decode(&cs.rt); err != nil {
-		return err
-	}
-	if err := dec.Decode(&cs.policy); err != nil {
 		return err
 	}
 	return nil
@@ -201,12 +204,21 @@ func (cs *Consensus) ProcessReward(b *types.Block, ctp *chain.ContextProcess) er
 	if err != nil {
 		return err
 	}
+
+	policy := &ConsensusPolicy{}
+	if bs := ctp.ProcessData([]byte("policy")); len(bs) == 0 {
+		return ErrInvalidRewardData
+	} else if err := encoding.Unmarshal(bs, &policy); err != nil {
+		return err
+	}
+
 	rd := newRewardData()
 	if bs := ctp.ProcessData([]byte("reward")); len(bs) == 0 {
 		return ErrInvalidRewardData
 	} else if err := encoding.Unmarshal(bs, &rd); err != nil {
 		return err
 	}
+
 	if true {
 		acc, err := ctp.Account(Formulator)
 		if err != nil {
@@ -219,13 +231,13 @@ func (cs *Consensus) ProcessReward(b *types.Block, ctp *chain.ContextProcess) er
 		}
 		switch frAcc.FormulationType {
 		case AlphaFormulatorType:
-			rd.addRewardPower(Formulator, frAcc.Amount.MulC(int64(cs.policy.AlphaEfficiency1000)).DivC(1000))
+			rd.addRewardPower(Formulator, frAcc.Amount.MulC(int64(policy.AlphaEfficiency1000)).DivC(1000))
 		case SigmaFormulatorType:
-			rd.addRewardPower(Formulator, frAcc.Amount.MulC(int64(cs.policy.SigmaEfficiency1000)).DivC(1000))
+			rd.addRewardPower(Formulator, frAcc.Amount.MulC(int64(policy.SigmaEfficiency1000)).DivC(1000))
 		case OmegaFormulatorType:
-			rd.addRewardPower(Formulator, frAcc.Amount.MulC(int64(cs.policy.OmegaEfficiency1000)).DivC(1000))
+			rd.addRewardPower(Formulator, frAcc.Amount.MulC(int64(policy.OmegaEfficiency1000)).DivC(1000))
 		case HyperFormulatorType:
-			PowerSum := frAcc.Amount.MulC(int64(cs.policy.HyperEfficiency1000)).DivC(1000)
+			PowerSum := frAcc.Amount.MulC(int64(policy.HyperEfficiency1000)).DivC(1000)
 
 			keys, err := ctp.AccountDataKeys(Formulator, tagStaking)
 			if err != nil {
@@ -245,7 +257,7 @@ func (cs *Consensus) ProcessReward(b *types.Block, ctp *chain.ContextProcess) er
 						}
 						rd.removeRewardPower(StakingAddress)
 					} else {
-						StakingPower := StakingAmount.MulC(int64(cs.policy.StakingEfficiency1000)).DivC(1000)
+						StakingPower := StakingAmount.MulC(int64(policy.StakingEfficiency1000)).DivC(1000)
 						ComissionPower := StakingPower.MulC(int64(frAcc.Policy.CommissionRatio1000)).DivC(1000)
 
 						if bs := ctp.AccountData(Formulator, toAutoStakingKey(StakingAddress)); len(bs) > 0 && bs[0] == 1 {
@@ -264,13 +276,13 @@ func (cs *Consensus) ProcessReward(b *types.Block, ctp *chain.ContextProcess) er
 		}
 	}
 
-	if ctp.TargetHeight() >= rd.lastPaidHeight+cs.policy.PayRewardEveryBlocks {
+	if ctp.TargetHeight() >= rd.lastPaidHeight+policy.PayRewardEveryBlocks {
 		TotalPower := amount.NewCoinAmount(0, 0)
 		rd.powerMap.EachAll(func(addr common.Address, PowerSum *amount.Amount) bool {
 			TotalPower = TotalPower.Add(PowerSum)
 			return true
 		})
-		TotalReward := cs.policy.RewardPerBlock.MulC(int64(ctp.TargetHeight() - rd.lastPaidHeight))
+		TotalReward := policy.RewardPerBlock.MulC(int64(ctp.TargetHeight() - rd.lastPaidHeight))
 		Ratio := TotalReward.Mul(amount.COIN).Div(TotalPower)
 		var inErr error
 		rd.powerMap.EachAll(func(RewardAddress common.Address, PowerSum *amount.Amount) bool {
@@ -325,11 +337,17 @@ func (cs *Consensus) ProcessReward(b *types.Block, ctp *chain.ContextProcess) er
 		rd.lastPaidHeight = ctp.TargetHeight()
 	}
 
-	data, err := encoding.Marshal(&rd)
-	if err != nil {
+	if data, err := encoding.Marshal(&policy); err != nil {
 		return err
+	} else {
+		ctp.SetProcessData([]byte("policy"), data)
 	}
-	ctp.SetProcessData([]byte("reward"), data)
+
+	if data, err := encoding.Marshal(&rd); err != nil {
+		return err
+	} else {
+		ctp.SetProcessData([]byte("reward"), data)
+	}
 	return nil
 }
 
@@ -380,11 +398,11 @@ func (cs *Consensus) OnSaveData(b *types.Block, ctp *chain.ContextProcess) error
 		return true
 	})
 
-	SaveData, err := cs.buildSaveData()
-	if err != nil {
+	if data, err := cs.buildSaveData(); err != nil {
 		return err
+	} else {
+		ctp.SetProcessData([]byte("state"), data)
 	}
-	ctp.SetProcessData([]byte("state"), SaveData)
 	return nil
 }
 
@@ -426,9 +444,6 @@ func (cs *Consensus) buildSaveData() ([]byte, error) {
 		return nil, err
 	}
 	if err := enc.Encode(cs.rt); err != nil {
-		return nil, err
-	}
-	if err := enc.Encode(cs.policy); err != nil {
 		return nil, err
 	}
 	return buffer.Bytes(), nil
