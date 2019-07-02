@@ -60,7 +60,7 @@ func (cs *Consensus) Init(reg *chain.Register, cn *chain.Chain, ct chain.Committ
 }
 
 // InitGenesis initializes genesis data
-func (cs *Consensus) InitGenesis(ctp *chain.ContextProcess) error {
+func (cs *Consensus) InitGenesis(ctp *types.ContextProcess) error {
 	cs.Lock()
 	defer cs.Unlock()
 
@@ -109,7 +109,7 @@ func (cs *Consensus) InitGenesis(ctp *chain.ContextProcess) error {
 }
 
 // OnLoadChain called when the chain loaded
-func (cs *Consensus) OnLoadChain(loader chain.LoaderProcess) error {
+func (cs *Consensus) OnLoadChain(loader types.LoaderProcess) error {
 	cs.Lock()
 	defer cs.Unlock()
 
@@ -199,7 +199,7 @@ func (cs *Consensus) ValidateSignature(bh *types.Header, sigs []common.Signature
 }
 
 // ProcessReward called when required to process reward to the context
-func (cs *Consensus) ProcessReward(b *types.Block, ctp *chain.ContextProcess) error {
+func (cs *Consensus) ProcessReward(b *types.Block, ctp *types.ContextProcess) error {
 	_, Formulator, err := cs.decodeConsensusData(b.Header.ConsensusData)
 	if err != nil {
 		return err
@@ -294,7 +294,7 @@ func (cs *Consensus) ProcessReward(b *types.Block, ctp *chain.ContextProcess) er
 				}
 			} else {
 				frAcc := acc.(*FormulationAccount)
-				if err := cs.cn.SwitchProcess(ctp, cs.vault, func(stp *chain.ContextProcess) error {
+				if err := cs.cn.SwitchProcess(ctp, cs.vault, func(stp *types.ContextProcess) error {
 					if err := cs.vault.AddBalance(stp, frAcc.Address(), PowerSum.Mul(Ratio).Div(amount.COIN)); err != nil {
 						return err
 					}
@@ -303,7 +303,6 @@ func (cs *Consensus) ProcessReward(b *types.Block, ctp *chain.ContextProcess) er
 					inErr = err
 					return false
 				}
-				//log.Println("AddBalance", frAcc.Address().String(), PowerSum.Mul(Ratio).Div(amount.COIN).String())
 			}
 			rd.removeRewardPower(RewardAddress)
 			return true
@@ -352,7 +351,7 @@ func (cs *Consensus) ProcessReward(b *types.Block, ctp *chain.ContextProcess) er
 }
 
 // OnSaveData called when the context of the block saved
-func (cs *Consensus) OnSaveData(b *types.Block, ctp *chain.ContextProcess) error {
+func (cs *Consensus) OnSaveData(b *types.Block, ctp *types.ContextProcess) error {
 	cs.Lock()
 	defer cs.Unlock()
 

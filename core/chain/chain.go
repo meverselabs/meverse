@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"bytes"
 	"runtime"
 	"sync"
 
@@ -68,10 +69,10 @@ func (cn *Chain) Init() error {
 
 	// InitGenesis
 	genesisContext := types.NewEmptyContext()
-	if err := cn.app.InitGenesis(NewContextProcess(255, genesisContext)); err != nil {
+	if err := cn.app.InitGenesis(types.NewContextProcess(255, genesisContext)); err != nil {
 		return err
 	}
-	if err := cn.consensus.InitGenesis(NewContextProcess(0, genesisContext)); err != nil {
+	if err := cn.consensus.InitGenesis(types.NewContextProcess(0, genesisContext)); err != nil {
 		return err
 	}
 	if genesisContext.StackSize() > 1 {
@@ -97,14 +98,14 @@ func (cn *Chain) Init() error {
 	// OnLoadChain
 	ctx := types.NewContext(cn.store)
 	for i, p := range cn.processes {
-		if err := p.OnLoadChain(NewContextProcess(IDMap[i], ctx)); err != nil {
+		if err := p.OnLoadChain(types.NewContextProcess(IDMap[i], ctx)); err != nil {
 			return err
 		}
 	}
-	if err := cn.app.OnLoadChain(NewContextProcess(255, ctx)); err != nil {
+	if err := cn.app.OnLoadChain(types.NewContextProcess(255, ctx)); err != nil {
 		return err
 	}
-	if err := cn.consensus.OnLoadChain(NewContextProcess(0, ctx)); err != nil {
+	if err := cn.consensus.OnLoadChain(types.NewContextProcess(0, ctx)); err != nil {
 		return err
 	}
 
@@ -211,12 +212,12 @@ func (cn *Chain) MustAddService(s Service) {
 }
 
 // SwitchProcess changes the context process to the target process
-func (cn *Chain) SwitchProcess(ctp *ContextProcess, p Process, fn func(stp *ContextProcess) error) error {
+func (cn *Chain) SwitchProcess(ctp *types.ContextProcess, p Process, fn func(stp *types.ContextProcess) error) error {
 	id, has := cn.processIDMap[p.Name()]
 	if !has {
 		return ErrNotExistProcess
 	}
-	if err := fn(NewContextProcess(id, ctp.ctx)); err != nil {
+	if err := fn(types.SwitchContextProcess(id, ctp)); err != nil {
 		return err
 	}
 	return nil
@@ -259,14 +260,14 @@ func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context) err
 
 	// OnSaveData
 	for i, p := range cn.processes {
-		if err := p.OnSaveData(b, NewContextProcess(IDMap[i], ctx)); err != nil {
+		if err := p.OnSaveData(b, types.NewContextProcess(IDMap[i], ctx)); err != nil {
 			return err
 		}
 	}
-	if err := cn.app.OnSaveData(b, NewContextProcess(255, ctx)); err != nil {
+	if err := cn.app.OnSaveData(b, types.NewContextProcess(255, ctx)); err != nil {
 		return err
 	}
-	if err := cn.consensus.OnSaveData(b, NewContextProcess(0, ctx)); err != nil {
+	if err := cn.consensus.OnSaveData(b, types.NewContextProcess(0, ctx)); err != nil {
 		return err
 	}
 
@@ -296,41 +297,42 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 
 	// BeforeExecuteTransactions
 	for i, p := range cn.processes {
-		if err := p.BeforeExecuteTransactions(NewContextProcess(IDMap[i], ctx)); err != nil {
+		if err := p.BeforeExecuteTransactions(types.NewContextProcess(IDMap[i], ctx)); err != nil {
 			return err
 		}
 	}
-	if err := cn.app.BeforeExecuteTransactions(NewContextProcess(255, ctx)); err != nil {
+	if err := cn.app.BeforeExecuteTransactions(types.NewContextProcess(255, ctx)); err != nil {
 		return err
 	}
 
 	// Execute Transctions
 	for i, tx := range b.Transactions {
-		if err := tx.Execute(ctx, uint16(i)); err != nil {
+		t := b.TransactionTypes[i]
+		if err := tx.Execute(types.NewContextProcess(uint8(t>>8), ctx), uint16(i)); err != nil {
 			return err
 		}
 	}
 
 	// AfterExecuteTransactions
 	for i, p := range cn.processes {
-		if err := p.AfterExecuteTransactions(b, NewContextProcess(IDMap[i], ctx)); err != nil {
+		if err := p.AfterExecuteTransactions(b, types.NewContextProcess(IDMap[i], ctx)); err != nil {
 			return err
 		}
 	}
-	if err := cn.app.AfterExecuteTransactions(b, NewContextProcess(255, ctx)); err != nil {
+	if err := cn.app.AfterExecuteTransactions(b, types.NewContextProcess(255, ctx)); err != nil {
 		return err
 	}
 
 	// ProcessReward
 	for i, p := range cn.processes {
-		if err := p.ProcessReward(b, NewContextProcess(IDMap[i], ctx)); err != nil {
+		if err := p.ProcessReward(b, types.NewContextProcess(IDMap[i], ctx)); err != nil {
 			return err
 		}
 	}
-	if err := cn.app.ProcessReward(b, NewContextProcess(255, ctx)); err != nil {
+	if err := cn.app.ProcessReward(b, types.NewContextProcess(255, ctx)); err != nil {
 		return err
 	}
-	if err := cn.consensus.ProcessReward(b, NewContextProcess(0, ctx)); err != nil {
+	if err := cn.consensus.ProcessReward(b, types.NewContextProcess(0, ctx)); err != nil {
 		return err
 	}
 	return nil
@@ -368,22 +370,22 @@ func (cn *Chain) validateHeader(bh *types.Header) error {
 	return nil
 }
 
-func (cn *Chain) validateTransactionSignatures(b *types.Block, loader types.Loader) error {
+func (cn *Chain) validateTransactionSignatures(b *types.Block, ctx *types.Context) error {
 	var wg sync.WaitGroup
 	cpuCnt := runtime.NumCPU()
 	if len(b.Transactions) < 1000 {
 		cpuCnt = 1
 	}
-	txCnt := len(b.Transactions) / cpuCnt
+	txUnit := len(b.Transactions) / cpuCnt
 	TxHashes := make([]hash.Hash256, len(b.Transactions)+1)
 	TxHashes[0] = b.Header.PrevHash
 	if len(b.Transactions)%cpuCnt != 0 {
-		txCnt++
+		txUnit++
 	}
 	errs := make(chan error, cpuCnt)
 	defer close(errs)
 	for i := 0; i < cpuCnt; i++ {
-		lastCnt := (i + 1) * txCnt
+		lastCnt := (i + 1) * txUnit
 		if lastCnt > len(b.Transactions) {
 			lastCnt = len(b.Transactions)
 		}
@@ -391,8 +393,20 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block, loader types.Load
 		go func(sidx int, txs []types.Transaction) {
 			defer wg.Done()
 			for q, tx := range txs {
+				t := b.TransactionTypes[sidx+q]
 				sigs := b.TranactionSignatures[sidx+q]
-				TxHash := encoding.Hash(tx)
+
+				var buffer bytes.Buffer
+				enc := encoding.NewEncoder(&buffer)
+				if err := enc.EncodeUint16(t); err != nil {
+					errs <- err
+					return
+				}
+				if err := enc.Encode(tx); err != nil {
+					errs <- err
+					return
+				}
+				TxHash := hash.Hash(buffer.Bytes())
 				TxHashes[sidx+q+1] = TxHash
 
 				signers := make([]common.PublicHash, 0, len(sigs))
@@ -404,12 +418,12 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block, loader types.Load
 					}
 					signers = append(signers, common.NewPublicHash(pubkey))
 				}
-				if err := tx.Validate(loader, signers); err != nil {
+				if err := tx.Validate(types.NewContextProcess(uint8(t>>8), ctx), signers); err != nil {
 					errs <- err
 					return
 				}
 			}
-		}(i*txCnt, b.Transactions[i*txCnt:lastCnt])
+		}(i*txUnit, b.Transactions[i*txUnit:lastCnt])
 	}
 	wg.Wait()
 	if len(errs) > 0 {

@@ -59,7 +59,7 @@ func (acc *FormulationAccount) Clone() types.Account {
 }
 
 // Validate validates account signers
-func (acc *FormulationAccount) Validate(loader types.Loader, signers []common.PublicHash) error {
+func (acc *FormulationAccount) Validate(loader types.LoaderProcess, signers []common.PublicHash) error {
 	if len(signers) != 1 {
 		return ErrInvalidSignerCount
 	}

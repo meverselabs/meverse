@@ -1,24 +1,32 @@
-package chain
+package types
 
 import (
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
-	"github.com/fletaio/fleta/core/types"
 )
 
 // ContextProcess is an context for the process
 type ContextProcess struct {
 	pid uint8
-	ctx *types.Context
+	ctx *Context
 }
 
 // NewContextProcess returns a ContextProcess
-func NewContextProcess(pid uint8, ctx *types.Context) *ContextProcess {
+func NewContextProcess(pid uint8, ctx *Context) *ContextProcess {
 	ctp := &ContextProcess{
 		pid: pid,
 		ctx: ctx,
 	}
 	return ctp
+}
+
+// SwitchContextProcess returns a ContextProcess of the pid
+func SwitchContextProcess(pid uint8, ctp *ContextProcess) *ContextProcess {
+	stp := &ContextProcess{
+		pid: pid,
+		ctx: ctp.ctx,
+	}
+	return stp
 }
 
 // Name returns the name of the chain
@@ -52,7 +60,7 @@ func (ctp *ContextProcess) LastTimestamp() uint64 {
 }
 
 // Top returns the top snapshot
-func (ctp *ContextProcess) Top() *types.ContextData {
+func (ctp *ContextProcess) Top() *ContextData {
 	return ctp.ctx.Top()
 }
 
@@ -67,7 +75,7 @@ func (ctp *ContextProcess) AddSeq(addr common.Address) {
 }
 
 // Account returns the account instance of the address
-func (ctp *ContextProcess) Account(addr common.Address) (types.Account, error) {
+func (ctp *ContextProcess) Account(addr common.Address) (Account, error) {
 	return ctp.ctx.Account(addr)
 }
 
@@ -87,12 +95,12 @@ func (ctp *ContextProcess) IsExistAccountName(Name string) (bool, error) {
 }
 
 // CreateAccount inserts the account to the top snapshot
-func (ctp *ContextProcess) CreateAccount(acc types.Account) error {
+func (ctp *ContextProcess) CreateAccount(acc Account) error {
 	return ctp.ctx.CreateAccount(acc)
 }
 
 // DeleteAccount deletes the account from the top snapshot
-func (ctp *ContextProcess) DeleteAccount(acc types.Account) error {
+func (ctp *ContextProcess) DeleteAccount(acc Account) error {
 	return ctp.ctx.DeleteAccount(acc)
 }
 
@@ -117,22 +125,22 @@ func (ctp *ContextProcess) IsExistUTXO(id uint64) (bool, error) {
 }
 
 // UTXO returns the UTXO from the top snapshot
-func (ctp *ContextProcess) UTXO(id uint64) (*types.UTXO, error) {
+func (ctp *ContextProcess) UTXO(id uint64) (*UTXO, error) {
 	return ctp.ctx.UTXO(id)
 }
 
 // CreateUTXO inserts the UTXO to the top snapshot
-func (ctp *ContextProcess) CreateUTXO(id uint64, vout *types.TxOut) error {
+func (ctp *ContextProcess) CreateUTXO(id uint64, vout *TxOut) error {
 	return ctp.ctx.CreateUTXO(id, vout)
 }
 
 // DeleteUTXO deletes the UTXO from the top snapshot
-func (ctp *ContextProcess) DeleteUTXO(utxo *types.UTXO) error {
+func (ctp *ContextProcess) DeleteUTXO(utxo *UTXO) error {
 	return ctp.ctx.DeleteUTXO(utxo)
 }
 
 // EmitEvent creates the event to the top snapshot
-func (ctp *ContextProcess) EmitEvent(e types.Event) error {
+func (ctp *ContextProcess) EmitEvent(e Event) error {
 	return ctp.ctx.EmitEvent(e)
 }
 

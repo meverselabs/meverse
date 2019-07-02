@@ -1,108 +1,17 @@
-package consensus
+package pof
 
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 
 	"github.com/fletaio/fleta/common"
-	"github.com/fletaio/fleta/common/hash"
-	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/common/amount"
-	"github.com/fletaio/fleta/core/data"
-	"github.com/fletaio/fleta/core/transaction"
+	"github.com/fletaio/fleta/core/types"
 )
-
-func init() {
-	data.RegisterTransaction("consensus.CreateAlpha", func(t transaction.Type) transaction.Transaction {
-		return &CreateAlpha{
-			Base: transaction.Base{
-				Type_: t,
-			},
-		}
-	}, func(loader data.Loader, t transaction.Transaction, signers []common.PublicHash) error {
-		tx := t.(*CreateAlpha)
-		if len(tx.Name) < 8 || len(tx.Name) > 16 {
-			return ErrInvalidAccountName
-		}
-
-		if tx.Seq() <= loader.Seq(tx.From()) {
-			return ErrInvalidSequence
-		}
-
-		fromAcc, err := loader.Account(tx.From())
-		if err != nil {
-			return err
-		}
-
-		if err := loader.Accounter().Validate(loader, fromAcc, signers); err != nil {
-			return err
-		}
-		return nil
-	}, func(ctx *data.Context, Fee *amount.Amount, t transaction.Transaction, coord *common.Coordinate) (ret interface{}, rerr error) {
-		tx := t.(*CreateAlpha)
-		if len(tx.Name) < 8 || len(tx.Name) > 16 {
-			return nil, ErrInvalidAccountName
-		}
-
-		policy, has := gConsensusPolicyMap[ctx.ChainCoord().ID()]
-		if !has {
-			return nil, ErrNotExistConsensusPolicy
-		}
-		if ctx.TargetHeight() < policy.FormulatorCreationLimitHeight {
-			return nil, ErrFormulatorCreationLimited
-		}
-
-		sn := ctx.Snapshot()
-		defer ctx.Revert(sn)
-
-		if tx.Seq() != ctx.Seq(tx.From())+1 {
-			return nil, ErrInvalidSequence
-		}
-		ctx.AddSeq(tx.From())
-
-		fromAcc, err := ctx.Account(tx.From())
-		if err != nil {
-			return nil, err
-		}
-		if err := fromAcc.SubBalance(Fee); err != nil {
-			return nil, err
-		}
-		if err := fromAcc.SubBalance(policy.AlphaCreationAmount); err != nil {
-			return nil, err
-		}
-
-		addr := common.NewAddress(coord, 0)
-		if is, err := ctx.IsExistAccount(addr); err != nil {
-			return nil, err
-		} else if is {
-			return nil, ErrExistAddress
-		} else if isn, err := ctx.IsExistAccountName(tx.Name); err != nil {
-			return nil, err
-		} else if isn {
-			return nil, ErrExistAccountName
-		} else {
-			a, err := ctx.Accounter().NewByTypeName("consensus.FormulationAccount")
-			if err != nil {
-				return nil, err
-			}
-			acc := a.(*FormulationAccount)
-			acc.Address_ = addr
-			acc.Name_ = tx.Name
-			acc.FormulationType = AlphaFormulatorType
-			acc.KeyHash = tx.KeyHash
-			acc.Amount = policy.AlphaCreationAmount
-			ctx.CreateAccount(acc)
-		}
-		ctx.Commit(sn)
-		return nil, nil
-	})
-}
 
 // CreateAlpha is a consensus.CreateAlpha
 // It is used to make formulation account
 type CreateAlpha struct {
-	transaction.Base
 	Seq_    uint64
 	From_   common.Address
 	Name    string
@@ -124,73 +33,81 @@ func (tx *CreateAlpha) Seq() uint64 {
 	return tx.Seq_
 }
 
-// Hash returns the hash value of it
-func (tx *CreateAlpha) Hash() hash.Hash256 {
-	return hash.DoubleHashByWriterTo(tx)
+func (tx *CreateAlpha) Validate(loader types.Loader, signers []common.PublicHash) error {
+	if len(tx.Name) < 8 || len(tx.Name) > 16 {
+		return ErrInvalidAccountName
+	}
+
+	if tx.Seq() <= loader.Seq(tx.From()) {
+		return ErrInvalidSequence
+	}
+
+	fromAcc, err := loader.Account(tx.From())
+	if err != nil {
+		return err
+	}
+	if err := fromAcc.Validate(loader, signers); err != nil {
+		return err
+	}
+	return nil
 }
 
-// WriteTo is a serialization function
-func (tx *CreateAlpha) WriteTo(w io.Writer) (int64, error) {
-	var wrote int64
-	if n, err := tx.Base.WriteTo(w); err != nil {
-		return wrote, err
-	} else {
-		wrote += n
+func (tx *CreateAlpha) Execute(ctx *types.Context, Fee *amount.Amount, t types.Transaction, coord *common.Coordinate) (ret interface{}, rerr error) {
+	if len(tx.Name) < 8 || len(tx.Name) > 16 {
+		return nil, ErrInvalidAccountName
 	}
-	if n, err := util.WriteUint64(w, tx.Seq_); err != nil {
-		return wrote, err
-	} else {
-		wrote += n
-	}
-	if n, err := tx.From_.WriteTo(w); err != nil {
-		return wrote, err
-	} else {
-		wrote += n
-	}
-	if n, err := util.WriteString(w, tx.Name); err != nil {
-		return wrote, err
-	} else {
-		wrote += n
-	}
-	if n, err := tx.KeyHash.WriteTo(w); err != nil {
-		return wrote, err
-	} else {
-		wrote += n
-	}
-	return wrote, nil
-}
 
-// ReadFrom is a deserialization function
-func (tx *CreateAlpha) ReadFrom(r io.Reader) (int64, error) {
-	var read int64
-	if n, err := tx.Base.ReadFrom(r); err != nil {
-		return read, err
-	} else {
-		read += n
+	policy, has := gConsensusPolicyMap[ctx.ChainCoord().ID()]
+	if !has {
+		return nil, ErrNotExistConsensusPolicy
 	}
-	if v, n, err := util.ReadUint64(r); err != nil {
-		return read, err
-	} else {
-		read += n
-		tx.Seq_ = v
+	if ctx.TargetHeight() < policy.FormulatorCreationLimitHeight {
+		return nil, ErrFormulatorCreationLimited
 	}
-	if n, err := tx.From_.ReadFrom(r); err != nil {
-		return read, err
-	} else {
-		read += n
+
+	sn := ctx.Snapshot()
+	defer ctx.Revert(sn)
+
+	if tx.Seq() != ctx.Seq(tx.From())+1 {
+		return nil, ErrInvalidSequence
 	}
-	if v, n, err := util.ReadString(r); err != nil {
-		return read, err
-	} else {
-		read += n
-		tx.Name = v
+	ctx.AddSeq(tx.From())
+
+	fromAcc, err := ctx.Account(tx.From())
+	if err != nil {
+		return nil, err
 	}
-	if n, err := tx.KeyHash.ReadFrom(r); err != nil {
-		return read, err
-	} else {
-		read += n
+	if err := fromAcc.SubBalance(Fee); err != nil {
+		return nil, err
 	}
-	return read, nil
+	if err := fromAcc.SubBalance(policy.AlphaCreationAmount); err != nil {
+		return nil, err
+	}
+
+	addr := common.NewAddress(coord, 0)
+	if is, err := ctx.IsExistAccount(addr); err != nil {
+		return nil, err
+	} else if is {
+		return nil, ErrExistAddress
+	} else if isn, err := ctx.IsExistAccountName(tx.Name); err != nil {
+		return nil, err
+	} else if isn {
+		return nil, ErrExistAccountName
+	} else {
+		a, err := ctx.Accounter().NewByTypeName("consensus.FormulationAccount")
+		if err != nil {
+			return nil, err
+		}
+		acc := a.(*FormulationAccount)
+		acc.Address_ = addr
+		acc.Name_ = tx.Name
+		acc.FormulationType = AlphaFormulatorType
+		acc.KeyHash = tx.KeyHash
+		acc.Amount = policy.AlphaCreationAmount
+		ctx.CreateAccount(acc)
+	}
+	ctx.Commit(sn)
+	return nil, nil
 }
 
 // MarshalJSON is a marshaler function

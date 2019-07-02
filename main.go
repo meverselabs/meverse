@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
@@ -111,10 +112,35 @@ func test() error {
 	if err := bc.Init(); err != nil {
 		return err
 	}
+	txs := []types.Transaction{}
+	sigs := [][]common.Signature{}
+	for i := 0; i < 20000; i++ {
+		tx := &Transaction{
+			Timestamp_: 0,
+			KeyHash:    common.PublicHash{},
+			Amount:     amount.NewCoinAmount(uint64(i+1), 0),
+		}
+		sig, _ := frkeys[0].Sign(encoding.Hash(tx))
+		sigs = append(sigs, []common.Signature{sig})
+		txs = append(txs, tx)
+	}
+
+	if true {
+		begin := time.Now().UnixNano()
+		for i := 0; i < 10000; i++ {
+			if err := bc.AddTx(txs[i], sigs[i]); err != nil {
+				return err
+			}
+		}
+		end := time.Now().UnixNano()
+		log.Println((end - begin) / int64(time.Millisecond))
+	}
+
 	b, err := bc.Finalize()
 	if err != nil {
 		return err
 	}
+
 	bh := encoding.Hash(b.Header)
 	sig0, _ := frkeys[0].Sign(bh)
 	Signatures := []common.Signature{
@@ -149,7 +175,7 @@ func test() error {
 		if err != nil {
 			return err
 		}
-		log.Println(cn.Provider().Height(), b, encoding.Hash(b.Header))
+		log.Println(cn.Provider().Height(), len(b.Transactions), encoding.Hash(b.Header))
 	}
 	return nil
 }
@@ -175,11 +201,12 @@ func (app *DApp) Version() string {
 // Init initializes the consensus
 func (app *DApp) Init(reg *chain.Register, cn *chain.Chain) error {
 	app.cn = cn
+	reg.RegisterTransaction(1, &Transaction{})
 	return nil
 }
 
 // InitGenesis initializes genesis data
-func (app *DApp) InitGenesis(ctp *chain.ContextProcess) error {
+func (app *DApp) InitGenesis(ctp *types.ContextProcess) error {
 	app.Lock()
 	defer app.Unlock()
 	acc := &pof.FormulationAccount{
@@ -192,5 +219,28 @@ func (app *DApp) InitGenesis(ctp *chain.ContextProcess) error {
 	if err := ctp.CreateAccount(acc); err != nil {
 		return err
 	}
+	return nil
+}
+
+// Transaction is an interface that defines common transaction functions
+type Transaction struct {
+	Timestamp_ uint64
+	KeyHash    common.PublicHash
+	Amount     *amount.Amount
+}
+
+func (tx *Transaction) Timestamp() uint64 {
+	return tx.Timestamp_
+}
+
+func (tx *Transaction) Fee(loader types.LoaderProcess) *amount.Amount {
+	return amount.COIN.DivC(10)
+}
+
+func (tx *Transaction) Validate(loader types.LoaderProcess, signers []common.PublicHash) error {
+	return nil
+}
+
+func (tx *Transaction) Execute(ctx *types.ContextProcess, index uint16) error {
 	return nil
 }

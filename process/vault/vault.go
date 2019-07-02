@@ -36,7 +36,7 @@ func (p *Vault) Init(reg *chain.Register, cn *chain.Chain) error {
 }
 
 // Balance returns balance of the account of the address
-func (p *Vault) Balance(ctp *chain.ContextProcess, addr common.Address) *amount.Amount {
+func (p *Vault) Balance(ctp *types.ContextProcess, addr common.Address) *amount.Amount {
 	var total *amount.Amount
 	if bs := ctp.ProcessData(addr[:]); len(bs) > 0 {
 		total = amount.NewAmountFromBytes(bs)
@@ -47,7 +47,7 @@ func (p *Vault) Balance(ctp *chain.ContextProcess, addr common.Address) *amount.
 }
 
 // AddBalance adds balance to the account of the address
-func (p *Vault) AddBalance(ctp *chain.ContextProcess, addr common.Address, am *amount.Amount) error {
+func (p *Vault) AddBalance(ctp *types.ContextProcess, addr common.Address, am *amount.Amount) error {
 	zero := amount.NewCoinAmount(0, 0)
 	if am.Less(zero) {
 		return ErrMinusInput
@@ -59,7 +59,7 @@ func (p *Vault) AddBalance(ctp *chain.ContextProcess, addr common.Address, am *a
 }
 
 // SubBalance subtracts balance to the account of the address
-func (p *Vault) SubBalance(ctp *chain.ContextProcess, addr common.Address, am *amount.Amount) error {
+func (p *Vault) SubBalance(ctp *types.ContextProcess, addr common.Address, am *amount.Amount) error {
 	total := p.Balance(ctp, addr)
 	if total.Less(am) {
 		return ErrMinusBalance
@@ -74,26 +74,26 @@ func (p *Vault) SubBalance(ctp *chain.ContextProcess, addr common.Address, am *a
 }
 
 // OnLoadChain called when the chain loaded
-func (p *Vault) OnLoadChain(loader chain.LoaderProcess) error {
+func (p *Vault) OnLoadChain(loader types.LoaderProcess) error {
 	return nil
 }
 
 // BeforeExecuteTransactions called before processes transactions of the block
-func (p *Vault) BeforeExecuteTransactions(ctp *chain.ContextProcess) error {
+func (p *Vault) BeforeExecuteTransactions(ctp *types.ContextProcess) error {
 	return nil
 }
 
 // AfterExecuteTransactions called after processes transactions of the block
-func (p *Vault) AfterExecuteTransactions(b *types.Block, ctp *chain.ContextProcess) error {
+func (p *Vault) AfterExecuteTransactions(b *types.Block, ctp *types.ContextProcess) error {
 	return nil
 }
 
 // ProcessReward called when required to process reward to the context
-func (p *Vault) ProcessReward(b *types.Block, ctp *chain.ContextProcess) error {
+func (p *Vault) ProcessReward(b *types.Block, ctp *types.ContextProcess) error {
 	return nil
 }
 
 // OnSaveData called when the context of the block saved
-func (p *Vault) OnSaveData(b *types.Block, ctp *chain.ContextProcess) error {
+func (p *Vault) OnSaveData(b *types.Block, ctp *types.ContextProcess) error {
 	return nil
 }

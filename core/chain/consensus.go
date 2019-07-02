@@ -8,23 +8,23 @@ import (
 // Consensus is a interface of the chain Consensus
 type Consensus interface {
 	Init(reg *Register, cn *Chain, ct Committer) error
-	InitGenesis(ctp *ContextProcess) error
-	OnLoadChain(loader LoaderProcess) error
+	InitGenesis(ctp *types.ContextProcess) error
+	OnLoadChain(loader types.LoaderProcess) error
 	ValidateSignature(bh *types.Header, sigs []common.Signature) error
-	ProcessReward(b *types.Block, ctp *ContextProcess) error
-	OnSaveData(b *types.Block, ctp *ContextProcess) error
+	ProcessReward(b *types.Block, ctp *types.ContextProcess) error
+	OnSaveData(b *types.Block, ctp *types.ContextProcess) error
 }
 
 // ConsensusBase is a base handler of the chain Consensus
 type ConsensusBase struct{}
 
 // InitGenesis initializes genesis data
-func (cs *ConsensusBase) InitGenesis(ctp *ContextProcess) error {
+func (cs *ConsensusBase) InitGenesis(ctp *types.ContextProcess) error {
 	return nil
 }
 
 // OnLoadChain called when the chain loaded
-func (cs *ConsensusBase) OnLoadChain(loader LoaderProcess) error {
+func (cs *ConsensusBase) OnLoadChain(loader types.LoaderProcess) error {
 	return nil
 }
 
@@ -34,11 +34,11 @@ func (cs *ConsensusBase) ValidateSignature(bh *types.Header, sigs []common.Signa
 }
 
 // ProcessReward called when required to process reward to the context
-func (cs *ConsensusBase) ProcessReward(b *types.Block, ctp *ContextProcess) error {
+func (cs *ConsensusBase) ProcessReward(b *types.Block, ctp *types.ContextProcess) error {
 	return nil
 }
 
 // OnSaveData called when the context of the block saved
-func (cs *ConsensusBase) OnSaveData(b *types.Block, ctp *ContextProcess) error {
+func (cs *ConsensusBase) OnSaveData(b *types.Block, ctp *types.ContextProcess) error {
 	return nil
 }

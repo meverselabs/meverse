@@ -9,5 +9,5 @@ type Account interface {
 	Address() common.Address
 	Name() string
 	Clone() Account
-	Validate(loader Loader, signers []common.PublicHash) error
+	Validate(loader LoaderProcess, signers []common.PublicHash) error
 }

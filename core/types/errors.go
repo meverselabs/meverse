@@ -26,4 +26,5 @@ var (
 	ErrInvalidChainCoordinate        = errors.New("invalid chain coordinate")
 	ErrUnknownEventType              = errors.New("unknown event type")
 	ErrInvalidAccountName            = errors.New("invalid account name")
+	ErrInvalidTransactionCount       = errors.New("invalid transaction count")
 )

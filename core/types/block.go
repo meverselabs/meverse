@@ -11,26 +11,31 @@ func init() {
 	fc := encoding.Factory("transaction")
 	encoding.Register(Block{}, func(enc *encoding.Encoder, rv reflect.Value) error {
 		item := rv.Interface().(Block)
+
+		if len(item.TransactionTypes) != len(item.Transactions) {
+			return ErrInvalidTransactionCount
+		}
+		if len(item.Transactions) != len(item.TranactionSignatures) {
+			return ErrInvalidTransactionCount
+		}
+
 		if err := enc.Encode(item.Header); err != nil {
 			return err
 		}
-		if err := enc.EncodeArrayLen(len(item.Transactions)); err != nil {
+		Len := len(item.Transactions)
+		if err := enc.EncodeArrayLen(Len); err != nil {
 			return err
 		}
-		for _, tx := range item.Transactions {
-			if t, err := fc.TypeOf(tx); err != nil {
-				return err
-			} else if err := enc.EncodeUint16(t); err != nil {
+		for i := 0; i < Len; i++ {
+			if err := enc.Encode(item.TransactionTypes[i]); err != nil {
 				return err
 			}
-			if err := enc.Encode(tx); err != nil {
+
+			if err := enc.Encode(item.Transactions[i]); err != nil {
 				return err
 			}
-		}
-		if err := enc.EncodeArrayLen(len(item.TranactionSignatures)); err != nil {
-			return err
-		}
-		for _, sigs := range item.TranactionSignatures {
+
+			sigs := item.TranactionSignatures[i]
 			if err := enc.EncodeArrayLen(len(sigs)); err != nil {
 				return err
 			}
@@ -38,6 +43,14 @@ func init() {
 				if err := enc.Encode(sig); err != nil {
 					return err
 				}
+			}
+		}
+		if err := enc.EncodeArrayLen(len(item.Signatures)); err != nil {
+			return err
+		}
+		for _, sig := range item.Signatures {
+			if err := enc.Encode(sig); err != nil {
+				return err
 			}
 		}
 		return nil
@@ -50,11 +63,16 @@ func init() {
 		if err != nil {
 			return err
 		}
+		item.TransactionTypes = make([]uint16, 0, TxLen)
+		item.Transactions = make([]Transaction, 0, TxLen)
+		item.TranactionSignatures = make([][]common.Signature, 0, TxLen)
 		for i := 0; i < TxLen; i++ {
 			t, err := dec.DecodeUint16()
 			if err != nil {
 				return err
 			}
+			item.TransactionTypes = append(item.TransactionTypes, t)
+
 			tx, err := fc.Create(t)
 			if err != nil {
 				return err
@@ -63,12 +81,7 @@ func init() {
 				return err
 			}
 			item.Transactions = append(item.Transactions, tx.(Transaction))
-		}
-		SigsLen, err := dec.DecodeArrayLen()
-		if err != nil {
-			return err
-		}
-		for i := 0; i < SigsLen; i++ {
+
 			SigLen, err := dec.DecodeArrayLen()
 			if err != nil {
 				return err
@@ -83,6 +96,18 @@ func init() {
 			}
 			item.TranactionSignatures = append(item.TranactionSignatures, sigs)
 		}
+		SigLen, err := dec.DecodeArrayLen()
+		if err != nil {
+			return err
+		}
+		item.Signatures = make([]common.Signature, 0, SigLen)
+		for j := 0; j < SigLen; j++ {
+			var sig common.Signature
+			if err := dec.Decode(&sig); err != nil {
+				return err
+			}
+			item.Signatures = append(item.Signatures, sig)
+		}
 		rv.Set(reflect.ValueOf(item).Elem())
 		return nil
 	})
@@ -91,6 +116,7 @@ func init() {
 // Block includes a block header and a block body
 type Block struct {
 	Header               Header
+	TransactionTypes     []uint16             //MAXLEN : 65535
 	Transactions         []Transaction        //MAXLEN : 65535
 	TranactionSignatures [][]common.Signature //MAXLEN : 65536
 	Signatures           []common.Signature   //MAXLEN : 255

@@ -1,19 +1,25 @@
 package chain
 
 import (
+	"bytes"
 	"time"
 
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/factory"
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/core/types"
+	"github.com/fletaio/fleta/encoding"
 )
+
+// TODO : BlockCreator에 txpool 연동해서 이미 서명 검사한 것은 signers 목록을 받아올 수 있도록 처리
 
 // BlockCreator helps to create block
 type BlockCreator struct {
-	cn       *Chain
-	ctx      *types.Context
-	txHashes []hash.Hash256
-	b        *types.Block
+	cn        *Chain
+	ctx       *types.Context
+	txHashes  []hash.Hash256
+	b         *types.Block
+	txFactory *factory.Factory
 }
 
 // NewBlockCreator returns a BlockCreator
@@ -34,6 +40,7 @@ func NewBlockCreator(cn *Chain, ConsensusData []byte) *BlockCreator {
 			TranactionSignatures: [][]common.Signature{},
 			Signatures:           []common.Signature{},
 		},
+		txFactory: encoding.Factory("transaction"),
 	}
 	return bc
 }
@@ -47,26 +54,52 @@ func (bc *BlockCreator) Init() error {
 
 	// BeforeExecuteTransactions
 	for i, p := range bc.cn.processes {
-		if err := p.BeforeExecuteTransactions(NewContextProcess(IDMap[i], bc.ctx)); err != nil {
+		if err := p.BeforeExecuteTransactions(types.NewContextProcess(IDMap[i], bc.ctx)); err != nil {
 			return err
 		}
 	}
-	if err := bc.cn.app.BeforeExecuteTransactions(NewContextProcess(255, bc.ctx)); err != nil {
+	if err := bc.cn.app.BeforeExecuteTransactions(types.NewContextProcess(255, bc.ctx)); err != nil {
 		return err
 	}
 	return nil
 }
 
 // AddTx validates, executes and adds transactions
-func (bc *BlockCreator) AddTx(tx types.Transaction, sigs []common.Signature, signers []common.PublicHash) error {
-	if err := tx.Validate(bc.ctx, signers); err != nil {
+func (bc *BlockCreator) AddTx(tx types.Transaction, sigs []common.Signature) error {
+	t, err := bc.txFactory.TypeOf(tx)
+	if err != nil {
 		return err
 	}
-	if err := tx.Execute(bc.ctx, uint16(len(bc.b.Transactions))); err != nil {
+
+	var buffer bytes.Buffer
+	enc := encoding.NewEncoder(&buffer)
+	if err := enc.EncodeUint16(t); err != nil {
 		return err
 	}
+	if err := enc.Encode(tx); err != nil {
+		return err
+	}
+	th := hash.Hash(buffer.Bytes())
+
+	signers := []common.PublicHash{}
+	for _, sig := range sigs {
+		if pubkey, err := common.RecoverPubkey(th, sig); err != nil {
+			return err
+		} else {
+			signers = append(signers, common.NewPublicHash(pubkey))
+		}
+	}
+	ctp := types.NewContextProcess(uint8(t>>8), bc.ctx)
+	if err := tx.Validate(ctp, signers); err != nil {
+		return err
+	}
+	if err := tx.Execute(ctp, uint16(len(bc.b.Transactions))); err != nil {
+		return err
+	}
+	bc.b.TransactionTypes = append(bc.b.TransactionTypes, t)
 	bc.b.Transactions = append(bc.b.Transactions, tx)
 	bc.b.TranactionSignatures = append(bc.b.TranactionSignatures, sigs)
+	bc.txHashes = append(bc.txHashes, th)
 	return nil
 }
 
@@ -85,24 +118,24 @@ func (bc *BlockCreator) Finalize() (*types.Block, error) {
 
 	// AfterExecuteTransactions
 	for i, p := range bc.cn.processes {
-		if err := p.AfterExecuteTransactions(bc.b, NewContextProcess(IDMap[i], bc.ctx)); err != nil {
+		if err := p.AfterExecuteTransactions(bc.b, types.NewContextProcess(IDMap[i], bc.ctx)); err != nil {
 			return nil, err
 		}
 	}
-	if err := bc.cn.app.AfterExecuteTransactions(bc.b, NewContextProcess(255, bc.ctx)); err != nil {
+	if err := bc.cn.app.AfterExecuteTransactions(bc.b, types.NewContextProcess(255, bc.ctx)); err != nil {
 		return nil, err
 	}
 
 	// ProcessReward
 	for i, p := range bc.cn.processes {
-		if err := p.ProcessReward(bc.b, NewContextProcess(IDMap[i], bc.ctx)); err != nil {
+		if err := p.ProcessReward(bc.b, types.NewContextProcess(IDMap[i], bc.ctx)); err != nil {
 			return nil, err
 		}
 	}
-	if err := bc.cn.app.ProcessReward(bc.b, NewContextProcess(255, bc.ctx)); err != nil {
+	if err := bc.cn.app.ProcessReward(bc.b, types.NewContextProcess(255, bc.ctx)); err != nil {
 		return nil, err
 	}
-	if err := bc.cn.consensus.ProcessReward(bc.b, NewContextProcess(0, bc.ctx)); err != nil {
+	if err := bc.cn.consensus.ProcessReward(bc.b, types.NewContextProcess(0, bc.ctx)); err != nil {
 		return nil, err
 	}
 
