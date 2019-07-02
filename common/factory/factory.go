@@ -6,35 +6,39 @@ import (
 	"github.com/fletaio/fleta/common/hash"
 )
 
-// Factory provide account's handlers of the target chain
+// Factory provides type's factory
 type Factory struct {
-	nameTypeName   map[hash.Hash256]uint16
-	typeReflectMap map[uint16]reflect.Type
+	nameHashTypeMap map[hash.Hash256]uint16
+	typeNameMap     map[uint16]string
+	typeReflectMap  map[uint16]reflect.Type
 }
 
 // NewFactory returns a Factory
 func NewFactory() *Factory {
 	fc := &Factory{
-		nameTypeName:   map[hash.Hash256]uint16{},
-		typeReflectMap: map[uint16]reflect.Type{},
+		nameHashTypeMap: map[hash.Hash256]uint16{},
+		typeNameMap:     map[uint16]string{},
+		typeReflectMap:  map[uint16]reflect.Type{},
 	}
 	return fc
 }
 
-// Register add the account type with handler loaded by the name from the global account registry
+// Register add the type
 func (fc *Factory) Register(t uint16, v interface{}) error {
 	rt := reflect.TypeOf(v)
 	for rt.Kind() == reflect.Ptr {
 		rt = rt.Elem()
 	}
-	name := TypeHashOf(rt)
+	name := typeNameOf(rt)
+	h := hash.Hash([]byte(name))
 	if _, has := fc.typeReflectMap[t]; has {
 		return ErrExistType
 	}
-	if _, has := fc.nameTypeName[name]; has {
+	if _, has := fc.nameHashTypeMap[h]; has {
 		return ErrExistTypeName
 	}
-	fc.nameTypeName[name] = t
+	fc.nameHashTypeMap[h] = t
+	fc.typeNameMap[t] = name
 	fc.typeReflectMap[t] = rt
 	return nil
 }
@@ -48,19 +52,25 @@ func (fc *Factory) Create(t uint16) (interface{}, error) {
 	return reflect.New(rt).Interface(), nil
 }
 
-// TypeOf returns the type of the account
+// TypeOf returns the type of the value
 func (fc *Factory) TypeOf(v interface{}) (uint16, error) {
-	name := TypeHashOf(reflect.TypeOf(v))
-
-	t, has := fc.nameTypeName[name]
+	t, has := fc.nameHashTypeMap[hash.Hash([]byte(typeNameOf(reflect.TypeOf(v))))]
 	if !has {
 		return 0, ErrUnknownType
 	}
 	return t, nil
 }
 
-// TypeHashOf returns the hash of the type
-func TypeHashOf(rt reflect.Type) hash.Hash256 {
+// TypeName returns the name of the type
+func (fc *Factory) TypeName(t uint16) (string, error) {
+	name, has := fc.typeNameMap[t]
+	if !has {
+		return "", ErrUnknownType
+	}
+	return name, nil
+}
+
+func typeNameOf(rt reflect.Type) string {
 	for rt.Kind() == reflect.Ptr {
 		rt = rt.Elem()
 	}
@@ -68,5 +78,5 @@ func TypeHashOf(rt reflect.Type) hash.Hash256 {
 	if pkgPath := rt.PkgPath(); len(pkgPath) > 0 {
 		name = pkgPath + "." + name
 	}
-	return hash.Hash([]byte(name))
+	return name
 }

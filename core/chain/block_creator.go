@@ -1,7 +1,6 @@
 package chain
 
 import (
-	"bytes"
 	"time"
 
 	"github.com/fletaio/fleta/common"
@@ -71,15 +70,7 @@ func (bc *BlockCreator) AddTx(tx types.Transaction, sigs []common.Signature) err
 		return err
 	}
 
-	var buffer bytes.Buffer
-	enc := encoding.NewEncoder(&buffer)
-	if err := enc.EncodeUint16(t); err != nil {
-		return err
-	}
-	if err := enc.Encode(tx); err != nil {
-		return err
-	}
-	th := hash.Hash(buffer.Bytes())
+	th := HashTransaction(t, tx)
 
 	signers := []common.PublicHash{}
 	for _, sig := range sigs {
