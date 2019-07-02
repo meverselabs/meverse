@@ -213,7 +213,7 @@ func (ctd *ContextData) CreateAccount(acc Account) error {
 			return err
 		}
 	} else {
-		return ErrExistAccount
+		return ErrExistAccountName
 	}
 	ctd.AccountMap.Put(acc.Address(), acc)
 	ctd.AccountNameMap.Put(acc.Name(), acc.Address())

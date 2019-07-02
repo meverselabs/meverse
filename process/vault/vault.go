@@ -88,11 +88,6 @@ func (p *Vault) AfterExecuteTransactions(b *types.Block, ctp *types.ContextProce
 	return nil
 }
 
-// ProcessReward called when required to process reward to the context
-func (p *Vault) ProcessReward(b *types.Block, ctp *types.ContextProcess) error {
-	return nil
-}
-
 // OnSaveData called when the context of the block saved
 func (p *Vault) OnSaveData(b *types.Block, ctp *types.ContextProcess) error {
 	return nil

@@ -13,6 +13,7 @@ var (
 	ErrInvalidBlockHeaderFormat      = errors.New("invalid block header format")
 	ErrExistAccount                  = errors.New("exist account")
 	ErrNotExistAccount               = errors.New("not exist account")
+	ErrExistAccountName              = errors.New("exist account name")
 	ErrExistUTXO                     = errors.New("exist utxo")
 	ErrNotExistUTXO                  = errors.New("not exist utxo")
 	ErrNotExistEvent                 = errors.New("not exist event")

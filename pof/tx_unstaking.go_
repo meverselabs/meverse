@@ -106,9 +106,9 @@ func init() {
 		}
 		frAcc.StakingAmount = frAcc.StakingAmount.Sub(tx.Amount)
 
-		policy, has := gConsensusPolicyMap[ctx.ChainCoord().ID()]
+		policy, has := gFormulationPolicyMap[ctx.ChainCoord().ID()]
 		if !has {
-			return nil, ErrNotExistConsensusPolicy
+			return nil, ErrNotExistFormulationPolicy
 		}
 
 		ctx.AddLockedBalance(fromAcc.Address(), tx.Amount, ctx.TargetHeight()+policy.StakingUnlockRequiredBlocks)

@@ -3,6 +3,7 @@ package main // import "github.com/fletaio/fleta"
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"log"
 	"sync"
 	"time"
@@ -68,7 +69,7 @@ func test() error {
 	}
 
 	MaxBlocksPerFormulator := uint32(10)
-	policy := &pof.ConsensusPolicy{
+	policy := &pof.FormulationPolicy{
 		RewardPerBlock:                amount.NewCoinAmount(0, 500000000000000000),
 		PayRewardEveryBlocks:          500,
 		FormulatorCreationLimitHeight: 1000,
@@ -243,4 +244,32 @@ func (tx *Transaction) Validate(loader types.LoaderProcess, signers []common.Pub
 
 func (tx *Transaction) Execute(ctx *types.ContextProcess, index uint16) error {
 	return nil
+}
+
+// MarshalJSON is a marshaler function
+func (tx *Transaction) MarshalJSON() ([]byte, error) {
+	var buffer bytes.Buffer
+	buffer.WriteString(`{`)
+	buffer.WriteString(`"timestamp":`)
+	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"key_hash":`)
+	if bs, err := tx.KeyHash.MarshalJSON(); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"amount":`)
+	if bs, err := tx.Amount.MarshalJSON(); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`}`)
+	return buffer.Bytes(), nil
 }

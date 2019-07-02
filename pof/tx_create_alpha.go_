@@ -57,9 +57,9 @@ func (tx *CreateAlpha) Execute(ctx *types.Context, Fee *amount.Amount, t types.T
 		return nil, ErrInvalidAccountName
 	}
 
-	policy, has := gConsensusPolicyMap[ctx.ChainCoord().ID()]
+	policy, has := gFormulationPolicyMap[ctx.ChainCoord().ID()]
 	if !has {
-		return nil, ErrNotExistConsensusPolicy
+		return nil, ErrNotExistFormulationPolicy
 	}
 	if ctx.TargetHeight() < policy.FormulatorCreationLimitHeight {
 		return nil, ErrFormulatorCreationLimited

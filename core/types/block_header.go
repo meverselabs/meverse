@@ -1,6 +1,7 @@
 package types
 
 import (
+	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
 )
 
@@ -12,5 +13,6 @@ type Header struct {
 	LevelRootHash hash.Hash256
 	ContextHash   hash.Hash256
 	Timestamp     uint64
+	Generator     common.Address
 	ConsensusData []byte
 }

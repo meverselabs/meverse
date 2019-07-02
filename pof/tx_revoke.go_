@@ -48,9 +48,9 @@ func init() {
 		}
 		ctx.AddSeq(tx.From())
 
-		policy, has := gConsensusPolicyMap[ctx.ChainCoord().ID()]
+		policy, has := gFormulationPolicyMap[ctx.ChainCoord().ID()]
 		if !has {
-			return nil, ErrNotExistConsensusPolicy
+			return nil, ErrNotExistFormulationPolicy
 		}
 
 		heritorAcc, err := ctx.Account(tx.From())

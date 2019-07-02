@@ -66,9 +66,9 @@ func init() {
 	}, func(ctx *data.Context, Fee *amount.Amount, t transaction.Transaction, coord *common.Coordinate) (ret interface{}, rerr error) {
 		tx := t.(*CreateOmega)
 
-		policy, has := gConsensusPolicyMap[ctx.ChainCoord().ID()]
+		policy, has := gFormulationPolicyMap[ctx.ChainCoord().ID()]
 		if !has {
-			return nil, ErrNotExistConsensusPolicy
+			return nil, ErrNotExistFormulationPolicy
 		}
 		if len(tx.SigmaFormulators) != int(policy.OmegaRequiredSigmaCount) {
 			return nil, ErrInvalidFormulatorCount

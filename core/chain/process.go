@@ -18,6 +18,11 @@ type Process interface {
 // ProcessBase is a base handler of the chain Process
 type ProcessBase struct{}
 
+// InitGenesis initializes genesis data
+func (p *ProcessBase) InitGenesis(ctp *types.ContextProcess) error {
+	return nil
+}
+
 // OnLoadChain called when the chain loaded
 func (p *ProcessBase) OnLoadChain(loader types.LoaderProcess) error {
 	return nil

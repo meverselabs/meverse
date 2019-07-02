@@ -1,4 +1,4 @@
-package pof
+package formulator
 
 import (
 	"reflect"

@@ -1,4 +1,4 @@
-package pof
+package formulator
 
 import (
 	"bytes"
@@ -7,8 +7,8 @@ import (
 	"github.com/fletaio/fleta/common/amount"
 )
 
-// ConsensusPolicy defines a staking policy user
-type ConsensusPolicy struct {
+// FormulationPolicy defines a staking policy user
+type FormulationPolicy struct {
 	RewardPerBlock                *amount.Amount
 	PayRewardEveryBlocks          uint32
 	FormulatorCreationLimitHeight uint32
@@ -31,7 +31,7 @@ type ConsensusPolicy struct {
 }
 
 // MarshalJSON is a marshaler function
-func (pc *ConsensusPolicy) MarshalJSON() ([]byte, error) {
+func (pc *FormulationPolicy) MarshalJSON() ([]byte, error) {
 	var buffer bytes.Buffer
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"reward_per_block":`)
