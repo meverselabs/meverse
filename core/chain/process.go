@@ -12,7 +12,6 @@ type Process interface {
 	OnLoadChain(loader types.LoaderProcess) error
 	BeforeExecuteTransactions(ctp *types.ContextProcess) error
 	AfterExecuteTransactions(b *types.Block, ctp *types.ContextProcess) error
-	ProcessReward(b *types.Block, ctp *types.ContextProcess) error
 	OnSaveData(b *types.Block, ctp *types.ContextProcess) error
 }
 
@@ -31,11 +30,6 @@ func (p *ProcessBase) BeforeExecuteTransactions(ctp *types.ContextProcess) error
 
 // AfterExecuteTransactions called after processes transactions of the block
 func (p *ProcessBase) AfterExecuteTransactions(b *types.Block, ctp *types.ContextProcess) error {
-	return nil
-}
-
-// ProcessReward called when required to process reward to the context
-func (p *ProcessBase) ProcessReward(b *types.Block, ctp *types.ContextProcess) error {
 	return nil
 }
 

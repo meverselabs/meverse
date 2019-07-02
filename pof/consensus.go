@@ -198,8 +198,13 @@ func (cs *Consensus) ValidateSignature(bh *types.Header, sigs []common.Signature
 	return nil
 }
 
-// ProcessReward called when required to process reward to the context
-func (cs *Consensus) ProcessReward(b *types.Block, ctp *types.ContextProcess) error {
+// BeforeExecuteTransactions called before processes transactions of the block
+func (cs *Consensus) BeforeExecuteTransactions(bctp *types.ContextProcess) error {
+	return nil
+}
+
+// AfterExecuteTransactions called after processes transactions of the block
+func (cs *Consensus) AfterExecuteTransactions(b *types.Block, ctp *types.ContextProcess) error {
 	_, Formulator, err := cs.decodeConsensusData(b.Header.ConsensusData)
 	if err != nil {
 		return err
@@ -211,7 +216,6 @@ func (cs *Consensus) ProcessReward(b *types.Block, ctp *types.ContextProcess) er
 	} else if err := encoding.Unmarshal(bs, &policy); err != nil {
 		return err
 	}
-
 	rd := newRewardData()
 	if bs := ctp.ProcessData([]byte("reward")); len(bs) == 0 {
 		return ErrInvalidRewardData

@@ -322,17 +322,7 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 	if err := cn.app.AfterExecuteTransactions(b, types.NewContextProcess(255, ctx)); err != nil {
 		return err
 	}
-
-	// ProcessReward
-	for i, p := range cn.processes {
-		if err := p.ProcessReward(b, types.NewContextProcess(IDMap[i], ctx)); err != nil {
-			return err
-		}
-	}
-	if err := cn.app.ProcessReward(b, types.NewContextProcess(255, ctx)); err != nil {
-		return err
-	}
-	if err := cn.consensus.ProcessReward(b, types.NewContextProcess(0, ctx)); err != nil {
+	if err := cn.consensus.AfterExecuteTransactions(b, types.NewContextProcess(0, ctx)); err != nil {
 		return err
 	}
 	return nil

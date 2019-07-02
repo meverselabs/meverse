@@ -125,17 +125,7 @@ func (bc *BlockCreator) Finalize() (*types.Block, error) {
 	if err := bc.cn.app.AfterExecuteTransactions(bc.b, types.NewContextProcess(255, bc.ctx)); err != nil {
 		return nil, err
 	}
-
-	// ProcessReward
-	for i, p := range bc.cn.processes {
-		if err := p.ProcessReward(bc.b, types.NewContextProcess(IDMap[i], bc.ctx)); err != nil {
-			return nil, err
-		}
-	}
-	if err := bc.cn.app.ProcessReward(bc.b, types.NewContextProcess(255, bc.ctx)); err != nil {
-		return nil, err
-	}
-	if err := bc.cn.consensus.ProcessReward(bc.b, types.NewContextProcess(0, bc.ctx)); err != nil {
+	if err := bc.cn.consensus.AfterExecuteTransactions(bc.b, types.NewContextProcess(0, bc.ctx)); err != nil {
 		return nil, err
 	}
 

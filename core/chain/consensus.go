@@ -11,7 +11,8 @@ type Consensus interface {
 	InitGenesis(ctp *types.ContextProcess) error
 	OnLoadChain(loader types.LoaderProcess) error
 	ValidateSignature(bh *types.Header, sigs []common.Signature) error
-	ProcessReward(b *types.Block, ctp *types.ContextProcess) error
+	BeforeExecuteTransactions(ctp *types.ContextProcess) error
+	AfterExecuteTransactions(b *types.Block, ctp *types.ContextProcess) error
 	OnSaveData(b *types.Block, ctp *types.ContextProcess) error
 }
 
@@ -33,8 +34,13 @@ func (cs *ConsensusBase) ValidateSignature(bh *types.Header, sigs []common.Signa
 	return nil
 }
 
-// ProcessReward called when required to process reward to the context
-func (cs *ConsensusBase) ProcessReward(b *types.Block, ctp *types.ContextProcess) error {
+// BeforeExecuteTransactions called before processes transactions of the block
+func (cs *ConsensusBase) BeforeExecuteTransactions(bctp *types.ContextProcess) error {
+	return nil
+}
+
+// AfterExecuteTransactions called after processes transactions of the block
+func (cs *ConsensusBase) AfterExecuteTransactions(b *types.Block, ctp *types.ContextProcess) error {
 	return nil
 }
 
