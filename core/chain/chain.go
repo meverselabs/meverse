@@ -1,7 +1,6 @@
 package chain
 
 import (
-	"bytes"
 	"runtime"
 	"sync"
 
@@ -10,7 +9,6 @@ import (
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/core/types"
-	"github.com/fletaio/fleta/encoding"
 )
 
 // Chain manages the chain data using processes
@@ -386,17 +384,7 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block, ctx *types.Contex
 				t := b.TransactionTypes[sidx+q]
 				sigs := b.TranactionSignatures[sidx+q]
 
-				var buffer bytes.Buffer
-				enc := encoding.NewEncoder(&buffer)
-				if err := enc.EncodeUint16(t); err != nil {
-					errs <- err
-					return
-				}
-				if err := enc.Encode(tx); err != nil {
-					errs <- err
-					return
-				}
-				TxHash := hash.Hash(buffer.Bytes())
+				TxHash := HashTransaction(t, tx)
 				TxHashes[sidx+q+1] = TxHash
 
 				signers := make([]common.PublicHash, 0, len(sigs))

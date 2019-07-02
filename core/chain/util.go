@@ -5,6 +5,8 @@ import (
 	"sync"
 
 	"github.com/fletaio/fleta/common/hash"
+	"github.com/fletaio/fleta/core/types"
+	"github.com/fletaio/fleta/encoding"
 )
 
 const hashPerLevel = 16
@@ -93,4 +95,16 @@ func BuildLevelRoot(hashes []hash.Hash256) (hash.Hash256, error) {
 		return hash.Hash256{}, err
 	}
 	return h, nil
+}
+
+func HashTransaction(t uint16, tx types.Transaction) hash.Hash256 {
+	var buffer bytes.Buffer
+	enc := encoding.NewEncoder(&buffer)
+	if err := enc.EncodeUint16(t); err != nil {
+		panic(err)
+	}
+	if err := enc.Encode(tx); err != nil {
+		panic(err)
+	}
+	return hash.Hash(buffer.Bytes())
 }
