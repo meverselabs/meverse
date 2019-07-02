@@ -47,7 +47,7 @@ func init() {
 	})
 }
 
-// Rank represents the rank information of the formulation account
+// Rank represents the rank information of the formulator account
 type Rank struct {
 	Address    common.Address
 	PublicHash common.PublicHash

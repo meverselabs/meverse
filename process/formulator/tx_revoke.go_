@@ -14,50 +14,32 @@ import (
 )
 
 func init() {
-	data.RegisterTransaction("consensus.CreateHyper", func(t transaction.Type) transaction.Transaction {
-		return &CreateHyper{
+	data.RegisterTransaction("consensus.Revoke", func(t transaction.Type) transaction.Transaction {
+		return &Revoke{
 			Base: transaction.Base{
 				Type_: t,
 			},
 		}
 	}, func(loader data.Loader, t transaction.Transaction, signers []common.PublicHash) error {
-		tx := t.(*CreateHyper)
-		if len(tx.Name) < 8 || len(tx.Name) > 16 {
-			return ErrInvalidAccountName
-		}
-
-		initAddr := common.NewAddress(common.NewCoordinate(0, 0), 0)
-		if tx.From().Equal(initAddr) {
-			return ErrUnauthorizedTransaction
-		}
-
+		tx := t.(*Revoke)
 		if tx.Seq() <= loader.Seq(tx.From()) {
 			return ErrInvalidSequence
 		}
 
-		fromAcc, err := loader.Account(tx.From())
+		acc, err := loader.Account(tx.From())
 		if err != nil {
 			return err
 		}
-
-		if err := loader.Accounter().Validate(loader, fromAcc, signers); err != nil {
+		frAcc, is := acc.(*FormulatorAccount)
+		if !is {
+			return ErrInvalidAccountType
+		}
+		if err := loader.Accounter().Validate(loader, frAcc, signers); err != nil {
 			return err
 		}
 		return nil
 	}, func(ctx *data.Context, Fee *amount.Amount, t transaction.Transaction, coord *common.Coordinate) (ret interface{}, rerr error) {
-		tx := t.(*CreateHyper)
-		if len(tx.Name) < 8 || len(tx.Name) > 16 {
-			return nil, ErrInvalidAccountName
-		}
-
-		policy, has := gFormulationPolicyMap[ctx.ChainCoord().ID()]
-		if !has {
-			return nil, ErrNotExistFormulationPolicy
-		}
-		if ctx.TargetHeight() < policy.FormulatorCreationLimitHeight {
-			return nil, ErrFormulatorCreationLimited
-		}
-
+		tx := t.(*Revoke)
 		sn := ctx.Snapshot()
 		defer ctx.Revert(sn)
 
@@ -66,76 +48,109 @@ func init() {
 		}
 		ctx.AddSeq(tx.From())
 
-		fromAcc, err := ctx.Account(tx.From())
+		policy, has := gFormulatorPolicyMap[ctx.ChainCoord().ID()]
+		if !has {
+			return nil, ErrNotExistFormulatorPolicy
+		}
+
+		heritorAcc, err := ctx.Account(tx.From())
 		if err != nil {
 			return nil, err
 		}
-		if err := fromAcc.SubBalance(Fee); err != nil {
-			return nil, err
-		}
-		if err := fromAcc.SubBalance(policy.HyperCreationAmount); err != nil {
-			return nil, err
-		}
 
-		addr := common.NewAddress(coord, 0)
-		if is, err := ctx.IsExistAccount(addr); err != nil {
+		acc, err := ctx.Account(tx.From())
+		if err != nil {
 			return nil, err
-		} else if is {
-			return nil, ErrExistAddress
-		} else if isn, err := ctx.IsExistAccountName(tx.Name); err != nil {
-			return nil, err
-		} else if isn {
-			return nil, ErrExistAccountName
-		} else {
-			a, err := ctx.Accounter().NewByTypeName("consensus.FormulationAccount")
+		}
+		frAcc, is := acc.(*FormulatorAccount)
+		if !is {
+			return nil, ErrInvalidAccountType
+		}
+		switch frAcc.FormulatorType {
+		case AlphaFormulatorType:
+			if err := frAcc.SubBalance(Fee); err != nil {
+				return nil, err
+			}
+			ctx.AddLockedBalance(heritorAcc.Address(), frAcc.Amount.Add(frAcc.Balance()), ctx.TargetHeight()+policy.AlphaUnlockRequiredBlocks)
+		case SigmaFormulatorType:
+			if err := frAcc.SubBalance(Fee); err != nil {
+				return nil, err
+			}
+			ctx.AddLockedBalance(heritorAcc.Address(), frAcc.Amount.Add(frAcc.Balance()), ctx.TargetHeight()+policy.SigmaUnlockRequiredBlocks)
+		case OmegaFormulatorType:
+			if err := frAcc.SubBalance(Fee); err != nil {
+				return nil, err
+			}
+			ctx.AddLockedBalance(heritorAcc.Address(), frAcc.Amount.Add(frAcc.Balance()), ctx.TargetHeight()+policy.OmegaUnlockRequiredBlocks)
+		case HyperFormulatorType:
+			if err := frAcc.SubBalance(Fee); err != nil {
+				return nil, err
+			}
+			ctx.AddLockedBalance(heritorAcc.Address(), frAcc.Amount.Add(frAcc.Balance()), ctx.TargetHeight()+policy.HyperUnlockRequiredBlocks)
+
+			keys, err := ctx.AccountDataKeys(tx.From(), TagStaking)
 			if err != nil {
 				return nil, err
 			}
-			acc := a.(*FormulationAccount)
-			acc.Address_ = addr
-			acc.Name_ = tx.Name
-			acc.FormulationType = HyperFormulatorType
-			acc.KeyHash = tx.KeyHash
-			acc.Amount = policy.HyperCreationAmount
-			ctx.CreateAccount(acc)
+			for _, k := range keys {
+				if addr, is := FromStakingKey(k); is {
+					bs := ctx.AccountData(tx.From(), k)
+					if len(bs) == 0 {
+						return nil, ErrInvalidStakingAddress
+					}
+					StakingAmount := amount.NewAmountFromBytes(bs)
+					if frAcc.StakingAmount.Less(StakingAmount) {
+						return nil, ErrCriticalStakingAmount
+					}
+					frAcc.StakingAmount.Sub(StakingAmount)
+
+					ctx.AddLockedBalance(addr, StakingAmount, ctx.TargetHeight()+policy.StakingUnlockRequiredBlocks)
+				}
+			}
+			if !frAcc.StakingAmount.IsZero() {
+				return nil, ErrCriticalStakingAmount
+			}
+		default:
+			return nil, ErrInvalidAccountType
 		}
+		ctx.DeleteAccount(acc)
+
 		ctx.Commit(sn)
 		return nil, nil
 	})
 }
 
-// CreateHyper is a consensus.CreateHyper
-// It is used to make formulation account
-type CreateHyper struct {
+// Revoke is a consensus.Revoke
+// It is used to remove formulator account and get back staked coin
+type Revoke struct {
 	transaction.Base
 	Seq_    uint64
 	From_   common.Address
-	Name    string
-	KeyHash common.PublicHash
+	Heritor common.Address
 }
 
 // IsUTXO returns false
-func (tx *CreateHyper) IsUTXO() bool {
+func (tx *Revoke) IsUTXO() bool {
 	return false
 }
 
 // From returns the creator of the transaction
-func (tx *CreateHyper) From() common.Address {
+func (tx *Revoke) From() common.Address {
 	return tx.From_
 }
 
 // Seq returns the sequence of the transaction
-func (tx *CreateHyper) Seq() uint64 {
+func (tx *Revoke) Seq() uint64 {
 	return tx.Seq_
 }
 
 // Hash returns the hash value of it
-func (tx *CreateHyper) Hash() hash.Hash256 {
+func (tx *Revoke) Hash() hash.Hash256 {
 	return hash.DoubleHashByWriterTo(tx)
 }
 
 // WriteTo is a serialization function
-func (tx *CreateHyper) WriteTo(w io.Writer) (int64, error) {
+func (tx *Revoke) WriteTo(w io.Writer) (int64, error) {
 	var wrote int64
 	if n, err := tx.Base.WriteTo(w); err != nil {
 		return wrote, err
@@ -152,12 +167,7 @@ func (tx *CreateHyper) WriteTo(w io.Writer) (int64, error) {
 	} else {
 		wrote += n
 	}
-	if n, err := util.WriteString(w, tx.Name); err != nil {
-		return wrote, err
-	} else {
-		wrote += n
-	}
-	if n, err := tx.KeyHash.WriteTo(w); err != nil {
+	if n, err := tx.Heritor.WriteTo(w); err != nil {
 		return wrote, err
 	} else {
 		wrote += n
@@ -166,7 +176,7 @@ func (tx *CreateHyper) WriteTo(w io.Writer) (int64, error) {
 }
 
 // ReadFrom is a deserialization function
-func (tx *CreateHyper) ReadFrom(r io.Reader) (int64, error) {
+func (tx *Revoke) ReadFrom(r io.Reader) (int64, error) {
 	var read int64
 	if n, err := tx.Base.ReadFrom(r); err != nil {
 		return read, err
@@ -184,13 +194,7 @@ func (tx *CreateHyper) ReadFrom(r io.Reader) (int64, error) {
 	} else {
 		read += n
 	}
-	if v, n, err := util.ReadString(r); err != nil {
-		return read, err
-	} else {
-		read += n
-		tx.Name = v
-	}
-	if n, err := tx.KeyHash.ReadFrom(r); err != nil {
+	if n, err := tx.Heritor.ReadFrom(r); err != nil {
 		return read, err
 	} else {
 		read += n
@@ -199,7 +203,7 @@ func (tx *CreateHyper) ReadFrom(r io.Reader) (int64, error) {
 }
 
 // MarshalJSON is a marshaler function
-func (tx *CreateHyper) MarshalJSON() ([]byte, error) {
+func (tx *Revoke) MarshalJSON() ([]byte, error) {
 	var buffer bytes.Buffer
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"type":`)
@@ -230,15 +234,8 @@ func (tx *CreateHyper) MarshalJSON() ([]byte, error) {
 		buffer.Write(bs)
 	}
 	buffer.WriteString(`,`)
-	buffer.WriteString(`"name":`)
-	if bs, err := json.Marshal(tx.Name); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"from":`)
-	if bs, err := tx.KeyHash.MarshalJSON(); err != nil {
+	buffer.WriteString(`"heritor":`)
+	if bs, err := tx.Heritor.MarshalJSON(); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

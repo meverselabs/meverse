@@ -14,14 +14,14 @@ import (
 )
 
 func init() {
-	data.RegisterTransaction("consensus.CreateOmega", func(t transaction.Type) transaction.Transaction {
-		return &CreateOmega{
+	data.RegisterTransaction("consensus.CreateSigma", func(t transaction.Type) transaction.Transaction {
+		return &CreateSigma{
 			Base: transaction.Base{
 				Type_: t,
 			},
 		}
 	}, func(loader data.Loader, t transaction.Transaction, signers []common.PublicHash) error {
-		tx := t.(*CreateOmega)
+		tx := t.(*CreateSigma)
 		if tx.Seq() <= loader.Seq(tx.From()) {
 			return ErrInvalidSequence
 		}
@@ -30,11 +30,11 @@ func init() {
 		if err != nil {
 			return err
 		}
-		frAcc, is := acc.(*FormulationAccount)
+		frAcc, is := acc.(*FormulatorAccount)
 		if !is {
 			return ErrInvalidAccountType
 		}
-		if frAcc.FormulationType != SigmaFormulatorType {
+		if frAcc.FormulatorType != AlphaFormulatorType {
 			return ErrInvalidAccountType
 		}
 
@@ -43,15 +43,15 @@ func init() {
 		}
 
 		hasFrom := false
-		for _, addr := range tx.SigmaFormulators {
+		for _, addr := range tx.AlphaFormulators {
 			if addr.Equal(tx.From()) {
 				hasFrom = true
 			}
 			if acc, err := loader.Account(addr); err != nil {
 				return err
-			} else if facc, is := acc.(*FormulationAccount); !is {
+			} else if facc, is := acc.(*FormulatorAccount); !is {
 				return ErrInvalidAccountType
-			} else if facc.FormulationType != SigmaFormulatorType {
+			} else if facc.FormulatorType != AlphaFormulatorType {
 				return ErrInvalidAccountType
 			} else {
 				if err := loader.Accounter().Validate(loader, facc, signers); err != nil {
@@ -64,13 +64,13 @@ func init() {
 		}
 		return nil
 	}, func(ctx *data.Context, Fee *amount.Amount, t transaction.Transaction, coord *common.Coordinate) (ret interface{}, rerr error) {
-		tx := t.(*CreateOmega)
+		tx := t.(*CreateSigma)
 
-		policy, has := gFormulationPolicyMap[ctx.ChainCoord().ID()]
+		policy, has := gFormulatorPolicyMap[ctx.ChainCoord().ID()]
 		if !has {
-			return nil, ErrNotExistFormulationPolicy
+			return nil, ErrNotExistFormulatorPolicy
 		}
-		if len(tx.SigmaFormulators) != int(policy.OmegaRequiredSigmaCount) {
+		if len(tx.AlphaFormulators) != int(policy.SigmaRequiredAlphaCount) {
 			return nil, ErrInvalidFormulatorCount
 		}
 
@@ -86,27 +86,27 @@ func init() {
 		if err != nil {
 			return nil, err
 		}
-		frAcc, is := acc.(*FormulationAccount)
+		frAcc, is := acc.(*FormulatorAccount)
 		if !is {
 			return nil, ErrInvalidAccountType
 		}
-		if frAcc.FormulationType != SigmaFormulatorType {
+		if frAcc.FormulatorType != AlphaFormulatorType {
 			return nil, ErrInvalidAccountType
 		}
 
-		hasFrom := true
-		for _, addr := range tx.SigmaFormulators {
+		hasFrom := false
+		for _, addr := range tx.AlphaFormulators {
 			if addr.Equal(tx.From()) {
 				hasFrom = true
 			}
 			if acc, err := ctx.Account(addr); err != nil {
 				return nil, err
-			} else if subAcc, is := acc.(*FormulationAccount); !is {
+			} else if subAcc, is := acc.(*FormulatorAccount); !is {
 				return nil, ErrInvalidAccountType
-			} else if subAcc.FormulationType != SigmaFormulatorType {
+			} else if subAcc.FormulatorType != AlphaFormulatorType {
 				return nil, ErrInvalidAccountType
 			} else {
-				if ctx.TargetHeight() < addr.Coordinate().Height+policy.OmegaRequiredSigmaBlocks {
+				if ctx.TargetHeight() < addr.Coordinate().Height+policy.SigmaRequiredAlphaBlocks {
 					return nil, ErrInsufficientFormulatorBlocks
 				}
 				if !addr.Equal(frAcc.Address()) {
@@ -125,37 +125,37 @@ func init() {
 	})
 }
 
-// CreateOmega is a consensus.CreateOmega
-// It is used to make formulation account
-type CreateOmega struct {
+// CreateSigma is a consensus.CreateSigma
+// It is used to make formulator account
+type CreateSigma struct {
 	transaction.Base
 	Seq_             uint64
 	From_            common.Address
-	SigmaFormulators []common.Address
+	AlphaFormulators []common.Address
 }
 
 // IsUTXO returns false
-func (tx *CreateOmega) IsUTXO() bool {
+func (tx *CreateSigma) IsUTXO() bool {
 	return false
 }
 
 // From returns the creator of the transaction
-func (tx *CreateOmega) From() common.Address {
+func (tx *CreateSigma) From() common.Address {
 	return tx.From_
 }
 
 // Seq returns the sequence of the transaction
-func (tx *CreateOmega) Seq() uint64 {
+func (tx *CreateSigma) Seq() uint64 {
 	return tx.Seq_
 }
 
 // Hash returns the hash value of it
-func (tx *CreateOmega) Hash() hash.Hash256 {
+func (tx *CreateSigma) Hash() hash.Hash256 {
 	return hash.DoubleHashByWriterTo(tx)
 }
 
 // WriteTo is a serialization function
-func (tx *CreateOmega) WriteTo(w io.Writer) (int64, error) {
+func (tx *CreateSigma) WriteTo(w io.Writer) (int64, error) {
 	var wrote int64
 	if n, err := tx.Base.WriteTo(w); err != nil {
 		return wrote, err
@@ -172,11 +172,11 @@ func (tx *CreateOmega) WriteTo(w io.Writer) (int64, error) {
 	} else {
 		wrote += n
 	}
-	if n, err := util.WriteUint8(w, uint8(len(tx.SigmaFormulators))); err != nil {
+	if n, err := util.WriteUint8(w, uint8(len(tx.AlphaFormulators))); err != nil {
 		return wrote, err
 	} else {
 		wrote += n
-		for _, addr := range tx.SigmaFormulators {
+		for _, addr := range tx.AlphaFormulators {
 			if n, err := addr.WriteTo(w); err != nil {
 				return wrote, err
 			} else {
@@ -188,7 +188,7 @@ func (tx *CreateOmega) WriteTo(w io.Writer) (int64, error) {
 }
 
 // ReadFrom is a deserialization function
-func (tx *CreateOmega) ReadFrom(r io.Reader) (int64, error) {
+func (tx *CreateSigma) ReadFrom(r io.Reader) (int64, error) {
 	var read int64
 	if n, err := tx.Base.ReadFrom(r); err != nil {
 		return read, err
@@ -210,7 +210,7 @@ func (tx *CreateOmega) ReadFrom(r io.Reader) (int64, error) {
 		return read, err
 	} else {
 		read += n
-		tx.SigmaFormulators = make([]common.Address, 0, Len)
+		tx.AlphaFormulators = make([]common.Address, 0, Len)
 		for i := 0; i < int(Len); i++ {
 			var addr common.Address
 			if n, err := addr.ReadFrom(r); err != nil {
@@ -218,14 +218,14 @@ func (tx *CreateOmega) ReadFrom(r io.Reader) (int64, error) {
 			} else {
 				read += n
 			}
-			tx.SigmaFormulators = append(tx.SigmaFormulators, addr)
+			tx.AlphaFormulators = append(tx.AlphaFormulators, addr)
 		}
 	}
 	return read, nil
 }
 
 // MarshalJSON is a marshaler function
-func (tx *CreateOmega) MarshalJSON() ([]byte, error) {
+func (tx *CreateSigma) MarshalJSON() ([]byte, error) {
 	var buffer bytes.Buffer
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"type":`)
@@ -256,8 +256,8 @@ func (tx *CreateOmega) MarshalJSON() ([]byte, error) {
 		buffer.Write(bs)
 	}
 	buffer.WriteString(`,`)
-	buffer.WriteString(`"sigma_formulators":[`)
-	for i, addr := range tx.SigmaFormulators {
+	buffer.WriteString(`"alpha_formulators":[`)
+	for i, addr := range tx.AlphaFormulators {
 		if i > 0 {
 			buffer.WriteString(`,`)
 		}

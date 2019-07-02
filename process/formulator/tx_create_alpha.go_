@@ -10,7 +10,7 @@ import (
 )
 
 // CreateAlpha is a consensus.CreateAlpha
-// It is used to make formulation account
+// It is used to make formulator account
 type CreateAlpha struct {
 	Seq_    uint64
 	From_   common.Address
@@ -57,9 +57,9 @@ func (tx *CreateAlpha) Execute(ctx *types.Context, Fee *amount.Amount, t types.T
 		return nil, ErrInvalidAccountName
 	}
 
-	policy, has := gFormulationPolicyMap[ctx.ChainCoord().ID()]
+	policy, has := gFormulatorPolicyMap[ctx.ChainCoord().ID()]
 	if !has {
-		return nil, ErrNotExistFormulationPolicy
+		return nil, ErrNotExistFormulatorPolicy
 	}
 	if ctx.TargetHeight() < policy.FormulatorCreationLimitHeight {
 		return nil, ErrFormulatorCreationLimited
@@ -94,14 +94,14 @@ func (tx *CreateAlpha) Execute(ctx *types.Context, Fee *amount.Amount, t types.T
 	} else if isn {
 		return nil, ErrExistAccountName
 	} else {
-		a, err := ctx.Accounter().NewByTypeName("consensus.FormulationAccount")
+		a, err := ctx.Accounter().NewByTypeName("consensus.FormulatorAccount")
 		if err != nil {
 			return nil, err
 		}
-		acc := a.(*FormulationAccount)
+		acc := a.(*FormulatorAccount)
 		acc.Address_ = addr
 		acc.Name_ = tx.Name
-		acc.FormulationType = AlphaFormulatorType
+		acc.FormulatorType = AlphaFormulatorType
 		acc.KeyHash = tx.KeyHash
 		acc.Amount = policy.AlphaCreationAmount
 		ctx.CreateAccount(acc)

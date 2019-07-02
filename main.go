@@ -12,6 +12,7 @@ import (
 	"github.com/fletaio/fleta/common/amount"
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/core/types"
+	"github.com/fletaio/fleta/process/formulator"
 	"github.com/fletaio/fleta/process/vault"
 
 	"github.com/fletaio/fleta/pof"
@@ -69,7 +70,7 @@ func test() error {
 	}
 
 	MaxBlocksPerFormulator := uint32(10)
-	policy := &pof.FormulationPolicy{
+	policy := &formulator.FormulatorPolicy{
 		RewardPerBlock:                amount.NewCoinAmount(0, 500000000000000000),
 		PayRewardEveryBlocks:          500,
 		FormulatorCreationLimitHeight: 1000,
@@ -89,12 +90,13 @@ func test() error {
 		HyperUnlockRequiredBlocks:     1000,
 		StakingEfficiency1000:         1000,
 	}
-	cs := pof.NewConsensus(policy, MaxBlocksPerFormulator, ObserverKeys)
+	cs := pof.NewConsensus(MaxBlocksPerFormulator, ObserverKeys)
 	app := &DApp{
 		frkey: frkeys[0],
 	}
 	cn := chain.NewChain(cs, app, st)
 	cn.MustAddProcess(1, vault.NewVault())
+	cn.MustAddProcess(1, formulator.NewFormulator(policy))
 	if err := cn.Init(); err != nil {
 		return err
 	}
@@ -210,10 +212,10 @@ func (app *DApp) Init(reg *chain.Register, cn *chain.Chain) error {
 func (app *DApp) InitGenesis(ctp *types.ContextProcess) error {
 	app.Lock()
 	defer app.Unlock()
-	acc := &pof.FormulationAccount{
+	acc := &formulator.FormulatorAccount{
 		Address_:        common.NewAddress(0, 0, 0),
 		Name_:           "fleta.001",
-		FormulationType: pof.AlphaFormulatorType,
+		FormulatorType: formulator.AlphaFormulatorType,
 		KeyHash:         common.NewPublicHash(app.frkey.PublicKey()),
 		Amount:          amount.NewCoinAmount(1000, 0),
 	}

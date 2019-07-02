@@ -9,23 +9,23 @@ import (
 	"github.com/fletaio/fleta/core/types"
 )
 
-// FormulationType is type of formulation account
-type FormulationType uint8
+// FormulatorType is type of formulator account
+type FormulatorType uint8
 
 // formulator types
 const (
-	AlphaFormulatorType = FormulationType(1)
-	SigmaFormulatorType = FormulationType(2)
-	OmegaFormulatorType = FormulationType(3)
-	HyperFormulatorType = FormulationType(4)
+	AlphaFormulatorType = FormulatorType(1)
+	SigmaFormulatorType = FormulatorType(2)
+	OmegaFormulatorType = FormulatorType(3)
+	HyperFormulatorType = FormulatorType(4)
 )
 
-// FormulationAccount is a consensus.FormulationAccount
+// FormulatorAccount is a consensus.FormulatorAccount
 // It is used to indentify Hyper formulator that supports the staking system
-type FormulationAccount struct {
+type FormulatorAccount struct {
 	Address_        common.Address
 	Name_           string
-	FormulationType FormulationType
+	FormulatorType FormulatorType
 	KeyHash         common.PublicHash
 	Amount          *amount.Amount
 	StakingAmount   *amount.Amount
@@ -33,25 +33,25 @@ type FormulationAccount struct {
 }
 
 // Address returns the address of the account
-func (acc *FormulationAccount) Address() common.Address {
+func (acc *FormulatorAccount) Address() common.Address {
 	return acc.Address_
 }
 
 // Name returns the name of the account
-func (acc *FormulationAccount) Name() string {
+func (acc *FormulatorAccount) Name() string {
 	return acc.Name_
 }
 
 // Clone returns the clonend value of it
-func (acc *FormulationAccount) Clone() types.Account {
-	c := &FormulationAccount{
+func (acc *FormulatorAccount) Clone() types.Account {
+	c := &FormulatorAccount{
 		Address_:        acc.Address_,
 		Name_:           acc.Name_,
-		FormulationType: acc.FormulationType,
+		FormulatorType: acc.FormulatorType,
 		KeyHash:         acc.KeyHash.Clone(),
 		Amount:          acc.Amount.Clone(),
 	}
-	if acc.FormulationType == HyperFormulatorType {
+	if acc.FormulatorType == HyperFormulatorType {
 		c.StakingAmount = acc.StakingAmount.Clone()
 		c.Policy = acc.Policy.Clone()
 	}
@@ -59,7 +59,7 @@ func (acc *FormulationAccount) Clone() types.Account {
 }
 
 // Validate validates account signers
-func (acc *FormulationAccount) Validate(loader types.LoaderProcess, signers []common.PublicHash) error {
+func (acc *FormulatorAccount) Validate(loader types.LoaderProcess, signers []common.PublicHash) error {
 	if len(signers) != 1 {
 		return ErrInvalidSignerCount
 	}
@@ -70,7 +70,7 @@ func (acc *FormulationAccount) Validate(loader types.LoaderProcess, signers []co
 }
 
 // MarshalJSON is a marshaler function
-func (acc *FormulationAccount) MarshalJSON() ([]byte, error) {
+func (acc *FormulatorAccount) MarshalJSON() ([]byte, error) {
 	var buffer bytes.Buffer
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"address":`)
@@ -87,8 +87,8 @@ func (acc *FormulationAccount) MarshalJSON() ([]byte, error) {
 		buffer.Write(bs)
 	}
 	buffer.WriteString(`,`)
-	buffer.WriteString(`"formulation_type":`)
-	if bs, err := json.Marshal(acc.FormulationType); err != nil {
+	buffer.WriteString(`"formulator_type":`)
+	if bs, err := json.Marshal(acc.FormulatorType); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)
@@ -100,7 +100,7 @@ func (acc *FormulationAccount) MarshalJSON() ([]byte, error) {
 	} else {
 		buffer.Write(bs)
 	}
-	if acc.FormulationType == HyperFormulatorType {
+	if acc.FormulatorType == HyperFormulatorType {
 		buffer.WriteString(`,`)
 		buffer.WriteString(`"policy":`)
 		if bs, err := acc.Policy.MarshalJSON(); err != nil {

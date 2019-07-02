@@ -7,8 +7,8 @@ import (
 	"github.com/fletaio/fleta/common/amount"
 )
 
-// FormulationPolicy defines a staking policy user
-type FormulationPolicy struct {
+// FormulatorPolicy defines a staking policy user
+type FormulatorPolicy struct {
 	RewardPerBlock                *amount.Amount
 	PayRewardEveryBlocks          uint32
 	FormulatorCreationLimitHeight uint32
@@ -31,7 +31,7 @@ type FormulationPolicy struct {
 }
 
 // MarshalJSON is a marshaler function
-func (pc *FormulationPolicy) MarshalJSON() ([]byte, error) {
+func (pc *FormulatorPolicy) MarshalJSON() ([]byte, error) {
 	var buffer bytes.Buffer
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"reward_per_block":`)
@@ -55,7 +55,7 @@ func (pc *FormulationPolicy) MarshalJSON() ([]byte, error) {
 		buffer.Write(bs)
 	}
 	buffer.WriteString(`,`)
-	buffer.WriteString(`"alpha_formulation_amount":`)
+	buffer.WriteString(`"alpha_formulator_amount":`)
 	if bs, err := pc.AlphaCreationAmount.MarshalJSON(); err != nil {
 		return nil, err
 	} else {
@@ -132,7 +132,7 @@ func (pc *FormulationPolicy) MarshalJSON() ([]byte, error) {
 		buffer.Write(bs)
 	}
 	buffer.WriteString(`,`)
-	buffer.WriteString(`"hyper_formulation_amount":`)
+	buffer.WriteString(`"hyper_formulator_amount":`)
 	if bs, err := pc.HyperCreationAmount.MarshalJSON(); err != nil {
 		return nil, err
 	} else {

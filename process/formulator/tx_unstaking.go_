@@ -35,11 +35,11 @@ func init() {
 		if err != nil {
 			return err
 		}
-		frAcc, is := acc.(*FormulationAccount)
+		frAcc, is := acc.(*FormulatorAccount)
 		if !is {
 			return ErrInvalidAccountType
 		}
-		if frAcc.FormulationType != HyperFormulatorType {
+		if frAcc.FormulatorType != HyperFormulatorType {
 			return ErrInvalidAccountType
 		}
 
@@ -78,11 +78,11 @@ func init() {
 		if err != nil {
 			return nil, err
 		}
-		frAcc, is := acc.(*FormulationAccount)
+		frAcc, is := acc.(*FormulatorAccount)
 		if !is {
 			return nil, ErrInvalidAccountType
 		}
-		if frAcc.FormulationType != HyperFormulatorType {
+		if frAcc.FormulatorType != HyperFormulatorType {
 			return nil, ErrInvalidAccountType
 		}
 
@@ -106,9 +106,9 @@ func init() {
 		}
 		frAcc.StakingAmount = frAcc.StakingAmount.Sub(tx.Amount)
 
-		policy, has := gFormulationPolicyMap[ctx.ChainCoord().ID()]
+		policy, has := gFormulatorPolicyMap[ctx.ChainCoord().ID()]
 		if !has {
-			return nil, ErrNotExistFormulationPolicy
+			return nil, ErrNotExistFormulatorPolicy
 		}
 
 		ctx.AddLockedBalance(fromAcc.Address(), tx.Amount, ctx.TargetHeight()+policy.StakingUnlockRequiredBlocks)
@@ -119,7 +119,7 @@ func init() {
 }
 
 // Unstaking is a consensus.Unstaking
-// It is used to make formulation account
+// It is used to make formulator account
 type Unstaking struct {
 	transaction.Base
 	Seq_            uint64

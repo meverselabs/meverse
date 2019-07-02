@@ -50,7 +50,7 @@ func init() {
 	})
 }
 
-// RankTable implements the proof of formulation algorithm
+// RankTable implements the proof of formulator algorithm
 type RankTable struct {
 	sync.Mutex
 	height     uint32

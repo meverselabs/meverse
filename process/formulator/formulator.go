@@ -14,11 +14,11 @@ type Formulator struct {
 	*chain.ProcessBase
 	cn            *chain.Chain
 	vault         *vault.Vault
-	genesisPolicy *FormulationPolicy
+	genesisPolicy *FormulatorPolicy
 }
 
 // NewFormulator returns a Formulator
-func NewFormulator(genesisPolicy *FormulationPolicy) *Formulator {
+func NewFormulator(genesisPolicy *FormulatorPolicy) *Formulator {
 	p := &Formulator{
 		genesisPolicy: genesisPolicy,
 	}
@@ -38,7 +38,7 @@ func (p *Formulator) Version() string {
 // Init initializes the process
 func (p *Formulator) Init(reg *chain.Register, cn *chain.Chain) error {
 	p.cn = cn
-	reg.RegisterAccount(1, &FormulationAccount{})
+	reg.RegisterAccount(1, &FormulatorAccount{})
 	if vp, err := cn.ProcessByName("fleta.vault"); err != nil {
 		return ErrNotExistVault
 	} else if v, is := vp.(*vault.Vault); !is {
@@ -74,7 +74,7 @@ func (p *Formulator) BeforeExecuteTransactions(ctp *types.ContextProcess) error 
 
 // AfterExecuteTransactions called after processes transactions of the block
 func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctp *types.ContextProcess) error {
-	policy := &FormulationPolicy{}
+	policy := &FormulatorPolicy{}
 	if bs := ctp.ProcessData([]byte("policy")); len(bs) == 0 {
 		return ErrInvalidRewardData
 	} else if err := encoding.Unmarshal(bs, &policy); err != nil {
@@ -93,11 +93,11 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctp *types.Context
 			return err
 		}
 
-		frAcc, is := acc.(*FormulationAccount)
+		frAcc, is := acc.(*FormulatorAccount)
 		if !is {
 			return ErrInvalidAccountType
 		}
-		switch frAcc.FormulationType {
+		switch frAcc.FormulatorType {
 		case AlphaFormulatorType:
 			rd.addRewardPower(b.Header.Generator, frAcc.Amount.MulC(int64(policy.AlphaEfficiency1000)).DivC(1000))
 		case SigmaFormulatorType:
@@ -161,7 +161,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctp *types.Context
 					return false
 				}
 			} else {
-				frAcc := acc.(*FormulationAccount)
+				frAcc := acc.(*FormulatorAccount)
 				if err := p.cn.SwitchProcess(ctp, p.vault, func(stp *types.ContextProcess) error {
 					if err := p.vault.AddBalance(stp, frAcc.Address(), PowerSum.Mul(Ratio).Div(amount.COIN)); err != nil {
 						return err

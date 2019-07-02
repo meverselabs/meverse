@@ -12,7 +12,7 @@ import (
 	"github.com/fletaio/fleta/process/formulator"
 )
 
-// Consensus implements the proof of formulation algorithm
+// Consensus implements the proof of formulator algorithm
 type Consensus struct {
 	sync.Mutex
 	*chain.ConsensusBase
@@ -54,7 +54,7 @@ func (cs *Consensus) InitGenesis(ctp *types.ContextProcess) error {
 	phase := cs.rt.largestPhase() + 1
 	ctp.Top().AccountMap.EachAll(func(addr common.Address, a types.Account) bool {
 		if a.Address().Coordinate().Height == ctp.TargetHeight() {
-			if acc, is := a.(*formulator.FormulationAccount); is {
+			if acc, is := a.(*formulator.FormulatorAccount); is {
 				addr := acc.Address()
 				if err := cs.rt.addRank(NewRank(addr, acc.KeyHash, phase, hash.DoubleHash(addr[:]))); err != nil {
 					inErr = err
@@ -68,7 +68,7 @@ func (cs *Consensus) InitGenesis(ctp *types.ContextProcess) error {
 		return inErr
 	}
 	ctp.Top().DeletedAccountMap.EachAll(func(addr common.Address, a types.Account) bool {
-		if acc, is := a.(*formulator.FormulationAccount); is {
+		if acc, is := a.(*formulator.FormulatorAccount); is {
 			cs.rt.removeRank(acc.Address())
 		}
 		return true
@@ -208,7 +208,7 @@ func (cs *Consensus) OnSaveData(b *types.Block, ctp *types.ContextProcess) error
 	phase := cs.rt.largestPhase() + 1
 	ctp.Top().AccountMap.EachAll(func(addr common.Address, a types.Account) bool {
 		if a.Address().Coordinate().Height == ctp.TargetHeight() {
-			if acc, is := a.(*formulator.FormulationAccount); is {
+			if acc, is := a.(*formulator.FormulatorAccount); is {
 				addr := acc.Address()
 				if err := cs.rt.addRank(NewRank(addr, acc.KeyHash, phase, hash.DoubleHash(addr[:]))); err != nil {
 					inErr = err
@@ -222,7 +222,7 @@ func (cs *Consensus) OnSaveData(b *types.Block, ctp *types.ContextProcess) error
 		return inErr
 	}
 	ctp.Top().DeletedAccountMap.EachAll(func(addr common.Address, a types.Account) bool {
-		if acc, is := a.(*formulator.FormulationAccount); is {
+		if acc, is := a.(*formulator.FormulatorAccount); is {
 			cs.rt.removeRank(acc.Address())
 		}
 		return true
