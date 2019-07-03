@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 
-	"github.com/fletaio/core/transaction"
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
 	"github.com/fletaio/fleta/core/types"
@@ -95,7 +94,7 @@ func (tx *Deposit) Execute(p types.Process, ctw *types.ContextWrapper, index uin
 			return types.ErrDustAmount
 		}
 		outsum = outsum.Add(vout.Amount)
-		if err := ctw.CreateUTXO(transaction.MarshalID(ctw.TargetHeight(), index, uint16(n)), vout); err != nil {
+		if err := ctw.CreateUTXO(types.MarshalID(ctw.TargetHeight(), index, uint16(n)), vout); err != nil {
 			return err
 		}
 	}
