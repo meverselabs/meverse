@@ -11,15 +11,25 @@ import (
 // Formulator manages balance of accounts of the chain
 type Formulator struct {
 	*types.ProcessBase
-	pm    types.ProcessManager
-	cn    types.Provider
-	vault *vault.Vault
+	pid          uint8
+	pm           types.ProcessManager
+	cn           types.Provider
+	vault        *vault.Vault
+	adminAddress common.Address
 }
 
 // NewFormulator returns a Formulator
-func NewFormulator() *Formulator {
-	p := &Formulator{}
+func NewFormulator(pid uint8, AdminAddress common.Address) *Formulator {
+	p := &Formulator{
+		pid:          pid,
+		adminAddress: AdminAddress,
+	}
 	return p
+}
+
+// ID returns the id of the process
+func (p *Formulator) ID() uint8 {
+	return p.pid
 }
 
 // Name returns the name of the process
@@ -47,11 +57,16 @@ func (p *Formulator) Init(reg *types.Register, pm types.ProcessManager, cn types
 
 	reg.RegisterAccount(1, &FormulatorAccount{})
 	reg.RegisterTransaction(1, &CreateAlpha{})
+	reg.RegisterTransaction(2, &CreateSigma{})
+	reg.RegisterTransaction(3, &CreateOmega{})
+	reg.RegisterTransaction(4, &CreateHyper{})
 	return nil
 }
 
 // InitPolicy called at OnInitGenesis of an application
-func (p *Formulator) InitPolicy(ctw *types.ContextWrapper, rp *RewardPolicy, ap *AlphaPolicy, sp *SigmaPolicy, op *OmegaPolicy, hp *HyperPolicy, kp *StakingPolicy) error {
+func (p *Formulator) InitPolicy(ctw *types.ContextWrapper, rp *RewardPolicy, ap *AlphaPolicy, sp *SigmaPolicy, op *OmegaPolicy, hp *HyperPolicy) error {
+	ctw = ctw.Switch(p.pid)
+
 	if bs, err := encoding.Marshal(rp); err != nil {
 		return err
 	} else {
@@ -77,11 +92,6 @@ func (p *Formulator) InitPolicy(ctw *types.ContextWrapper, rp *RewardPolicy, ap 
 	} else {
 		ctw.SetProcessData([]byte("HyperPolicy"), bs)
 	}
-	if bs, err := encoding.Marshal(kp); err != nil {
-		return err
-	} else {
-		ctw.SetProcessData([]byte("StakingPolicy"), bs)
-	}
 	return nil
 }
 
@@ -101,9 +111,6 @@ func (p *Formulator) OnLoadChain(loader types.LoaderWrapper) error {
 	}
 	if bs := loader.ProcessData([]byte("HyperPolicy")); len(bs) == 0 {
 		return ErrHyperPolicyShouldBeSetupInApplication
-	}
-	if bs := loader.ProcessData([]byte("StakingPolicy")); len(bs) == 0 {
-		return ErrStakingPolicyShouldBeSetupInApplication
 	}
 	return nil
 }
@@ -207,12 +214,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 				}
 			} else {
 				frAcc := acc.(*FormulatorAccount)
-				if err := p.pm.SwitchProcess(ctw, p.vault, func(cts *types.ContextWrapper) error {
-					if err := p.vault.AddBalance(cts, frAcc.Address(), PowerSum.Mul(Ratio).Div(amount.COIN)); err != nil {
-						return err
-					}
-					return nil
-				}); err != nil {
+				if err := p.vault.AddBalance(ctw, frAcc.Address(), PowerSum.Mul(Ratio).Div(amount.COIN)); err != nil {
 					inErr = err
 					return false
 				}

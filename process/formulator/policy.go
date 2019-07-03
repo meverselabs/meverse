@@ -181,8 +181,9 @@ func (pc *OmegaPolicy) MarshalJSON() ([]byte, error) {
 
 // HyperPolicy defines a hyper policy
 type HyperPolicy struct {
-	HyperCreationAmount       *amount.Amount
-	HyperUnlockRequiredBlocks uint32
+	HyperCreationAmount         *amount.Amount
+	HyperUnlockRequiredBlocks   uint32
+	StakingUnlockRequiredBlocks uint32
 }
 
 // MarshalJSON is a marshaler function
@@ -202,19 +203,7 @@ func (pc *HyperPolicy) MarshalJSON() ([]byte, error) {
 	} else {
 		buffer.Write(bs)
 	}
-	buffer.WriteString(`}`)
-	return buffer.Bytes(), nil
-}
-
-// StakingPolicy defines a omega policy
-type StakingPolicy struct {
-	StakingUnlockRequiredBlocks uint32
-}
-
-// MarshalJSON is a marshaler function
-func (pc *StakingPolicy) MarshalJSON() ([]byte, error) {
-	var buffer bytes.Buffer
-	buffer.WriteString(`{`)
+	buffer.WriteString(`,`)
 	buffer.WriteString(`"staking_unlock_required_blocks":`)
 	if bs, err := json.Marshal(pc.StakingUnlockRequiredBlocks); err != nil {
 		return nil, err
@@ -230,7 +219,6 @@ type ValidatorPolicy struct {
 	CommissionRatio1000        uint32
 	UnlockEnableRequiredBlocks uint32
 	MinimumStaking             *amount.Amount
-	MaximumStaking             *amount.Amount
 }
 
 // Clone returns the clonend value of it
@@ -239,7 +227,6 @@ func (pc *ValidatorPolicy) Clone() *ValidatorPolicy {
 		CommissionRatio1000:        pc.CommissionRatio1000,
 		UnlockEnableRequiredBlocks: pc.UnlockEnableRequiredBlocks,
 		MinimumStaking:             pc.MinimumStaking.Clone(),
-		MaximumStaking:             pc.MaximumStaking.Clone(),
 	}
 }
 
@@ -263,13 +250,6 @@ func (pc *ValidatorPolicy) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"minimum_staking":`)
 	if bs, err := json.Marshal(pc.MinimumStaking); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"maximum_staking":`)
-	if bs, err := json.Marshal(pc.MaximumStaking); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

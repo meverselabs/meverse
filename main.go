@@ -72,26 +72,24 @@ func test() error {
 	MaxBlocksPerFormulator := uint32(10)
 	cs := pof.NewConsensus(MaxBlocksPerFormulator, ObserverKeys)
 	app := &DApp{
-		frkey: frkeys[0],
+		frkey:        frkeys[0],
+		adminAddress: common.NewAddress(0, 1, 0),
 	}
 	cn := chain.NewChain(cs, app, st)
-	cn.MustAddProcess(1, vault.NewVault())
-	cn.MustAddProcess(2, formulator.NewFormulator())
+	cn.MustAddProcess(vault.NewVault(1))
+	cn.MustAddProcess(formulator.NewFormulator(2, app.adminAddress))
 	if err := cn.Init(); err != nil {
 		return err
 	}
 
 	TimeoutCount := uint32(0)
-	Formulator := common.NewAddress(0, 0, 0)
+	Formulator := common.NewAddress(0, 2, 0)
 	var buffer bytes.Buffer
 	enc := encoding.NewEncoder(&buffer)
 	if err := enc.EncodeUint32(TimeoutCount); err != nil {
 		return err
 	}
-	if err := enc.Encode(Formulator); err != nil {
-		return err
-	}
-	bc := chain.NewBlockCreator(cn, buffer.Bytes())
+	bc := chain.NewBlockCreator(cn, Formulator, buffer.Bytes())
 	if err := bc.Init(); err != nil {
 		return err
 	}
@@ -167,9 +165,15 @@ func test() error {
 type DApp struct {
 	sync.Mutex
 	*types.ProcessBase
-	pm    types.ProcessManager
-	cn    types.Provider
-	frkey key.Key
+	pm           types.ProcessManager
+	cn           types.Provider
+	frkey        key.Key
+	adminAddress common.Address
+}
+
+// ID must returns 255
+func (app *DApp) ID() uint8 {
+	return 255
 }
 
 // Name returns the name of the application
@@ -200,47 +204,57 @@ func (app *DApp) InitGenesis(ctw *types.ContextWrapper) error {
 	} else if fp, is := p.(*formulator.Formulator); !is {
 		return types.ErrNotExistProcess
 	} else {
-		if err := app.pm.SwitchProcess(ctw, fp, func(cts *types.ContextWrapper) error {
-			return fp.InitPolicy(cts, &formulator.RewardPolicy{
-				RewardPerBlock:        amount.NewCoinAmount(0, 500000000000000000),
-				PayRewardEveryBlocks:  500,
-				AlphaEfficiency1000:   1000,
-				SigmaEfficiency1000:   1000,
-				OmegaEfficiency1000:   1000,
-				HyperEfficiency1000:   1000,
-				StakingEfficiency1000: 1000,
-			}, &formulator.AlphaPolicy{
-				AlphaCreationLimitHeight:  1000,
-				AlphaCreationAmount:       amount.NewCoinAmount(1000, 0),
-				AlphaUnlockRequiredBlocks: 1000,
-			}, &formulator.SigmaPolicy{
-				SigmaRequiredAlphaBlocks:  1000,
-				SigmaRequiredAlphaCount:   4,
-				SigmaUnlockRequiredBlocks: 1000,
-			}, &formulator.OmegaPolicy{
-				OmegaRequiredSigmaBlocks:  1000,
-				OmegaRequiredSigmaCount:   2,
-				OmegaUnlockRequiredBlocks: 1000,
-			}, &formulator.HyperPolicy{
-				HyperCreationAmount:       amount.NewCoinAmount(1000, 0),
-				HyperUnlockRequiredBlocks: 1000,
-			}, &formulator.StakingPolicy{
-				StakingUnlockRequiredBlocks: 1000,
-			})
+		if err := fp.InitPolicy(ctw, &formulator.RewardPolicy{
+			RewardPerBlock:        amount.NewCoinAmount(0, 500000000000000000),
+			PayRewardEveryBlocks:  500,
+			AlphaEfficiency1000:   1000,
+			SigmaEfficiency1000:   1000,
+			OmegaEfficiency1000:   1000,
+			HyperEfficiency1000:   1000,
+			StakingEfficiency1000: 1000,
+		}, &formulator.AlphaPolicy{
+			AlphaCreationLimitHeight:  1000,
+			AlphaCreationAmount:       amount.NewCoinAmount(1000, 0),
+			AlphaUnlockRequiredBlocks: 1000,
+		}, &formulator.SigmaPolicy{
+			SigmaRequiredAlphaBlocks:  1000,
+			SigmaRequiredAlphaCount:   4,
+			SigmaUnlockRequiredBlocks: 1000,
+		}, &formulator.OmegaPolicy{
+			OmegaRequiredSigmaBlocks:  1000,
+			OmegaRequiredSigmaCount:   2,
+			OmegaUnlockRequiredBlocks: 1000,
+		}, &formulator.HyperPolicy{
+			HyperCreationAmount:         amount.NewCoinAmount(1000, 0),
+			HyperUnlockRequiredBlocks:   1000,
+			StakingUnlockRequiredBlocks: 1000,
 		}); err != nil {
 			return err
 		}
 	}
-
-	acc := &formulator.FormulatorAccount{
-		Address_:       common.NewAddress(0, 0, 0),
-		Name_:          "fleta.001",
-		FormulatorType: formulator.AlphaFormulatorType,
-		KeyHash:        common.NewPublicHash(app.frkey.PublicKey()),
-		Amount:         amount.NewCoinAmount(1000, 0),
+	if true {
+		acc := &formulator.FormulatorAccount{
+			Address_:       common.NewAddress(0, 1, 0),
+			Name_:          "admin",
+			FormulatorType: formulator.AlphaFormulatorType,
+			KeyHash:        common.NewPublicHash(app.frkey.PublicKey()),
+			Amount:         amount.NewCoinAmount(1000, 0),
+		}
+		if err := ctw.CreateAccount(acc); err != nil {
+			return err
+		}
 	}
-	if err := ctw.CreateAccount(acc); err != nil {
-		return err
+	if true {
+		acc := &formulator.FormulatorAccount{
+			Address_:       common.NewAddress(0, 2, 0),
+			Name_:          "fleta.001",
+			FormulatorType: formulator.AlphaFormulatorType,
+			KeyHash:        common.NewPublicHash(app.frkey.PublicKey()),
+			Amount:         amount.NewCoinAmount(1000, 0),
+		}
+		if err := ctw.CreateAccount(acc); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -260,7 +274,7 @@ func (tx *Transaction) Fee(loader types.LoaderWrapper) *amount.Amount {
 	return amount.COIN.DivC(10)
 }
 
-func (tx *Transaction) Validate(loader types.LoaderWrapper, signers []common.PublicHash) error {
+func (tx *Transaction) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	return nil
 }
 

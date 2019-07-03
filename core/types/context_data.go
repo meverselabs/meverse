@@ -198,6 +198,9 @@ func (ctd *ContextData) HasAccountName(Name string) (bool, error) {
 
 // CreateAccount inserts the account
 func (ctd *ContextData) CreateAccount(acc Account) error {
+	if acc.Address() == common.NewAddress(0, 0, 0) {
+		return ErrNotAllowedZeroAddressAccount
+	}
 	if len(acc.Name()) < 4 {
 		return ErrInvalidAccountName
 	}

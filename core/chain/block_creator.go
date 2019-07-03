@@ -22,7 +22,7 @@ type BlockCreator struct {
 }
 
 // NewBlockCreator returns a BlockCreator
-func NewBlockCreator(cn *Chain, ConsensusData []byte) *BlockCreator {
+func NewBlockCreator(cn *Chain, Generator common.Address, ConsensusData []byte) *BlockCreator {
 	ctx := types.NewContext(cn.store)
 	bc := &BlockCreator{
 		cn:       cn,
@@ -33,6 +33,7 @@ func NewBlockCreator(cn *Chain, ConsensusData []byte) *BlockCreator {
 				Version:       ctx.Version(),
 				Height:        ctx.TargetHeight(),
 				PrevHash:      ctx.LastHash(),
+				Generator:     Generator,
 				ConsensusData: ConsensusData,
 			},
 			Transactions:         []types.Transaction{},
@@ -81,12 +82,12 @@ func (bc *BlockCreator) AddTx(tx types.Transaction, sigs []common.Signature) err
 		}
 	}
 	ctw := types.NewContextWrapper(uint8(t>>8), bc.ctx)
-	if err := tx.Validate(ctw, signers); err != nil {
-		return err
-	}
 	pid := uint8(t >> 8)
 	p, err := bc.cn.Process(pid)
 	if err != nil {
+		return err
+	}
+	if err := tx.Validate(p, ctw, signers); err != nil {
 		return err
 	}
 	if err := tx.Execute(p, ctw, uint16(len(bc.b.Transactions))); err != nil {

@@ -73,6 +73,9 @@ func (cs *Consensus) InitGenesis(ctw *types.ContextWrapper) error {
 		}
 		return true
 	})
+	if cs.rt.CandidateCount() == 0 {
+		return ErrInsufficientCandidateCount
+	}
 	if data, err := cs.buildSaveData(); err != nil {
 		return err
 	} else {

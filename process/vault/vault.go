@@ -9,14 +9,22 @@ import (
 // Vault manages balance of accounts of the chain
 type Vault struct {
 	*types.ProcessBase
-	pm types.ProcessManager
-	cn types.Provider
+	pid uint8
+	pm  types.ProcessManager
+	cn  types.Provider
 }
 
 // NewVault returns a Vault
-func NewVault() *Vault {
-	p := &Vault{}
+func NewVault(pid uint8) *Vault {
+	p := &Vault{
+		pid: pid,
+	}
 	return p
+}
+
+// ID returns the id of the process
+func (p *Vault) ID() uint8 {
+	return p.pid
 }
 
 // Name returns the name of the process
@@ -39,6 +47,8 @@ func (p *Vault) Init(reg *types.Register, pm types.ProcessManager, cn types.Prov
 
 // Balance returns balance of the account of the address
 func (p *Vault) Balance(ctw *types.ContextWrapper, addr common.Address) *amount.Amount {
+	ctw = ctw.Switch(p.pid)
+
 	var total *amount.Amount
 	if bs := ctw.ProcessData(addr[:]); len(bs) > 0 {
 		total = amount.NewAmountFromBytes(bs)
@@ -50,6 +60,8 @@ func (p *Vault) Balance(ctw *types.ContextWrapper, addr common.Address) *amount.
 
 // AddBalance adds balance to the account of the address
 func (p *Vault) AddBalance(ctw *types.ContextWrapper, addr common.Address, am *amount.Amount) error {
+	ctw = ctw.Switch(p.pid)
+
 	zero := amount.NewCoinAmount(0, 0)
 	if am.Less(zero) {
 		return ErrMinusInput
@@ -62,6 +74,8 @@ func (p *Vault) AddBalance(ctw *types.ContextWrapper, addr common.Address, am *a
 
 // SubBalance subtracts balance to the account of the address
 func (p *Vault) SubBalance(ctw *types.ContextWrapper, addr common.Address, am *amount.Amount) error {
+	ctw = ctw.Switch(p.pid)
+
 	total := p.Balance(ctw, addr)
 	if total.Less(am) {
 		return ErrMinusBalance
@@ -73,6 +87,13 @@ func (p *Vault) SubBalance(ctw *types.ContextWrapper, addr common.Address, am *a
 		ctw.SetProcessData(addr[:], total.Bytes())
 	}
 	return nil
+}
+
+// AddLockedBalance adds locked balance to the account of the address
+func (p *Vault) AddLockedBalance(ctw *types.ContextWrapper, addr common.Address, am *amount.Amount, height uint32) error {
+	ctw = ctw.Switch(p.pid)
+
+	panic("TODO")
 }
 
 // OnLoadChain called when the chain loaded

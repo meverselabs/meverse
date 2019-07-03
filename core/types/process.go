@@ -2,6 +2,7 @@ package types
 
 // Process is a interface of the chain Process
 type Process interface {
+	ID() uint8
 	Version() string
 	Name() string
 	Init(reg *Register, pm ProcessManager, cn Provider) error
@@ -11,7 +12,7 @@ type Process interface {
 	OnSaveData(b *Block, ctw *ContextWrapper) error
 }
 
-// ProcessBase is a base handler of the chain Process
+// ProcessBase is a base handler of the chain process
 type ProcessBase struct{}
 
 // InitGenesis initializes genesis data

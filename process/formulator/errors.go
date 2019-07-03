@@ -19,11 +19,7 @@ var (
 	ErrStakingPolicyShouldBeSetupInApplication = errors.New("StakingPolicy should be setup in application")
 	ErrInvalidFormulatorCount                  = errors.New("invalid formulator count")
 	ErrInsufficientFormulatorBlocks            = errors.New("insufficient formulator blocks")
-
-	/*
-		ErrInsufficientStakingAmount      = errors.New("insufficient staking amount")
-		ErrExceedStakingAmount            = errors.New("exceed staking amount")
-		ErrCriticalStakingAmount          = errors.New("critical staking amount")
-		ErrUnauthorizedTransaction        = errors.New("unauthorized transaction")
-	*/
+	ErrUnauthorizedTransaction                 = errors.New("unauthorized transaction")
+	ErrCriticalStakingAmount                   = errors.New("critical staking amount")
+	ErrInsufficientStakingAmount               = errors.New("insufficient staking amount")
 )

@@ -10,8 +10,8 @@ import (
 	"github.com/fletaio/fleta/encoding"
 )
 
-// CreateAlpha is used to make alpha formulator account
-type CreateAlpha struct {
+// CreateHyper is used to make hyper formulator account
+type CreateHyper struct {
 	Timestamp_ uint64
 	Seq_       uint64
 	From       common.Address
@@ -20,28 +20,34 @@ type CreateAlpha struct {
 }
 
 // Timestamp returns the timestamp of the transaction
-func (tx *CreateAlpha) Timestamp() uint64 {
+func (tx *CreateHyper) Timestamp() uint64 {
 	return tx.Timestamp_
 }
 
 // Seq returns the sequence of the transaction
-func (tx *CreateAlpha) Seq() uint64 {
+func (tx *CreateHyper) Seq() uint64 {
 	return tx.Seq_
 }
 
 // Fee returns the fee of the transaction
-func (tx *CreateAlpha) Fee(loader types.LoaderWrapper) *amount.Amount {
+func (tx *CreateHyper) Fee(loader types.LoaderWrapper) *amount.Amount {
 	return amount.COIN.DivC(10)
 }
 
 // Validate validates signatures of the transaction
-func (tx *CreateAlpha) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
+func (tx *CreateHyper) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
+	sp := p.(*Formulator)
+
 	if len(tx.Name) < 8 || len(tx.Name) > 16 {
 		return types.ErrInvalidAccountName
 	}
 
 	if tx.Seq() <= loader.Seq(tx.From) {
 		return types.ErrInvalidSequence
+	}
+
+	if tx.From != sp.adminAddress {
+		return ErrUnauthorizedTransaction
 	}
 
 	fromAcc, err := loader.Account(tx.From)
@@ -55,19 +61,16 @@ func (tx *CreateAlpha) Validate(p types.Process, loader types.LoaderWrapper, sig
 }
 
 // Execute updates the context by the transaction
-func (tx *CreateAlpha) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
+func (tx *CreateHyper) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
 	if len(tx.Name) < 8 || len(tx.Name) > 16 {
 		return types.ErrInvalidAccountName
 	}
 
-	policy := &AlphaPolicy{}
-	if err := encoding.Unmarshal(ctw.ProcessData([]byte("AlphaPolicy")), &policy); err != nil {
+	policy := &HyperPolicy{}
+	if err := encoding.Unmarshal(ctw.ProcessData([]byte("HyperPolicy")), &policy); err != nil {
 		return err
-	}
-	if ctw.TargetHeight() < policy.AlphaCreationLimitHeight {
-		return ErrAlphaCreationLimited
 	}
 
 	sn := ctw.Snapshot()
@@ -86,7 +89,7 @@ func (tx *CreateAlpha) Execute(p types.Process, ctw *types.ContextWrapper, index
 	if err := sp.vault.SubBalance(ctw, tx.From, tx.Fee(ctw)); err != nil {
 		return err
 	}
-	if err := sp.vault.SubBalance(ctw, tx.From, policy.AlphaCreationAmount); err != nil {
+	if err := sp.vault.SubBalance(ctw, tx.From, policy.HyperCreationAmount); err != nil {
 		return err
 	}
 
@@ -103,9 +106,9 @@ func (tx *CreateAlpha) Execute(p types.Process, ctw *types.ContextWrapper, index
 		acc := &FormulatorAccount{
 			Address_:       addr,
 			Name_:          tx.Name,
-			FormulatorType: AlphaFormulatorType,
+			FormulatorType: HyperFormulatorType,
 			KeyHash:        tx.KeyHash,
-			Amount:         policy.AlphaCreationAmount,
+			Amount:         policy.HyperCreationAmount,
 			UpdatedHeight:  ctw.TargetHeight(),
 		}
 		ctw.CreateAccount(acc)
@@ -115,7 +118,7 @@ func (tx *CreateAlpha) Execute(p types.Process, ctw *types.ContextWrapper, index
 }
 
 // MarshalJSON is a marshaler function
-func (tx *CreateAlpha) MarshalJSON() ([]byte, error) {
+func (tx *CreateHyper) MarshalJSON() ([]byte, error) {
 	var buffer bytes.Buffer
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)

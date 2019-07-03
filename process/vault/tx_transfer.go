@@ -34,7 +34,7 @@ func (tx *Transfer) Fee(loader types.LoaderWrapper) *amount.Amount {
 }
 
 // Validate validates signatures of the transaction
-func (tx *Transfer) Validate(loader types.LoaderWrapper, signers []common.PublicHash) error {
+func (tx *Transfer) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	if tx.Seq() <= loader.Seq(tx.From) {
 		return types.ErrInvalidSequence
 	}

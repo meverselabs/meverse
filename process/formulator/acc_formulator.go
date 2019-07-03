@@ -28,6 +28,7 @@ type FormulatorAccount struct {
 	FormulatorType FormulatorType
 	KeyHash        common.PublicHash
 	Amount         *amount.Amount
+	UpdatedHeight  uint32
 	StakingAmount  *amount.Amount
 	Policy         *ValidatorPolicy
 }
@@ -50,6 +51,7 @@ func (acc *FormulatorAccount) Clone() types.Account {
 		FormulatorType: acc.FormulatorType,
 		KeyHash:        acc.KeyHash.Clone(),
 		Amount:         acc.Amount.Clone(),
+		UpdatedHeight:  acc.UpdatedHeight,
 	}
 	if acc.FormulatorType == HyperFormulatorType {
 		c.StakingAmount = acc.StakingAmount.Clone()
@@ -100,17 +102,24 @@ func (acc *FormulatorAccount) MarshalJSON() ([]byte, error) {
 	} else {
 		buffer.Write(bs)
 	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"amount":`)
+	if bs, err := acc.Amount.MarshalJSON(); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"updated_height":`)
+	if bs, err := json.Marshal(acc.UpdatedHeight); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
 	if acc.FormulatorType == HyperFormulatorType {
 		buffer.WriteString(`,`)
 		buffer.WriteString(`"policy":`)
 		if bs, err := acc.Policy.MarshalJSON(); err != nil {
-			return nil, err
-		} else {
-			buffer.Write(bs)
-		}
-		buffer.WriteString(`,`)
-		buffer.WriteString(`"amount":`)
-		if bs, err := acc.Amount.MarshalJSON(); err != nil {
 			return nil, err
 		} else {
 			buffer.Write(bs)

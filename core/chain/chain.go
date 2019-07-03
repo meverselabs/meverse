@@ -29,6 +29,9 @@ type Chain struct {
 
 // NewChain returns a Chain
 func NewChain(consensus Consensus, app types.Application, store *Store) *Chain {
+	if app.ID() != 255 {
+		panic(ErrApplicationIDMustBe255)
+	}
 	cn := &Chain{
 		consensus:       consensus,
 		app:             app,
@@ -63,6 +66,11 @@ func (cn *Chain) Init() error {
 	}
 	if err := cn.consensus.Init(cn, newChainCommiter(cn)); err != nil {
 		return err
+	}
+	for _, s := range cn.services {
+		if err := s.Init(cn, cn.Provider()); err != nil {
+			return err
+		}
 	}
 
 	// InitGenesis
@@ -162,36 +170,24 @@ func (cn *Chain) ProcessByName(name string) (types.Process, error) {
 	return cn.processes[idx], nil
 }
 
-// SwitchProcess changes the context process to the target process
-func (cn *Chain) SwitchProcess(ctw *types.ContextWrapper, p types.Process, fn func(cts *types.ContextWrapper) error) error {
-	id, has := cn.processIDMap[p.Name()]
-	if !has {
-		return types.ErrNotExistProcess
-	}
-	if err := fn(types.SwitchContextWrapper(id, ctw)); err != nil {
-		return err
-	}
-	return nil
-}
-
 // MustAddProcess adds Process but panic when has the same name process
-func (cn *Chain) MustAddProcess(id uint8, p types.Process) {
+func (cn *Chain) MustAddProcess(p types.Process) {
 	if cn.isInit {
 		panic(ErrAddBeforeChainInit)
 	}
-	if id == 0 || id == 255 {
+	if p.ID() == 0 || p.ID() == 255 {
 		panic(ErrReservedID)
 	}
 	if _, has := cn.processIDMap[p.Name()]; has {
 		panic(types.ErrExistProcessName)
 	}
-	if _, has := cn.processIndexMap[id]; has {
+	if _, has := cn.processIndexMap[p.ID()]; has {
 		panic(types.ErrExistProcessID)
 	}
 	idx := len(cn.processes)
 	cn.processes = append(cn.processes, p)
-	cn.processIDMap[p.Name()] = id
-	cn.processIndexMap[id] = idx
+	cn.processIDMap[p.Name()] = p.ID()
+	cn.processIndexMap[p.ID()] = idx
 }
 
 // Services returns services
@@ -342,6 +338,9 @@ func (cn *Chain) validateHeader(bh *types.Header) error {
 	if bh.Timestamp <= provider.LastTimestamp() {
 		return ErrInvalidTimestamp
 	}
+	if bh.Generator == common.NewAddress(0, 0, 0) {
+		return ErrInvalidGenerator
+	}
 
 	height := provider.Height()
 	if bh.Height != height+1 {
@@ -404,7 +403,13 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block, ctx *types.Contex
 					}
 					signers = append(signers, common.NewPublicHash(pubkey))
 				}
-				if err := tx.Validate(types.NewContextWrapper(uint8(t>>8), ctx), signers); err != nil {
+				pid := uint8(t >> 8)
+				p, err := cn.Process(pid)
+				if err != nil {
+					errs <- err
+					return
+				}
+				if err := tx.Validate(p, types.NewContextWrapper(uint8(t>>8), ctx), signers); err != nil {
 					errs <- err
 					return
 				}
