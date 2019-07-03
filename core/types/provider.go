@@ -1,6 +1,7 @@
 package types
 
 import (
+	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
 )
 
@@ -13,4 +14,5 @@ type Provider interface {
 	Hash(height uint32) (hash.Hash256, error)
 	Header(height uint32) (*Header, error)
 	Block(height uint32) (*Block, error)
+	Seq(addr common.Address) uint64
 }

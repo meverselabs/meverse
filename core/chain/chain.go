@@ -225,6 +225,11 @@ func (cn *Chain) MustAddService(s types.Service) {
 	cn.serviceMap[s.Name()] = s
 }
 
+// Seq returns the squence of the address
+func (cn *Chain) Seq(addr common.Address) uint64 {
+	return cn.store.Seq(addr)
+}
+
 // ConnectBlock try to connect block to the chain
 func (cn *Chain) ConnectBlock(b *types.Block) error {
 	cn.closeLock.RLock()
@@ -393,7 +398,7 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block, ctx *types.Contex
 				t := b.TransactionTypes[sidx+q]
 				sigs := b.TranactionSignatures[sidx+q]
 
-				TxHash := HashTransaction(t, tx)
+				TxHash := HashTransactionByType(t, tx)
 				TxHashes[sidx+q+1] = TxHash
 
 				signers := make([]common.PublicHash, 0, len(sigs))

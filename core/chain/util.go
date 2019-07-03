@@ -97,7 +97,18 @@ func BuildLevelRoot(hashes []hash.Hash256) (hash.Hash256, error) {
 	return h, nil
 }
 
-func HashTransaction(t uint16, tx types.Transaction) hash.Hash256 {
+// HashTransaction returns the hash of the transaction
+func HashTransaction(tx types.Transaction) hash.Hash256 {
+	fc := encoding.Factory("transaction")
+	t, err := fc.TypeOf(tx)
+	if err != nil {
+		panic(err)
+	}
+	return HashTransactionByType(t, tx)
+}
+
+// HashTransactionByType returns the hash of the transaction using the type
+func HashTransactionByType(t uint16, tx types.Transaction) hash.Hash256 {
 	var buffer bytes.Buffer
 	enc := encoding.NewEncoder(&buffer)
 	if err := enc.EncodeUint16(t); err != nil {

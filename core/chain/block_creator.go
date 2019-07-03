@@ -71,7 +71,7 @@ func (bc *BlockCreator) AddTx(tx types.Transaction, sigs []common.Signature) err
 		return err
 	}
 
-	th := HashTransaction(t, tx)
+	th := HashTransactionByType(t, tx)
 
 	signers := []common.PublicHash{}
 	for _, sig := range sigs {

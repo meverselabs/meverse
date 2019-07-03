@@ -3,9 +3,9 @@ package main // import "github.com/fletaio/fleta"
 import (
 	"bytes"
 	"encoding/hex"
-	"encoding/json"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
@@ -106,78 +106,79 @@ func test() error {
 		return err
 	}
 
-	for i := 0; i < 2000; i++ {
-		TimeoutCount := uint32(0)
-		Formulator := common.NewAddress(0, 2, 0)
-		var buffer bytes.Buffer
-		enc := encoding.NewEncoder(&buffer)
-		if err := enc.EncodeUint32(TimeoutCount); err != nil {
-			return err
-		}
-		bc := chain.NewBlockCreator(cn, Formulator, buffer.Bytes())
-		if err := bc.Init(); err != nil {
-			return err
-		}
-		/*
-			txs := []types.Transaction{}
-			sigs := [][]common.Signature{}
-			for i := 0; i < 20000; i++ {
-				tx := &Transaction{
-					Timestamp_: 0,
-					KeyHash:    common.PublicHash{},
-					Amount:     amount.NewCoinAmount(uint64(i+1), 0),
-				}
-				sig, _ := frkeys[0].Sign(encoding.Hash(tx))
-				sigs = append(sigs, []common.Signature{sig})
-				txs = append(txs, tx)
-			}
-
-			if true {
-				begin := time.Now().UnixNano()
-				for i := 0; i < 10000; i++ {
-					if err := bc.AddTx(txs[i], sigs[i]); err != nil {
-						return err
-					}
-				}
-				end := time.Now().UnixNano()
-				log.Println((end - begin) / int64(time.Millisecond))
-			}
-		*/
-		b, err := bc.Finalize()
-		if err != nil {
-			return err
-		}
-
-		bh := encoding.Hash(b.Header)
-		sig0, _ := frkeys[0].Sign(bh)
-		Signatures := []common.Signature{
-			sig0,
-		}
-		b.Signatures = Signatures
-
-		// TODO
-
-		// Header
-		// Context
-		// Signature[0]
-
-		bs := &types.BlockSign{
-			HeaderHash:         bh,
-			GeneratorSignature: sig0,
-		}
-		bsh := encoding.Hash(bs)
-		sig1, _ := obkeys[0].Sign(bsh)
-		sig2, _ := obkeys[1].Sign(bsh)
-		sig3, _ := obkeys[2].Sign(bsh)
-
-		b.Signatures = append(b.Signatures, sig1)
-		b.Signatures = append(b.Signatures, sig2)
-		b.Signatures = append(b.Signatures, sig3)
-
-		if err := cn.ConnectBlock(b); err != nil {
-			return err
-		}
+	TimeoutCount := uint32(0)
+	Formulator := common.NewAddress(0, 2, 0)
+	var buffer bytes.Buffer
+	enc := encoding.NewEncoder(&buffer)
+	if err := enc.EncodeUint32(TimeoutCount); err != nil {
+		return err
 	}
+	bc := chain.NewBlockCreator(cn, Formulator, buffer.Bytes())
+	if err := bc.Init(); err != nil {
+		return err
+	}
+	txs := []types.Transaction{}
+	sigs := [][]common.Signature{}
+	Seq := cn.Seq(common.NewAddress(0, 1, 0))
+	for i := 0; i < 1; i++ {
+		Seq++
+		tx := &vault.Transfer{
+			Timestamp_: 0,
+			Seq_:       Seq,
+			From:       common.NewAddress(0, 1, 0),
+			To:         common.NewAddress(0, 2, 0),
+			Amount:     amount.NewCoinAmount(1, 0),
+		}
+		sig, _ := frkeys[0].Sign(chain.HashTransaction(tx))
+		sigs = append(sigs, []common.Signature{sig})
+		txs = append(txs, tx)
+	}
+
+	if true {
+		begin := time.Now().UnixNano()
+		for i := 0; i < len(txs); i++ {
+			if err := bc.AddTx(txs[i], sigs[i]); err != nil {
+				return err
+			}
+		}
+		end := time.Now().UnixNano()
+		log.Println((end - begin) / int64(time.Millisecond))
+	}
+	b, err := bc.Finalize()
+	if err != nil {
+		return err
+	}
+
+	bh := encoding.Hash(b.Header)
+	sig0, _ := frkeys[0].Sign(bh)
+	Signatures := []common.Signature{
+		sig0,
+	}
+	b.Signatures = Signatures
+
+	// TODO
+
+	// Header
+	// Context
+	// Signature[0]
+
+	bs := &types.BlockSign{
+		HeaderHash:         bh,
+		GeneratorSignature: sig0,
+	}
+	bsh := encoding.Hash(bs)
+	sig1, _ := obkeys[0].Sign(bsh)
+	sig2, _ := obkeys[1].Sign(bsh)
+	sig3, _ := obkeys[2].Sign(bsh)
+
+	b.Signatures = append(b.Signatures, sig1)
+	b.Signatures = append(b.Signatures, sig2)
+	b.Signatures = append(b.Signatures, sig3)
+
+	if err := cn.ConnectBlock(b); err != nil {
+		return err
+	}
+
 	if true {
 		b, err := cn.Provider().Block(cn.Provider().Height())
 		if err != nil {
@@ -217,7 +218,6 @@ func (app *DApp) Version() string {
 func (app *DApp) Init(reg *types.Register, pm types.ProcessManager, cn types.Provider) error {
 	app.pm = pm
 	app.cn = cn
-	reg.RegisterTransaction(1, &Transaction{})
 	return nil
 }
 
@@ -259,20 +259,21 @@ func (app *DApp) InitGenesis(ctw *types.ContextWrapper) error {
 			return err
 		}
 	}
-	/*
-		if true {
-			acc := &formulator.FormulatorAccount{
-				Address_:       common.NewAddress(0, 1, 0),
-				Name_:          "admin",
-				FormulatorType: formulator.AlphaFormulatorType,
-				KeyHash:        common.NewPublicHash(app.frkey.PublicKey()),
-				Amount:         amount.NewCoinAmount(1000, 0),
-			}
-			if err := ctw.CreateAccount(acc); err != nil {
-				return err
-			}
+	if p, err := app.pm.ProcessByName("fleta.vault"); err != nil {
+		return err
+	} else if sp, is := p.(*vault.Vault); !is {
+		return types.ErrNotExistProcess
+	} else {
+		acc := &vault.SingleAccount{
+			Address_: common.NewAddress(0, 1, 0),
+			Name_:    "admin",
+			KeyHash:  common.NewPublicHash(app.frkey.PublicKey()),
 		}
-	*/
+		if err := ctw.CreateAccount(acc); err != nil {
+			return err
+		}
+		sp.AddBalance(ctw, acc.Address(), amount.NewCoinAmount(100000000000, 0))
+	}
 	if true {
 		acc := &formulator.FormulatorAccount{
 			Address_:       common.NewAddress(0, 2, 0),
@@ -286,55 +287,4 @@ func (app *DApp) InitGenesis(ctw *types.ContextWrapper) error {
 		}
 	}
 	return nil
-}
-
-// Transaction is an interface that defines common transaction functions
-type Transaction struct {
-	Timestamp_ uint64
-	KeyHash    common.PublicHash
-	Amount     *amount.Amount
-}
-
-func (tx *Transaction) Timestamp() uint64 {
-	return tx.Timestamp_
-}
-
-func (tx *Transaction) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
-}
-
-func (tx *Transaction) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
-	return nil
-}
-
-func (tx *Transaction) Execute(p types.Process, ctx *types.ContextWrapper, index uint16) error {
-	return nil
-}
-
-// MarshalJSON is a marshaler function
-func (tx *Transaction) MarshalJSON() ([]byte, error) {
-	var buffer bytes.Buffer
-	buffer.WriteString(`{`)
-	buffer.WriteString(`"timestamp":`)
-	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"key_hash":`)
-	if bs, err := tx.KeyHash.MarshalJSON(); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"amount":`)
-	if bs, err := tx.Amount.MarshalJSON(); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`}`)
-	return buffer.Bytes(), nil
 }
