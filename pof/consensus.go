@@ -50,31 +50,8 @@ func (cs *Consensus) InitGenesis(ctw *types.ContextWrapper) error {
 	cs.Lock()
 	defer cs.Unlock()
 
-	var inErr error
-	phase := cs.rt.largestPhase() + 1
-	ctw.Top().AccountMap.EachAll(func(addr common.Address, a types.Account) bool {
-		if a.Address().Coordinate().Height == ctw.TargetHeight() {
-			if acc, is := a.(*formulator.FormulatorAccount); is {
-				addr := acc.Address()
-				if err := cs.rt.addRank(NewRank(addr, acc.KeyHash, phase, hash.DoubleHash(addr[:]))); err != nil {
-					inErr = err
-					return false
-				}
-			}
-		}
-		return true
-	})
-	if inErr != nil {
-		return inErr
-	}
-	ctw.Top().DeletedAccountMap.EachAll(func(addr common.Address, a types.Account) bool {
-		if acc, is := a.(*formulator.FormulatorAccount); is {
-			cs.rt.removeRank(acc.Address())
-		}
-		return true
-	})
-	if cs.rt.CandidateCount() == 0 {
-		return ErrInsufficientCandidateCount
+	if err := cs.updateFormulatorList(ctw); err != nil {
+		return err
 	}
 	if data, err := cs.buildSaveData(); err != nil {
 		return err
@@ -197,6 +174,18 @@ func (cs *Consensus) OnSaveData(b *types.Block, ctw *types.ContextWrapper) error
 		cs.blocksBySameFormulator = 0
 	}
 
+	if err := cs.updateFormulatorList(ctw); err != nil {
+		return err
+	}
+	if data, err := cs.buildSaveData(); err != nil {
+		return err
+	} else {
+		ctw.SetProcessData(tagState, data)
+	}
+	return nil
+}
+
+func (cs *Consensus) updateFormulatorList(ctw *types.ContextWrapper) error {
 	var inErr error
 	phase := cs.rt.largestPhase() + 1
 	ctw.Top().AccountMap.EachAll(func(addr common.Address, a types.Account) bool {
@@ -220,11 +209,8 @@ func (cs *Consensus) OnSaveData(b *types.Block, ctw *types.ContextWrapper) error
 		}
 		return true
 	})
-
-	if data, err := cs.buildSaveData(); err != nil {
-		return err
-	} else {
-		ctw.SetProcessData(tagState, data)
+	if cs.rt.CandidateCount() == 0 {
+		return ErrInsufficientCandidateCount
 	}
 	return nil
 }
