@@ -505,7 +505,9 @@ func (st *Store) AccountDataKeys(addr common.Address, pid uint8, Prefix []byte) 
 
 	list := [][]byte{}
 	if err := st.db.View(func(txn *badger.Txn) error {
-		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		it := txn.NewIterator(badger.IteratorOptions{
+			PrefetchValues: false,
+		})
 		defer it.Close()
 		pre := toAccountDataKey(string(addr[:]) + string(pid))
 		if len(Prefix) > 0 {
@@ -660,7 +662,9 @@ func (st *Store) ProcessDataKeys(pid uint8, Prefix []byte) ([][]byte, error) {
 
 	list := [][]byte{}
 	if err := st.db.View(func(txn *badger.Txn) error {
-		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		it := txn.NewIterator(badger.IteratorOptions{
+			PrefetchValues: false,
+		})
 		defer it.Close()
 		pre := toProcessDataKey(string(pid))
 		if len(Prefix) > 0 {
@@ -886,7 +890,9 @@ func applyContextData(txn *badger.Txn, ctd *types.ContextData) error {
 			inErr = err
 			return false
 		}
-		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		it := txn.NewIterator(badger.IteratorOptions{
+			PrefetchValues: false,
+		})
 		defer it.Close()
 		prefix := toAccountDataKey(string(addr[:]))
 		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
