@@ -496,7 +496,7 @@ func (st *Store) HasAccountName(Name string) (bool, error) {
 }
 
 // AccountDataKeys returns all data keys of the account in the store
-func (st *Store) AccountDataKeys(addr common.Address, Prefix []byte) ([][]byte, error) {
+func (st *Store) AccountDataKeys(addr common.Address, pid uint8, Prefix []byte) ([][]byte, error) {
 	st.closeLock.RLock()
 	defer st.closeLock.RUnlock()
 	if st.isClose {
@@ -507,7 +507,7 @@ func (st *Store) AccountDataKeys(addr common.Address, Prefix []byte) ([][]byte, 
 	if err := st.db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
-		pre := toAccountDataKey(string(addr[:]))
+		pre := toAccountDataKey(string(addr[:]) + string(pid))
 		if len(Prefix) > 0 {
 			pre = append(pre, Prefix...)
 		}
@@ -524,14 +524,14 @@ func (st *Store) AccountDataKeys(addr common.Address, Prefix []byte) ([][]byte, 
 }
 
 // AccountData returns the account data from the store
-func (st *Store) AccountData(addr common.Address, name []byte) []byte {
+func (st *Store) AccountData(addr common.Address, pid uint8, name []byte) []byte {
 	st.closeLock.RLock()
 	defer st.closeLock.RUnlock()
 	if st.isClose {
 		return nil
 	}
 
-	key := string(addr[:]) + string(name)
+	key := string(addr[:]) + string(pid) + string(name)
 	var data []byte
 	if err := st.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(toAccountDataKey(key))
@@ -883,10 +883,6 @@ func applyContextData(txn *badger.Txn, ctd *types.ContextData) error {
 	}
 	ctd.DeletedAccountMap.EachAll(func(addr common.Address, acc types.Account) bool {
 		if err := txn.Delete(toAccountKey(addr)); err != nil {
-			inErr = err
-			return false
-		}
-		if err := txn.Delete(toAccountBalanceKey(addr)); err != nil {
 			inErr = err
 			return false
 		}

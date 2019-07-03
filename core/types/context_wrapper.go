@@ -106,17 +106,17 @@ func (ctw *ContextWrapper) DeleteAccount(acc Account) error {
 
 // AccountDataKeys returns all data keys of the account in the context
 func (ctw *ContextWrapper) AccountDataKeys(addr common.Address, Prefix []byte) ([][]byte, error) {
-	return ctw.ctx.AccountDataKeys(addr, Prefix)
+	return ctw.ctx.AccountDataKeys(addr, ctw.pid, Prefix)
 }
 
 // AccountData returns the account data from the top snapshot
 func (ctw *ContextWrapper) AccountData(addr common.Address, name []byte) []byte {
-	return ctw.ctx.AccountData(addr, name)
+	return ctw.ctx.AccountData(addr, ctw.pid, name)
 }
 
 // SetAccountData inserts the account data to the top snapshot
 func (ctw *ContextWrapper) SetAccountData(addr common.Address, name []byte, value []byte) {
-	ctw.ctx.SetAccountData(addr, name, value)
+	ctw.ctx.SetAccountData(addr, ctw.pid, name, value)
 }
 
 // HasUTXO checks that the utxo of the id is exist or not

@@ -16,8 +16,7 @@ var (
 	tagAccount             = []byte{2, 0}
 	tagAccountName         = []byte{2, 1}
 	tagAccountSeq          = []byte{2, 2}
-	tagAccountBalance      = []byte{2, 3}
-	tagAccountData         = []byte{2, 4}
+	tagAccountData         = []byte{2, 3}
 	tagUTXO                = []byte{3, 0}
 	tagProcessData         = []byte{4, 0}
 	tagEvent               = []byte{5, 0}
@@ -70,13 +69,6 @@ func toAccountNameKey(Name string) []byte {
 func toAccountSeqKey(addr common.Address) []byte {
 	bs := make([]byte, 2+common.AddressSize)
 	copy(bs, tagAccountSeq)
-	copy(bs[2:], addr[:])
-	return bs
-}
-
-func toAccountBalanceKey(addr common.Address) []byte {
-	bs := make([]byte, 2+common.AddressSize)
-	copy(bs, tagAccountBalance)
 	copy(bs[2:], addr[:])
 	return bs
 }

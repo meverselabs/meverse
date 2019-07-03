@@ -125,19 +125,19 @@ func (ctx *Context) DeleteAccount(acc Account) error {
 }
 
 // AccountDataKeys returns all data keys of the account in the context
-func (ctx *Context) AccountDataKeys(addr common.Address, Prefix []byte) ([][]byte, error) {
-	return ctx.Top().AccountDataKeys(addr, Prefix)
+func (ctx *Context) AccountDataKeys(addr common.Address, pid uint8, Prefix []byte) ([][]byte, error) {
+	return ctx.Top().AccountDataKeys(addr, pid, Prefix)
 }
 
 // AccountData returns the account data from the top snapshot
-func (ctx *Context) AccountData(addr common.Address, name []byte) []byte {
-	return ctx.Top().AccountData(addr, name)
+func (ctx *Context) AccountData(addr common.Address, pid uint8, name []byte) []byte {
+	return ctx.Top().AccountData(addr, pid, name)
 }
 
 // SetAccountData inserts the account data to the top snapshot
-func (ctx *Context) SetAccountData(addr common.Address, name []byte, value []byte) {
+func (ctx *Context) SetAccountData(addr common.Address, pid uint8, name []byte, value []byte) {
 	ctx.isLatestHash = false
-	ctx.Top().SetAccountData(addr, name, value)
+	ctx.Top().SetAccountData(addr, pid, name, value)
 }
 
 // HasUTXO checks that the utxo of the id is exist or not

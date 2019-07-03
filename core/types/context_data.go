@@ -233,10 +233,10 @@ func (ctd *ContextData) DeleteAccount(acc Account) error {
 }
 
 // AccountDataKeys returns all data keys of the account in the context
-func (ctd *ContextData) AccountDataKeys(addr common.Address, Prefix []byte) ([][]byte, error) {
+func (ctd *ContextData) AccountDataKeys(addr common.Address, pid uint8, Prefix []byte) ([][]byte, error) {
 	keyMap := NewStringBoolMap()
 	if ctd.Parent != nil {
-		keys, err := ctd.Parent.AccountDataKeys(addr, Prefix)
+		keys, err := ctd.Parent.AccountDataKeys(addr, pid, Prefix)
 		if err != nil {
 			return nil, err
 		}
@@ -244,7 +244,7 @@ func (ctd *ContextData) AccountDataKeys(addr common.Address, Prefix []byte) ([][
 			keyMap.Put(string(k), true)
 		}
 	} else {
-		keys, err := ctd.loader.AccountDataKeys(addr, Prefix)
+		keys, err := ctd.loader.AccountDataKeys(addr, pid, Prefix)
 		if err != nil {
 			return nil, err
 		}
@@ -252,12 +252,13 @@ func (ctd *ContextData) AccountDataKeys(addr common.Address, Prefix []byte) ([][
 			keyMap.Put(string(k), true)
 		}
 	}
-	ctd.AccountDataMap.EachPrefix(string(addr[:]), func(key string, value []byte) bool {
-		keyMap.Put(key[len(addr):], true)
+	prefix := string(addr[:]) + string(pid)
+	ctd.AccountDataMap.EachPrefix(prefix, func(key string, value []byte) bool {
+		keyMap.Put(key[len(prefix):], true)
 		return true
 	})
-	ctd.DeletedAccountDataMap.EachPrefix(string(addr[:]), func(key string, value bool) bool {
-		keyMap.Delete(key[len(addr):])
+	ctd.DeletedAccountDataMap.EachPrefix(prefix, func(key string, value bool) bool {
+		keyMap.Delete(key[len(prefix):])
 		return true
 	})
 	keys := [][]byte{}
@@ -269,15 +270,15 @@ func (ctd *ContextData) AccountDataKeys(addr common.Address, Prefix []byte) ([][
 }
 
 // AccountData returns the account data
-func (ctd *ContextData) AccountData(addr common.Address, name []byte) []byte {
-	key := string(addr[:]) + string(name)
+func (ctd *ContextData) AccountData(addr common.Address, pid uint8, name []byte) []byte {
+	key := string(addr[:]) + string(pid) + string(name)
 	if ctd.DeletedAccountDataMap.Has(key) {
 		return nil
 	}
 	if value, has := ctd.AccountDataMap.Get(key); has {
 		return value
 	} else if ctd.Parent != nil {
-		value := ctd.Parent.AccountData(addr, name)
+		value := ctd.Parent.AccountData(addr, pid, name)
 		if len(value) > 0 {
 			if ctd.isTop {
 				nvalue := make([]byte, len(value))
@@ -291,7 +292,7 @@ func (ctd *ContextData) AccountData(addr common.Address, name []byte) []byte {
 			return nil
 		}
 	} else {
-		value := ctd.loader.AccountData(addr, name)
+		value := ctd.loader.AccountData(addr, pid, name)
 		if len(value) > 0 {
 			if ctd.isTop {
 				nvalue := make([]byte, len(value))
@@ -308,8 +309,8 @@ func (ctd *ContextData) AccountData(addr common.Address, name []byte) []byte {
 }
 
 // SetAccountData inserts the account data
-func (ctd *ContextData) SetAccountData(addr common.Address, name []byte, value []byte) {
-	key := string(addr[:]) + string(name)
+func (ctd *ContextData) SetAccountData(addr common.Address, pid uint8, name []byte, value []byte) {
+	key := string(addr[:]) + string(pid) + string(name)
 	if len(value) == 0 {
 		ctd.AccountDataMap.Delete(key)
 		ctd.DeletedAccountDataMap.Put(key, true)

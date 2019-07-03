@@ -17,14 +17,14 @@ type Loader interface {
 	AddressByName(Name string) (common.Address, error)
 	HasAccount(addr common.Address) (bool, error)
 	HasAccountName(Name string) (bool, error)
-	AccountData(addr common.Address, name []byte) []byte
-	AccountDataKeys(addr common.Address, Prefix []byte) ([][]byte, error)
 	HasUTXO(id uint64) (bool, error)
 	UTXO(id uint64) (*UTXO, error)
 }
 
 type internalLoader interface {
 	Loader
+	AccountData(addr common.Address, pid uint8, name []byte) []byte
+	AccountDataKeys(addr common.Address, pid uint8, Prefix []byte) ([][]byte, error)
 	ProcessData(pid uint8, name []byte) []byte
 	ProcessDataKeys(pid uint8, Prefix []byte) ([][]byte, error)
 }
@@ -88,12 +88,12 @@ func (st *emptyLoader) HasAccountName(Name string) (bool, error) {
 }
 
 // AccountDataKeys returns nil
-func (st *emptyLoader) AccountDataKeys(addr common.Address, Prefix []byte) ([][]byte, error) {
+func (st *emptyLoader) AccountDataKeys(addr common.Address, pid uint8, Prefix []byte) ([][]byte, error) {
 	return nil, nil
 }
 
 // AccountData returns nil
-func (st *emptyLoader) AccountData(addr common.Address, name []byte) []byte {
+func (st *emptyLoader) AccountData(addr common.Address, pid uint8, name []byte) []byte {
 	return nil
 }
 

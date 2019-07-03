@@ -115,17 +115,17 @@ func (cc *contextCache) HasAccountName(Name string) (bool, error) {
 }
 
 // AccountDataKeys returns all data keys of the account in the context
-func (cc *contextCache) AccountDataKeys(addr common.Address, Prefix []byte) ([][]byte, error) {
-	return cc.ctx.loader.AccountDataKeys(addr, Prefix)
+func (cc *contextCache) AccountDataKeys(addr common.Address, pid uint8, Prefix []byte) ([][]byte, error) {
+	return cc.ctx.loader.AccountDataKeys(addr, pid, Prefix)
 }
 
 // AccountData returns the account data
-func (cc *contextCache) AccountData(addr common.Address, name []byte) []byte {
-	key := string(addr[:]) + string(name)
+func (cc *contextCache) AccountData(addr common.Address, pid uint8, name []byte) []byte {
+	key := string(addr[:]) + string(pid) + string(name)
 	if value, has := cc.AccountDataMap[key]; has {
 		return value
 	} else {
-		value := cc.ctx.loader.AccountData(addr, name)
+		value := cc.ctx.loader.AccountData(addr, pid, name)
 		cc.AccountDataMap[key] = value
 		return value
 	}

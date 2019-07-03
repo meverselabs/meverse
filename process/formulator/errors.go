@@ -17,13 +17,13 @@ var (
 	ErrOmegaPolicyShouldBeSetupInApplication   = errors.New("OmegaPolicy should be setup in application")
 	ErrHyperPolicyShouldBeSetupInApplication   = errors.New("HyperPolicy should be setup in application")
 	ErrStakingPolicyShouldBeSetupInApplication = errors.New("StakingPolicy should be setup in application")
+	ErrInvalidFormulatorCount                  = errors.New("invalid formulator count")
+	ErrInsufficientFormulatorBlocks            = errors.New("insufficient formulator blocks")
 
 	/*
 		ErrInsufficientStakingAmount      = errors.New("insufficient staking amount")
 		ErrExceedStakingAmount            = errors.New("exceed staking amount")
 		ErrCriticalStakingAmount          = errors.New("critical staking amount")
-		ErrInvalidFormulatorCount         = errors.New("invalid formulator count")
-		ErrInsufficientFormulatorBlocks   = errors.New("insufficient formulator blocks")
 		ErrUnauthorizedTransaction        = errors.New("unauthorized transaction")
 	*/
 )
