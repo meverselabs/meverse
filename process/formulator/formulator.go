@@ -60,6 +60,9 @@ func (p *Formulator) Init(reg *types.Register, pm types.ProcessManager, cn types
 	reg.RegisterTransaction(2, &CreateSigma{})
 	reg.RegisterTransaction(3, &CreateOmega{})
 	reg.RegisterTransaction(4, &CreateHyper{})
+	reg.RegisterTransaction(5, &Revoke{})
+	reg.RegisterTransaction(6, &Staking{})
+	reg.RegisterTransaction(7, &Unstaking{})
 	return nil
 }
 
