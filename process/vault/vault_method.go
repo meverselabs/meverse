@@ -11,7 +11,7 @@ func (p *Vault) Balance(ctw *types.ContextWrapper, addr common.Address) *amount.
 	ctw = ctw.Switch(p.pid)
 
 	var total *amount.Amount
-	if bs := ctw.ProcessData(addr[:]); len(bs) > 0 {
+	if bs := ctw.AccountData(addr, tagBalance); len(bs) > 0 {
 		total = amount.NewAmountFromBytes(bs)
 	} else {
 		total = amount.NewCoinAmount(0, 0)
@@ -27,9 +27,8 @@ func (p *Vault) AddBalance(ctw *types.ContextWrapper, addr common.Address, am *a
 	if am.Less(zero) {
 		return ErrMinusInput
 	}
-	total := p.Balance(ctw, addr)
-	total = total.Add(am)
-	ctw.SetAccountData(addr, tagBalance, total.Bytes())
+	//log.Println("AddBalance", ctw.TargetHeight(), addr.String(), am.String(), p.Balance(ctw, addr).Add(am).String())
+	ctw.SetAccountData(addr, tagBalance, p.Balance(ctw, addr).Add(am).Bytes())
 	return nil
 }
 
@@ -41,6 +40,8 @@ func (p *Vault) SubBalance(ctw *types.ContextWrapper, addr common.Address, am *a
 	if total.Less(am) {
 		return ErrMinusBalance
 	}
+	//log.Println("SubBalance", ctw.TargetHeight(), addr.String(), am.String(), p.Balance(ctw, addr).Sub(am).String())
+
 	total = total.Sub(am)
 	if total.IsZero() {
 		ctw.SetAccountData(addr, tagBalance, nil)
