@@ -114,6 +114,11 @@ func (cn *Chain) Init() error {
 	if err := cn.consensus.OnLoadChain(types.NewContextWrapper(0, ctx)); err != nil {
 		return err
 	}
+	for _, s := range cn.services {
+		if err := s.OnLoadChain(ctx); err != nil {
+			return err
+		}
+	}
 
 	cn.isInit = true
 	return nil
