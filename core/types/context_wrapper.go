@@ -31,7 +31,11 @@ func SwitchContextWrapper(pid uint8, ctw *ContextWrapper) *ContextWrapper {
 
 // Switch returns a SwitchContextWrapper of the pid
 func (ctw *ContextWrapper) Switch(pid uint8) *ContextWrapper {
-	return SwitchContextWrapper(pid, ctw)
+	if ctw.pid == pid {
+		return ctw
+	} else {
+		return SwitchContextWrapper(pid, ctw)
+	}
 }
 
 // Name returns the name of the chain

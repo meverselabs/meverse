@@ -52,8 +52,17 @@ func (p *Vault) SubBalance(ctw *types.ContextWrapper, addr common.Address, am *a
 }
 
 // AddLockedBalance adds locked balance to the account of the address
-func (p *Vault) AddLockedBalance(ctw *types.ContextWrapper, addr common.Address, am *amount.Amount, height uint32) error {
+func (p *Vault) AddLockedBalance(ctw *types.ContextWrapper, addr common.Address, height uint32, am *amount.Amount) {
 	ctw = ctw.Switch(p.pid)
+	ctw.SetProcessData(toLockedBalanceKey(height, addr), p.LockedBalance(ctw, addr, height).Add(am).Bytes())
+}
 
-	panic("TODO")
+// LockedBalance returns locked balance of the account of the address
+func (p *Vault) LockedBalance(ctw *types.ContextWrapper, addr common.Address, height uint32) *amount.Amount {
+	ctw = ctw.Switch(p.pid)
+	if bs := ctw.ProcessData(toLockedBalanceKey(height, addr)); len(bs) > 0 {
+		return amount.NewAmountFromBytes(bs)
+	} else {
+		return amount.NewCoinAmount(0, 0)
+	}
 }

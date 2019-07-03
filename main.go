@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"log"
 	"sync"
-	"time"
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
@@ -22,6 +21,30 @@ import (
 )
 
 func main() {
+	/*
+		RoundVote
+		RoundVoteAck
+		BlockWait
+		BlockVote
+
+		State
+		VoteTargetHeight
+		RoundVoteMessageMap
+		PublicHash
+		RoundVoteAckMessageMap
+		MinRoundVoteAck
+		BlockGenerationMap
+		BlockVoteMessageMap
+		BlockRound
+			Generator
+			TimeoutCount
+			TargetHeight
+		RoundVoteMessageWaitMap
+		RoundVoteAckMessageWaitMap
+		BlockGenerationWaitMap
+		BlockVoteMessageWaitMap
+	*/
+
 	if err := test(); err != nil {
 		panic(err)
 	}
@@ -82,74 +105,77 @@ func test() error {
 		return err
 	}
 
-	TimeoutCount := uint32(0)
-	Formulator := common.NewAddress(0, 2, 0)
-	var buffer bytes.Buffer
-	enc := encoding.NewEncoder(&buffer)
-	if err := enc.EncodeUint32(TimeoutCount); err != nil {
-		return err
-	}
-	bc := chain.NewBlockCreator(cn, Formulator, buffer.Bytes())
-	if err := bc.Init(); err != nil {
-		return err
-	}
-	txs := []types.Transaction{}
-	sigs := [][]common.Signature{}
-	for i := 0; i < 20000; i++ {
-		tx := &Transaction{
-			Timestamp_: 0,
-			KeyHash:    common.PublicHash{},
-			Amount:     amount.NewCoinAmount(uint64(i+1), 0),
+	for i := 0; i < 2000; i++ {
+		TimeoutCount := uint32(0)
+		Formulator := common.NewAddress(0, 2, 0)
+		var buffer bytes.Buffer
+		enc := encoding.NewEncoder(&buffer)
+		if err := enc.EncodeUint32(TimeoutCount); err != nil {
+			return err
 		}
-		sig, _ := frkeys[0].Sign(encoding.Hash(tx))
-		sigs = append(sigs, []common.Signature{sig})
-		txs = append(txs, tx)
-	}
-
-	if true {
-		begin := time.Now().UnixNano()
-		for i := 0; i < 10000; i++ {
-			if err := bc.AddTx(txs[i], sigs[i]); err != nil {
-				return err
+		bc := chain.NewBlockCreator(cn, Formulator, buffer.Bytes())
+		if err := bc.Init(); err != nil {
+			return err
+		}
+		/*
+			txs := []types.Transaction{}
+			sigs := [][]common.Signature{}
+			for i := 0; i < 20000; i++ {
+				tx := &Transaction{
+					Timestamp_: 0,
+					KeyHash:    common.PublicHash{},
+					Amount:     amount.NewCoinAmount(uint64(i+1), 0),
+				}
+				sig, _ := frkeys[0].Sign(encoding.Hash(tx))
+				sigs = append(sigs, []common.Signature{sig})
+				txs = append(txs, tx)
 			}
+
+			if true {
+				begin := time.Now().UnixNano()
+				for i := 0; i < 10000; i++ {
+					if err := bc.AddTx(txs[i], sigs[i]); err != nil {
+						return err
+					}
+				}
+				end := time.Now().UnixNano()
+				log.Println((end - begin) / int64(time.Millisecond))
+			}
+		*/
+		b, err := bc.Finalize()
+		if err != nil {
+			return err
 		}
-		end := time.Now().UnixNano()
-		log.Println((end - begin) / int64(time.Millisecond))
-	}
 
-	b, err := bc.Finalize()
-	if err != nil {
-		return err
-	}
+		bh := encoding.Hash(b.Header)
+		sig0, _ := frkeys[0].Sign(bh)
+		Signatures := []common.Signature{
+			sig0,
+		}
+		b.Signatures = Signatures
 
-	bh := encoding.Hash(b.Header)
-	sig0, _ := frkeys[0].Sign(bh)
-	Signatures := []common.Signature{
-		sig0,
-	}
-	b.Signatures = Signatures
+		// TODO
 
-	// TODO
+		// Header
+		// Context
+		// Signature[0]
 
-	// Header
-	// Context
-	// Signature[0]
+		bs := &types.BlockSign{
+			HeaderHash:         bh,
+			GeneratorSignature: sig0,
+		}
+		bsh := encoding.Hash(bs)
+		sig1, _ := obkeys[0].Sign(bsh)
+		sig2, _ := obkeys[1].Sign(bsh)
+		sig3, _ := obkeys[2].Sign(bsh)
 
-	bs := &types.BlockSign{
-		HeaderHash:         bh,
-		GeneratorSignature: sig0,
-	}
-	bsh := encoding.Hash(bs)
-	sig1, _ := obkeys[0].Sign(bsh)
-	sig2, _ := obkeys[1].Sign(bsh)
-	sig3, _ := obkeys[2].Sign(bsh)
+		b.Signatures = append(b.Signatures, sig1)
+		b.Signatures = append(b.Signatures, sig2)
+		b.Signatures = append(b.Signatures, sig3)
 
-	b.Signatures = append(b.Signatures, sig1)
-	b.Signatures = append(b.Signatures, sig2)
-	b.Signatures = append(b.Signatures, sig3)
-
-	if err := cn.ConnectBlock(b); err != nil {
-		return err
+		if err := cn.ConnectBlock(b); err != nil {
+			return err
+		}
 	}
 	if true {
 		b, err := cn.Provider().Block(cn.Provider().Height())
@@ -208,10 +234,10 @@ func (app *DApp) InitGenesis(ctw *types.ContextWrapper) error {
 			RewardPerBlock:        amount.NewCoinAmount(0, 500000000000000000),
 			PayRewardEveryBlocks:  500,
 			AlphaEfficiency1000:   1000,
-			SigmaEfficiency1000:   1000,
-			OmegaEfficiency1000:   1000,
-			HyperEfficiency1000:   1000,
-			StakingEfficiency1000: 1000,
+			SigmaEfficiency1000:   1500,
+			OmegaEfficiency1000:   2000,
+			HyperEfficiency1000:   2500,
+			StakingEfficiency1000: 500,
 		}, &formulator.AlphaPolicy{
 			AlphaCreationLimitHeight:  1000,
 			AlphaCreationAmount:       amount.NewCoinAmount(1000, 0),
@@ -232,18 +258,20 @@ func (app *DApp) InitGenesis(ctw *types.ContextWrapper) error {
 			return err
 		}
 	}
-	if true {
-		acc := &formulator.FormulatorAccount{
-			Address_:       common.NewAddress(0, 1, 0),
-			Name_:          "admin",
-			FormulatorType: formulator.AlphaFormulatorType,
-			KeyHash:        common.NewPublicHash(app.frkey.PublicKey()),
-			Amount:         amount.NewCoinAmount(1000, 0),
+	/*
+		if true {
+			acc := &formulator.FormulatorAccount{
+				Address_:       common.NewAddress(0, 1, 0),
+				Name_:          "admin",
+				FormulatorType: formulator.AlphaFormulatorType,
+				KeyHash:        common.NewPublicHash(app.frkey.PublicKey()),
+				Amount:         amount.NewCoinAmount(1000, 0),
+			}
+			if err := ctw.CreateAccount(acc); err != nil {
+				return err
+			}
 		}
-		if err := ctw.CreateAccount(acc); err != nil {
-			return err
-		}
-	}
+	*/
 	if true {
 		acc := &formulator.FormulatorAccount{
 			Address_:       common.NewAddress(0, 2, 0),

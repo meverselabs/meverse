@@ -55,6 +55,16 @@ func (p *Vault) BeforeExecuteTransactions(ctw *types.ContextWrapper) error {
 
 // AfterExecuteTransactions called after processes transactions of the block
 func (p *Vault) AfterExecuteTransactions(b *types.Block, ctw *types.ContextWrapper) error {
+	keys, err := ctw.ProcessDataKeys(toLockedBalancePrefix(b.Header.Height))
+	if err != nil {
+		return err
+	}
+	for _, k := range keys {
+		if addr, is := fromLockedBalancePrefix(k); is {
+			p.AddBalance(ctw, addr, p.LockedBalance(ctw, addr, b.Header.Height))
+			ctw.SetProcessData(k, nil)
+		}
+	}
 	return nil
 }
 

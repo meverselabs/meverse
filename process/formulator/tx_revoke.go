@@ -87,7 +87,7 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 		if err := sp.vault.SubBalance(ctw, frAcc.Address(), tx.Fee(ctw)); err != nil {
 			return err
 		}
-		sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), frAcc.Amount, ctw.TargetHeight()+policy.AlphaUnlockRequiredBlocks)
+		sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), ctw.TargetHeight()+policy.AlphaUnlockRequiredBlocks, frAcc.Amount)
 		sp.vault.AddBalance(ctw, heritorAcc.Address(), sp.vault.Balance(ctw, frAcc.Address()))
 	case SigmaFormulatorType:
 		policy := &SigmaPolicy{}
@@ -98,7 +98,7 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 		if err := sp.vault.SubBalance(ctw, frAcc.Address(), tx.Fee(ctw)); err != nil {
 			return err
 		}
-		sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), frAcc.Amount, ctw.TargetHeight()+policy.SigmaUnlockRequiredBlocks)
+		sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), ctw.TargetHeight()+policy.SigmaUnlockRequiredBlocks, frAcc.Amount)
 		sp.vault.AddBalance(ctw, heritorAcc.Address(), sp.vault.Balance(ctw, frAcc.Address()))
 	case OmegaFormulatorType:
 		policy := &OmegaPolicy{}
@@ -109,7 +109,7 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 		if err := sp.vault.SubBalance(ctw, frAcc.Address(), tx.Fee(ctw)); err != nil {
 			return err
 		}
-		sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), frAcc.Amount, ctw.TargetHeight()+policy.OmegaUnlockRequiredBlocks)
+		sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), ctw.TargetHeight()+policy.OmegaUnlockRequiredBlocks, frAcc.Amount)
 		sp.vault.AddBalance(ctw, heritorAcc.Address(), sp.vault.Balance(ctw, frAcc.Address()))
 	case HyperFormulatorType:
 		policy := &HyperPolicy{}
@@ -120,7 +120,7 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 		if err := sp.vault.SubBalance(ctw, frAcc.Address(), tx.Fee(ctw)); err != nil {
 			return err
 		}
-		sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), frAcc.Amount, ctw.TargetHeight()+policy.HyperUnlockRequiredBlocks)
+		sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), ctw.TargetHeight()+policy.HyperUnlockRequiredBlocks, frAcc.Amount)
 		sp.vault.AddBalance(ctw, heritorAcc.Address(), sp.vault.Balance(ctw, frAcc.Address()))
 
 		PowerMap, err := sp.getStakingAmountMap(ctw, tx.From)
@@ -136,7 +136,7 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 			}
 			frAcc.StakingAmount.Sub(StakingAmount)
 
-			sp.vault.AddLockedBalance(ctw, addr, StakingAmount, ctw.TargetHeight()+policy.StakingUnlockRequiredBlocks)
+			sp.vault.AddLockedBalance(ctw, addr, ctw.TargetHeight()+policy.StakingUnlockRequiredBlocks, StakingAmount)
 		}
 		if !frAcc.StakingAmount.IsZero() {
 			return ErrCriticalStakingAmount
