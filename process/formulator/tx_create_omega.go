@@ -100,7 +100,9 @@ func (tx *CreateOmega) Execute(p types.Process, ctw *types.ContextWrapper, index
 		} else if ctw.TargetHeight() < subAcc.UpdatedHeight+policy.OmegaRequiredSigmaBlocks {
 			return ErrInsufficientFormulatorBlocks
 		} else {
-			sp.vault.AddBalance(ctw, tx.SigmaFormulators[0], subAcc.Amount)
+			if err := sp.vault.AddBalance(ctw, tx.SigmaFormulators[0], subAcc.Amount); err != nil {
+				return err
+			}
 			ctw.DeleteAccount(subAcc)
 		}
 	}

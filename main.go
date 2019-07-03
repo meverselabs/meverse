@@ -33,16 +33,17 @@ func main() {
 		PublicHash
 		RoundVoteAckMessageMap
 		MinRoundVoteAck
-		BlockGenerationMap
-		BlockVoteMessageMap
 		BlockRound
-			Generator
-			TimeoutCount
 			TargetHeight
+			BlockGeneration
+			Context
+			BlockVoteMessageMap
+			BlockGenerationWait
+			BlockVoteMessageWaitMap
+
 		RoundVoteMessageWaitMap
 		RoundVoteAckMessageWaitMap
 		BlockGenerationWaitMap
-		BlockVoteMessageWaitMap
 	*/
 
 	if err := test(); err != nil {

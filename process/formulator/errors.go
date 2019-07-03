@@ -4,8 +4,6 @@ import "errors"
 
 // consensus errors
 var (
-	ErrInvalidSignerCount                      = errors.New("invalid signer count")
-	ErrInvalidAccountSigner                    = errors.New("invalid account signer")
 	ErrInvalidStakingAddress                   = errors.New("invalid staking address")
 	ErrInvalidStakingAmount                    = errors.New("invalid staking amount")
 	ErrAlphaCreationLimited                    = errors.New("alpha creation limited")

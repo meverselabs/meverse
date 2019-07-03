@@ -124,7 +124,9 @@ func (tx *Unstaking) Execute(p types.Process, ctw *types.ContextWrapper, index u
 	if err := encoding.Unmarshal(ctw.ProcessData(tagHyperPolicy), &policy); err != nil {
 		return err
 	}
-	sp.vault.AddLockedBalance(ctw, fromAcc.Address(), ctw.TargetHeight()+policy.StakingUnlockRequiredBlocks, tx.Amount)
+	if err := sp.vault.AddLockedBalance(ctw, fromAcc.Address(), ctw.TargetHeight()+policy.StakingUnlockRequiredBlocks, tx.Amount); err != nil {
+		return err
+	}
 
 	ctw.Commit(sn)
 	return nil

@@ -63,10 +63,10 @@ func (acc *FormulatorAccount) Clone() types.Account {
 // Validate validates account signers
 func (acc *FormulatorAccount) Validate(loader types.LoaderWrapper, signers []common.PublicHash) error {
 	if len(signers) != 1 {
-		return ErrInvalidSignerCount
+		return types.ErrInvalidSignerCount
 	}
 	if acc.KeyHash != signers[0] {
-		return ErrInvalidAccountSigner
+		return types.ErrInvalidAccountSigner
 	}
 	return nil
 }

@@ -39,7 +39,11 @@ func (p *Vault) Version() string {
 func (p *Vault) Init(reg *types.Register, pm types.ProcessManager, cn types.Provider) error {
 	p.pm = pm
 	p.cn = cn
+	reg.RegisterAccount(1, &SingleAccount{})
+	reg.RegisterAccount(1, &MultiAccount{})
 	reg.RegisterTransaction(1, &Transfer{})
+	reg.RegisterTransaction(2, &Burn{})
+	reg.RegisterTransaction(3, &CreateAccount{})
 	return nil
 }
 
@@ -61,7 +65,9 @@ func (p *Vault) AfterExecuteTransactions(b *types.Block, ctw *types.ContextWrapp
 	}
 	for _, k := range keys {
 		if addr, is := fromLockedBalancePrefix(k); is {
-			p.AddBalance(ctw, addr, p.LockedBalance(ctw, addr, b.Header.Height))
+			if err := p.AddBalance(ctw, addr, p.LockedBalance(ctw, addr, b.Header.Height)); err != nil {
+				return err
+			}
 			ctw.SetProcessData(k, nil)
 		}
 	}

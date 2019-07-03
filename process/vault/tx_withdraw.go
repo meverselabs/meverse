@@ -4,40 +4,37 @@ import (
 	"bytes"
 	"encoding/json"
 
+	"github.com/fletaio/core/transaction"
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
 	"github.com/fletaio/fleta/core/types"
 )
 
-// Transfer is a Transfer
-type Transfer struct {
+// Withdraw makes utxos from the account
+type Withdraw struct {
 	Timestamp_ uint64
 	Seq_       uint64
 	From       common.Address
-	To         common.Address
-	Amount     *amount.Amount
+	Vout       []*types.TxOut
 }
 
 // Timestamp returns the timestamp of the transaction
-func (tx *Transfer) Timestamp() uint64 {
+func (tx *Withdraw) Timestamp() uint64 {
 	return tx.Timestamp_
 }
 
 // Seq returns the sequence of the transaction
-func (tx *Transfer) Seq() uint64 {
+func (tx *Withdraw) Seq() uint64 {
 	return tx.Seq_
 }
 
 // Fee returns the fee of the transaction
-func (tx *Transfer) Fee(loader types.LoaderWrapper) *amount.Amount {
+func (tx *Withdraw) Fee(loader types.LoaderWrapper) *amount.Amount {
 	return amount.COIN.DivC(10)
 }
 
 // Validate validates signatures of the transaction
-func (tx *Transfer) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
-	if tx.Amount.Less(amount.COIN.DivC(10)) {
-		return types.ErrDustAmount
-	}
+func (tx *Withdraw) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	if tx.Seq() <= loader.Seq(tx.From) {
 		return types.ErrInvalidSequence
 	}
@@ -53,12 +50,8 @@ func (tx *Transfer) Validate(p types.Process, loader types.LoaderWrapper, signer
 }
 
 // Execute updates the context by the transaction
-func (tx *Transfer) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
+func (tx *Withdraw) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Vault)
-
-	if tx.Amount.Less(amount.COIN.DivC(10)) {
-		return types.ErrDustAmount
-	}
 
 	sn := ctw.Snapshot()
 	defer ctw.Revert(sn)
@@ -73,19 +66,17 @@ func (tx *Transfer) Execute(p types.Process, ctw *types.ContextWrapper, index ui
 	} else if !has {
 		return types.ErrNotExistAccount
 	}
-	if err := sp.SubBalance(ctw, tx.From, tx.Fee(ctw)); err != nil {
-		return err
+	outsum := tx.Fee(ctw)
+	for n, vout := range tx.Vout {
+		if vout.Amount.Less(amount.COIN.DivC(10)) {
+			return types.ErrDustAmount
+		}
+		outsum = outsum.Add(vout.Amount)
+		if err := ctw.CreateUTXO(transaction.MarshalID(ctw.TargetHeight(), index, uint16(n)), vout); err != nil {
+			return err
+		}
 	}
-	if err := sp.SubBalance(ctw, tx.From, tx.Amount); err != nil {
-		return err
-	}
-
-	if has, err := ctw.HasAccount(tx.To); err != nil {
-		return err
-	} else if !has {
-		return types.ErrNotExistAccount
-	}
-	if err := sp.AddBalance(ctw, tx.To, tx.Amount); err != nil {
+	if err := sp.SubBalance(ctw, tx.From, outsum); err != nil {
 		return err
 	}
 
@@ -94,7 +85,7 @@ func (tx *Transfer) Execute(p types.Process, ctw *types.ContextWrapper, index ui
 }
 
 // MarshalJSON is a marshaler function
-func (tx *Transfer) MarshalJSON() ([]byte, error) {
+func (tx *Withdraw) MarshalJSON() ([]byte, error) {
 	var buffer bytes.Buffer
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
@@ -118,19 +109,19 @@ func (tx *Transfer) MarshalJSON() ([]byte, error) {
 		buffer.Write(bs)
 	}
 	buffer.WriteString(`,`)
-	buffer.WriteString(`"to":`)
-	if bs, err := tx.To.MarshalJSON(); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
+	buffer.WriteString(`"vout":`)
+	buffer.WriteString(`[`)
+	for i, vout := range tx.Vout {
+		if i > 0 {
+			buffer.WriteString(`,`)
+		}
+		if bs, err := vout.MarshalJSON(); err != nil {
+			return nil, err
+		} else {
+			buffer.Write(bs)
+		}
 	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"amount":`)
-	if bs, err := tx.Amount.MarshalJSON(); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
+	buffer.WriteString(`]`)
 	buffer.WriteString(`}`)
 	return buffer.Bytes(), nil
 }
