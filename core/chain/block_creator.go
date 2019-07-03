@@ -122,9 +122,6 @@ func (bc *BlockCreator) Finalize() (*types.Block, error) {
 	if err := bc.cn.app.AfterExecuteTransactions(bc.b, types.NewContextWrapper(255, bc.ctx)); err != nil {
 		return nil, err
 	}
-	if err := bc.cn.consensus.AfterExecuteTransactions(bc.b, types.NewContextWrapper(0, bc.ctx)); err != nil {
-		return nil, err
-	}
 
 	now := uint64(time.Now().UnixNano())
 	if now <= bc.ctx.LastTimestamp() {

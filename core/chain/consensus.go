@@ -11,8 +11,6 @@ type Consensus interface {
 	InitGenesis(ctw *types.ContextWrapper) error
 	OnLoadChain(loader types.LoaderWrapper) error
 	ValidateSignature(bh *types.Header, sigs []common.Signature) error
-	BeforeExecuteTransactions(ctw *types.ContextWrapper) error
-	AfterExecuteTransactions(b *types.Block, ctw *types.ContextWrapper) error
 	OnSaveData(b *types.Block, ctw *types.ContextWrapper) error
 }
 
@@ -31,16 +29,6 @@ func (cs *ConsensusBase) OnLoadChain(loader types.LoaderWrapper) error {
 
 // ValidateSignature called when required to validate signatures
 func (cs *ConsensusBase) ValidateSignature(bh *types.Header, sigs []common.Signature) error {
-	return nil
-}
-
-// BeforeExecuteTransactions called before processes transactions of the block
-func (cs *ConsensusBase) BeforeExecuteTransactions(ctw *types.ContextWrapper) error {
-	return nil
-}
-
-// AfterExecuteTransactions called after processes transactions of the block
-func (cs *ConsensusBase) AfterExecuteTransactions(b *types.Block, ctw *types.ContextWrapper) error {
 	return nil
 }
 

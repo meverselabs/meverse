@@ -174,16 +174,6 @@ func (cs *Consensus) ValidateSignature(bh *types.Header, sigs []common.Signature
 	return nil
 }
 
-// BeforeExecuteTransactions called before processes transactions of the block
-func (cs *Consensus) BeforeExecuteTransactions(bctw *types.ContextWrapper) error {
-	return nil
-}
-
-// AfterExecuteTransactions called after processes transactions of the block
-func (cs *Consensus) AfterExecuteTransactions(b *types.Block, ctw *types.ContextWrapper) error {
-	return nil
-}
-
 // OnSaveData called when the context of the block saved
 func (cs *Consensus) OnSaveData(b *types.Block, ctw *types.ContextWrapper) error {
 	cs.Lock()

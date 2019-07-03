@@ -329,9 +329,6 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 	if err := cn.app.AfterExecuteTransactions(b, types.NewContextWrapper(255, ctx)); err != nil {
 		return err
 	}
-	if err := cn.consensus.AfterExecuteTransactions(b, types.NewContextWrapper(0, ctx)); err != nil {
-		return err
-	}
 	return nil
 }
 
