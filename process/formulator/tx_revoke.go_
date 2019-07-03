@@ -120,8 +120,7 @@ func init() {
 	})
 }
 
-// Revoke is a consensus.Revoke
-// It is used to remove formulator account and get back staked coin
+// Revoke is used to remove formulator account and get back staked coin
 type Revoke struct {
 	transaction.Base
 	Seq_    uint64

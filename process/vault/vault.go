@@ -33,6 +33,7 @@ func (p *Vault) Version() string {
 func (p *Vault) Init(reg *types.Register, pm types.ProcessManager, cn types.Provider) error {
 	p.pm = pm
 	p.cn = cn
+	reg.RegisterTransaction(1, &Transfer{})
 	return nil
 }
 

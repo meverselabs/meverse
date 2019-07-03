@@ -125,8 +125,7 @@ func init() {
 	})
 }
 
-// CreateOmega is a consensus.CreateOmega
-// It is used to make formulator account
+// CreateOmega is used to make omega formulator account
 type CreateOmega struct {
 	transaction.Base
 	Seq_             uint64

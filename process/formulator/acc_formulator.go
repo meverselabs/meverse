@@ -20,7 +20,7 @@ const (
 	HyperFormulatorType = FormulatorType(4)
 )
 
-// FormulatorAccount is a consensus.FormulatorAccount
+// FormulatorAccount is a FormulatorAccount
 // It is used to indentify Hyper formulator that supports the staking system
 type FormulatorAccount struct {
 	Address_       common.Address

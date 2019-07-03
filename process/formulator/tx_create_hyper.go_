@@ -54,10 +54,7 @@ func init() {
 		if !has {
 			return nil, ErrNotExistRewardPolicy
 		}
-		if ctx.TargetHeight() < policy.FormulatorCreationLimitHeight {
-			return nil, ErrFormulatorCreationLimited
-		}
-
+		
 		sn := ctx.Snapshot()
 		defer ctx.Revert(sn)
 
@@ -105,25 +102,14 @@ func init() {
 	})
 }
 
-// CreateHyper is a consensus.CreateHyper
-// It is used to make formulator account
+// CreateHyper is used to make hyper formulator account
 type CreateHyper struct {
 	transaction.Base
 	Seq_    uint64
-	From_   common.Address
+	From   common.Address
 	Name    string
 	KeyHash common.PublicHash
 	ValidatorPolicy *ValidatorPolicy
-}
-
-// IsUTXO returns false
-func (tx *CreateHyper) IsUTXO() bool {
-	return false
-}
-
-// From returns the creator of the transaction
-func (tx *CreateHyper) From common.Address {
-	return tx.From_
 }
 
 // Seq returns the sequence of the transaction

@@ -116,8 +116,7 @@ func init() {
 	})
 }
 
-// Staking is a consensus.Staking
-// It is used to make formulator account
+// Staking is used to stake coin to the hyper formulator
 type Staking struct {
 	transaction.Base
 	Seq_            uint64

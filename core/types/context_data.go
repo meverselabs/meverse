@@ -338,7 +338,7 @@ func (ctd *ContextData) HasUTXO(id uint64) (bool, error) {
 // UTXO returns the UTXO
 func (ctd *ContextData) UTXO(id uint64) (*UTXO, error) {
 	if ctd.DeletedUTXOMap.Has(id) {
-		return nil, ErrDoubleSpent
+		return nil, ErrUsedUTXO
 	}
 	if utxo, has := ctd.UTXOMap.Get(id); has {
 		return utxo, nil

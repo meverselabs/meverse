@@ -125,8 +125,7 @@ func init() {
 	})
 }
 
-// CreateSigma is a consensus.CreateSigma
-// It is used to make formulator account
+// CreateSigma is used to make sigma formulator account
 type CreateSigma struct {
 	transaction.Base
 	Seq_             uint64

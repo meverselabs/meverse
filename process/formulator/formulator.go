@@ -37,14 +37,16 @@ func (p *Formulator) Init(reg *types.Register, pm types.ProcessManager, cn types
 	p.pm = pm
 	p.cn = cn
 
-	reg.RegisterAccount(1, &FormulatorAccount{})
 	if vp, err := pm.ProcessByName("fleta.vault"); err != nil {
-		return ErrNotExistVault
+		return err
 	} else if v, is := vp.(*vault.Vault); !is {
-		return ErrNotExistVault
+		return types.ErrInvalidProcess
 	} else {
 		p.vault = v
 	}
+
+	reg.RegisterAccount(1, &FormulatorAccount{})
+	reg.RegisterTransaction(1, &CreateAlpha{})
 	return nil
 }
 
@@ -122,15 +124,11 @@ func (p *Formulator) BeforeExecuteTransactions(ctw *types.ContextWrapper) error 
 // AfterExecuteTransactions called after processes transactions of the block
 func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.ContextWrapper) error {
 	policy := &RewardPolicy{}
-	if bs := ctw.ProcessData([]byte("RewardPolicy")); len(bs) == 0 {
-		return ErrNotExistPolicyData
-	} else if err := encoding.Unmarshal(bs, &policy); err != nil {
+	if err := encoding.Unmarshal(ctw.ProcessData([]byte("RewardPolicy")), &policy); err != nil {
 		return err
 	}
 	rd := newRewardData()
-	if bs := ctw.ProcessData([]byte("RewardData")); len(bs) == 0 {
-		return ErrNotExistRewardData
-	} else if err := encoding.Unmarshal(bs, &rd); err != nil {
+	if err := encoding.Unmarshal(ctw.ProcessData([]byte("RewardData")), &rd); err != nil {
 		return err
 	}
 
@@ -142,7 +140,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 
 		frAcc, is := acc.(*FormulatorAccount)
 		if !is {
-			return ErrInvalidAccountType
+			return types.ErrInvalidAccountType
 		}
 		switch frAcc.FormulatorType {
 		case AlphaFormulatorType:
@@ -187,7 +185,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 			}
 			rd.addRewardPower(b.Header.Generator, PowerSum)
 		default:
-			return ErrInvalidAccountType
+			return types.ErrInvalidAccountType
 		}
 	}
 

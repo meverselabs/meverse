@@ -120,8 +120,7 @@ func init() {
 	})
 }
 
-// Unstaking is a consensus.Unstaking
-// It is used to make formulator account
+// Unstaking is used to ustake coin from the hyper formulator
 type Unstaking struct {
 	transaction.Base
 	Seq_            uint64
