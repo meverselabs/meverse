@@ -4,9 +4,6 @@ import "errors"
 
 // errors
 var (
-	ErrExistProcessName     = errors.New("exist process name")
-	ErrExistProcessID       = errors.New("exist process id")
-	ErrNotExistProcess      = errors.New("not exist process")
 	ErrExistServiceName     = errors.New("exist service name")
 	ErrExistServiceID       = errors.New("exist service id")
 	ErrNotExistService      = errors.New("not exist service")

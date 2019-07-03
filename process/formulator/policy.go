@@ -7,31 +7,19 @@ import (
 	"github.com/fletaio/fleta/common/amount"
 )
 
-// FormulatorPolicy defines a staking policy user
-type FormulatorPolicy struct {
-	RewardPerBlock                *amount.Amount
-	PayRewardEveryBlocks          uint32
-	FormulatorCreationLimitHeight uint32
-	AlphaCreationAmount           *amount.Amount
-	AlphaEfficiency1000           uint32
-	AlphaUnlockRequiredBlocks     uint32
-	SigmaRequiredAlphaBlocks      uint32
-	SigmaRequiredAlphaCount       uint32
-	SigmaEfficiency1000           uint32
-	SigmaUnlockRequiredBlocks     uint32
-	OmegaRequiredSigmaBlocks      uint32
-	OmegaRequiredSigmaCount       uint32
-	OmegaEfficiency1000           uint32
-	OmegaUnlockRequiredBlocks     uint32
-	HyperCreationAmount           *amount.Amount
-	HyperEfficiency1000           uint32
-	HyperUnlockRequiredBlocks     uint32
-	StakingEfficiency1000         uint32
-	StakingUnlockRequiredBlocks   uint32
+// RewardPolicy defines a reward policy
+type RewardPolicy struct {
+	RewardPerBlock        *amount.Amount
+	PayRewardEveryBlocks  uint32
+	AlphaEfficiency1000   uint32
+	SigmaEfficiency1000   uint32
+	OmegaEfficiency1000   uint32
+	HyperEfficiency1000   uint32
+	StakingEfficiency1000 uint32
 }
 
 // MarshalJSON is a marshaler function
-func (pc *FormulatorPolicy) MarshalJSON() ([]byte, error) {
+func (pc *RewardPolicy) MarshalJSON() ([]byte, error) {
 	var buffer bytes.Buffer
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"reward_per_block":`)
@@ -48,22 +36,57 @@ func (pc *FormulatorPolicy) MarshalJSON() ([]byte, error) {
 		buffer.Write(bs)
 	}
 	buffer.WriteString(`,`)
-	buffer.WriteString(`"formulator_creation_limit_height":`)
-	if bs, err := json.Marshal(pc.FormulatorCreationLimitHeight); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"alpha_formulator_amount":`)
-	if bs, err := pc.AlphaCreationAmount.MarshalJSON(); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
 	buffer.WriteString(`"alpha_efficiency_1000":`)
 	if bs, err := json.Marshal(pc.AlphaEfficiency1000); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"sigma_efficiency_1000":`)
+	if bs, err := json.Marshal(pc.SigmaEfficiency1000); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"omega_efficiency_1000":`)
+	if bs, err := json.Marshal(pc.OmegaEfficiency1000); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"hyper_efficiency_1000":`)
+	if bs, err := json.Marshal(pc.HyperEfficiency1000); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"staking_efficiency_1000":`)
+	if bs, err := json.Marshal(pc.StakingEfficiency1000); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`}`)
+	return buffer.Bytes(), nil
+}
+
+// AlphaPolicy defines a alpha policy
+type AlphaPolicy struct {
+	AlphaCreationAmount       *amount.Amount
+	AlphaUnlockRequiredBlocks uint32
+	AlphaCreationLimitHeight  uint32
+}
+
+// MarshalJSON is a marshaler function
+func (pc *AlphaPolicy) MarshalJSON() ([]byte, error) {
+	var buffer bytes.Buffer
+	buffer.WriteString(`{`)
+	buffer.WriteString(`"alpha_creation_amount":`)
+	if bs, err := pc.AlphaCreationAmount.MarshalJSON(); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)
@@ -76,6 +99,27 @@ func (pc *FormulatorPolicy) MarshalJSON() ([]byte, error) {
 		buffer.Write(bs)
 	}
 	buffer.WriteString(`,`)
+	buffer.WriteString(`"alpha_creation_limit_height":`)
+	if bs, err := json.Marshal(pc.AlphaCreationLimitHeight); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`}`)
+	return buffer.Bytes(), nil
+}
+
+// SigmaPolicy defines a sigma policy
+type SigmaPolicy struct {
+	SigmaRequiredAlphaBlocks  uint32
+	SigmaRequiredAlphaCount   uint32
+	SigmaUnlockRequiredBlocks uint32
+}
+
+// MarshalJSON is a marshaler function
+func (pc *SigmaPolicy) MarshalJSON() ([]byte, error) {
+	var buffer bytes.Buffer
+	buffer.WriteString(`{`)
 	buffer.WriteString(`"sigma_required_alpha_blocks":`)
 	if bs, err := json.Marshal(pc.SigmaRequiredAlphaBlocks); err != nil {
 		return nil, err
@@ -90,20 +134,27 @@ func (pc *FormulatorPolicy) MarshalJSON() ([]byte, error) {
 		buffer.Write(bs)
 	}
 	buffer.WriteString(`,`)
-	buffer.WriteString(`"sigma_efficiency_1000":`)
-	if bs, err := json.Marshal(pc.SigmaEfficiency1000); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
 	buffer.WriteString(`"sigma_unlock_required_blocks":`)
 	if bs, err := json.Marshal(pc.SigmaUnlockRequiredBlocks); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)
 	}
-	buffer.WriteString(`,`)
+	buffer.WriteString(`}`)
+	return buffer.Bytes(), nil
+}
+
+// OmegaPolicy defines a omega policy
+type OmegaPolicy struct {
+	OmegaRequiredSigmaBlocks  uint32
+	OmegaRequiredSigmaCount   uint32
+	OmegaUnlockRequiredBlocks uint32
+}
+
+// MarshalJSON is a marshaler function
+func (pc *OmegaPolicy) MarshalJSON() ([]byte, error) {
+	var buffer bytes.Buffer
+	buffer.WriteString(`{`)
 	buffer.WriteString(`"omega_required_sigma_blocks":`)
 	if bs, err := json.Marshal(pc.OmegaRequiredSigmaBlocks); err != nil {
 		return nil, err
@@ -118,29 +169,28 @@ func (pc *FormulatorPolicy) MarshalJSON() ([]byte, error) {
 		buffer.Write(bs)
 	}
 	buffer.WriteString(`,`)
-	buffer.WriteString(`"omega_efficiency_1000":`)
-	if bs, err := json.Marshal(pc.OmegaEfficiency1000); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
 	buffer.WriteString(`"omega_unlock_required_blocks":`)
 	if bs, err := json.Marshal(pc.OmegaUnlockRequiredBlocks); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)
 	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"hyper_formulator_amount":`)
+	buffer.WriteString(`}`)
+	return buffer.Bytes(), nil
+}
+
+// HyperPolicy defines a hyper policy
+type HyperPolicy struct {
+	HyperCreationAmount       *amount.Amount
+	HyperUnlockRequiredBlocks uint32
+}
+
+// MarshalJSON is a marshaler function
+func (pc *HyperPolicy) MarshalJSON() ([]byte, error) {
+	var buffer bytes.Buffer
+	buffer.WriteString(`{`)
+	buffer.WriteString(`"hyper_creation_amount":`)
 	if bs, err := pc.HyperCreationAmount.MarshalJSON(); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"hyper_efficiency_1000":`)
-	if bs, err := json.Marshal(pc.HyperEfficiency1000); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)
@@ -152,14 +202,19 @@ func (pc *FormulatorPolicy) MarshalJSON() ([]byte, error) {
 	} else {
 		buffer.Write(bs)
 	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"staking_efficiency_1000":`)
-	if bs, err := json.Marshal(pc.StakingEfficiency1000); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
+	buffer.WriteString(`}`)
+	return buffer.Bytes(), nil
+}
+
+// StakingPolicy defines a omega policy
+type StakingPolicy struct {
+	StakingUnlockRequiredBlocks uint32
+}
+
+// MarshalJSON is a marshaler function
+func (pc *StakingPolicy) MarshalJSON() ([]byte, error) {
+	var buffer bytes.Buffer
+	buffer.WriteString(`{`)
 	buffer.WriteString(`"staking_unlock_required_blocks":`)
 	if bs, err := json.Marshal(pc.StakingUnlockRequiredBlocks); err != nil {
 		return nil, err
@@ -170,28 +225,37 @@ func (pc *FormulatorPolicy) MarshalJSON() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-// HyperPolicy defines a policy of Hyper formulator
-type HyperPolicy struct {
-	CommissionRatio1000 uint32
-	MinimumStaking      *amount.Amount
-	MaximumStaking      *amount.Amount
+// ValidatorPolicy defines a policy of Hyper formulator
+type ValidatorPolicy struct {
+	CommissionRatio1000        uint32
+	UnlockEnableRequiredBlocks uint32
+	MinimumStaking             *amount.Amount
+	MaximumStaking             *amount.Amount
 }
 
 // Clone returns the clonend value of it
-func (pc *HyperPolicy) Clone() *HyperPolicy {
-	return &HyperPolicy{
-		CommissionRatio1000: pc.CommissionRatio1000,
-		MinimumStaking:      pc.MinimumStaking.Clone(),
-		MaximumStaking:      pc.MaximumStaking.Clone(),
+func (pc *ValidatorPolicy) Clone() *ValidatorPolicy {
+	return &ValidatorPolicy{
+		CommissionRatio1000:        pc.CommissionRatio1000,
+		UnlockEnableRequiredBlocks: pc.UnlockEnableRequiredBlocks,
+		MinimumStaking:             pc.MinimumStaking.Clone(),
+		MaximumStaking:             pc.MaximumStaking.Clone(),
 	}
 }
 
 // MarshalJSON is a marshaler function
-func (pc *HyperPolicy) MarshalJSON() ([]byte, error) {
+func (pc *ValidatorPolicy) MarshalJSON() ([]byte, error) {
 	var buffer bytes.Buffer
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"commission_ratio_1000":`)
 	if bs, err := json.Marshal(pc.CommissionRatio1000); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"unlock_enable_required_blocks":`)
+	if bs, err := json.Marshal(pc.UnlockEnableRequiredBlocks); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)
@@ -214,13 +278,13 @@ func (pc *HyperPolicy) MarshalJSON() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-// StakingPolicy defines a staking policy user
-type StakingPolicy struct {
+// UserPolicy defines a user policy
+type UserPolicy struct {
 	AutoStaking bool
 }
 
 // MarshalJSON is a marshaler function
-func (pc *StakingPolicy) MarshalJSON() ([]byte, error) {
+func (pc *UserPolicy) MarshalJSON() ([]byte, error) {
 	var buffer bytes.Buffer
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"auto_staking":`)

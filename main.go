@@ -70,33 +70,13 @@ func test() error {
 	}
 
 	MaxBlocksPerFormulator := uint32(10)
-	policy := &formulator.FormulatorPolicy{
-		RewardPerBlock:                amount.NewCoinAmount(0, 500000000000000000),
-		PayRewardEveryBlocks:          500,
-		FormulatorCreationLimitHeight: 1000,
-		AlphaCreationAmount:           amount.NewCoinAmount(1000, 0),
-		AlphaEfficiency1000:           1000,
-		AlphaUnlockRequiredBlocks:     1000,
-		SigmaRequiredAlphaBlocks:      1000,
-		SigmaRequiredAlphaCount:       4,
-		SigmaEfficiency1000:           1000,
-		SigmaUnlockRequiredBlocks:     1000,
-		OmegaRequiredSigmaBlocks:      1000,
-		OmegaRequiredSigmaCount:       2,
-		OmegaEfficiency1000:           1000,
-		OmegaUnlockRequiredBlocks:     1000,
-		HyperCreationAmount:           amount.NewCoinAmount(1000, 0),
-		HyperEfficiency1000:           1000,
-		HyperUnlockRequiredBlocks:     1000,
-		StakingEfficiency1000:         1000,
-	}
 	cs := pof.NewConsensus(MaxBlocksPerFormulator, ObserverKeys)
 	app := &DApp{
 		frkey: frkeys[0],
 	}
 	cn := chain.NewChain(cs, app, st)
 	cn.MustAddProcess(1, vault.NewVault())
-	cn.MustAddProcess(1, formulator.NewFormulator(policy))
+	cn.MustAddProcess(2, formulator.NewFormulator())
 	if err := cn.Init(); err != nil {
 		return err
 	}
@@ -186,8 +166,9 @@ func test() error {
 // DApp is app
 type DApp struct {
 	sync.Mutex
-	*chain.ProcessBase
-	cn    *chain.Chain
+	*types.ProcessBase
+	pm    types.ProcessManager
+	cn    types.Provider
 	frkey key.Key
 }
 
@@ -202,24 +183,63 @@ func (app *DApp) Version() string {
 }
 
 // Init initializes the consensus
-func (app *DApp) Init(reg *chain.Register, cn *chain.Chain) error {
+func (app *DApp) Init(reg *types.Register, pm types.ProcessManager, cn types.Provider) error {
+	app.pm = pm
 	app.cn = cn
 	reg.RegisterTransaction(1, &Transaction{})
 	return nil
 }
 
 // InitGenesis initializes genesis data
-func (app *DApp) InitGenesis(ctp *types.ContextProcess) error {
+func (app *DApp) InitGenesis(ctw *types.ContextWrapper) error {
 	app.Lock()
 	defer app.Unlock()
-	acc := &formulator.FormulatorAccount{
-		Address_:        common.NewAddress(0, 0, 0),
-		Name_:           "fleta.001",
-		FormulatorType: formulator.AlphaFormulatorType,
-		KeyHash:         common.NewPublicHash(app.frkey.PublicKey()),
-		Amount:          amount.NewCoinAmount(1000, 0),
+
+	if p, err := app.pm.ProcessByName("fleta.formulator"); err != nil {
+		return err
+	} else if fp, is := p.(*formulator.Formulator); !is {
+		return types.ErrNotExistProcess
+	} else {
+		if err := app.pm.SwitchProcess(ctw, fp, func(cts *types.ContextWrapper) error {
+			return fp.InitPolicy(cts, &formulator.RewardPolicy{
+				RewardPerBlock:        amount.NewCoinAmount(0, 500000000000000000),
+				PayRewardEveryBlocks:  500,
+				AlphaEfficiency1000:   1000,
+				SigmaEfficiency1000:   1000,
+				OmegaEfficiency1000:   1000,
+				HyperEfficiency1000:   1000,
+				StakingEfficiency1000: 1000,
+			}, &formulator.AlphaPolicy{
+				AlphaCreationLimitHeight:  1000,
+				AlphaCreationAmount:       amount.NewCoinAmount(1000, 0),
+				AlphaUnlockRequiredBlocks: 1000,
+			}, &formulator.SigmaPolicy{
+				SigmaRequiredAlphaBlocks:  1000,
+				SigmaRequiredAlphaCount:   4,
+				SigmaUnlockRequiredBlocks: 1000,
+			}, &formulator.OmegaPolicy{
+				OmegaRequiredSigmaBlocks:  1000,
+				OmegaRequiredSigmaCount:   2,
+				OmegaUnlockRequiredBlocks: 1000,
+			}, &formulator.HyperPolicy{
+				HyperCreationAmount:       amount.NewCoinAmount(1000, 0),
+				HyperUnlockRequiredBlocks: 1000,
+			}, &formulator.StakingPolicy{
+				StakingUnlockRequiredBlocks: 1000,
+			})
+		}); err != nil {
+			return err
+		}
 	}
-	if err := ctp.CreateAccount(acc); err != nil {
+
+	acc := &formulator.FormulatorAccount{
+		Address_:       common.NewAddress(0, 0, 0),
+		Name_:          "fleta.001",
+		FormulatorType: formulator.AlphaFormulatorType,
+		KeyHash:        common.NewPublicHash(app.frkey.PublicKey()),
+		Amount:         amount.NewCoinAmount(1000, 0),
+	}
+	if err := ctw.CreateAccount(acc); err != nil {
 		return err
 	}
 	return nil
@@ -236,15 +256,15 @@ func (tx *Transaction) Timestamp() uint64 {
 	return tx.Timestamp_
 }
 
-func (tx *Transaction) Fee(loader types.LoaderProcess) *amount.Amount {
+func (tx *Transaction) Fee(loader types.LoaderWrapper) *amount.Amount {
 	return amount.COIN.DivC(10)
 }
 
-func (tx *Transaction) Validate(loader types.LoaderProcess, signers []common.PublicHash) error {
+func (tx *Transaction) Validate(loader types.LoaderWrapper, signers []common.PublicHash) error {
 	return nil
 }
 
-func (tx *Transaction) Execute(ctx *types.ContextProcess, index uint16) error {
+func (tx *Transaction) Execute(p types.Process, ctx *types.ContextWrapper, index uint16) error {
 	return nil
 }
 

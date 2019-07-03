@@ -23,7 +23,7 @@ func init() {
 		}
 	}, func(loader data.Loader, t transaction.Transaction, signers []common.PublicHash) error {
 		tx := t.(*Staking)
-		if tx.Seq() <= loader.Seq(tx.From()) {
+		if tx.Seq() <= loader.Seq(tx.From) {
 			return ErrInvalidSequence
 		}
 
@@ -49,7 +49,7 @@ func init() {
 			return ErrInvalidStakingAmount
 		}
 
-		fromAcc, err := loader.Account(tx.From())
+		fromAcc, err := loader.Account(tx.From)
 		if err != nil {
 			return err
 		}
@@ -63,10 +63,10 @@ func init() {
 		sn := ctx.Snapshot()
 		defer ctx.Revert(sn)
 
-		if tx.Seq() != ctx.Seq(tx.From())+1 {
+		if tx.Seq() != ctx.Seq(tx.From)+1 {
 			return nil, ErrInvalidSequence
 		}
-		ctx.AddSeq(tx.From())
+		ctx.AddSeq(tx.From)
 
 		if tx.Amount.Less(amount.COIN.DivC(10)) {
 			return nil, ErrInvalidStakingAmount
@@ -90,7 +90,7 @@ func init() {
 			return nil, ErrExceedStakingAmount
 		}
 
-		fromAcc, err := ctx.Account(tx.From())
+		fromAcc, err := ctx.Account(tx.From)
 		if err != nil {
 			return nil, err
 		}
@@ -102,13 +102,13 @@ func init() {
 		}
 
 		var fromStakingAmount *amount.Amount
-		if bs := ctx.AccountData(tx.HyperFormulator, ToStakingKey(tx.From())); len(bs) > 0 {
+		if bs := ctx.AccountData(tx.HyperFormulator, ToStakingKey(tx.From)); len(bs) > 0 {
 			fromStakingAmount = amount.NewAmountFromBytes(bs)
 		} else {
 			fromStakingAmount = amount.NewCoinAmount(0, 0)
 		}
 		fromStakingAmount.Add(tx.Amount)
-		ctx.SetAccountData(tx.HyperFormulator, ToStakingKey(tx.From()), fromStakingAmount.Bytes())
+		ctx.SetAccountData(tx.HyperFormulator, ToStakingKey(tx.From), fromStakingAmount.Bytes())
 		frAcc.StakingAmount = frAcc.StakingAmount.Add(tx.Amount)
 
 		ctx.Commit(sn)
@@ -132,7 +132,7 @@ func (tx *Staking) IsUTXO() bool {
 }
 
 // From returns the creator of the transaction
-func (tx *Staking) From() common.Address {
+func (tx *Staking) From common.Address {
 	return tx.From_
 }
 

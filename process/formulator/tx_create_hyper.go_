@@ -27,15 +27,15 @@ func init() {
 		}
 
 		initAddr := common.NewAddress(common.NewCoordinate(0, 0), 0)
-		if tx.From().Equal(initAddr) {
+		if tx.From.Equal(initAddr) {
 			return ErrUnauthorizedTransaction
 		}
 
-		if tx.Seq() <= loader.Seq(tx.From()) {
+		if tx.Seq() <= loader.Seq(tx.From) {
 			return ErrInvalidSequence
 		}
 
-		fromAcc, err := loader.Account(tx.From())
+		fromAcc, err := loader.Account(tx.From)
 		if err != nil {
 			return err
 		}
@@ -50,9 +50,9 @@ func init() {
 			return nil, ErrInvalidAccountName
 		}
 
-		policy, has := gFormulatorPolicyMap[ctx.ChainCoord().ID()]
+		policy, has := gRewardPolicyMap[ctx.ChainCoord().ID()]
 		if !has {
-			return nil, ErrNotExistFormulatorPolicy
+			return nil, ErrNotExistRewardPolicy
 		}
 		if ctx.TargetHeight() < policy.FormulatorCreationLimitHeight {
 			return nil, ErrFormulatorCreationLimited
@@ -61,12 +61,12 @@ func init() {
 		sn := ctx.Snapshot()
 		defer ctx.Revert(sn)
 
-		if tx.Seq() != ctx.Seq(tx.From())+1 {
+		if tx.Seq() != ctx.Seq(tx.From)+1 {
 			return nil, ErrInvalidSequence
 		}
-		ctx.AddSeq(tx.From())
+		ctx.AddSeq(tx.From)
 
-		fromAcc, err := ctx.Account(tx.From())
+		fromAcc, err := ctx.Account(tx.From)
 		if err != nil {
 			return nil, err
 		}
@@ -78,11 +78,11 @@ func init() {
 		}
 
 		addr := common.NewAddress(coord, 0)
-		if is, err := ctx.IsExistAccount(addr); err != nil {
+		if is, err := ctx.HasAccount(addr); err != nil {
 			return nil, err
 		} else if is {
 			return nil, ErrExistAddress
-		} else if isn, err := ctx.IsExistAccountName(tx.Name); err != nil {
+		} else if isn, err := ctx.HasAccountName(tx.Name); err != nil {
 			return nil, err
 		} else if isn {
 			return nil, ErrExistAccountName
@@ -97,6 +97,7 @@ func init() {
 			acc.FormulatorType = HyperFormulatorType
 			acc.KeyHash = tx.KeyHash
 			acc.Amount = policy.HyperCreationAmount
+			acc.Policy = ValidatorPolicy
 			ctx.CreateAccount(acc)
 		}
 		ctx.Commit(sn)
@@ -112,6 +113,7 @@ type CreateHyper struct {
 	From_   common.Address
 	Name    string
 	KeyHash common.PublicHash
+	ValidatorPolicy *ValidatorPolicy
 }
 
 // IsUTXO returns false
@@ -120,7 +122,7 @@ func (tx *CreateHyper) IsUTXO() bool {
 }
 
 // From returns the creator of the transaction
-func (tx *CreateHyper) From() common.Address {
+func (tx *CreateHyper) From common.Address {
 	return tx.From_
 }
 

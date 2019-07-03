@@ -7,25 +7,25 @@ import (
 
 // Consensus is a interface of the chain Consensus
 type Consensus interface {
-	Init(reg *Register, cn *Chain, ct Committer) error
-	InitGenesis(ctp *types.ContextProcess) error
-	OnLoadChain(loader types.LoaderProcess) error
+	Init(cn *Chain, ct Committer) error
+	InitGenesis(ctw *types.ContextWrapper) error
+	OnLoadChain(loader types.LoaderWrapper) error
 	ValidateSignature(bh *types.Header, sigs []common.Signature) error
-	BeforeExecuteTransactions(ctp *types.ContextProcess) error
-	AfterExecuteTransactions(b *types.Block, ctp *types.ContextProcess) error
-	OnSaveData(b *types.Block, ctp *types.ContextProcess) error
+	BeforeExecuteTransactions(ctw *types.ContextWrapper) error
+	AfterExecuteTransactions(b *types.Block, ctw *types.ContextWrapper) error
+	OnSaveData(b *types.Block, ctw *types.ContextWrapper) error
 }
 
 // ConsensusBase is a base handler of the chain Consensus
 type ConsensusBase struct{}
 
 // InitGenesis initializes genesis data
-func (cs *ConsensusBase) InitGenesis(ctp *types.ContextProcess) error {
+func (cs *ConsensusBase) InitGenesis(ctw *types.ContextWrapper) error {
 	return nil
 }
 
 // OnLoadChain called when the chain loaded
-func (cs *ConsensusBase) OnLoadChain(loader types.LoaderProcess) error {
+func (cs *ConsensusBase) OnLoadChain(loader types.LoaderWrapper) error {
 	return nil
 }
 
@@ -35,16 +35,16 @@ func (cs *ConsensusBase) ValidateSignature(bh *types.Header, sigs []common.Signa
 }
 
 // BeforeExecuteTransactions called before processes transactions of the block
-func (cs *ConsensusBase) BeforeExecuteTransactions(bctp *types.ContextProcess) error {
+func (cs *ConsensusBase) BeforeExecuteTransactions(ctw *types.ContextWrapper) error {
 	return nil
 }
 
 // AfterExecuteTransactions called after processes transactions of the block
-func (cs *ConsensusBase) AfterExecuteTransactions(b *types.Block, ctp *types.ContextProcess) error {
+func (cs *ConsensusBase) AfterExecuteTransactions(b *types.Block, ctw *types.ContextWrapper) error {
 	return nil
 }
 
 // OnSaveData called when the context of the block saved
-func (cs *ConsensusBase) OnSaveData(b *types.Block, ctp *types.ContextProcess) error {
+func (cs *ConsensusBase) OnSaveData(b *types.Block, ctw *types.ContextWrapper) error {
 	return nil
 }

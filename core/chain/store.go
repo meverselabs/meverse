@@ -435,15 +435,15 @@ func (st *Store) AddressByName(Name string) (common.Address, error) {
 	return addr, nil
 }
 
-// IsExistAccount bhecks that the account of the address is exist or not
-func (st *Store) IsExistAccount(addr common.Address) (bool, error) {
+// HasAccount bhecks that the account of the address is exist or not
+func (st *Store) HasAccount(addr common.Address) (bool, error) {
 	st.closeLock.RLock()
 	defer st.closeLock.RUnlock()
 	if st.isClose {
 		return false, ErrStoreClosed
 	}
 
-	var isExist bool
+	var Has bool
 	if err := st.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(toAccountKey(addr))
 		if err != nil {
@@ -453,7 +453,7 @@ func (st *Store) IsExistAccount(addr common.Address) (bool, error) {
 				return err
 			}
 		}
-		isExist = !item.IsDeletedOrExpired()
+		Has = !item.IsDeletedOrExpired()
 		return nil
 	}); err != nil {
 		if err == ErrNotExistKey {
@@ -462,18 +462,18 @@ func (st *Store) IsExistAccount(addr common.Address) (bool, error) {
 			return false, err
 		}
 	}
-	return isExist, nil
+	return Has, nil
 }
 
-// IsExistAccountName bhecks that the account of the name is exist or not
-func (st *Store) IsExistAccountName(Name string) (bool, error) {
+// HasAccountName bhecks that the account of the name is exist or not
+func (st *Store) HasAccountName(Name string) (bool, error) {
 	st.closeLock.RLock()
 	defer st.closeLock.RUnlock()
 	if st.isClose {
 		return false, ErrStoreClosed
 	}
 
-	var isExist bool
+	var Has bool
 	if err := st.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(toAccountNameKey(Name))
 		if err != nil {
@@ -483,7 +483,7 @@ func (st *Store) IsExistAccountName(Name string) (bool, error) {
 				return err
 			}
 		}
-		isExist = !item.IsDeletedOrExpired()
+		Has = !item.IsDeletedOrExpired()
 		return nil
 	}); err != nil {
 		if err == ErrNotExistKey {
@@ -492,7 +492,7 @@ func (st *Store) IsExistAccountName(Name string) (bool, error) {
 			return false, err
 		}
 	}
-	return isExist, nil
+	return Has, nil
 }
 
 // AccountDataKeys returns all data keys of the account in the store
@@ -584,15 +584,15 @@ func (st *Store) UTXOs() ([]*types.UTXO, error) {
 	return list, nil
 }
 
-// IsExistUTXO bhecks that the utxo of the id is exist or not
-func (st *Store) IsExistUTXO(id uint64) (bool, error) {
+// HasUTXO bhecks that the utxo of the id is exist or not
+func (st *Store) HasUTXO(id uint64) (bool, error) {
 	st.closeLock.RLock()
 	defer st.closeLock.RUnlock()
 	if st.isClose {
 		return false, ErrStoreClosed
 	}
 
-	var isExist bool
+	var Has bool
 	if err := st.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(toUTXOKey(id))
 		if err != nil {
@@ -602,7 +602,7 @@ func (st *Store) IsExistUTXO(id uint64) (bool, error) {
 				return err
 			}
 		}
-		isExist = !item.IsDeletedOrExpired()
+		Has = !item.IsDeletedOrExpired()
 		return nil
 	}); err != nil {
 		if err == ErrNotExistKey {
@@ -611,7 +611,7 @@ func (st *Store) IsExistUTXO(id uint64) (bool, error) {
 			return false, err
 		}
 	}
-	return isExist, nil
+	return Has, nil
 }
 
 // UTXO returns the UTXO from the top store

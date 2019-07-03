@@ -17,27 +17,27 @@ type Chain struct {
 	isInit          bool
 	store           *Store
 	consensus       Consensus
-	app             Application
-	processes       []Process
+	app             types.Application
+	processes       []types.Process
 	processIDMap    map[string]uint8
 	processIndexMap map[uint8]int
-	services        []Service
-	serviceMap      map[string]Service
+	services        []types.Service
+	serviceMap      map[string]types.Service
 	closeLock       sync.RWMutex
 	isClose         bool
 }
 
 // NewChain returns a Chain
-func NewChain(consensus Consensus, app Application, store *Store) *Chain {
+func NewChain(consensus Consensus, app types.Application, store *Store) *Chain {
 	cn := &Chain{
 		consensus:       consensus,
 		app:             app,
 		store:           store,
-		processes:       []Process{},
+		processes:       []types.Process{},
 		processIDMap:    map[string]uint8{},
 		processIndexMap: map[uint8]int{},
-		services:        []Service{},
-		serviceMap:      map[string]Service{},
+		services:        []types.Service{},
+		serviceMap:      map[string]types.Service{},
 	}
 	return cn
 }
@@ -54,23 +54,23 @@ func (cn *Chain) Init() error {
 
 	// Init
 	for i, p := range cn.processes {
-		if err := p.Init(NewRegister(IDMap[i]), cn); err != nil {
+		if err := p.Init(types.NewRegister(IDMap[i]), cn, cn.Provider()); err != nil {
 			return err
 		}
 	}
-	if err := cn.app.Init(NewRegister(255), cn); err != nil {
+	if err := cn.app.Init(types.NewRegister(255), cn, cn.Provider()); err != nil {
 		return err
 	}
-	if err := cn.consensus.Init(NewRegister(0), cn, newChainCommiter(cn)); err != nil {
+	if err := cn.consensus.Init(cn, newChainCommiter(cn)); err != nil {
 		return err
 	}
 
 	// InitGenesis
 	genesisContext := types.NewEmptyContext()
-	if err := cn.app.InitGenesis(types.NewContextProcess(255, genesisContext)); err != nil {
+	if err := cn.app.InitGenesis(types.NewContextWrapper(255, genesisContext)); err != nil {
 		return err
 	}
-	if err := cn.consensus.InitGenesis(types.NewContextProcess(0, genesisContext)); err != nil {
+	if err := cn.consensus.InitGenesis(types.NewContextWrapper(0, genesisContext)); err != nil {
 		return err
 	}
 	if genesisContext.StackSize() > 1 {
@@ -96,14 +96,14 @@ func (cn *Chain) Init() error {
 	// OnLoadChain
 	ctx := types.NewContext(cn.store)
 	for i, p := range cn.processes {
-		if err := p.OnLoadChain(types.NewContextProcess(IDMap[i], ctx)); err != nil {
+		if err := p.OnLoadChain(types.NewContextWrapper(IDMap[i], ctx)); err != nil {
 			return err
 		}
 	}
-	if err := cn.app.OnLoadChain(types.NewContextProcess(255, ctx)); err != nil {
+	if err := cn.app.OnLoadChain(types.NewContextWrapper(255, ctx)); err != nil {
 		return err
 	}
-	if err := cn.consensus.OnLoadChain(types.NewContextProcess(0, ctx)); err != nil {
+	if err := cn.consensus.OnLoadChain(types.NewContextWrapper(0, ctx)); err != nil {
 		return err
 	}
 
@@ -112,7 +112,7 @@ func (cn *Chain) Init() error {
 }
 
 // Provider returns a chain provider
-func (cn *Chain) Provider() Provider {
+func (cn *Chain) Provider() types.Provider {
 	return cn.store
 }
 
@@ -129,8 +129,8 @@ func (cn *Chain) Close() {
 }
 
 // Processes returns processes
-func (cn *Chain) Processes() []Process {
-	list := []Process{}
+func (cn *Chain) Processes() []types.Process {
+	list := []types.Process{}
 	for _, p := range cn.processes {
 		list = append(list, p)
 	}
@@ -138,29 +138,44 @@ func (cn *Chain) Processes() []Process {
 }
 
 // Process returns the process by the id
-func (cn *Chain) Process(id uint8) (Process, error) {
+func (cn *Chain) Process(id uint8) (types.Process, error) {
+	if id == 255 {
+		return cn.app, nil
+	}
 	idx, has := cn.processIndexMap[id]
 	if !has {
-		return nil, ErrNotExistProcess
+		return nil, types.ErrNotExistProcess
 	}
 	return cn.processes[idx], nil
 }
 
 // ProcessByName returns the process by the name
-func (cn *Chain) ProcessByName(name string) (Process, error) {
+func (cn *Chain) ProcessByName(name string) (types.Process, error) {
 	id, has := cn.processIDMap[name]
 	if !has {
-		return nil, ErrNotExistProcess
+		return nil, types.ErrNotExistProcess
 	}
 	idx, has := cn.processIndexMap[id]
 	if !has {
-		return nil, ErrNotExistProcess
+		return nil, types.ErrNotExistProcess
 	}
 	return cn.processes[idx], nil
 }
 
+// SwitchProcess changes the context process to the target process
+func (cn *Chain) SwitchProcess(ctw *types.ContextWrapper, p types.Process, fn func(cts *types.ContextWrapper) error) error {
+	id, has := cn.processIDMap[p.Name()]
+	if !has {
+		return types.ErrNotExistProcess
+	}
+	if err := fn(types.SwitchContextWrapper(id, ctw)); err != nil {
+		return err
+	}
+	return nil
+}
+
 // MustAddProcess adds Process but panic when has the same name process
-func (cn *Chain) MustAddProcess(id uint8, p Process) {
+func (cn *Chain) MustAddProcess(id uint8, p types.Process) {
 	if cn.isInit {
 		panic(ErrAddBeforeChainInit)
 	}
@@ -168,10 +183,10 @@ func (cn *Chain) MustAddProcess(id uint8, p Process) {
 		panic(ErrReservedID)
 	}
 	if _, has := cn.processIDMap[p.Name()]; has {
-		panic(ErrExistProcessName)
+		panic(types.ErrExistProcessName)
 	}
 	if _, has := cn.processIndexMap[id]; has {
-		panic(ErrExistProcessID)
+		panic(types.ErrExistProcessID)
 	}
 	idx := len(cn.processes)
 	cn.processes = append(cn.processes, p)
@@ -180,8 +195,8 @@ func (cn *Chain) MustAddProcess(id uint8, p Process) {
 }
 
 // Services returns services
-func (cn *Chain) Services() []Service {
-	list := []Service{}
+func (cn *Chain) Services() []types.Service {
+	list := []types.Service{}
 	for _, s := range cn.services {
 		list = append(list, s)
 	}
@@ -189,7 +204,7 @@ func (cn *Chain) Services() []Service {
 }
 
 // ServiceByName returns the service by the name
-func (cn *Chain) ServiceByName(name string) (Service, error) {
+func (cn *Chain) ServiceByName(name string) (types.Service, error) {
 	s, has := cn.serviceMap[name]
 	if !has {
 		return nil, ErrNotExistService
@@ -198,7 +213,7 @@ func (cn *Chain) ServiceByName(name string) (Service, error) {
 }
 
 // MustAddService adds Service but panic when has the same name service
-func (cn *Chain) MustAddService(s Service) {
+func (cn *Chain) MustAddService(s types.Service) {
 	if cn.isInit {
 		panic(ErrAddBeforeChainInit)
 	}
@@ -207,18 +222,6 @@ func (cn *Chain) MustAddService(s Service) {
 	}
 	cn.services = append(cn.services, s)
 	cn.serviceMap[s.Name()] = s
-}
-
-// SwitchProcess changes the context process to the target process
-func (cn *Chain) SwitchProcess(ctp *types.ContextProcess, p Process, fn func(stp *types.ContextProcess) error) error {
-	id, has := cn.processIDMap[p.Name()]
-	if !has {
-		return ErrNotExistProcess
-	}
-	if err := fn(types.SwitchContextProcess(id, ctp)); err != nil {
-		return err
-	}
-	return nil
 }
 
 // ConnectBlock try to connect block to the chain
@@ -258,14 +261,14 @@ func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context) err
 
 	// OnSaveData
 	for i, p := range cn.processes {
-		if err := p.OnSaveData(b, types.NewContextProcess(IDMap[i], ctx)); err != nil {
+		if err := p.OnSaveData(b, types.NewContextWrapper(IDMap[i], ctx)); err != nil {
 			return err
 		}
 	}
-	if err := cn.app.OnSaveData(b, types.NewContextProcess(255, ctx)); err != nil {
+	if err := cn.app.OnSaveData(b, types.NewContextWrapper(255, ctx)); err != nil {
 		return err
 	}
-	if err := cn.consensus.OnSaveData(b, types.NewContextProcess(0, ctx)); err != nil {
+	if err := cn.consensus.OnSaveData(b, types.NewContextWrapper(0, ctx)); err != nil {
 		return err
 	}
 
@@ -295,32 +298,37 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 
 	// BeforeExecuteTransactions
 	for i, p := range cn.processes {
-		if err := p.BeforeExecuteTransactions(types.NewContextProcess(IDMap[i], ctx)); err != nil {
+		if err := p.BeforeExecuteTransactions(types.NewContextWrapper(IDMap[i], ctx)); err != nil {
 			return err
 		}
 	}
-	if err := cn.app.BeforeExecuteTransactions(types.NewContextProcess(255, ctx)); err != nil {
+	if err := cn.app.BeforeExecuteTransactions(types.NewContextWrapper(255, ctx)); err != nil {
 		return err
 	}
 
 	// Execute Transctions
 	for i, tx := range b.Transactions {
 		t := b.TransactionTypes[i]
-		if err := tx.Execute(types.NewContextProcess(uint8(t>>8), ctx), uint16(i)); err != nil {
+		pid := uint8(t >> 8)
+		p, err := cn.Process(pid)
+		if err != nil {
+			return err
+		}
+		if err := tx.Execute(p, types.NewContextWrapper(pid, ctx), uint16(i)); err != nil {
 			return err
 		}
 	}
 
 	// AfterExecuteTransactions
 	for i, p := range cn.processes {
-		if err := p.AfterExecuteTransactions(b, types.NewContextProcess(IDMap[i], ctx)); err != nil {
+		if err := p.AfterExecuteTransactions(b, types.NewContextWrapper(IDMap[i], ctx)); err != nil {
 			return err
 		}
 	}
-	if err := cn.app.AfterExecuteTransactions(b, types.NewContextProcess(255, ctx)); err != nil {
+	if err := cn.app.AfterExecuteTransactions(b, types.NewContextWrapper(255, ctx)); err != nil {
 		return err
 	}
-	if err := cn.consensus.AfterExecuteTransactions(b, types.NewContextProcess(0, ctx)); err != nil {
+	if err := cn.consensus.AfterExecuteTransactions(b, types.NewContextWrapper(0, ctx)); err != nil {
 		return err
 	}
 	return nil
@@ -396,7 +404,7 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block, ctx *types.Contex
 					}
 					signers = append(signers, common.NewPublicHash(pubkey))
 				}
-				if err := tx.Validate(types.NewContextProcess(uint8(t>>8), ctx), signers); err != nil {
+				if err := tx.Validate(types.NewContextWrapper(uint8(t>>8), ctx), signers); err != nil {
 					errs <- err
 					return
 				}

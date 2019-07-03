@@ -23,13 +23,13 @@ const (
 // FormulatorAccount is a consensus.FormulatorAccount
 // It is used to indentify Hyper formulator that supports the staking system
 type FormulatorAccount struct {
-	Address_        common.Address
-	Name_           string
+	Address_       common.Address
+	Name_          string
 	FormulatorType FormulatorType
-	KeyHash         common.PublicHash
-	Amount          *amount.Amount
-	StakingAmount   *amount.Amount
-	Policy          *HyperPolicy
+	KeyHash        common.PublicHash
+	Amount         *amount.Amount
+	StakingAmount  *amount.Amount
+	Policy         *ValidatorPolicy
 }
 
 // Address returns the address of the account
@@ -45,11 +45,11 @@ func (acc *FormulatorAccount) Name() string {
 // Clone returns the clonend value of it
 func (acc *FormulatorAccount) Clone() types.Account {
 	c := &FormulatorAccount{
-		Address_:        acc.Address_,
-		Name_:           acc.Name_,
+		Address_:       acc.Address_,
+		Name_:          acc.Name_,
 		FormulatorType: acc.FormulatorType,
-		KeyHash:         acc.KeyHash.Clone(),
-		Amount:          acc.Amount.Clone(),
+		KeyHash:        acc.KeyHash.Clone(),
+		Amount:         acc.Amount.Clone(),
 	}
 	if acc.FormulatorType == HyperFormulatorType {
 		c.StakingAmount = acc.StakingAmount.Clone()
@@ -59,7 +59,7 @@ func (acc *FormulatorAccount) Clone() types.Account {
 }
 
 // Validate validates account signers
-func (acc *FormulatorAccount) Validate(loader types.LoaderProcess, signers []common.PublicHash) error {
+func (acc *FormulatorAccount) Validate(loader types.LoaderWrapper, signers []common.PublicHash) error {
 	if len(signers) != 1 {
 		return ErrInvalidSignerCount
 	}

@@ -15,11 +15,11 @@ type Loader interface {
 	Seq(addr common.Address) uint64
 	Account(addr common.Address) (Account, error)
 	AddressByName(Name string) (common.Address, error)
-	IsExistAccount(addr common.Address) (bool, error)
-	IsExistAccountName(Name string) (bool, error)
+	HasAccount(addr common.Address) (bool, error)
+	HasAccountName(Name string) (bool, error)
 	AccountData(addr common.Address, name []byte) []byte
 	AccountDataKeys(addr common.Address, Prefix []byte) ([][]byte, error)
-	IsExistUTXO(id uint64) (bool, error)
+	HasUTXO(id uint64) (bool, error)
 	UTXO(id uint64) (*UTXO, error)
 }
 
@@ -77,13 +77,13 @@ func (st *emptyLoader) AddressByName(Name string) (common.Address, error) {
 	return common.Address{}, ErrNotExistAccount
 }
 
-// IsExistAccount returns false
-func (st *emptyLoader) IsExistAccount(addr common.Address) (bool, error) {
+// HasAccount returns false
+func (st *emptyLoader) HasAccount(addr common.Address) (bool, error) {
 	return false, nil
 }
 
-// IsExistAccountName returns false
-func (st *emptyLoader) IsExistAccountName(Name string) (bool, error) {
+// HasAccountName returns false
+func (st *emptyLoader) HasAccountName(Name string) (bool, error) {
 	return false, nil
 }
 
@@ -97,8 +97,8 @@ func (st *emptyLoader) AccountData(addr common.Address, name []byte) []byte {
 	return nil
 }
 
-// IsExistUTXO returns false
-func (st *emptyLoader) IsExistUTXO(id uint64) (bool, error) {
+// HasUTXO returns false
+func (st *emptyLoader) HasUTXO(id uint64) (bool, error) {
 	return false, nil
 }
 

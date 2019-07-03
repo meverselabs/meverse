@@ -53,11 +53,11 @@ func (bc *BlockCreator) Init() error {
 
 	// BeforeExecuteTransactions
 	for i, p := range bc.cn.processes {
-		if err := p.BeforeExecuteTransactions(types.NewContextProcess(IDMap[i], bc.ctx)); err != nil {
+		if err := p.BeforeExecuteTransactions(types.NewContextWrapper(IDMap[i], bc.ctx)); err != nil {
 			return err
 		}
 	}
-	if err := bc.cn.app.BeforeExecuteTransactions(types.NewContextProcess(255, bc.ctx)); err != nil {
+	if err := bc.cn.app.BeforeExecuteTransactions(types.NewContextWrapper(255, bc.ctx)); err != nil {
 		return err
 	}
 	return nil
@@ -80,11 +80,16 @@ func (bc *BlockCreator) AddTx(tx types.Transaction, sigs []common.Signature) err
 			signers = append(signers, common.NewPublicHash(pubkey))
 		}
 	}
-	ctp := types.NewContextProcess(uint8(t>>8), bc.ctx)
-	if err := tx.Validate(ctp, signers); err != nil {
+	ctw := types.NewContextWrapper(uint8(t>>8), bc.ctx)
+	if err := tx.Validate(ctw, signers); err != nil {
 		return err
 	}
-	if err := tx.Execute(ctp, uint16(len(bc.b.Transactions))); err != nil {
+	pid := uint8(t >> 8)
+	p, err := bc.cn.Process(pid)
+	if err != nil {
+		return err
+	}
+	if err := tx.Execute(p, ctw, uint16(len(bc.b.Transactions))); err != nil {
 		return err
 	}
 	bc.b.TransactionTypes = append(bc.b.TransactionTypes, t)
@@ -109,14 +114,14 @@ func (bc *BlockCreator) Finalize() (*types.Block, error) {
 
 	// AfterExecuteTransactions
 	for i, p := range bc.cn.processes {
-		if err := p.AfterExecuteTransactions(bc.b, types.NewContextProcess(IDMap[i], bc.ctx)); err != nil {
+		if err := p.AfterExecuteTransactions(bc.b, types.NewContextWrapper(IDMap[i], bc.ctx)); err != nil {
 			return nil, err
 		}
 	}
-	if err := bc.cn.app.AfterExecuteTransactions(bc.b, types.NewContextProcess(255, bc.ctx)); err != nil {
+	if err := bc.cn.app.AfterExecuteTransactions(bc.b, types.NewContextWrapper(255, bc.ctx)); err != nil {
 		return nil, err
 	}
-	if err := bc.cn.consensus.AfterExecuteTransactions(bc.b, types.NewContextProcess(0, bc.ctx)); err != nil {
+	if err := bc.cn.consensus.AfterExecuteTransactions(bc.b, types.NewContextWrapper(0, bc.ctx)); err != nil {
 		return nil, err
 	}
 

@@ -102,14 +102,14 @@ func (ctx *Context) AddressByName(Name string) (common.Address, error) {
 	return ctx.Top().AddressByName(Name)
 }
 
-// IsExistAccount checks that the account of the address is exist or not
-func (ctx *Context) IsExistAccount(addr common.Address) (bool, error) {
-	return ctx.Top().IsExistAccount(addr)
+// HasAccount checks that the account of the address is exist or not
+func (ctx *Context) HasAccount(addr common.Address) (bool, error) {
+	return ctx.Top().HasAccount(addr)
 }
 
-// IsExistAccountName checks that the account of the name is exist or not
-func (ctx *Context) IsExistAccountName(Name string) (bool, error) {
-	return ctx.Top().IsExistAccountName(Name)
+// HasAccountName checks that the account of the name is exist or not
+func (ctx *Context) HasAccountName(Name string) (bool, error) {
+	return ctx.Top().HasAccountName(Name)
 }
 
 // CreateAccount inserts the account to the top snapshot
@@ -140,9 +140,9 @@ func (ctx *Context) SetAccountData(addr common.Address, name []byte, value []byt
 	ctx.Top().SetAccountData(addr, name, value)
 }
 
-// IsExistUTXO checks that the utxo of the id is exist or not
-func (ctx *Context) IsExistUTXO(id uint64) (bool, error) {
-	return ctx.Top().IsExistUTXO(id)
+// HasUTXO checks that the utxo of the id is exist or not
+func (ctx *Context) HasUTXO(id uint64) (bool, error) {
+	return ctx.Top().HasUTXO(id)
 }
 
 // UTXO returns the UTXO from the top snapshot

@@ -22,11 +22,11 @@ func init() {
 		}
 	}, func(loader data.Loader, t transaction.Transaction, signers []common.PublicHash) error {
 		tx := t.(*Revoke)
-		if tx.Seq() <= loader.Seq(tx.From()) {
+		if tx.Seq() <= loader.Seq(tx.From) {
 			return ErrInvalidSequence
 		}
 
-		acc, err := loader.Account(tx.From())
+		acc, err := loader.Account(tx.From)
 		if err != nil {
 			return err
 		}
@@ -43,22 +43,22 @@ func init() {
 		sn := ctx.Snapshot()
 		defer ctx.Revert(sn)
 
-		if tx.Seq() != ctx.Seq(tx.From())+1 {
+		if tx.Seq() != ctx.Seq(tx.From)+1 {
 			return nil, ErrInvalidSequence
 		}
-		ctx.AddSeq(tx.From())
+		ctx.AddSeq(tx.From)
 
-		policy, has := gFormulatorPolicyMap[ctx.ChainCoord().ID()]
+		policy, has := gRewardPolicyMap[ctx.ChainCoord().ID()]
 		if !has {
-			return nil, ErrNotExistFormulatorPolicy
+			return nil, ErrNotExistRewardPolicy
 		}
 
-		heritorAcc, err := ctx.Account(tx.From())
+		heritorAcc, err := ctx.Account(tx.From)
 		if err != nil {
 			return nil, err
 		}
 
-		acc, err := ctx.Account(tx.From())
+		acc, err := ctx.Account(tx.From)
 		if err != nil {
 			return nil, err
 		}
@@ -88,13 +88,13 @@ func init() {
 			}
 			ctx.AddLockedBalance(heritorAcc.Address(), frAcc.Amount.Add(frAcc.Balance()), ctx.TargetHeight()+policy.HyperUnlockRequiredBlocks)
 
-			keys, err := ctx.AccountDataKeys(tx.From(), TagStaking)
+			keys, err := ctx.AccountDataKeys(tx.From, TagStaking)
 			if err != nil {
 				return nil, err
 			}
 			for _, k := range keys {
 				if addr, is := FromStakingKey(k); is {
-					bs := ctx.AccountData(tx.From(), k)
+					bs := ctx.AccountData(tx.From, k)
 					if len(bs) == 0 {
 						return nil, ErrInvalidStakingAddress
 					}
@@ -135,7 +135,7 @@ func (tx *Revoke) IsUTXO() bool {
 }
 
 // From returns the creator of the transaction
-func (tx *Revoke) From() common.Address {
+func (tx *Revoke) From common.Address {
 	return tx.From_
 }
 

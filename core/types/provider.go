@@ -1,8 +1,7 @@
-package chain
+package types
 
 import (
 	"github.com/fletaio/fleta/common/hash"
-	"github.com/fletaio/fleta/core/types"
 )
 
 // Provider is a interface to give a chain data
@@ -12,6 +11,6 @@ type Provider interface {
 	LastHash() hash.Hash256
 	LastTimestamp() uint64
 	Hash(height uint32) (hash.Hash256, error)
-	Header(height uint32) (*types.Header, error)
-	Block(height uint32) (*types.Block, error)
+	Header(height uint32) (*Header, error)
+	Block(height uint32) (*Block, error)
 }

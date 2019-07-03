@@ -96,21 +96,21 @@ func (cc *contextCache) AddressByName(Name string) (common.Address, error) {
 	}
 }
 
-// IsExistAccount checks that the account of the address is exist or not
-func (cc *contextCache) IsExistAccount(addr common.Address) (bool, error) {
+// HasAccount checks that the account of the address is exist or not
+func (cc *contextCache) HasAccount(addr common.Address) (bool, error) {
 	if _, has := cc.AccountMap[addr]; has {
 		return true, nil
 	} else {
-		return cc.ctx.loader.IsExistAccount(addr)
+		return cc.ctx.loader.HasAccount(addr)
 	}
 }
 
-// IsExistAccountName checks that the account of the name is exist or not
-func (cc *contextCache) IsExistAccountName(Name string) (bool, error) {
+// HasAccountName checks that the account of the name is exist or not
+func (cc *contextCache) HasAccountName(Name string) (bool, error) {
 	if _, has := cc.AccountNameMap[Name]; has {
 		return true, nil
 	} else {
-		return cc.ctx.loader.IsExistAccountName(Name)
+		return cc.ctx.loader.HasAccountName(Name)
 	}
 }
 
@@ -131,8 +131,8 @@ func (cc *contextCache) AccountData(addr common.Address, name []byte) []byte {
 	}
 }
 
-// IsExistUTXO checks that the utxo of the id is exist or not
-func (cc *contextCache) IsExistUTXO(id uint64) (bool, error) {
+// HasUTXO checks that the utxo of the id is exist or not
+func (cc *contextCache) HasUTXO(id uint64) (bool, error) {
 	if _, has := cc.UTXOMap[id]; has {
 		return true, nil
 	} else {

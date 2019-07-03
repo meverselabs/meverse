@@ -23,7 +23,7 @@ func init() {
 		}
 	}, func(loader data.Loader, t transaction.Transaction, signers []common.PublicHash) error {
 		tx := t.(*Unstaking)
-		if tx.Seq() <= loader.Seq(tx.From()) {
+		if tx.Seq() <= loader.Seq(tx.From) {
 			return ErrInvalidSequence
 		}
 
@@ -43,7 +43,7 @@ func init() {
 			return ErrInvalidAccountType
 		}
 
-		fromAcc, err := loader.Account(tx.From())
+		fromAcc, err := loader.Account(tx.From)
 		if err != nil {
 			return err
 		}
@@ -57,16 +57,18 @@ func init() {
 		sn := ctx.Snapshot()
 		defer ctx.Revert(sn)
 
-		if tx.Seq() != ctx.Seq(tx.From())+1 {
+		if tx.Seq() != ctx.Seq(tx.From)+1 {
 			return nil, ErrInvalidSequence
 		}
-		ctx.AddSeq(tx.From())
+		ctx.AddSeq(tx.From)
 
 		if tx.Amount.Less(amount.COIN.DivC(10)) {
 			return nil, ErrInvalidStakingAmount
 		}
 
-		fromAcc, err := ctx.Account(tx.From())
+		//UnlockEnableRequiredBlocks
+
+		fromAcc, err := ctx.Account(tx.From)
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +89,7 @@ func init() {
 		}
 
 		var fromStakingAmount *amount.Amount
-		if bs := ctx.AccountData(tx.HyperFormulator, ToStakingKey(tx.From())); len(bs) > 0 {
+		if bs := ctx.AccountData(tx.HyperFormulator, ToStakingKey(tx.From)); len(bs) > 0 {
 			fromStakingAmount = amount.NewAmountFromBytes(bs)
 		} else {
 			fromStakingAmount = amount.NewCoinAmount(0, 0)
@@ -97,18 +99,18 @@ func init() {
 		}
 		fromStakingAmount.Sub(tx.Amount)
 		if fromStakingAmount.IsZero() {
-			ctx.SetAccountData(tx.HyperFormulator, ToStakingKey(tx.From()), nil)
+			ctx.SetAccountData(tx.HyperFormulator, ToStakingKey(tx.From), nil)
 		} else {
-			ctx.SetAccountData(tx.HyperFormulator, ToStakingKey(tx.From()), fromStakingAmount.Bytes())
+			ctx.SetAccountData(tx.HyperFormulator, ToStakingKey(tx.From), fromStakingAmount.Bytes())
 		}
 		if frAcc.StakingAmount.Less(tx.Amount) {
 			return nil, ErrInsufficientStakingAmount
 		}
 		frAcc.StakingAmount = frAcc.StakingAmount.Sub(tx.Amount)
 
-		policy, has := gFormulatorPolicyMap[ctx.ChainCoord().ID()]
+		policy, has := gRewardPolicyMap[ctx.ChainCoord().ID()]
 		if !has {
-			return nil, ErrNotExistFormulatorPolicy
+			return nil, ErrNotExistRewardPolicy
 		}
 
 		ctx.AddLockedBalance(fromAcc.Address(), tx.Amount, ctx.TargetHeight()+policy.StakingUnlockRequiredBlocks)
@@ -134,7 +136,7 @@ func (tx *Unstaking) IsUTXO() bool {
 }
 
 // From returns the creator of the transaction
-func (tx *Unstaking) From() common.Address {
+func (tx *Unstaking) From common.Address {
 	return tx.From_
 }
 

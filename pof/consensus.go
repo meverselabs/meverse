@@ -39,21 +39,21 @@ func NewConsensus(MaxBlocksPerFormulator uint32, ObserverKeys []common.PublicHas
 }
 
 // Init initializes the consensus
-func (cs *Consensus) Init(reg *chain.Register, cn *chain.Chain, ct chain.Committer) error {
+func (cs *Consensus) Init(cn *chain.Chain, ct chain.Committer) error {
 	cs.cn = cn
 	cs.ct = ct
 	return nil
 }
 
 // InitGenesis initializes genesis data
-func (cs *Consensus) InitGenesis(ctp *types.ContextProcess) error {
+func (cs *Consensus) InitGenesis(ctw *types.ContextWrapper) error {
 	cs.Lock()
 	defer cs.Unlock()
 
 	var inErr error
 	phase := cs.rt.largestPhase() + 1
-	ctp.Top().AccountMap.EachAll(func(addr common.Address, a types.Account) bool {
-		if a.Address().Coordinate().Height == ctp.TargetHeight() {
+	ctw.Top().AccountMap.EachAll(func(addr common.Address, a types.Account) bool {
+		if a.Address().Coordinate().Height == ctw.TargetHeight() {
 			if acc, is := a.(*formulator.FormulatorAccount); is {
 				addr := acc.Address()
 				if err := cs.rt.addRank(NewRank(addr, acc.KeyHash, phase, hash.DoubleHash(addr[:]))); err != nil {
@@ -67,7 +67,7 @@ func (cs *Consensus) InitGenesis(ctp *types.ContextProcess) error {
 	if inErr != nil {
 		return inErr
 	}
-	ctp.Top().DeletedAccountMap.EachAll(func(addr common.Address, a types.Account) bool {
+	ctw.Top().DeletedAccountMap.EachAll(func(addr common.Address, a types.Account) bool {
 		if acc, is := a.(*formulator.FormulatorAccount); is {
 			cs.rt.removeRank(acc.Address())
 		}
@@ -76,13 +76,13 @@ func (cs *Consensus) InitGenesis(ctp *types.ContextProcess) error {
 	if data, err := cs.buildSaveData(); err != nil {
 		return err
 	} else {
-		ctp.SetProcessData([]byte("state"), data)
+		ctw.SetProcessData([]byte("state"), data)
 	}
 	return nil
 }
 
 // OnLoadChain called when the chain loaded
-func (cs *Consensus) OnLoadChain(loader types.LoaderProcess) error {
+func (cs *Consensus) OnLoadChain(loader types.LoaderWrapper) error {
 	cs.Lock()
 	defer cs.Unlock()
 
@@ -172,17 +172,17 @@ func (cs *Consensus) ValidateSignature(bh *types.Header, sigs []common.Signature
 }
 
 // BeforeExecuteTransactions called before processes transactions of the block
-func (cs *Consensus) BeforeExecuteTransactions(bctp *types.ContextProcess) error {
+func (cs *Consensus) BeforeExecuteTransactions(bctw *types.ContextWrapper) error {
 	return nil
 }
 
 // AfterExecuteTransactions called after processes transactions of the block
-func (cs *Consensus) AfterExecuteTransactions(b *types.Block, ctp *types.ContextProcess) error {
+func (cs *Consensus) AfterExecuteTransactions(b *types.Block, ctw *types.ContextWrapper) error {
 	return nil
 }
 
 // OnSaveData called when the context of the block saved
-func (cs *Consensus) OnSaveData(b *types.Block, ctp *types.ContextProcess) error {
+func (cs *Consensus) OnSaveData(b *types.Block, ctw *types.ContextWrapper) error {
 	cs.Lock()
 	defer cs.Unlock()
 
@@ -206,8 +206,8 @@ func (cs *Consensus) OnSaveData(b *types.Block, ctp *types.ContextProcess) error
 
 	var inErr error
 	phase := cs.rt.largestPhase() + 1
-	ctp.Top().AccountMap.EachAll(func(addr common.Address, a types.Account) bool {
-		if a.Address().Coordinate().Height == ctp.TargetHeight() {
+	ctw.Top().AccountMap.EachAll(func(addr common.Address, a types.Account) bool {
+		if a.Address().Coordinate().Height == ctw.TargetHeight() {
 			if acc, is := a.(*formulator.FormulatorAccount); is {
 				addr := acc.Address()
 				if err := cs.rt.addRank(NewRank(addr, acc.KeyHash, phase, hash.DoubleHash(addr[:]))); err != nil {
@@ -221,7 +221,7 @@ func (cs *Consensus) OnSaveData(b *types.Block, ctp *types.ContextProcess) error
 	if inErr != nil {
 		return inErr
 	}
-	ctp.Top().DeletedAccountMap.EachAll(func(addr common.Address, a types.Account) bool {
+	ctw.Top().DeletedAccountMap.EachAll(func(addr common.Address, a types.Account) bool {
 		if acc, is := a.(*formulator.FormulatorAccount); is {
 			cs.rt.removeRank(acc.Address())
 		}
@@ -231,7 +231,7 @@ func (cs *Consensus) OnSaveData(b *types.Block, ctp *types.ContextProcess) error
 	if data, err := cs.buildSaveData(); err != nil {
 		return err
 	} else {
-		ctp.SetProcessData([]byte("state"), data)
+		ctw.SetProcessData([]byte("state"), data)
 	}
 	return nil
 }

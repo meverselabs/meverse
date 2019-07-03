@@ -3,14 +3,14 @@ package vault
 import (
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
-	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/core/types"
 )
 
 // Vault manages balance of accounts of the chain
 type Vault struct {
-	*chain.ProcessBase
-	cn *chain.Chain
+	*types.ProcessBase
+	pm types.ProcessManager
+	cn types.Provider
 }
 
 // NewVault returns a Vault
@@ -30,15 +30,16 @@ func (p *Vault) Version() string {
 }
 
 // Init initializes the process
-func (p *Vault) Init(reg *chain.Register, cn *chain.Chain) error {
+func (p *Vault) Init(reg *types.Register, pm types.ProcessManager, cn types.Provider) error {
+	p.pm = pm
 	p.cn = cn
 	return nil
 }
 
 // Balance returns balance of the account of the address
-func (p *Vault) Balance(ctp *types.ContextProcess, addr common.Address) *amount.Amount {
+func (p *Vault) Balance(ctw *types.ContextWrapper, addr common.Address) *amount.Amount {
 	var total *amount.Amount
-	if bs := ctp.ProcessData(addr[:]); len(bs) > 0 {
+	if bs := ctw.ProcessData(addr[:]); len(bs) > 0 {
 		total = amount.NewAmountFromBytes(bs)
 	} else {
 		total = amount.NewCoinAmount(0, 0)
@@ -47,48 +48,48 @@ func (p *Vault) Balance(ctp *types.ContextProcess, addr common.Address) *amount.
 }
 
 // AddBalance adds balance to the account of the address
-func (p *Vault) AddBalance(ctp *types.ContextProcess, addr common.Address, am *amount.Amount) error {
+func (p *Vault) AddBalance(ctw *types.ContextWrapper, addr common.Address, am *amount.Amount) error {
 	zero := amount.NewCoinAmount(0, 0)
 	if am.Less(zero) {
 		return ErrMinusInput
 	}
-	total := p.Balance(ctp, addr)
+	total := p.Balance(ctw, addr)
 	total = total.Add(am)
-	ctp.SetProcessData(addr[:], total.Bytes())
+	ctw.SetProcessData(addr[:], total.Bytes())
 	return nil
 }
 
 // SubBalance subtracts balance to the account of the address
-func (p *Vault) SubBalance(ctp *types.ContextProcess, addr common.Address, am *amount.Amount) error {
-	total := p.Balance(ctp, addr)
+func (p *Vault) SubBalance(ctw *types.ContextWrapper, addr common.Address, am *amount.Amount) error {
+	total := p.Balance(ctw, addr)
 	if total.Less(am) {
 		return ErrMinusBalance
 	}
 	total = total.Sub(am)
 	if total.IsZero() {
-		ctp.SetProcessData(addr[:], nil)
+		ctw.SetProcessData(addr[:], nil)
 	} else {
-		ctp.SetProcessData(addr[:], total.Bytes())
+		ctw.SetProcessData(addr[:], total.Bytes())
 	}
 	return nil
 }
 
 // OnLoadChain called when the chain loaded
-func (p *Vault) OnLoadChain(loader types.LoaderProcess) error {
+func (p *Vault) OnLoadChain(loader types.LoaderWrapper) error {
 	return nil
 }
 
 // BeforeExecuteTransactions called before processes transactions of the block
-func (p *Vault) BeforeExecuteTransactions(ctp *types.ContextProcess) error {
+func (p *Vault) BeforeExecuteTransactions(ctw *types.ContextWrapper) error {
 	return nil
 }
 
 // AfterExecuteTransactions called after processes transactions of the block
-func (p *Vault) AfterExecuteTransactions(b *types.Block, ctp *types.ContextProcess) error {
+func (p *Vault) AfterExecuteTransactions(b *types.Block, ctw *types.ContextWrapper) error {
 	return nil
 }
 
 // OnSaveData called when the context of the block saved
-func (p *Vault) OnSaveData(b *types.Block, ctp *types.ContextProcess) error {
+func (p *Vault) OnSaveData(b *types.Block, ctw *types.ContextWrapper) error {
 	return nil
 }

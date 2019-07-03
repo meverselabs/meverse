@@ -168,31 +168,31 @@ func (ctd *ContextData) AddressByName(Name string) (common.Address, error) {
 	}
 }
 
-// IsExistAccount checks that the account of the address is exist or not
-func (ctd *ContextData) IsExistAccount(addr common.Address) (bool, error) {
+// HasAccount checks that the account of the address is exist or not
+func (ctd *ContextData) HasAccount(addr common.Address) (bool, error) {
 	if ctd.DeletedAccountMap.Has(addr) {
 		return false, nil
 	}
 	if ctd.AccountMap.Has(addr) {
 		return true, nil
 	} else if ctd.Parent != nil {
-		return ctd.Parent.IsExistAccount(addr)
+		return ctd.Parent.HasAccount(addr)
 	} else {
-		return ctd.loader.IsExistAccount(addr)
+		return ctd.loader.HasAccount(addr)
 	}
 }
 
-// IsExistAccountName checks that the account of the address is exist or not
-func (ctd *ContextData) IsExistAccountName(Name string) (bool, error) {
+// HasAccountName checks that the account of the address is exist or not
+func (ctd *ContextData) HasAccountName(Name string) (bool, error) {
 	if ctd.DeletedAccountNameMap.Has(Name) {
 		return false, nil
 	}
 	if ctd.AccountNameMap.Has(Name) {
 		return true, nil
 	} else if ctd.Parent != nil {
-		return ctd.Parent.IsExistAccountName(Name)
+		return ctd.Parent.HasAccountName(Name)
 	} else {
-		return ctd.loader.IsExistAccountName(Name)
+		return ctd.loader.HasAccountName(Name)
 	}
 }
 
@@ -319,8 +319,8 @@ func (ctd *ContextData) SetAccountData(addr common.Address, name []byte, value [
 	}
 }
 
-// IsExistUTXO checks that the utxo of the id is exist or not
-func (ctd *ContextData) IsExistUTXO(id uint64) (bool, error) {
+// HasUTXO checks that the utxo of the id is exist or not
+func (ctd *ContextData) HasUTXO(id uint64) (bool, error) {
 	if ctd.DeletedUTXOMap.Has(id) {
 		return false, nil
 	}
@@ -329,9 +329,9 @@ func (ctd *ContextData) IsExistUTXO(id uint64) (bool, error) {
 	} else if ctd.CreatedUTXOMap.Has(id) {
 		return true, nil
 	} else if ctd.Parent != nil {
-		return ctd.Parent.IsExistUTXO(id)
+		return ctd.Parent.HasUTXO(id)
 	} else {
-		return ctd.loader.IsExistUTXO(id)
+		return ctd.loader.HasUTXO(id)
 	}
 }
 

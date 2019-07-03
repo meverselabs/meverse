@@ -28,4 +28,8 @@ var (
 	ErrUnknownEventType              = errors.New("unknown event type")
 	ErrInvalidAccountName            = errors.New("invalid account name")
 	ErrInvalidTransactionCount       = errors.New("invalid transaction count")
+
+	ErrExistProcessName = errors.New("exist process name")
+	ErrExistProcessID   = errors.New("exist process id")
+	ErrNotExistProcess  = errors.New("not exist process")
 )

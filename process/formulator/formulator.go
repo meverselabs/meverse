@@ -3,7 +3,6 @@ package formulator
 import (
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
-	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/process/vault"
@@ -11,17 +10,15 @@ import (
 
 // Formulator manages balance of accounts of the chain
 type Formulator struct {
-	*chain.ProcessBase
-	cn            *chain.Chain
-	vault         *vault.Vault
-	genesisPolicy *FormulatorPolicy
+	*types.ProcessBase
+	pm    types.ProcessManager
+	cn    types.Provider
+	vault *vault.Vault
 }
 
 // NewFormulator returns a Formulator
-func NewFormulator(genesisPolicy *FormulatorPolicy) *Formulator {
-	p := &Formulator{
-		genesisPolicy: genesisPolicy,
-	}
+func NewFormulator() *Formulator {
+	p := &Formulator{}
 	return p
 }
 
@@ -36,10 +33,12 @@ func (p *Formulator) Version() string {
 }
 
 // Init initializes the process
-func (p *Formulator) Init(reg *chain.Register, cn *chain.Chain) error {
+func (p *Formulator) Init(reg *types.Register, pm types.ProcessManager, cn types.Provider) error {
+	p.pm = pm
 	p.cn = cn
+
 	reg.RegisterAccount(1, &FormulatorAccount{})
-	if vp, err := cn.ProcessByName("fleta.vault"); err != nil {
+	if vp, err := pm.ProcessByName("fleta.vault"); err != nil {
 		return ErrNotExistVault
 	} else if v, is := vp.(*vault.Vault); !is {
 		return ErrNotExistVault
@@ -49,46 +48,94 @@ func (p *Formulator) Init(reg *chain.Register, cn *chain.Chain) error {
 	return nil
 }
 
+// InitPolicy called at OnInitGenesis of an application
+func (p *Formulator) InitPolicy(ctw *types.ContextWrapper, rp *RewardPolicy, ap *AlphaPolicy, sp *SigmaPolicy, op *OmegaPolicy, hp *HyperPolicy, kp *StakingPolicy) error {
+	if bs, err := encoding.Marshal(rp); err != nil {
+		return err
+	} else {
+		ctw.SetProcessData([]byte("RewardPolicy"), bs)
+	}
+	if bs, err := encoding.Marshal(ap); err != nil {
+		return err
+	} else {
+		ctw.SetProcessData([]byte("AlphaPolicy"), bs)
+	}
+	if bs, err := encoding.Marshal(sp); err != nil {
+		return err
+	} else {
+		ctw.SetProcessData([]byte("SigmaPolicy"), bs)
+	}
+	if bs, err := encoding.Marshal(op); err != nil {
+		return err
+	} else {
+		ctw.SetProcessData([]byte("OmegaPolicy"), bs)
+	}
+	if bs, err := encoding.Marshal(hp); err != nil {
+		return err
+	} else {
+		ctw.SetProcessData([]byte("HyperPolicy"), bs)
+	}
+	if bs, err := encoding.Marshal(kp); err != nil {
+		return err
+	} else {
+		ctw.SetProcessData([]byte("StakingPolicy"), bs)
+	}
+	return nil
+}
+
 // OnLoadChain called when the chain loaded
-func (p *Formulator) OnLoadChain(loader types.LoaderProcess) error {
+func (p *Formulator) OnLoadChain(loader types.LoaderWrapper) error {
+	if bs := loader.ProcessData([]byte("RewardPolicy")); len(bs) == 0 {
+		return ErrRewardPolicyShouldBeSetupInApplication
+	}
+	if bs := loader.ProcessData([]byte("AlphaPolicy")); len(bs) == 0 {
+		return ErrAlphaPolicyShouldBeSetupInApplication
+	}
+	if bs := loader.ProcessData([]byte("SigmaPolicy")); len(bs) == 0 {
+		return ErrSigmaPolicyShouldBeSetupInApplication
+	}
+	if bs := loader.ProcessData([]byte("OmegaPolicy")); len(bs) == 0 {
+		return ErrOmegaPolicyShouldBeSetupInApplication
+	}
+	if bs := loader.ProcessData([]byte("HyperPolicy")); len(bs) == 0 {
+		return ErrHyperPolicyShouldBeSetupInApplication
+	}
+	if bs := loader.ProcessData([]byte("StakingPolicy")); len(bs) == 0 {
+		return ErrStakingPolicyShouldBeSetupInApplication
+	}
 	return nil
 }
 
 // BeforeExecuteTransactions called before processes transactions of the block
-func (p *Formulator) BeforeExecuteTransactions(ctp *types.ContextProcess) error {
-	if ctp.TargetHeight() == 1 {
-		if data, err := encoding.Marshal(&p.genesisPolicy); err != nil {
-			return err
-		} else {
-			ctp.SetProcessData([]byte("policy"), data)
-		}
+func (p *Formulator) BeforeExecuteTransactions(ctw *types.ContextWrapper) error {
+	if ctw.TargetHeight() == 1 {
 		rd := newRewardData()
 		if data, err := encoding.Marshal(&rd); err != nil {
 			return err
 		} else {
-			ctp.SetProcessData([]byte("reward"), data)
+			ctw.SetProcessData([]byte("RewardData"), data)
 		}
 	}
 	return nil
 }
 
 // AfterExecuteTransactions called after processes transactions of the block
-func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctp *types.ContextProcess) error {
-	policy := &FormulatorPolicy{}
-	if bs := ctp.ProcessData([]byte("policy")); len(bs) == 0 {
-		return ErrInvalidRewardData
+func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.ContextWrapper) error {
+	policy := &RewardPolicy{}
+	if bs := ctw.ProcessData([]byte("RewardPolicy")); len(bs) == 0 {
+		return ErrNotExistPolicyData
 	} else if err := encoding.Unmarshal(bs, &policy); err != nil {
 		return err
 	}
 	rd := newRewardData()
-	if bs := ctp.ProcessData([]byte("reward")); len(bs) == 0 {
-		return ErrInvalidRewardData
+	if bs := ctw.ProcessData([]byte("RewardData")); len(bs) == 0 {
+		return ErrNotExistRewardData
 	} else if err := encoding.Unmarshal(bs, &rd); err != nil {
 		return err
 	}
 
 	if true {
-		acc, err := ctp.Account(b.Header.Generator)
+		acc, err := ctw.Account(b.Header.Generator)
 		if err != nil {
 			return err
 		}
@@ -107,19 +154,19 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctp *types.Context
 		case HyperFormulatorType:
 			PowerSum := frAcc.Amount.MulC(int64(policy.HyperEfficiency1000)).DivC(1000)
 
-			keys, err := ctp.AccountDataKeys(b.Header.Generator, tagStaking)
+			keys, err := ctw.AccountDataKeys(b.Header.Generator, tagStaking)
 			if err != nil {
 				return err
 			}
 			for _, k := range keys {
 				if StakingAddress, is := fromStakingKey(k); is {
-					bs := ctp.AccountData(b.Header.Generator, k)
+					bs := ctw.AccountData(b.Header.Generator, k)
 					if len(bs) == 0 {
 						return ErrInvalidStakingAddress
 					}
 					StakingAmount := amount.NewAmountFromBytes(bs)
 
-					if _, err := ctp.Account(StakingAddress); err != nil {
+					if _, err := ctw.Account(StakingAddress); err != nil {
 						if err != types.ErrNotExistAccount {
 							return err
 						}
@@ -128,7 +175,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctp *types.Context
 						StakingPower := StakingAmount.MulC(int64(policy.StakingEfficiency1000)).DivC(1000)
 						ComissionPower := StakingPower.MulC(int64(frAcc.Policy.CommissionRatio1000)).DivC(1000)
 
-						if bs := ctp.AccountData(b.Header.Generator, toAutoStakingKey(StakingAddress)); len(bs) > 0 && bs[0] == 1 {
+						if bs := ctw.AccountData(b.Header.Generator, toAutoStakingKey(StakingAddress)); len(bs) > 0 && bs[0] == 1 {
 							rd.addStakingPower(b.Header.Generator, StakingAddress, StakingPower.Sub(ComissionPower))
 							PowerSum = PowerSum.Add(StakingPower)
 						} else {
@@ -144,17 +191,17 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctp *types.Context
 		}
 	}
 
-	if ctp.TargetHeight() >= rd.lastPaidHeight+policy.PayRewardEveryBlocks {
+	if ctw.TargetHeight() >= rd.lastPaidHeight+policy.PayRewardEveryBlocks {
 		TotalPower := amount.NewCoinAmount(0, 0)
 		rd.powerMap.EachAll(func(addr common.Address, PowerSum *amount.Amount) bool {
 			TotalPower = TotalPower.Add(PowerSum)
 			return true
 		})
-		TotalReward := policy.RewardPerBlock.MulC(int64(ctp.TargetHeight() - rd.lastPaidHeight))
+		TotalReward := policy.RewardPerBlock.MulC(int64(ctw.TargetHeight() - rd.lastPaidHeight))
 		Ratio := TotalReward.Mul(amount.COIN).Div(TotalPower)
 		var inErr error
 		rd.powerMap.EachAll(func(RewardAddress common.Address, PowerSum *amount.Amount) bool {
-			acc, err := ctp.Account(RewardAddress)
+			acc, err := ctw.Account(RewardAddress)
 			if err != nil {
 				if err != types.ErrNotExistAccount {
 					inErr = err
@@ -162,8 +209,8 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctp *types.Context
 				}
 			} else {
 				frAcc := acc.(*FormulatorAccount)
-				if err := p.cn.SwitchProcess(ctp, p.vault, func(stp *types.ContextProcess) error {
-					if err := p.vault.AddBalance(stp, frAcc.Address(), PowerSum.Mul(Ratio).Div(amount.COIN)); err != nil {
+				if err := p.pm.SwitchProcess(ctw, p.vault, func(cts *types.ContextWrapper) error {
+					if err := p.vault.AddBalance(cts, frAcc.Address(), PowerSum.Mul(Ratio).Div(amount.COIN)); err != nil {
 						return err
 					}
 					return nil
@@ -181,13 +228,13 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctp *types.Context
 
 		rd.stakingPowerMap.EachAll(func(HyperAddress common.Address, PowerMap *types.AddressAmountMap) bool {
 			PowerMap.EachAll(func(StakingAddress common.Address, PowerSum *amount.Amount) bool {
-				bs := ctp.AccountData(HyperAddress, toStakingKey(StakingAddress))
+				bs := ctw.AccountData(HyperAddress, toStakingKey(StakingAddress))
 				if len(bs) == 0 {
 					inErr = ErrInvalidStakingAddress
 					return false
 				}
 				StakingAmount := amount.NewAmountFromBytes(bs)
-				ctp.SetAccountData(HyperAddress, toStakingKey(StakingAddress), StakingAmount.Add(PowerSum.Mul(Ratio).Div(amount.COIN)).Bytes())
+				ctw.SetAccountData(HyperAddress, toStakingKey(StakingAddress), StakingAmount.Add(PowerSum.Mul(Ratio).Div(amount.COIN)).Bytes())
 				return true
 			})
 			if inErr != nil {
@@ -200,25 +247,19 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctp *types.Context
 		}
 		rd.stakingPowerMap = types.NewAddressAddressAmountMap()
 
-		//log.Println("Paid at", ctp.TargetHeight())
-		rd.lastPaidHeight = ctp.TargetHeight()
-	}
-
-	if data, err := encoding.Marshal(&policy); err != nil {
-		return err
-	} else {
-		ctp.SetProcessData([]byte("policy"), data)
+		//log.Println("Paid at", ctw.TargetHeight())
+		rd.lastPaidHeight = ctw.TargetHeight()
 	}
 
 	if data, err := encoding.Marshal(&rd); err != nil {
 		return err
 	} else {
-		ctp.SetProcessData([]byte("reward"), data)
+		ctw.SetProcessData([]byte("RewardData"), data)
 	}
 	return nil
 }
 
 // OnSaveData called when the context of the block saved
-func (p *Formulator) OnSaveData(b *types.Block, ctp *types.ContextProcess) error {
+func (p *Formulator) OnSaveData(b *types.Block, ctw *types.ContextWrapper) error {
 	return nil
 }

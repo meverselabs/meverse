@@ -12,5 +12,5 @@ type Account interface {
 	Address() common.Address
 	Name() string
 	Clone() Account
-	Validate(loader LoaderProcess, signers []common.PublicHash) error
+	Validate(loader LoaderWrapper, signers []common.PublicHash) error
 }

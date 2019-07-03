@@ -11,7 +11,7 @@ import (
 type Transaction interface {
 	json.Marshaler
 	Timestamp() uint64
-	Fee(loader LoaderProcess) *amount.Amount
-	Validate(loader LoaderProcess, signers []common.PublicHash) error
-	Execute(ctx *ContextProcess, index uint16) error
+	Fee(loader LoaderWrapper) *amount.Amount
+	Validate(loader LoaderWrapper, signers []common.PublicHash) error
+	Execute(p Process, ctx *ContextWrapper, index uint16) error
 }

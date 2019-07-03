@@ -22,11 +22,11 @@ func init() {
 		}
 	}, func(loader data.Loader, t transaction.Transaction, signers []common.PublicHash) error {
 		tx := t.(*CreateSigma)
-		if tx.Seq() <= loader.Seq(tx.From()) {
+		if tx.Seq() <= loader.Seq(tx.From) {
 			return ErrInvalidSequence
 		}
 
-		acc, err := loader.Account(tx.From())
+		acc, err := loader.Account(tx.From)
 		if err != nil {
 			return err
 		}
@@ -44,7 +44,7 @@ func init() {
 
 		hasFrom := false
 		for _, addr := range tx.AlphaFormulators {
-			if addr.Equal(tx.From()) {
+			if addr.Equal(tx.From) {
 				hasFrom = true
 			}
 			if acc, err := loader.Account(addr); err != nil {
@@ -66,9 +66,9 @@ func init() {
 	}, func(ctx *data.Context, Fee *amount.Amount, t transaction.Transaction, coord *common.Coordinate) (ret interface{}, rerr error) {
 		tx := t.(*CreateSigma)
 
-		policy, has := gFormulatorPolicyMap[ctx.ChainCoord().ID()]
+		policy, has := gRewardPolicyMap[ctx.ChainCoord().ID()]
 		if !has {
-			return nil, ErrNotExistFormulatorPolicy
+			return nil, ErrNotExistRewardPolicy
 		}
 		if len(tx.AlphaFormulators) != int(policy.SigmaRequiredAlphaCount) {
 			return nil, ErrInvalidFormulatorCount
@@ -77,12 +77,12 @@ func init() {
 		sn := ctx.Snapshot()
 		defer ctx.Revert(sn)
 
-		if tx.Seq() != ctx.Seq(tx.From())+1 {
+		if tx.Seq() != ctx.Seq(tx.From)+1 {
 			return nil, ErrInvalidSequence
 		}
-		ctx.AddSeq(tx.From())
+		ctx.AddSeq(tx.From)
 
-		acc, err := ctx.Account(tx.From())
+		acc, err := ctx.Account(tx.From)
 		if err != nil {
 			return nil, err
 		}
@@ -96,7 +96,7 @@ func init() {
 
 		hasFrom := false
 		for _, addr := range tx.AlphaFormulators {
-			if addr.Equal(tx.From()) {
+			if addr.Equal(tx.From) {
 				hasFrom = true
 			}
 			if acc, err := ctx.Account(addr); err != nil {
@@ -140,7 +140,7 @@ func (tx *CreateSigma) IsUTXO() bool {
 }
 
 // From returns the creator of the transaction
-func (tx *CreateSigma) From() common.Address {
+func (tx *CreateSigma) From common.Address {
 	return tx.From_
 }
 
