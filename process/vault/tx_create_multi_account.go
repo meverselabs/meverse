@@ -9,8 +9,8 @@ import (
 	"github.com/fletaio/fleta/core/types"
 )
 
-// CreateMultiAccunt is used to make multi account
-type CreateMultiAccunt struct {
+// CreateMultiAccount is used to make multi account
+type CreateMultiAccount struct {
 	Timestamp_ uint64
 	Seq_       uint64
 	From       common.Address
@@ -20,22 +20,22 @@ type CreateMultiAccunt struct {
 }
 
 // Timestamp returns the timestamp of the transaction
-func (tx *CreateMultiAccunt) Timestamp() uint64 {
+func (tx *CreateMultiAccount) Timestamp() uint64 {
 	return tx.Timestamp_
 }
 
 // Seq returns the sequence of the transaction
-func (tx *CreateMultiAccunt) Seq() uint64 {
+func (tx *CreateMultiAccount) Seq() uint64 {
 	return tx.Seq_
 }
 
 // Fee returns the fee of the transaction
-func (tx *CreateMultiAccunt) Fee(loader types.LoaderWrapper) *amount.Amount {
+func (tx *CreateMultiAccount) Fee(loader types.LoaderWrapper) *amount.Amount {
 	return amount.COIN.MulC(10)
 }
 
 // Validate validates signatures of the transaction
-func (tx *CreateMultiAccunt) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
+func (tx *CreateMultiAccount) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	if len(tx.Name) < 8 || len(tx.Name) > 16 {
 		return types.ErrInvalidAccountName
 	}
@@ -74,7 +74,7 @@ func (tx *CreateMultiAccunt) Validate(p types.Process, loader types.LoaderWrappe
 }
 
 // Execute updates the context by the transaction
-func (tx *CreateMultiAccunt) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
+func (tx *CreateMultiAccount) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Vault)
 
 	if len(tx.Name) < 8 || len(tx.Name) > 16 {
@@ -140,7 +140,7 @@ func (tx *CreateMultiAccunt) Execute(p types.Process, ctw *types.ContextWrapper,
 }
 
 // MarshalJSON is a marshaler function
-func (tx *CreateMultiAccunt) MarshalJSON() ([]byte, error) {
+func (tx *CreateMultiAccount) MarshalJSON() ([]byte, error) {
 	var buffer bytes.Buffer
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)

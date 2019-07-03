@@ -40,10 +40,15 @@ func (p *Vault) Init(reg *types.Register, pm types.ProcessManager, cn types.Prov
 	p.pm = pm
 	p.cn = cn
 	reg.RegisterAccount(1, &SingleAccount{})
-	reg.RegisterAccount(1, &MultiAccount{})
+	reg.RegisterAccount(2, &MultiAccount{})
 	reg.RegisterTransaction(1, &Transfer{})
 	reg.RegisterTransaction(2, &Burn{})
-	reg.RegisterTransaction(3, &CreateAccount{})
+	reg.RegisterTransaction(3, &Withdraw{})
+	reg.RegisterTransaction(4, &CreateAccount{})
+	reg.RegisterTransaction(5, &CreateMultiAccount{})
+	reg.RegisterTransaction(6, &Assign{})
+	reg.RegisterTransaction(7, &Deposit{})
+	reg.RegisterTransaction(8, &OpenAccount{})
 	return nil
 }
 
