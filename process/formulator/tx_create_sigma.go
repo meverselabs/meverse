@@ -62,7 +62,7 @@ func (tx *CreateSigma) Execute(p types.Process, ctw *types.ContextWrapper, index
 	sp := p.(*Formulator)
 
 	policy := &SigmaPolicy{}
-	if err := encoding.Unmarshal(ctw.ProcessData([]byte("SigmaPolicy")), &policy); err != nil {
+	if err := encoding.Unmarshal(ctw.ProcessData(tagSigmaPolicy), &policy); err != nil {
 		return err
 	}
 	if len(tx.AlphaFormulators) != int(policy.SigmaRequiredAlphaCount) {

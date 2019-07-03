@@ -62,7 +62,7 @@ func (tx *CreateOmega) Execute(p types.Process, ctw *types.ContextWrapper, index
 	sp := p.(*Formulator)
 
 	policy := &OmegaPolicy{}
-	if err := encoding.Unmarshal(ctw.ProcessData([]byte("OmegaPolicy")), &policy); err != nil {
+	if err := encoding.Unmarshal(ctw.ProcessData(tagOmegaPolicy), &policy); err != nil {
 		return err
 	}
 	if len(tx.SigmaFormulators) != int(policy.OmegaRequiredSigmaCount) {

@@ -4,7 +4,7 @@ package types
 type Service interface {
 	Name() string
 	Init(pm ProcessManager, cn Provider) error
-	OnLoadChain(loader LoaderWrapper) error
+	OnLoadChain(loader Loader) error
 	OnBlockConnected(b *Block, events []Event, loader Loader) error
 }
 
@@ -12,7 +12,7 @@ type Service interface {
 type ServiceBase struct{}
 
 // OnLoadChain called when the chain loaded
-func (m *ServiceBase) OnLoadChain(loader LoaderWrapper) error {
+func (m *ServiceBase) OnLoadChain(loader Loader) error {
 	return nil
 }
 

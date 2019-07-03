@@ -63,7 +63,7 @@ func (tx *CreateAlpha) Execute(p types.Process, ctw *types.ContextWrapper, index
 	}
 
 	policy := &AlphaPolicy{}
-	if err := encoding.Unmarshal(ctw.ProcessData([]byte("AlphaPolicy")), &policy); err != nil {
+	if err := encoding.Unmarshal(ctw.ProcessData(tagAlphaPolicy), &policy); err != nil {
 		return err
 	}
 	if ctw.TargetHeight() < policy.AlphaCreationLimitHeight {

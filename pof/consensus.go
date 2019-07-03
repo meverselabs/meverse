@@ -79,7 +79,7 @@ func (cs *Consensus) InitGenesis(ctw *types.ContextWrapper) error {
 	if data, err := cs.buildSaveData(); err != nil {
 		return err
 	} else {
-		ctw.SetProcessData([]byte("state"), data)
+		ctw.SetProcessData(tagState, data)
 	}
 	return nil
 }
@@ -89,7 +89,7 @@ func (cs *Consensus) OnLoadChain(loader types.LoaderWrapper) error {
 	cs.Lock()
 	defer cs.Unlock()
 
-	dec := encoding.NewDecoder(bytes.NewReader(loader.ProcessData([]byte("state"))))
+	dec := encoding.NewDecoder(bytes.NewReader(loader.ProcessData(tagState)))
 	if v, err := dec.DecodeUint32(); err != nil {
 		return err
 	} else {
@@ -234,7 +234,7 @@ func (cs *Consensus) OnSaveData(b *types.Block, ctw *types.ContextWrapper) error
 	if data, err := cs.buildSaveData(); err != nil {
 		return err
 	} else {
-		ctw.SetProcessData([]byte("state"), data)
+		ctw.SetProcessData(tagState, data)
 	}
 	return nil
 }

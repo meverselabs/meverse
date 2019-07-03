@@ -271,7 +271,7 @@ func (st *Store) Height() uint32 {
 
 	var height uint32
 	st.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get([]byte("height"))
+		item, err := txn.Get(tagHeight)
 		if err != nil {
 			if err == badger.ErrKeyNotFound {
 				return ErrNotExistKey
@@ -763,7 +763,7 @@ func (st *Store) StoreGenesis(genHash hash.Hash256, ctd *types.ContextData) erro
 			if err := txn.Set(toHashHeightKey(genHash), bsHeight); err != nil {
 				return err
 			}
-			if err := txn.Set([]byte("height"), bsHeight); err != nil {
+			if err := txn.Set(tagHeight, bsHeight); err != nil {
 				return err
 			}
 		}
@@ -817,7 +817,7 @@ func (st *Store) StoreBlock(b *types.Block, ctd *types.ContextData) error {
 			if err := txn.Set(toHashHeightKey(DataHash), bsHeight); err != nil {
 				return err
 			}
-			if err := txn.Set([]byte("height"), bsHeight); err != nil {
+			if err := txn.Set(tagHeight, bsHeight); err != nil {
 				return err
 			}
 		}

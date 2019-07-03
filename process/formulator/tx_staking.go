@@ -110,14 +110,7 @@ func (tx *Staking) Execute(p types.Process, ctw *types.ContextWrapper, index uin
 		return err
 	}
 
-	var fromStakingAmount *amount.Amount
-	if bs := ctw.AccountData(tx.HyperFormulator, toStakingKey(tx.From)); len(bs) > 0 {
-		fromStakingAmount = amount.NewAmountFromBytes(bs)
-	} else {
-		fromStakingAmount = amount.NewCoinAmount(0, 0)
-	}
-	fromStakingAmount.Add(tx.Amount)
-	ctw.SetAccountData(tx.HyperFormulator, toStakingKey(tx.From), fromStakingAmount.Bytes())
+	sp.addStakingAmount(ctw, tx.HyperFormulator, tx.From, tx.Amount)
 	frAcc.StakingAmount = frAcc.StakingAmount.Add(tx.Amount)
 
 	ctw.Commit(sn)

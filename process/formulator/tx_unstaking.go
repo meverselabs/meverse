@@ -105,20 +105,15 @@ func (tx *Unstaking) Execute(p types.Process, ctw *types.ContextWrapper, index u
 		return types.ErrInvalidAccountType
 	}
 
-	var fromStakingAmount *amount.Amount
-	if bs := ctw.AccountData(tx.HyperFormulator, toStakingKey(tx.From)); len(bs) > 0 {
-		fromStakingAmount = amount.NewAmountFromBytes(bs)
-	} else {
-		fromStakingAmount = amount.NewCoinAmount(0, 0)
-	}
+	fromStakingAmount := sp.getStakingAmount(ctw, tx.HyperFormulator, tx.From)
 	if fromStakingAmount.Less(tx.Amount) {
 		return ErrInsufficientStakingAmount
 	}
 	fromStakingAmount.Sub(tx.Amount)
 	if fromStakingAmount.IsZero() {
-		ctw.SetAccountData(tx.HyperFormulator, toStakingKey(tx.From), nil)
+		sp.removeStakingAmount(ctw, tx.HyperFormulator, tx.From)
 	} else {
-		ctw.SetAccountData(tx.HyperFormulator, toStakingKey(tx.From), fromStakingAmount.Bytes())
+		sp.setStakingAmount(ctw, tx.HyperFormulator, tx.From, fromStakingAmount)
 	}
 	if frAcc.StakingAmount.Less(tx.Amount) {
 		return ErrInsufficientStakingAmount
@@ -126,7 +121,7 @@ func (tx *Unstaking) Execute(p types.Process, ctw *types.ContextWrapper, index u
 	frAcc.StakingAmount = frAcc.StakingAmount.Sub(tx.Amount)
 
 	policy := &HyperPolicy{}
-	if err := encoding.Unmarshal(ctw.ProcessData([]byte("HyperPolicy")), &policy); err != nil {
+	if err := encoding.Unmarshal(ctw.ProcessData(tagHyperPolicy), &policy); err != nil {
 		return err
 	}
 	sp.vault.AddLockedBalance(ctw, fromAcc.Address(), tx.Amount, ctw.TargetHeight()+policy.StakingUnlockRequiredBlocks)

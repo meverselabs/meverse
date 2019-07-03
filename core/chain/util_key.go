@@ -9,7 +9,8 @@ import (
 )
 
 var (
-	tagHeightHash          = []byte{1, 0}
+	tagHeight              = []byte{1, 0}
+	tagHeightHash          = []byte{1, 1}
 	tagHeightHeader        = []byte{1, 2}
 	tagHeightBlock         = []byte{1, 3}
 	tagHashHeight          = []byte{1, 4}

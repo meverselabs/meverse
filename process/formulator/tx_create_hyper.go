@@ -69,7 +69,7 @@ func (tx *CreateHyper) Execute(p types.Process, ctw *types.ContextWrapper, index
 	}
 
 	policy := &HyperPolicy{}
-	if err := encoding.Unmarshal(ctw.ProcessData([]byte("HyperPolicy")), &policy); err != nil {
+	if err := encoding.Unmarshal(ctw.ProcessData(tagHyperPolicy), &policy); err != nil {
 		return err
 	}
 
