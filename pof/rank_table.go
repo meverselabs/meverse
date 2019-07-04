@@ -67,6 +67,18 @@ func NewRankTable() *RankTable {
 	return cs
 }
 
+// Candidates returns a candidates
+func (cs *RankTable) Candidates() []*Rank {
+	cs.Lock()
+	defer cs.Unlock()
+
+	list := []*Rank{}
+	for _, c := range cs.candidates {
+		list = append(list, c.Clone())
+	}
+	return list
+}
+
 // CandidateCount returns a count of the rank table
 func (cs *RankTable) CandidateCount() int {
 	cs.Lock()
