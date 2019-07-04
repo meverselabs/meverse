@@ -130,20 +130,17 @@ func (cs *Consensus) ValidateSignature(bh *types.Header, sigs []common.Signature
 	if len(sigs) != cs.observerKeyMap.Len()/2+2 {
 		return ErrInvalidSignatureCount
 	}
-	s := &ObserverSigned{
-		BlockSign: types.BlockSign{
-			HeaderHash:         encoding.Hash(bh),
-			GeneratorSignature: sigs[0],
-		},
-		ObserverSignatures: sigs[1:],
-	}
-
 	KeyMap := map[common.PublicHash]bool{}
 	cs.observerKeyMap.EachAll(func(pubhash common.PublicHash, value bool) bool {
 		KeyMap[pubhash] = true
 		return true
 	})
-	if err := common.ValidateSignaturesMajority(encoding.Hash(s.BlockSign), s.ObserverSignatures, KeyMap); err != nil {
+	bs := types.BlockSign{
+		HeaderHash:         encoding.Hash(bh),
+		GeneratorSignature: sigs[0],
+	}
+	ObserverSignatures := sigs[1:]
+	if err := common.ValidateSignaturesMajority(encoding.Hash(bs), ObserverSignatures, KeyMap); err != nil {
 		return err
 	}
 	return nil
