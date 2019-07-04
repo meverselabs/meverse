@@ -3,9 +3,9 @@
 This is repository of FLETA project.<br/>
 This repository contains an explanation and contents about the FLETA Daemon, Observer Daemon, Block Explorer, and DApp examples.<br/>
 This v2 of FLETA blockchain provides more easy and convenient way to develop DApp.<br/>
-!!!Currently, we are developing FLETA blockchain v2 that reworks whole structure!!!<br/>
-!!!Currently, consensus by nodes on the network is remained to reworks(already implemented at v1, but conversion required)!!!<br/>
-!!!Currently, example and explorer is running on single node by local consensus. It will be removed when we finish to convert our consensus by node on the network!!!<br/>
+#### !!!Currently, we are developing FLETA blockchain v2 that reworks whole structure!!!
+#### !!!Currently, consensus by nodes on the network is remained to reworks(already implemented at v1, but conversion required)!!!
+#### !!!Currently, example and explorer is running on single node by local consensus. It will be removed when we finish to convert our consensus by node on the network!!!
 
 ## Related repositories
 * You can find the Explorer at https://github.com/fletaio/explorer.
@@ -44,7 +44,7 @@ When the changing possibility of configurations and command sets are reduced, co
 
 All the requirements mentioned in this document are written based on FLETA’s full node. All requirements can be changed at the release stage.
 Currently, we can achieve 10,000 TPS with 36 6-core servers in global regions, and now we are developing our system to achieve 20,000 TPS, which is the objective of the project.
-
+##
 ### Configuration
 
 In current stage, only the minimal configuration for the execution is being provided.<br/>
