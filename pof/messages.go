@@ -8,7 +8,6 @@ import (
 
 // RoundVote is a message for a round vote
 type RoundVote struct {
-	ChainCoord           *common.Coordinate
 	LastHash             hash.Hash256
 	VoteTargetHeight     uint32
 	TimeoutCount         uint32
@@ -45,7 +44,7 @@ type RoundVoteAckMessage struct {
 
 // BlockVote is message for a block vote
 type BlockVote struct {
-	VoteTargetHeight   uint32
+	TargetHeight       uint32
 	Header             *types.Header
 	GeneratorSignature common.Signature
 	ObserverSignature  common.Signature
@@ -61,6 +60,13 @@ type BlockVoteMessage struct {
 // RoundSetup is a message for a round setup
 type RoundSetup struct {
 	RoundVoteAcks []*RoundVoteAck
+	IsReply       bool
+}
+
+// RoundSetupMessage is a message for a round setup
+type RoundSetupMessage struct {
+	RoundSetup *RoundSetup
+	Signautre  common.Signature
 }
 
 // BlockReqMessage is a message for a block request

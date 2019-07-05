@@ -16,7 +16,7 @@ type Consensus struct {
 	*chain.ConsensusBase
 	cn                     *chain.Chain
 	ct                     chain.Committer
-	MaxBlocksPerFormulator uint32
+	maxBlocksPerFormulator uint32
 	blocksBySameFormulator uint32
 	observerKeyMap         *types.PublicHashBoolMap
 	rt                     *RankTable
@@ -29,7 +29,7 @@ func NewConsensus(MaxBlocksPerFormulator uint32, ObserverKeys []common.PublicHas
 		ObserverKeyMap.Put(pubhash.Clone(), true)
 	}
 	cs := &Consensus{
-		MaxBlocksPerFormulator: MaxBlocksPerFormulator,
+		maxBlocksPerFormulator: MaxBlocksPerFormulator,
 		observerKeyMap:         ObserverKeyMap,
 		rt:                     NewRankTable(),
 	}
@@ -68,7 +68,7 @@ func (cs *Consensus) OnLoadChain(loader types.LoaderWrapper) error {
 	if v, err := dec.DecodeUint32(); err != nil {
 		return err
 	} else {
-		if cs.MaxBlocksPerFormulator != v {
+		if cs.maxBlocksPerFormulator != v {
 			return ErrInvalidMaxBlocksPerFormulator
 		}
 	}
@@ -164,7 +164,7 @@ func (cs *Consensus) OnSaveData(b *types.Block, ctw *types.ContextWrapper) error
 		cs.blocksBySameFormulator = 0
 	}
 	cs.blocksBySameFormulator++
-	if cs.blocksBySameFormulator >= cs.MaxBlocksPerFormulator {
+	if cs.blocksBySameFormulator >= cs.maxBlocksPerFormulator {
 		cs.rt.forwardTop(HeaderHash)
 		cs.blocksBySameFormulator = 0
 	}

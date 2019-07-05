@@ -69,7 +69,7 @@ func (cs *Consensus) encodeConsensusData(TimeoutCount uint32) ([]byte, error) {
 func (cs *Consensus) buildSaveData() ([]byte, error) {
 	var buffer bytes.Buffer
 	enc := encoding.NewEncoder(&buffer)
-	if err := enc.EncodeUint32(cs.MaxBlocksPerFormulator); err != nil {
+	if err := enc.EncodeUint32(cs.maxBlocksPerFormulator); err != nil {
 		return nil, err
 	}
 	if err := enc.Encode(cs.observerKeyMap); err != nil {

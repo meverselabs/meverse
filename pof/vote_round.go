@@ -39,6 +39,7 @@ func NewVoteRound(TargetHeight uint32, MaxBlocksPerFormulator uint32) *VoteRound
 		RoundVoteAckMessageMap:     map[common.PublicHash]*RoundVoteAckMessage{},
 		RoundVoteWaitMap:           map[common.PublicHash]*RoundVoteMessage{},
 		RoundVoteAckMessageWaitMap: map[common.PublicHash]*RoundVoteAckMessage{},
+		BlockRound:                 NewBlockRound(TargetHeight),
 	}
 	return vr
 }
