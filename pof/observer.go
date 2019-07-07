@@ -8,9 +8,10 @@ import (
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/queue"
+	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
-	"github.com/fletaio/framework/chain"
+	"github.com/fletaio/fleta/service/p2p"
 )
 
 type messageItem struct {
@@ -40,6 +41,16 @@ func NewObserver(cs *Consensus, MyPublicHash common.PublicHash) *Observer {
 	}
 }
 
+func (ob *Observer) Init() {
+	fc := encoding.Factory("pof.message")
+	fc.Register(types.DefineHashedType("pof.RoundVoteMessage"), &RoundVoteMessage{})
+	fc.Register(types.DefineHashedType("pof.RoundVoteAckMessage"), &RoundVoteAckMessage{})
+	fc.Register(types.DefineHashedType("pof.BlockReqMessage"), &BlockReqMessage{})
+	fc.Register(types.DefineHashedType("pof.BlockGenMessage"), &BlockGenMessage{})
+	fc.Register(types.DefineHashedType("pof.BlockVoteMessage"), &BlockVoteMessage{})
+	fc.Register(types.DefineHashedType("pof.BlockObSignMessage"), &BlockObSignMessage{})
+}
+
 func (ob *Observer) syncVoteRound() {
 	cp := ob.cs.cn.Provider()
 	TargetHeight := cp.Height() + 1
@@ -60,6 +71,64 @@ func (ob *Observer) resetVoteRound(resetStat bool) {
 		ob.roundFirstTime = 0
 		ob.roundFirstHeight = 0
 	}
+}
+
+func (ob *Observer) onRecv(p *Peer, m interface{}, raw []byte) error {
+	if msg, is := m.(*p2p.RequestMessage); is {
+		log.Println(msg)
+		/*
+			if fp, is := p.(*FormulatorPeer); is {
+				ob.obLock.Lock("OnRecv msg is RequestMessage")
+				defer ob.obLock.Unlock()
+
+				enable := false
+
+				if fp.GuessHeight() < msg.Height {
+					CountMap := ob.fs.GuessHeightCountMap()
+					if CountMap[ob.kn.Provider().Height()] < 3 {
+						enable = true
+					} else {
+						ranks, err := ob.kn.RanksInMap(ob.adjustFormulatorMap(), 5)
+						if err != nil {
+							return err
+						}
+						rankMap := map[string]bool{}
+						for _, r := range ranks {
+							rankMap[r.Address.String()] = true
+						}
+						enable = rankMap[p.ID()]
+					}
+					if enable {
+						fp.UpdateGuessHeight(msg.Height)
+
+						//ob.kn.DebugLog("Observer", ob.kn.Provider().Height(), "Send DataMessage", msg.Height, (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
+
+						cd, err := ob.kn.Provider().Data(msg.Height)
+						if err != nil {
+							return err
+						}
+						sm := &chain.DataMessage{
+							Data: cd,
+						}
+						if err := p.Send(sm); err != nil {
+							return err
+						}
+					}
+				}
+			}
+		*/
+	} else if msg, is := m.(*BlockGenMessage); is {
+		ob.messageQueue.Push(&messageItem{
+			Message: msg,
+			Raw:     raw,
+		})
+	} else {
+		ob.messageQueue.Push(&messageItem{
+			PublicHash: p.pubhash,
+			Message:    m,
+		})
+	}
+	return nil
 }
 
 func (ob *Observer) Run() {

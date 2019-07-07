@@ -17,4 +17,5 @@ var (
 	ErrInvalidVote                   = errors.New("invalid vote")
 	ErrInvalidRoundState             = errors.New("invalid round state")
 	ErrAlreadyVoted                  = errors.New("already voted")
+	ErrNotExistObserverPeer          = errors.New("not exist observer peer")
 )
