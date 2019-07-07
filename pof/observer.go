@@ -35,6 +35,10 @@ type Observer struct {
 	messageQueue     *queue.Queue
 	requestTimer     *p2p.RequestTimer
 	blockQ           *queue.SortedQueue
+	isRunning        bool
+	closeLock        sync.RWMutex
+	runEnd           chan struct{}
+	isClose          bool
 }
 
 func NewObserver(key key.Key, NetAddressMap map[common.PublicHash]string, cs *Consensus, MyPublicHash common.PublicHash) *Observer {
@@ -65,26 +69,50 @@ func (ob *Observer) Init() {
 	fc.Register(types.DefineHashedType("p2p.StatusMessage"), &p2p.StatusMessage{})
 }
 
+// Close terminates the observer
+func (ob *Observer) Close() {
+	ob.closeLock.Lock()
+	defer ob.closeLock.Unlock()
+
+	ob.Lock()
+	defer ob.Unlock()
+
+	ob.isClose = true
+	ob.cs.cn.Close()
+	ob.runEnd <- struct{}{}
+}
+
 // Run starts the pof consensus on the observer
-func (ob *Observer) Run() {
+func (ob *Observer) Run(BindObserver string, BindFormulator string) {
+	ob.Lock()
+	if ob.isRunning {
+		ob.Unlock()
+		return
+	}
+	ob.isRunning = true
+	ob.Unlock()
+
+	go ob.ms.Run(BindObserver)
+	go ob.fs.Run(BindFormulator)
+
 	blockTimer := time.NewTimer(time.Millisecond)
 	queueTimer := time.NewTimer(time.Millisecond)
 	voteTimer := time.NewTimer(time.Millisecond)
-	for {
+	for !ob.isClose {
 		select {
 		case <-blockTimer.C:
 			cp := ob.cs.cn.Provider()
 			ob.Lock()
-			targetHeight := uint64(cp.Height() + 1)
-			item := ob.blockQ.PopUntil(targetHeight)
+			TargetHeight := uint64(cp.Height() + 1)
+			item := ob.blockQ.PopUntil(TargetHeight)
 			for item != nil {
 				b := item.(*types.Block)
 				if err := ob.cs.cn.ConnectBlock(b); err != nil {
 					break
 				}
 				ob.broadcastStatus()
-				targetHeight++
-				item = ob.blockQ.PopUntil(targetHeight)
+				TargetHeight++
+				item = ob.blockQ.PopUntil(TargetHeight)
 			}
 			ob.Unlock()
 			blockTimer.Reset(50 * time.Millisecond)

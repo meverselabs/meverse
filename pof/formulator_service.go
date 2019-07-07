@@ -60,7 +60,7 @@ func (ms *FormulatorService) RemovePeer(addr common.Address) {
 	ms.Unlock()
 
 	if has {
-		p.conn.Close()
+		p.Close()
 	}
 }
 
@@ -207,11 +207,11 @@ func (ms *FormulatorService) handleConnection(p *FormulatorPeer) error {
 			select {
 			case <-pingTimer.C:
 				if err := p.Send(&p2p.PingMessage{}); err != nil {
-					p.conn.Close()
+					p.Close()
 					return
 				}
 				if atomic.AddUint64(&pingCount, 1) > pingCountLimit {
-					p.conn.Close()
+					p.Close()
 					return
 				}
 			}

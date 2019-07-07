@@ -25,6 +25,7 @@ type FormulatorPeer struct {
 	address     common.Address
 	guessHeight uint32
 	writeQueue  *queue.Queue
+	isClose     bool
 }
 
 // NewFormulatorPeer returns a ormulatorPeer
@@ -41,6 +42,9 @@ func NewFormulatorPeer(conn net.Conn, pubhash common.PublicHash, address common.
 		defer p.conn.Close()
 
 		for {
+			if p.isClose {
+				return
+			}
 			v := p.writeQueue.Pop()
 			if v == nil {
 				time.Sleep(50 * time.Millisecond)
@@ -68,6 +72,12 @@ func NewFormulatorPeer(conn net.Conn, pubhash common.PublicHash, address common.
 		}
 	}()
 	return p
+}
+
+// Close closes peer
+func (p *FormulatorPeer) Close() {
+	p.conn.Close()
+	p.isClose = true
 }
 
 // ID returns the id of the peer

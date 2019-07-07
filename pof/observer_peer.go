@@ -22,6 +22,7 @@ type Peer struct {
 	conn       net.Conn
 	pubhash    common.PublicHash
 	writeQueue *queue.Queue
+	isClose    bool
 }
 
 // NewPeer returns a Peer
@@ -37,6 +38,9 @@ func NewPeer(conn net.Conn, pubhash common.PublicHash) *Peer {
 		defer p.conn.Close()
 
 		for {
+			if p.isClose {
+				return
+			}
 			v := p.writeQueue.Pop()
 			if v == nil {
 				time.Sleep(50 * time.Millisecond)
@@ -64,6 +68,12 @@ func NewPeer(conn net.Conn, pubhash common.PublicHash) *Peer {
 		}
 	}()
 	return p
+}
+
+// Close closes peer
+func (p *Peer) Close() {
+	p.conn.Close()
+	p.isClose = true
 }
 
 // ID returns the id of the peer

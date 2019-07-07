@@ -97,10 +97,10 @@ func (ms *ObserverMesh) RemovePeer(p *Peer) {
 	ms.Unlock()
 
 	if hasClient {
-		pc.conn.Close()
+		pc.Close()
 	}
 	if hasServer {
-		ps.conn.Close()
+		ps.Close()
 	}
 }
 
@@ -110,7 +110,7 @@ func (ms *ObserverMesh) RemovePeerInMap(p *Peer, peerMap map[common.PublicHash]*
 	delete(peerMap, p.pubhash)
 	ms.Unlock()
 
-	p.conn.Close()
+	p.Close()
 }
 
 // SendTo sends a message to the observer
