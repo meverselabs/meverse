@@ -6,22 +6,8 @@ import (
 	"github.com/fletaio/fleta/core/types"
 )
 
-// TransactionMessage is a message for a transaction
-type TransactionMessage struct {
-	TxType uint8
-	Tx     types.Transaction
-	Sigs   []common.Signature
-}
-
-// HeaderMessage used to send a chain header to a peer
-type HeaderMessage struct {
-	Header     *types.Header
-	Signatures []common.Signature
-}
-
-// BlockMessage used to send a chain block to a peer
-type BlockMessage struct {
-	Block *types.Block
+// PingMessage is a message for a block generation
+type PingMessage struct {
 }
 
 // RequestMessage used to request a chain data to a peer
@@ -36,6 +22,14 @@ type StatusMessage struct {
 	LastHash hash.Hash256
 }
 
-// PingMessage is a message for a block generation
-type PingMessage struct {
+// BlockMessage used to send a chain block to a peer
+type BlockMessage struct {
+	Block *types.Block
+}
+
+// TransactionMessage is a message for a transaction
+type TransactionMessage struct {
+	TxType uint8
+	Tx     types.Transaction
+	Sigs   []common.Signature
 }

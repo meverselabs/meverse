@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"log"
 	"net"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -21,16 +20,16 @@ import (
 type ObserverMesh struct {
 	sync.Mutex
 	ob            *Observer
-	Key           key.Key
-	NetAddressMap map[common.PublicHash]string
+	key           key.Key
+	netAddressMap map[common.PublicHash]string
 	clientPeerMap map[common.PublicHash]*Peer
 	serverPeerMap map[common.PublicHash]*Peer
 }
 
-func NewObserverMesh(Key key.Key, NetAddressMap map[common.PublicHash]string, ob *Observer) *ObserverMesh {
+func NewObserverMesh(key key.Key, NetAddressMap map[common.PublicHash]string, ob *Observer) *ObserverMesh {
 	ms := &ObserverMesh{
-		Key:           Key,
-		NetAddressMap: NetAddressMap,
+		key:           key,
+		netAddressMap: NetAddressMap,
 		clientPeerMap: map[common.PublicHash]*Peer{},
 		serverPeerMap: map[common.PublicHash]*Peer{},
 		ob:            ob,
@@ -38,9 +37,10 @@ func NewObserverMesh(Key key.Key, NetAddressMap map[common.PublicHash]string, ob
 	return ms
 }
 
+// Run starts the observer mesh
 func (ms *ObserverMesh) Run(BindAddress string) {
-	myPublicHash := common.NewPublicHash(ms.Key.PublicKey())
-	for PubHash, v := range ms.NetAddressMap {
+	myPublicHash := common.NewPublicHash(ms.key.PublicKey())
+	for PubHash, v := range ms.netAddressMap {
 		if PubHash != myPublicHash {
 			go func(pubhash common.PublicHash, NetAddr string) {
 				time.Sleep(1 * time.Second)
@@ -62,6 +62,25 @@ func (ms *ObserverMesh) Run(BindAddress string) {
 	if err := ms.server(BindAddress); err != nil {
 		panic(err)
 	}
+}
+
+// Peers returns peers of the observer mesh
+func (ms *ObserverMesh) Peers() []*Peer {
+	peerMap := map[common.PublicHash]*Peer{}
+	ms.Lock()
+	for _, p := range ms.clientPeerMap {
+		peerMap[p.pubhash] = p
+	}
+	for _, p := range ms.serverPeerMap {
+		peerMap[p.pubhash] = p
+	}
+	ms.Unlock()
+
+	peers := []*Peer{}
+	for _, p := range peerMap {
+		peers = append(peers, p)
+	}
+	return peers
 }
 
 // RemovePeer removes peers from the mesh
@@ -116,7 +135,7 @@ func (ms *ObserverMesh) SendTo(PublicHash common.PublicHash, m interface{}) erro
 }
 
 // BroadcastRaw sends a message to all peers
-func (ms *ObserverMesh) BroadcastRaw(bs []byte) error {
+func (ms *ObserverMesh) BroadcastRaw(bs []byte) {
 	peerMap := map[common.PublicHash]*Peer{}
 	ms.Lock()
 	for _, p := range ms.clientPeerMap {
@@ -128,12 +147,8 @@ func (ms *ObserverMesh) BroadcastRaw(bs []byte) error {
 	ms.Unlock()
 
 	for _, p := range peerMap {
-		if err := p.SendRaw(bs); err != nil {
-			log.Println(err)
-			ms.RemovePeer(p)
-		}
+		p.SendRaw(bs)
 	}
-	return nil
 }
 
 // BroadcastMessage sends a message to all peers
@@ -164,12 +179,8 @@ func (ms *ObserverMesh) BroadcastMessage(m interface{}) error {
 	ms.Unlock()
 
 	for _, p := range peerMap {
-		if err := p.SendRaw(data); err != nil {
-			log.Println(err)
-			ms.RemovePeer(p)
-		}
+		p.SendRaw(data)
 	}
-	runtime.Gosched()
 	return nil
 }
 
@@ -192,7 +203,7 @@ func (ms *ObserverMesh) client(Address string, TargetPubHash common.PublicHash) 
 	if pubhash != TargetPubHash {
 		return common.ErrInvalidPublicHash
 	}
-	if _, has := ms.NetAddressMap[pubhash]; !has {
+	if _, has := ms.netAddressMap[pubhash]; !has {
 		return ErrInvalidObserverKey
 	}
 
@@ -217,7 +228,7 @@ func (ms *ObserverMesh) server(BindAddress string) error {
 	if err != nil {
 		return err
 	}
-	log.Println(common.NewPublicHash(ms.Key.PublicKey()), "Start to Listen", BindAddress)
+	log.Println(common.NewPublicHash(ms.key.PublicKey()), "Start to Listen", BindAddress)
 	for {
 		conn, err := lstn.Accept()
 		if err != nil {
@@ -231,7 +242,7 @@ func (ms *ObserverMesh) server(BindAddress string) error {
 				log.Println("[sendHandshake]", err)
 				return
 			}
-			if _, has := ms.NetAddressMap[pubhash]; !has {
+			if _, has := ms.netAddressMap[pubhash]; !has {
 				log.Println("ErrInvalidPublicHash")
 				return
 			}
@@ -258,7 +269,7 @@ func (ms *ObserverMesh) server(BindAddress string) error {
 }
 
 func (ms *ObserverMesh) handleConnection(p *Peer) error {
-	log.Println(common.NewPublicHash(ms.Key.PublicKey()).String(), "Connected", p.pubhash.String())
+	log.Println(common.NewPublicHash(ms.key.PublicKey()).String(), "Connected", p.pubhash.String())
 
 	var pingCount uint64
 	pingCountLimit := uint64(3)
@@ -289,7 +300,7 @@ func (ms *ObserverMesh) handleConnection(p *Peer) error {
 			continue
 		}
 
-		if err := ms.ob.onRecv(p, m, bs); err != nil {
+		if err := ms.ob.onObserverRecv(p, m, bs); err != nil {
 			return err
 		}
 	}
@@ -311,7 +322,7 @@ func (ms *ObserverMesh) recvHandshake(conn net.Conn) error {
 	}
 	//log.Println("sendHandshakeAck")
 	h := hash.Hash(req)
-	if sig, err := ms.Key.Sign(h); err != nil {
+	if sig, err := ms.key.Sign(h); err != nil {
 		return err
 	} else if _, err := conn.Write(sig[:]); err != nil {
 		return err

@@ -18,4 +18,6 @@ var (
 	ErrInvalidRoundState             = errors.New("invalid round state")
 	ErrAlreadyVoted                  = errors.New("already voted")
 	ErrNotExistObserverPeer          = errors.New("not exist observer peer")
+	ErrNotExistFormulatorPeer        = errors.New("not exist formulator peer")
+	ErrUnknownMessage                = errors.New("unknown message")
 )

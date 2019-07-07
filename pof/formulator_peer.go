@@ -6,31 +6,35 @@ import (
 	"encoding/binary"
 	"io/ioutil"
 	"net"
+	"sync"
 	"time"
 
-	"github.com/fletaio/fleta/common/queue"
-
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/queue"
 	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/service/p2p"
 )
 
-// Peer is a observer peer
-type Peer struct {
-	id         string
-	netAddr    string
-	conn       net.Conn
-	pubhash    common.PublicHash
-	writeQueue *queue.Queue
+// FormulatorPeer is a formulator peer
+type FormulatorPeer struct {
+	sync.Mutex
+	id          string
+	netAddr     string
+	conn        net.Conn
+	pubhash     common.PublicHash
+	address     common.Address
+	guessHeight uint32
+	writeQueue  *queue.Queue
 }
 
-// NewPeer returns a Peer
-func NewPeer(conn net.Conn, pubhash common.PublicHash) *Peer {
-	p := &Peer{
-		id:         pubhash.String(),
+// NewFormulatorPeer returns a ormulatorPeer
+func NewFormulatorPeer(conn net.Conn, pubhash common.PublicHash, address common.Address) *FormulatorPeer {
+	p := &FormulatorPeer{
+		id:         address.String(),
 		netAddr:    conn.RemoteAddr().String(),
 		conn:       conn,
 		pubhash:    pubhash,
+		address:    address,
 		writeQueue: queue.NewQueue(),
 	}
 	go func() {
@@ -67,17 +71,22 @@ func NewPeer(conn net.Conn, pubhash common.PublicHash) *Peer {
 }
 
 // ID returns the id of the peer
-func (p *Peer) ID() string {
+func (p *FormulatorPeer) ID() string {
 	return p.id
 }
 
 // NetAddr returns the network address of the peer
-func (p *Peer) NetAddr() string {
+func (p *FormulatorPeer) NetAddr() string {
 	return p.netAddr
 }
 
+// Address returns the formulator address of the peer
+func (p *FormulatorPeer) Address() common.Address {
+	return p.address
+}
+
 // ReadMessageData returns a message data
-func (p *Peer) ReadMessageData() (interface{}, []byte, error) {
+func (p *FormulatorPeer) ReadMessageData() (interface{}, []byte, error) {
 	var t uint16
 	if v, _, err := p2p.ReadUint16(p.conn); err != nil {
 		return nil, nil, err
@@ -117,7 +126,7 @@ func (p *Peer) ReadMessageData() (interface{}, []byte, error) {
 }
 
 // Send sends a message to the peer
-func (p *Peer) Send(m interface{}) error {
+func (p *FormulatorPeer) Send(m interface{}) error {
 	var buffer bytes.Buffer
 	enc := encoding.NewEncoder(&buffer)
 	fc := encoding.Factory("pof.message")
@@ -136,6 +145,19 @@ func (p *Peer) Send(m interface{}) error {
 }
 
 // SendRaw sends bytes to the peer
-func (p *Peer) SendRaw(bs []byte) {
+func (p *FormulatorPeer) SendRaw(bs []byte) {
 	p.writeQueue.Push(bs)
+}
+
+// UpdateGuessHeight updates the guess height of the peer
+func (p *FormulatorPeer) UpdateGuessHeight(height uint32) {
+	p.Lock()
+	defer p.Unlock()
+
+	p.guessHeight = height
+}
+
+// GuessHeight updates the guess height of the peer
+func (p *FormulatorPeer) GuessHeight() uint32 {
+	return p.guessHeight
 }

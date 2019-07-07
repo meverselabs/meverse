@@ -19,8 +19,10 @@ import (
 )
 
 func main() {
-	ob := pof.NewObserver(nil)
-	ob.Test()
+	ob := &pof.Observer{}
+	log.Println(ob)
+	return
+
 	if err := test(); err != nil {
 		panic(err)
 	}

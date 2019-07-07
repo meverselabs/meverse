@@ -2,24 +2,13 @@ package types
 
 import (
 	"bytes"
-	"reflect"
 	"strconv"
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/encoding"
-	sortedmap "github.com/umpc/go-sortedmap"
 )
-
-func init() {
-
-	encoding.Register(sortedmap.SortedMap{}, func(enc *encoding.Encoder, rv reflect.Value) error {
-		panic("prevent encode sortedmap")
-	}, func(dec *encoding.Decoder, rv reflect.Value) error {
-		panic("prevent encode sortedmap")
-	})
-}
 
 // ContextData is a state data of the context
 type ContextData struct {
