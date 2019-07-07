@@ -6,6 +6,7 @@ import "github.com/fletaio/fleta/core/types"
 type Committer interface {
 	ExecuteBlockOnContext(b *types.Block, ctx *types.Context) error
 	ConnectBlockWithContext(b *types.Block, ctx *types.Context) error
+	NewContext() *types.Context
 }
 
 type chainCommiter struct {
@@ -38,4 +39,11 @@ func (ct *chainCommiter) ConnectBlockWithContext(b *types.Block, ctx *types.Cont
 	defer ct.cn.Unlock()
 
 	return ct.cn.connectBlockWithContext(b, ctx)
+}
+
+func (ct *chainCommiter) NewContext() *types.Context {
+	ct.cn.Lock()
+	defer ct.cn.Unlock()
+
+	return types.NewContext(ct.cn.store)
 }

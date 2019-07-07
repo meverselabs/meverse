@@ -17,29 +17,32 @@ const (
 // VoteRound is data for the voting round
 type VoteRound struct {
 	RoundState                 int
-	VoteTargetHeight           uint32
-	VoteFailCount              int
+	TargetHeight               uint32
 	RemainBlocks               uint32
 	RoundVoteMessageMap        map[common.PublicHash]*RoundVoteMessage
 	MinVotePublicHash          common.PublicHash
 	RoundVoteAckMessageMap     map[common.PublicHash]*RoundVoteAckMessage
 	MinRoundVoteAck            *RoundVoteAck
-	BlockRound                 *BlockRound
+	BlockRoundMap              map[uint32]*BlockRound
 	RoundVoteWaitMap           map[common.PublicHash]*RoundVoteMessage
 	RoundVoteAckMessageWaitMap map[common.PublicHash]*RoundVoteAckMessage
+	VoteFailCount              int
 }
 
 // NewVoteRound returns a VoteRound
-func NewVoteRound(TargetHeight uint32, MaxBlocksPerFormulator uint32) *VoteRound {
+func NewVoteRound(TargetHeight uint32, RemainBlocks uint32) *VoteRound {
 	vr := &VoteRound{
 		RoundState:                 RoundVoteState,
-		VoteTargetHeight:           TargetHeight,
-		RemainBlocks:               MaxBlocksPerFormulator,
+		TargetHeight:               TargetHeight,
+		RemainBlocks:               RemainBlocks,
 		RoundVoteMessageMap:        map[common.PublicHash]*RoundVoteMessage{},
 		RoundVoteAckMessageMap:     map[common.PublicHash]*RoundVoteAckMessage{},
 		RoundVoteWaitMap:           map[common.PublicHash]*RoundVoteMessage{},
 		RoundVoteAckMessageWaitMap: map[common.PublicHash]*RoundVoteAckMessage{},
-		BlockRound:                 NewBlockRound(TargetHeight),
+		BlockRoundMap:              map[uint32]*BlockRound{},
+	}
+	for i := TargetHeight; i < TargetHeight+RemainBlocks; i++ {
+		vr.BlockRoundMap[i] = NewBlockRound(i)
 	}
 	return vr
 }

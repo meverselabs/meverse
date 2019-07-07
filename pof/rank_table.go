@@ -68,45 +68,45 @@ func NewRankTable() *RankTable {
 }
 
 // Candidates returns a candidates
-func (cs *RankTable) Candidates() []*Rank {
-	cs.Lock()
-	defer cs.Unlock()
+func (rt *RankTable) Candidates() []*Rank {
+	rt.Lock()
+	defer rt.Unlock()
 
 	list := []*Rank{}
-	for _, c := range cs.candidates {
+	for _, c := range rt.candidates {
 		list = append(list, c.Clone())
 	}
 	return list
 }
 
 // CandidateCount returns a count of the rank table
-func (cs *RankTable) CandidateCount() int {
-	cs.Lock()
-	defer cs.Unlock()
+func (rt *RankTable) CandidateCount() int {
+	rt.Lock()
+	defer rt.Unlock()
 
-	return len(cs.candidates)
+	return len(rt.candidates)
 }
 
 // TopRank returns the top rank by Timeoutcount
-func (cs *RankTable) TopRank(TimeoutCount int) (*Rank, error) {
-	cs.Lock()
-	defer cs.Unlock()
+func (rt *RankTable) TopRank(TimeoutCount int) (*Rank, error) {
+	rt.Lock()
+	defer rt.Unlock()
 
-	if TimeoutCount >= len(cs.candidates) {
+	if TimeoutCount >= len(rt.candidates) {
 		return nil, ErrInsufficientCandidateCount
 	}
-	return cs.candidates[TimeoutCount].Clone(), nil
+	return rt.candidates[TimeoutCount].Clone(), nil
 }
 
 // TopRankInMap returns the top rank by the given timeout count in the given map
-func (cs *RankTable) TopRankInMap(FormulatorMap map[common.Address]bool) (*Rank, int, error) {
-	cs.Lock()
-	defer cs.Unlock()
+func (rt *RankTable) TopRankInMap(FormulatorMap map[common.Address]bool) (*Rank, int, error) {
+	rt.Lock()
+	defer rt.Unlock()
 
 	if len(FormulatorMap) == 0 {
 		return nil, 0, ErrInsufficientCandidateCount
 	}
-	for i, r := range cs.candidates {
+	for i, r := range rt.candidates {
 		if FormulatorMap[r.Address] {
 			return r, i, nil
 		}
@@ -115,9 +115,9 @@ func (cs *RankTable) TopRankInMap(FormulatorMap map[common.Address]bool) (*Rank,
 }
 
 // RanksInMap returns the ranks in the map
-func (cs *RankTable) RanksInMap(FormulatorMap map[common.Address]bool, Limit int) ([]*Rank, error) {
-	cs.Lock()
-	defer cs.Unlock()
+func (rt *RankTable) RanksInMap(FormulatorMap map[common.Address]bool, Limit int) ([]*Rank, error) {
+	rt.Lock()
+	defer rt.Unlock()
 
 	if len(FormulatorMap) == 0 {
 		return nil, ErrInsufficientCandidateCount
@@ -126,7 +126,7 @@ func (cs *RankTable) RanksInMap(FormulatorMap map[common.Address]bool, Limit int
 		Limit = 1
 	}
 	list := make([]*Rank, 0, Limit)
-	for _, r := range cs.candidates {
+	for _, r := range rt.candidates {
 		if FormulatorMap[r.Address] {
 			list = append(list, r)
 			if len(list) >= Limit {
@@ -138,11 +138,11 @@ func (cs *RankTable) RanksInMap(FormulatorMap map[common.Address]bool, Limit int
 }
 
 // IsFormulator returns the given information is correct or not
-func (cs *RankTable) IsFormulator(Formulator common.Address, Publichash common.PublicHash) bool {
-	cs.Lock()
-	defer cs.Unlock()
+func (rt *RankTable) IsFormulator(Formulator common.Address, Publichash common.PublicHash) bool {
+	rt.Lock()
+	defer rt.Unlock()
 
-	rank := cs.rankMap[Formulator]
+	rank := rt.rankMap[Formulator]
 	if rank == nil {
 		return false
 	}
@@ -152,32 +152,32 @@ func (cs *RankTable) IsFormulator(Formulator common.Address, Publichash common.P
 	return true
 }
 
-func (cs *RankTable) largestPhase() uint32 {
-	if len(cs.candidates) == 0 {
+func (rt *RankTable) largestPhase() uint32 {
+	if len(rt.candidates) == 0 {
 		return 0
 	}
-	return cs.candidates[len(cs.candidates)-1].phase
+	return rt.candidates[len(rt.candidates)-1].phase
 }
 
-func (cs *RankTable) addRank(s *Rank) error {
-	if len(cs.candidates) > 0 {
-		if s.Phase() < cs.candidates[0].Phase() {
+func (rt *RankTable) addRank(s *Rank) error {
+	if len(rt.candidates) > 0 {
+		if s.Phase() < rt.candidates[0].Phase() {
 			return ErrInvalidPhase
 		}
 	}
-	if cs.rankMap[s.Address] != nil {
+	if rt.rankMap[s.Address] != nil {
 		return ErrExistAddress
 	}
-	cs.candidates = InsertRankToList(cs.candidates, s)
-	cs.rankMap[s.Address] = s
+	rt.candidates = InsertRankToList(rt.candidates, s)
+	rt.rankMap[s.Address] = s
 	return nil
 }
 
-func (cs *RankTable) removeRank(addr common.Address) {
-	if _, has := cs.rankMap[addr]; has {
-		delete(cs.rankMap, addr)
-		candidates := make([]*Rank, 0, len(cs.candidates))
-		for _, s := range cs.candidates {
+func (rt *RankTable) removeRank(addr common.Address) {
+	if _, has := rt.rankMap[addr]; has {
+		delete(rt.rankMap, addr)
+		candidates := make([]*Rank, 0, len(rt.candidates))
+		for _, s := range rt.candidates {
 			if s.Address != addr {
 				candidates = append(candidates, s)
 			}
@@ -185,35 +185,35 @@ func (cs *RankTable) removeRank(addr common.Address) {
 	}
 }
 
-func (cs *RankTable) forwardCandidates(TimeoutCount int) error {
-	if TimeoutCount >= len(cs.candidates) {
+func (rt *RankTable) forwardCandidates(TimeoutCount int) error {
+	if TimeoutCount >= len(rt.candidates) {
 		return ErrExceedCandidateCount
 	}
 
 	// increase phase
 	for i := 0; i < TimeoutCount; i++ {
-		m := cs.candidates[0]
+		m := rt.candidates[0]
 		m.SetPhase(m.Phase() + 2)
-		idx := sort.Search(len(cs.candidates)-1, func(i int) bool {
-			return m.Less(cs.candidates[i+1])
+		idx := sort.Search(len(rt.candidates)-1, func(i int) bool {
+			return m.Less(rt.candidates[i+1])
 		})
-		copy(cs.candidates, cs.candidates[1:idx+1])
-		cs.candidates[idx] = m
+		copy(rt.candidates, rt.candidates[1:idx+1])
+		rt.candidates[idx] = m
 	}
 	return nil
 }
 
-func (cs *RankTable) forwardTop(LastTableAppendHash hash.Hash256) {
+func (rt *RankTable) forwardTop(LastTableAppendHash hash.Hash256) {
 	// update top phase and hashSpace
-	top := cs.candidates[0]
+	top := rt.candidates[0]
 	top.Set(top.Phase()+1, LastTableAppendHash)
-	idx := sort.Search(len(cs.candidates)-1, func(i int) bool {
-		return top.Less(cs.candidates[i+1])
+	idx := sort.Search(len(rt.candidates)-1, func(i int) bool {
+		return top.Less(rt.candidates[i+1])
 	})
-	copy(cs.candidates, cs.candidates[1:idx+1])
-	cs.candidates[idx] = top
+	copy(rt.candidates, rt.candidates[1:idx+1])
+	rt.candidates[idx] = top
 
-	cs.height++
+	rt.height++
 }
 
 // InsertRankToList inserts the rank by the score to the rank list

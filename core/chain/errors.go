@@ -26,4 +26,5 @@ var (
 	ErrReservedID             = errors.New("reserved id")
 	ErrAddBeforeChainInit     = errors.New("add before chain init")
 	ErrApplicationIDMustBe255 = errors.New("application id must be 255")
+	ErrFoundForkedBlock       = errors.New("found forked block")
 )

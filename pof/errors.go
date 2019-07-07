@@ -13,4 +13,8 @@ var (
 	ErrInvalidSignatureCount         = errors.New("invalid signature count")
 	ErrInvalidPhase                  = errors.New("invalid phase")
 	ErrExistAddress                  = errors.New("exist address")
+	ErrFoundForkedBlockGen           = errors.New("found forked block gen")
+	ErrInvalidVote                   = errors.New("invalid vote")
+	ErrInvalidRoundState             = errors.New("invalid round state")
+	ErrAlreadyVoted                  = errors.New("already voted")
 )

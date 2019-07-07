@@ -9,11 +9,11 @@ import (
 // RoundVote is a message for a round vote
 type RoundVote struct {
 	LastHash             hash.Hash256
-	VoteTargetHeight     uint32
+	TargetHeight         uint32
+	RemainBlocks         uint32
 	TimeoutCount         uint32
 	Formulator           common.Address
 	FormulatorPublicHash common.PublicHash
-	RemainBlocks         uint32
 	Timestamp            uint64
 	IsReply              bool
 }
@@ -26,11 +26,12 @@ type RoundVoteMessage struct {
 
 // RoundVoteAck is a message for a round vote ack
 type RoundVoteAck struct {
-	VoteTargetHeight     uint32
+	LastHash             hash.Hash256
+	TargetHeight         uint32
+	RemainBlocks         uint32
 	TimeoutCount         uint32
 	Formulator           common.Address
 	FormulatorPublicHash common.PublicHash
-	RemainBlocks         uint32
 	PublicHash           common.PublicHash
 	Timestamp            uint64
 	IsReply              bool
@@ -40,6 +41,23 @@ type RoundVoteAck struct {
 type RoundVoteAckMessage struct {
 	RoundVoteAck *RoundVoteAck
 	Signautre    common.Signature
+}
+
+// BlockReqMessage is a message for a block request
+type BlockReqMessage struct {
+	PrevHash             hash.Hash256
+	TargetHeight         uint32
+	RemainBlocks         uint32
+	TimeoutCount         uint32
+	Formulator           common.Address
+	FormulatorPublicHash common.PublicHash
+}
+
+// BlockGenMessage is a message for a block generation
+type BlockGenMessage struct {
+	Block              *types.Block
+	GeneratorSignature common.Signature
+	IsReply            bool
 }
 
 // BlockVote is message for a block vote
@@ -55,34 +73,6 @@ type BlockVote struct {
 type BlockVoteMessage struct {
 	BlockVote *BlockVote
 	Signautre common.Signature
-}
-
-// RoundSetup is a message for a round setup
-type RoundSetup struct {
-	RoundVoteAcks []*RoundVoteAck
-	IsReply       bool
-}
-
-// RoundSetupMessage is a message for a round setup
-type RoundSetupMessage struct {
-	RoundSetup *RoundSetup
-	Signautre  common.Signature
-}
-
-// BlockReqMessage is a message for a block request
-type BlockReqMessage struct {
-	PrevHash             hash.Hash256
-	TargetHeight         uint32
-	TimeoutCount         uint32
-	Formulator           common.Address
-	FormulatorPublicHash common.PublicHash
-}
-
-// BlockGenMessage is a message for a block generation
-type BlockGenMessage struct {
-	Block              *types.Block
-	GeneratorSignature common.Signature
-	IsReply            bool
 }
 
 // BlockObSignMessage is a message for a block observer signatures
