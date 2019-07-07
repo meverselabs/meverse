@@ -13,6 +13,7 @@ import (
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/key"
+	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/service/p2p"
 )
@@ -83,15 +84,13 @@ func (ms *FormulatorService) SendTo(Formulator common.Address, m interface{}) er
 // BroadcastMessage sends a message to all peers
 func (ms *FormulatorService) BroadcastMessage(m interface{}) error {
 	var buffer bytes.Buffer
-	enc := encoding.NewEncoder(&buffer)
 	fc := encoding.Factory("pof.message")
 	t, err := fc.TypeOf(m)
 	if err != nil {
 		return err
 	}
-	if err := enc.EncodeUint16(t); err != nil {
-		return err
-	}
+	buffer.Write(util.Uint16ToBytes(t))
+	enc := encoding.NewEncoder(&buffer)
 	if err := enc.Encode(m); err != nil {
 		return err
 	}
@@ -223,8 +222,7 @@ func (ms *FormulatorService) handleConnection(p *FormulatorPeer) error {
 			return err
 		}
 		atomic.SwapUint64(&pingCount, 0)
-		if m == nil {
-			// Because a Message is zero size, so do not need to consume the body
+		if _, is := m.(*p2p.PingMessage); is {
 			continue
 		}
 

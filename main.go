@@ -1,38 +1,27 @@
 package main // import "github.com/fletaio/fleta"
 
 import (
-	"bytes"
 	"encoding/hex"
-	"log"
+	"strconv"
 	"sync"
-	"time"
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/core/types"
-	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/pof"
 	"github.com/fletaio/fleta/process/formulator"
 	"github.com/fletaio/fleta/process/vault"
 )
 
 func main() {
-	ob := &pof.Observer{}
-	log.Println(ob)
-	return
-
 	if err := test(); err != nil {
 		panic(err)
 	}
 }
 
 func test() error {
-	st, err := chain.NewStore("./_data", "FLEAT Mainnet", 0x0001, true)
-	if err != nil {
-		return err
-	}
 
 	obstrs := []string{
 		"cd7cca6359869f4f58bb31aa11c2c4825d4621406f7b514058bc4dbe788c29be",
@@ -43,7 +32,8 @@ func test() error {
 	}
 	obkeys := make([]key.Key, 0, len(obstrs))
 	ObserverKeys := make([]common.PublicHash, 0, len(obstrs))
-	for _, v := range obstrs {
+	NetAddressMap := map[common.PublicHash]string{}
+	for i, v := range obstrs {
 		if bs, err := hex.DecodeString(v); err != nil {
 			panic(err)
 		} else if Key, err := key.NewMemoryKeyFromBytes(bs); err != nil {
@@ -52,6 +42,7 @@ func test() error {
 			obkeys = append(obkeys, Key)
 			pubhash := common.NewPublicHash(Key.PublicKey())
 			ObserverKeys = append(ObserverKeys, pubhash)
+			NetAddressMap[pubhash] = "localhost:390" + strconv.Itoa(i+1)
 		}
 	}
 
@@ -71,98 +62,121 @@ func test() error {
 	}
 
 	MaxBlocksPerFormulator := uint32(10)
-	cs := pof.NewConsensus(MaxBlocksPerFormulator, ObserverKeys)
-	app := &DApp{
-		frkey:        frkeys[0],
-		adminAddress: common.NewAddress(0, 1, 0),
-	}
-	cn := chain.NewChain(cs, app, st)
-	cn.MustAddProcess(vault.NewVault(1))
-	cn.MustAddProcess(formulator.NewFormulator(2, app.adminAddress))
-	if err := cn.Init(); err != nil {
-		return err
-	}
 
-	TimeoutCount := uint32(0)
-	Formulator := common.NewAddress(0, 2, 0)
-	var buffer bytes.Buffer
-	enc := encoding.NewEncoder(&buffer)
-	if err := enc.EncodeUint32(TimeoutCount); err != nil {
-		return err
-	}
-	bc := chain.NewBlockCreator(cn, Formulator, buffer.Bytes())
-	if err := bc.Init(); err != nil {
-		return err
-	}
-	txs := []types.Transaction{}
-	sigs := [][]common.Signature{}
-	Seq := cn.Seq(common.NewAddress(0, 1, 0))
-	for i := 0; i < 1; i++ {
-		Seq++
-		tx := &vault.Transfer{
-			Timestamp_: 0,
-			Seq_:       Seq,
-			From:       common.NewAddress(0, 1, 0),
-			To:         common.NewAddress(0, 2, 0),
-			Amount:     amount.NewCoinAmount(1, 0),
-		}
-		sig, _ := frkeys[0].Sign(chain.HashTransaction(tx))
-		sigs = append(sigs, []common.Signature{sig})
-		txs = append(txs, tx)
-	}
-
-	if true {
-		begin := time.Now().UnixNano()
-		for i := 0; i < len(txs); i++ {
-			if err := bc.AddTx(txs[i], sigs[i]); err != nil {
-				return err
-			}
-		}
-		end := time.Now().UnixNano()
-		log.Println((end - begin) / int64(time.Millisecond))
-	}
-	b, err := bc.Finalize()
-	if err != nil {
-		return err
-	}
-
-	bh := encoding.Hash(b.Header)
-	sig0, _ := frkeys[0].Sign(bh)
-	Signatures := []common.Signature{
-		sig0,
-	}
-	b.Signatures = Signatures
-
-	// TODO
-
-	// Header
-	// Context
-	// Signature[0]
-
-	bs := &types.BlockSign{
-		HeaderHash:         bh,
-		GeneratorSignature: sig0,
-	}
-	bsh := encoding.Hash(bs)
-	sig1, _ := obkeys[0].Sign(bsh)
-	sig2, _ := obkeys[1].Sign(bsh)
-	sig3, _ := obkeys[2].Sign(bsh)
-
-	b.Signatures = append(b.Signatures, sig1)
-	b.Signatures = append(b.Signatures, sig2)
-	b.Signatures = append(b.Signatures, sig3)
-
-	if err := cn.ConnectBlock(b); err != nil {
-		return err
-	}
-
-	if true {
-		b, err := cn.Provider().Block(cn.Provider().Height())
+	obs := []*pof.Observer{}
+	for i, obkey := range obkeys {
+		st, err := chain.NewStore("./_data"+strconv.Itoa(i+1), "FLEAT Mainnet", 0x0001, true)
 		if err != nil {
 			return err
 		}
-		log.Println(cn.Provider().Height(), len(b.Transactions), encoding.Hash(b.Header))
+		cs := pof.NewConsensus(MaxBlocksPerFormulator, ObserverKeys)
+		app := &DApp{
+			frkey:        frkeys[0],
+			adminAddress: common.NewAddress(0, 1, 0),
+		}
+		cn := chain.NewChain(cs, app, st)
+		cn.MustAddProcess(vault.NewVault(1))
+		cn.MustAddProcess(formulator.NewFormulator(2, app.adminAddress))
+		if err := cn.Init(); err != nil {
+			return err
+		}
+		ob := pof.NewObserver(obkey, NetAddressMap, cs, ObserverKeys[i])
+		if err := ob.Init(); err != nil {
+			return err
+		}
+		obs = append(obs, ob)
 	}
+
+	for i, ob := range obs {
+		go ob.Run(
+			"localhost:390"+strconv.Itoa(i+1),
+			"localhost:490"+strconv.Itoa(i+1),
+		)
+	}
+	select {}
+
+	/*
+		TimeoutCount := uint32(0)
+		Formulator := common.NewAddress(0, 2, 0)
+		var buffer bytes.Buffer
+		enc := encoding.NewEncoder(&buffer)
+		if err := enc.EncodeUint32(TimeoutCount); err != nil {
+			return err
+		}
+		bc := chain.NewBlockCreator(cn, Formulator, buffer.Bytes())
+		if err := bc.Init(); err != nil {
+			return err
+		}
+		txs := []types.Transaction{}
+		sigs := [][]common.Signature{}
+		Seq := cn.Seq(common.NewAddress(0, 1, 0))
+		for i := 0; i < 1; i++ {
+			Seq++
+			tx := &vault.Transfer{
+				Timestamp_: 0,
+				Seq_:       Seq,
+				From:       common.NewAddress(0, 1, 0),
+				To:         common.NewAddress(0, 2, 0),
+				Amount:     amount.NewCoinAmount(1, 0),
+			}
+			sig, _ := frkeys[0].Sign(chain.HashTransaction(tx))
+			sigs = append(sigs, []common.Signature{sig})
+			txs = append(txs, tx)
+		}
+
+		if true {
+			begin := time.Now().UnixNano()
+			for i := 0; i < len(txs); i++ {
+				if err := bc.AddTx(txs[i], sigs[i]); err != nil {
+					return err
+				}
+			}
+			end := time.Now().UnixNano()
+			log.Println((end - begin) / int64(time.Millisecond))
+		}
+		b, err := bc.Finalize()
+		if err != nil {
+			return err
+		}
+
+		bh := encoding.Hash(b.Header)
+		sig0, _ := frkeys[0].Sign(bh)
+		Signatures := []common.Signature{
+			sig0,
+		}
+		b.Signatures = Signatures
+
+		// TODO
+
+		// Header
+		// Context
+		// Signature[0]
+
+		bs := &types.BlockSign{
+			HeaderHash:         bh,
+			GeneratorSignature: sig0,
+		}
+		bsh := encoding.Hash(bs)
+		sig1, _ := obkeys[0].Sign(bsh)
+		sig2, _ := obkeys[1].Sign(bsh)
+		sig3, _ := obkeys[2].Sign(bsh)
+
+		b.Signatures = append(b.Signatures, sig1)
+		b.Signatures = append(b.Signatures, sig2)
+		b.Signatures = append(b.Signatures, sig3)
+
+		if err := cn.ConnectBlock(b); err != nil {
+			return err
+		}
+
+		if true {
+			b, err := cn.Provider().Block(cn.Provider().Height())
+			if err != nil {
+				return err
+			}
+			log.Println(cn.Provider().Height(), len(b.Transactions), encoding.Hash(b.Header))
+		}
+	*/
 	return nil
 }
 

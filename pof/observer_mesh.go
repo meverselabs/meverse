@@ -13,6 +13,7 @@ import (
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/key"
+	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/service/p2p"
 )
@@ -154,15 +155,13 @@ func (ms *ObserverMesh) BroadcastRaw(bs []byte) {
 // BroadcastMessage sends a message to all peers
 func (ms *ObserverMesh) BroadcastMessage(m interface{}) error {
 	var buffer bytes.Buffer
-	enc := encoding.NewEncoder(&buffer)
 	fc := encoding.Factory("pof.message")
 	t, err := fc.TypeOf(m)
 	if err != nil {
 		return err
 	}
-	if err := enc.EncodeUint16(t); err != nil {
-		return err
-	}
+	buffer.Write(util.Uint16ToBytes(t))
+	enc := encoding.NewEncoder(&buffer)
 	if err := enc.Encode(m); err != nil {
 		return err
 	}
@@ -295,8 +294,7 @@ func (ms *ObserverMesh) handleConnection(p *Peer) error {
 			return err
 		}
 		atomic.SwapUint64(&pingCount, 0)
-		if m == nil {
-			// Because a Message is zero size, so do not need to consume the body
+		if _, is := m.(*p2p.PingMessage); is {
 			continue
 		}
 
@@ -347,9 +345,7 @@ func (ms *ObserverMesh) sendHandshake(conn net.Conn) (common.PublicHash, error) 
 		return common.PublicHash{}, err
 	}
 	var sig common.Signature
-	if err := encoding.Unmarshal(bs, &sig); err != nil {
-		return common.PublicHash{}, err
-	}
+	copy(sig[:], bs)
 	pubkey, err := common.RecoverPubkey(h, sig)
 	if err != nil {
 		return common.PublicHash{}, err

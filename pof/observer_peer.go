@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fletaio/fleta/common/queue"
+	"github.com/fletaio/fleta/common/util"
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/encoding"
@@ -129,15 +130,13 @@ func (p *Peer) ReadMessageData() (interface{}, []byte, error) {
 // Send sends a message to the peer
 func (p *Peer) Send(m interface{}) error {
 	var buffer bytes.Buffer
-	enc := encoding.NewEncoder(&buffer)
 	fc := encoding.Factory("pof.message")
 	t, err := fc.TypeOf(m)
 	if err != nil {
 		return err
 	}
-	if err := enc.EncodeUint16(t); err != nil {
-		return err
-	}
+	buffer.Write(util.Uint16ToBytes(t))
+	enc := encoding.NewEncoder(&buffer)
 	if err := enc.Encode(m); err != nil {
 		return err
 	}

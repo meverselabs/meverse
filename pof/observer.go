@@ -39,6 +39,8 @@ type Observer struct {
 	closeLock        sync.RWMutex
 	runEnd           chan struct{}
 	isClose          bool
+
+	prevRoundEndTime int64 // FOR DEBUG
 }
 
 func NewObserver(key key.Key, NetAddressMap map[common.PublicHash]string, cs *Consensus, MyPublicHash common.PublicHash) *Observer {
@@ -58,7 +60,7 @@ func NewObserver(key key.Key, NetAddressMap map[common.PublicHash]string, cs *Co
 }
 
 // Init initializes observer
-func (ob *Observer) Init() {
+func (ob *Observer) Init() error {
 	fc := encoding.Factory("pof.message")
 	fc.Register(types.DefineHashedType("pof.RoundVoteMessage"), &RoundVoteMessage{})
 	fc.Register(types.DefineHashedType("pof.RoundVoteAckMessage"), &RoundVoteAckMessage{})
@@ -67,6 +69,8 @@ func (ob *Observer) Init() {
 	fc.Register(types.DefineHashedType("pof.BlockVoteMessage"), &BlockVoteMessage{})
 	fc.Register(types.DefineHashedType("pof.BlockObSignMessage"), &BlockObSignMessage{})
 	fc.Register(types.DefineHashedType("p2p.StatusMessage"), &p2p.StatusMessage{})
+	fc.Register(types.DefineHashedType("p2p.PingMessage"), &p2p.PingMessage{})
+	return nil
 }
 
 // Close terminates the observer
@@ -130,9 +134,11 @@ func (ob *Observer) Run(BindObserver string, BindFormulator string) {
 			queueTimer.Reset(10 * time.Millisecond)
 		case <-voteTimer.C:
 			ob.Lock()
+			cp := ob.cs.cn.Provider()
 			ob.syncVoteRound()
+			IsFailable := true
 			if len(ob.adjustFormulatorMap()) > 0 {
-				IsFailable := true
+				log.Println("Observer", cp.Height(), "Current State", ob.round.RoundState, len(ob.adjustFormulatorMap()), ob.fs.PeerCount(), (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
 				if ob.round.RoundState == RoundVoteState {
 					ob.sendRoundVote()
 				} else if ob.round.RoundState == BlockVoteState {
@@ -151,15 +157,18 @@ func (ob *Observer) Run(BindObserver string, BindFormulator string) {
 								ob.ignoreMap[addr] = time.Now().UnixNano() + int64(30*time.Second)
 							}
 						}
+						ob.resetVoteRound(true)
 						ob.sendRoundVote()
 					}
 				}
+			} else {
+				log.Println("Observer", cp.Height(), "No Formulator", ob.round.RoundState, len(ob.adjustFormulatorMap()), ob.fs.PeerCount(), (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
 			}
 			ob.Unlock()
 
 			voteTimer.Reset(100 * time.Millisecond)
-			//case <-ob.runEnd:
-			//return
+		case <-ob.runEnd:
+			return
 		}
 	}
 }
@@ -192,6 +201,7 @@ func (ob *Observer) syncVoteRound() {
 
 func (ob *Observer) resetVoteRound(resetStat bool) {
 	ob.round = NewVoteRound(ob.cs.cn.Provider().Height()+1, ob.cs.maxBlocksPerFormulator-ob.cs.blocksBySameFormulator)
+	ob.prevRoundEndTime = time.Now().UnixNano()
 	if resetStat {
 		ob.roundFirstTime = 0
 		ob.roundFirstHeight = 0
@@ -259,12 +269,11 @@ func (ob *Observer) onFormulatorRecv(p *FormulatorPeer, m interface{}, raw []byt
 func (ob *Observer) handleObserverMessage(SenderPublicHash common.PublicHash, m interface{}, raw []byte) error {
 	cp := ob.cs.cn.Provider()
 
-	msgh := encoding.Hash(m)
-
 	ob.syncVoteRound()
 
 	switch msg := m.(type) {
 	case *RoundVoteMessage:
+		msgh := encoding.Hash(msg.RoundVote)
 		if pubkey, err := common.RecoverPubkey(msgh, msg.Signature); err != nil {
 			return err
 		} else if obkey := common.NewPublicHash(pubkey); SenderPublicHash != obkey {
@@ -361,6 +370,7 @@ func (ob *Observer) handleObserverMessage(SenderPublicHash common.PublicHash, m 
 			}
 		}
 	case *RoundVoteAckMessage:
+		msgh := encoding.Hash(msg.RoundVoteAck)
 		if pubkey, err := common.RecoverPubkey(msgh, msg.Signature); err != nil {
 			return err
 		} else if obkey := common.NewPublicHash(pubkey); SenderPublicHash != obkey {
@@ -576,6 +586,7 @@ func (ob *Observer) handleObserverMessage(SenderPublicHash common.PublicHash, m 
 			})
 		}
 	case *BlockVoteMessage:
+		msgh := encoding.Hash(msg.BlockVote)
 		if pubkey, err := common.RecoverPubkey(msgh, msg.Signature); err != nil {
 			return err
 		} else if obkey := common.NewPublicHash(pubkey); SenderPublicHash != obkey {
@@ -837,8 +848,8 @@ func (ob *Observer) addblock(b *types.Block) error {
 }
 
 func (ob *Observer) adjustFormulatorMap() map[common.Address]bool {
-	//FormulatorMap := ob.fs.FormulatorMap()
-	FormulatorMap := map[common.Address]bool{} //TEMP
+	FormulatorMap := ob.fs.FormulatorMap()
+	FormulatorMap[common.NewAddress(0, 2, 0)] = true // TEMP
 	now := time.Now().UnixNano()
 	for addr := range FormulatorMap {
 		if now < ob.ignoreMap[addr] {
