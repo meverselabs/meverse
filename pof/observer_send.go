@@ -29,21 +29,19 @@ func (ob *Observer) sendRoundVote() error {
 			IsReply:              false,
 		},
 	}
-	/*
-		if gh, err := ob.fs.GuessHeight(Top.Address); err != nil {
-			ob.fs.SendTo(Top.Address, &p2p.StatusMessage{
-				Version:  cp.Version(),
-				Height:   cp.Height(),
-				LastHash: cp.LastHash(),
-			})
-		} else if gh < cp.Height() {
-			ob.fs.SendTo(Top.Address, &p2p.StatusMessage{
-				Version:  cp.Version(),
-				Height:   cp.Height(),
-				LastHash: cp.LastHash(),
-			})
-		}
-	*/
+	if gh, err := ob.fs.GuessHeight(Top.Address); err != nil {
+		ob.fs.SendTo(Top.Address, &p2p.StatusMessage{
+			Version:  cp.Version(),
+			Height:   cp.Height(),
+			LastHash: cp.LastHash(),
+		})
+	} else if gh < cp.Height() {
+		ob.fs.SendTo(Top.Address, &p2p.StatusMessage{
+			Version:  cp.Version(),
+			Height:   cp.Height(),
+			LastHash: cp.LastHash(),
+		})
+	}
 	ob.round.VoteFailCount = 0
 
 	if sig, err := ob.key.Sign(encoding.Hash(nm.RoundVote)); err != nil {
@@ -156,19 +154,19 @@ func (ob *Observer) sendRoundVoteAckTo(TargetPubHash common.PublicHash) error {
 	return nil
 }
 
-func (ob *Observer) sendBlockVote(br *BlockRound) error {
+func (ob *Observer) sendBlockVote(gen *BlockGenMessage) error {
 	nm := &BlockVoteMessage{
 		BlockVote: &BlockVote{
 			TargetHeight:       ob.round.TargetHeight,
-			Header:             &br.BlockGenMessage.Block.Header,
-			GeneratorSignature: br.BlockGenMessage.GeneratorSignature,
+			Header:             &gen.Block.Header,
+			GeneratorSignature: gen.GeneratorSignature,
 			IsReply:            false,
 		},
 	}
 
 	s := &types.BlockSign{
-		HeaderHash:         encoding.Hash(br.BlockGenMessage.Block.Header),
-		GeneratorSignature: br.BlockGenMessage.GeneratorSignature,
+		HeaderHash:         encoding.Hash(gen.Block.Header),
+		GeneratorSignature: gen.GeneratorSignature,
 	}
 	if sig, err := ob.key.Sign(encoding.Hash(s)); err != nil {
 		return err
@@ -187,6 +185,14 @@ func (ob *Observer) sendBlockVote(br *BlockRound) error {
 	})
 
 	ob.ms.BroadcastMessage(nm)
+	return nil
+}
+
+func (ob *Observer) sendBlockGenTo(gen *BlockGenMessage, TargetPubHash common.PublicHash) error {
+	if TargetPubHash == ob.myPublicHash {
+		return nil
+	}
+	ob.ms.SendTo(TargetPubHash, gen)
 	return nil
 }
 

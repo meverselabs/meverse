@@ -87,7 +87,7 @@ func (p *Peer) ReadMessageData() (interface{}, []byte, error) {
 	if Len, _, err := p2p.ReadUint32(p.conn); err != nil {
 		return nil, nil, err
 	} else if Len == 0 {
-		return nil, nil, nil
+		return nil, nil, p2p.ErrUnknownMessage
 	} else {
 		zbs := make([]byte, Len)
 		if _, err := p2p.FillBytes(p.conn, zbs); err != nil {

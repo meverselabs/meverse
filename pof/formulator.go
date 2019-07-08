@@ -2,6 +2,7 @@ package pof
 
 import (
 	"bytes"
+	"log"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -175,6 +176,7 @@ func (fr *Formulator) onRecv(p *Peer, m interface{}) error {
 func (fr *Formulator) handleMessage(p *Peer, m interface{}, RetryCount int) error {
 	switch msg := m.(type) {
 	case *BlockReqMessage:
+		log.Println("Formulator", "BlockReqMessage", msg.TargetHeight, msg.RemainBlocks)
 		fr.Lock()
 		defer fr.Unlock()
 
@@ -284,6 +286,7 @@ func (fr *Formulator) handleMessage(p *Peer, m interface{}, RetryCount int) erro
 			if err := p.Send(nm); err != nil {
 				return err
 			}
+			log.Println("Formulator", "BlockGenMessage", nm.Block.Header.Height)
 
 			fr.lastGenMessages = append(fr.lastGenMessages, nm)
 			fr.lastContextes = append(fr.lastContextes, ctx)

@@ -298,6 +298,8 @@ func (ms *ObserverMesh) handleConnection(p *Peer) error {
 		atomic.SwapUint64(&pingCount, 0)
 		if _, is := m.(*p2p.PingMessage); is {
 			continue
+		} else if m == nil {
+			return p2p.ErrUnknownMessage
 		}
 
 		if err := ms.ob.onObserverRecv(p, m); err != nil {
