@@ -22,9 +22,9 @@ func NewContext(loader internalLoader) *Context {
 		loader:          loader,
 		genTargetHeight: loader.TargetHeight(),
 		genLastHash:     loader.LastHash(),
-		stack:           []*ContextData{NewContextData(loader, nil)},
 	}
 	ctx.cache = newContextCache(ctx)
+	ctx.stack = []*ContextData{NewContextData(ctx.cache, nil)}
 	return ctx
 }
 
@@ -48,6 +48,7 @@ func (ctx *Context) NextContext(NextHash hash.Hash256) *Context {
 	nctx := NewContext(ctx)
 	nctx.genTargetHeight = ctx.genTargetHeight + 1
 	nctx.genLastHash = NextHash
+	nctx.cache = newContextCache(ctx)
 	return nctx
 }
 

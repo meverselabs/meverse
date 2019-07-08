@@ -125,6 +125,8 @@ func (p *Formulator) BeforeExecuteTransactions(ctw *types.ContextWrapper) error 
 
 // AfterExecuteTransactions called after processes transactions of the block
 func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.ContextWrapper) error {
+	return nil
+
 	policy := &RewardPolicy{}
 	if err := encoding.Unmarshal(ctw.ProcessData(tagRewardPolicy), &policy); err != nil {
 		return err

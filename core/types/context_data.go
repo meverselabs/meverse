@@ -482,11 +482,12 @@ func (ctd *ContextData) SetProcessData(pid uint8, name []byte, value []byte) {
 // Hash returns the hash value of it
 func (ctd *ContextData) Hash() hash.Hash256 {
 	var buffer bytes.Buffer
-
 	buffer.WriteString("ChainName")
 	buffer.WriteString(ctd.loader.Name())
 	buffer.WriteString("ChainVersion")
 	buffer.Write(util.Uint16ToBytes(ctd.loader.Version()))
+	buffer.WriteString("Height")
+	buffer.Write(util.Uint32ToBytes(ctd.loader.TargetHeight()))
 	buffer.WriteString("PrevHash")
 	lastHash := ctd.loader.LastHash()
 	buffer.Write(lastHash[:])
@@ -542,6 +543,19 @@ func (ctd *ContextData) Hash() hash.Hash256 {
 // Dump prints the context data
 func (ctd *ContextData) Dump() string {
 	var buffer bytes.Buffer
+	buffer.WriteString("ChainName\n")
+	buffer.WriteString(ctd.loader.Name())
+	buffer.WriteString("\n")
+	buffer.WriteString("ChainVersion\n")
+	buffer.WriteString(strconv.FormatUint(uint64(ctd.loader.Version()), 10))
+	buffer.WriteString("\n")
+	buffer.WriteString("Height\n")
+	buffer.WriteString(strconv.FormatUint(uint64(ctd.loader.TargetHeight()), 10))
+	buffer.WriteString("\n")
+	buffer.WriteString("PrevHash\n")
+	lastHash := ctd.loader.LastHash()
+	buffer.WriteString(lastHash.String())
+	buffer.WriteString("\n")
 	buffer.WriteString("SeqMap\n")
 	ctd.SeqMap.EachAll(func(addr common.Address, seq uint64) bool {
 		buffer.WriteString(addr.String())

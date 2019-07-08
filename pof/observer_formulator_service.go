@@ -23,7 +23,7 @@ type FormulatorService struct {
 	sync.Mutex
 	key     key.Key
 	ob      *Observer
-	peerMap map[common.Address]*FormulatorPeer
+	peerMap map[common.Address]*Peer
 }
 
 // NewFormulatorService returns a FormulatorService
@@ -31,7 +31,7 @@ func NewFormulatorService(ob *Observer) *FormulatorService {
 	ms := &FormulatorService{
 		key:     ob.key,
 		ob:      ob,
-		peerMap: map[common.Address]*FormulatorPeer{},
+		peerMap: map[common.Address]*Peer{},
 	}
 	return ms
 }
@@ -96,7 +96,7 @@ func (ms *FormulatorService) BroadcastMessage(m interface{}) error {
 	}
 	data := buffer.Bytes()
 
-	peers := []*FormulatorPeer{}
+	peers := []*Peer{}
 	ms.Lock()
 	for _, p := range ms.peerMap {
 		peers = append(peers, p)
@@ -146,7 +146,7 @@ func (ms *FormulatorService) server(BindAddress string) error {
 	if err != nil {
 		return err
 	}
-	log.Println("Observer", common.NewPublicHash(ms.key.PublicKey()), "Start to Listen", BindAddress)
+	log.Println("FormulatorService", common.NewPublicHash(ms.key.PublicKey()), "Start to Listen", BindAddress)
 
 	for {
 		conn, err := lstn.Accept()
@@ -171,7 +171,9 @@ func (ms *FormulatorService) server(BindAddress string) error {
 				return
 			}
 
-			p := NewFormulatorPeer(conn, pubhash, Formulator)
+			p := NewPeer(conn)
+			p.pubhash = pubhash
+			p.address = Formulator
 			ms.Lock()
 			old, has := ms.peerMap[Formulator]
 			ms.peerMap[Formulator] = p
@@ -188,7 +190,7 @@ func (ms *FormulatorService) server(BindAddress string) error {
 	}
 }
 
-func (ms *FormulatorService) handleConnection(p *FormulatorPeer) error {
+func (ms *FormulatorService) handleConnection(p *Peer) error {
 	log.Println("Observer", common.NewPublicHash(ms.key.PublicKey()).String(), "Fromulator Connected", p.address.String())
 
 	cp := ms.ob.cs.cn.Provider()
@@ -275,9 +277,7 @@ func (ms *FormulatorService) sendHandshake(conn net.Conn) (common.PublicHash, er
 		return common.PublicHash{}, err
 	}
 	var sig common.Signature
-	if err := encoding.Unmarshal(bs, &sig); err != nil {
-		return common.PublicHash{}, err
-	}
+	copy(sig[:], bs)
 	pubkey, err := common.RecoverPubkey(h, sig)
 	if err != nil {
 		return common.PublicHash{}, err

@@ -22,8 +22,7 @@ type BlockCreator struct {
 }
 
 // NewBlockCreator returns a BlockCreator
-func NewBlockCreator(cn *Chain, Generator common.Address, ConsensusData []byte) *BlockCreator {
-	ctx := types.NewContext(cn.store)
+func NewBlockCreator(cn *Chain, ctx *types.Context, Generator common.Address, ConsensusData []byte) *BlockCreator {
 	bc := &BlockCreator{
 		cn:       cn,
 		ctx:      ctx,

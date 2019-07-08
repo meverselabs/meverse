@@ -6,33 +6,31 @@ import (
 	"encoding/binary"
 	"io/ioutil"
 	"net"
+	"sync"
 	"time"
 
+	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/queue"
 	"github.com/fletaio/fleta/common/util"
-
-	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/service/p2p"
 )
 
-// Peer is a observer peer
+// Peer is a formulator peer
 type Peer struct {
-	id         string
-	netAddr    string
-	conn       net.Conn
-	pubhash    common.PublicHash
-	writeQueue *queue.Queue
-	isClose    bool
+	sync.Mutex
+	conn        net.Conn
+	pubhash     common.PublicHash
+	address     common.Address
+	guessHeight uint32
+	writeQueue  *queue.Queue
+	isClose     bool
 }
 
-// NewPeer returns a Peer
-func NewPeer(conn net.Conn, pubhash common.PublicHash) *Peer {
+// NewPeer returns a ormulatorPeer
+func NewPeer(conn net.Conn) *Peer {
 	p := &Peer{
-		id:         pubhash.String(),
-		netAddr:    conn.RemoteAddr().String(),
 		conn:       conn,
-		pubhash:    pubhash,
 		writeQueue: queue.NewQueue(),
 	}
 	go func() {
@@ -75,16 +73,6 @@ func NewPeer(conn net.Conn, pubhash common.PublicHash) *Peer {
 func (p *Peer) Close() {
 	p.conn.Close()
 	p.isClose = true
-}
-
-// ID returns the id of the peer
-func (p *Peer) ID() string {
-	return p.id
-}
-
-// NetAddr returns the network address of the peer
-func (p *Peer) NetAddr() string {
-	return p.netAddr
 }
 
 // ReadMessageData returns a message data
@@ -147,4 +135,17 @@ func (p *Peer) Send(m interface{}) error {
 // SendRaw sends bytes to the peer
 func (p *Peer) SendRaw(bs []byte) {
 	p.writeQueue.Push(bs)
+}
+
+// UpdateGuessHeight updates the guess height of the peer
+func (p *Peer) UpdateGuessHeight(height uint32) {
+	p.Lock()
+	defer p.Unlock()
+
+	p.guessHeight = height
+}
+
+// GuessHeight updates the guess height of the peer
+func (p *Peer) GuessHeight() uint32 {
+	return p.guessHeight
 }
