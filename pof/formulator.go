@@ -102,6 +102,7 @@ func (fr *Formulator) Run() {
 	fr.Unlock()
 
 	go fr.ms.Run()
+	go fr.requestTimer.Run()
 
 	WorkerCount := runtime.NumCPU() - 1
 	if WorkerCount < 1 {

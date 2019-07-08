@@ -44,6 +44,7 @@ func init() {
 			}
 			item.candidates = append(item.candidates, s)
 			item.rankMap[s.Address] = s
+			s.update()
 		}
 		rv.Set(reflect.ValueOf(item).Elem())
 		return nil

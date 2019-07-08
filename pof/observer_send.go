@@ -196,22 +196,22 @@ func (ob *Observer) sendBlockGenTo(gen *BlockGenMessage, TargetPubHash common.Pu
 	return nil
 }
 
-func (ob *Observer) sendBlockVoteTo(br *BlockRound, TargetPubHash common.PublicHash) error {
+func (ob *Observer) sendBlockVoteTo(gen *BlockGenMessage, TargetPubHash common.PublicHash) error {
 	if TargetPubHash == ob.myPublicHash {
 		return nil
 	}
 
 	nm := &BlockVoteMessage{
 		BlockVote: &BlockVote{
-			Header:             &br.BlockGenMessage.Block.Header,
-			GeneratorSignature: br.BlockGenMessage.GeneratorSignature,
+			Header:             &gen.Block.Header,
+			GeneratorSignature: gen.GeneratorSignature,
 			IsReply:            true,
 		},
 	}
 
 	s := &types.BlockSign{
-		HeaderHash:         encoding.Hash(br.BlockGenMessage.Block.Header),
-		GeneratorSignature: br.BlockGenMessage.GeneratorSignature,
+		HeaderHash:         encoding.Hash(gen.Block.Header),
+		GeneratorSignature: gen.GeneratorSignature,
 	}
 	if sig, err := ob.key.Sign(encoding.Hash(s)); err != nil {
 		return err
@@ -263,6 +263,6 @@ func (ob *Observer) sendRequestBlockTo(TargetPubHash common.PublicHash, Height u
 		Height: Height,
 	}
 	ob.ms.SendTo(TargetPubHash, nm)
-	ob.requestTimer.Add(Height, 10*time.Second, TargetPubHash)
+	ob.requestTimer.Add(Height, 2*time.Second, TargetPubHash)
 	return nil
 }

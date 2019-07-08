@@ -40,14 +40,12 @@ func NewFormulatorMesh(key key.Key, NetAddressMap map[common.PublicHash]string, 
 func (ms *FormulatorMesh) Run() {
 	for PubHash, v := range ms.netAddressMap {
 		go func(pubhash common.PublicHash, NetAddr string) {
-			log.Println("Formulator", ms.fr.Config.Formulator.String(), "Runner To Connect", pubhash.String())
 			time.Sleep(1 * time.Second)
 			for {
 				ms.Lock()
 				_, has := ms.peerMap[pubhash]
 				ms.Unlock()
 				if !has {
-					log.Println("Formulator", ms.fr.Config.Formulator.String(), "Try To Connect", pubhash.String())
 					if err := ms.client(NetAddr, pubhash); err != nil {
 						log.Println("[client]", err, NetAddr)
 					}

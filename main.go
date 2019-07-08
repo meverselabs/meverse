@@ -2,7 +2,6 @@ package main // import "github.com/fletaio/fleta"
 
 import (
 	"encoding/hex"
-	"os"
 	"strconv"
 	"sync"
 
@@ -23,7 +22,7 @@ func main() {
 }
 
 func test() error {
-	os.RemoveAll("./_data")
+	//os.RemoveAll("./_data")
 
 	obstrs := []string{
 		"cd7cca6359869f4f58bb31aa11c2c4825d4621406f7b514058bc4dbe788c29be",

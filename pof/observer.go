@@ -3,7 +3,6 @@ package pof
 import (
 	"bytes"
 	"log"
-	"math/rand"
 	"sort"
 	"sync"
 	"time"
@@ -103,6 +102,7 @@ func (ob *Observer) Run(BindObserver string, BindFormulator string) {
 
 	go ob.ms.Run(BindObserver)
 	go ob.fs.Run(BindFormulator)
+	go ob.requestTimer.Run()
 
 	blockTimer := time.NewTimer(time.Millisecond)
 	queueTimer := time.NewTimer(time.Millisecond)
@@ -117,6 +117,8 @@ func (ob *Observer) Run(BindObserver string, BindFormulator string) {
 			for item != nil {
 				b := item.(*types.Block)
 				if err := ob.cs.cn.ConnectBlock(b); err != nil {
+					log.Println(err)
+					panic(err)
 					break
 				}
 				ob.broadcastStatus()
@@ -146,6 +148,7 @@ func (ob *Observer) Run(BindObserver string, BindFormulator string) {
 				log.Println("Observer", ob.myPublicHash.String(), cp.Height(), "Current State", ob.round.RoundState, len(ob.adjustFormulatorMap()), ob.fs.PeerCount(), (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
 				if ob.round.RoundState == RoundVoteState {
 					ob.sendRoundVote()
+					ob.broadcastStatus()
 				} else if ob.round.RoundState == BlockVoteState {
 					br, has := ob.round.BlockRoundMap[ob.round.TargetHeight]
 					if has {
@@ -173,9 +176,6 @@ func (ob *Observer) Run(BindObserver string, BindFormulator string) {
 				}
 			} else {
 				log.Println("Observer", ob.myPublicHash.String(), cp.Height(), "No Formulator", ob.round.RoundState, len(ob.adjustFormulatorMap()), ob.fs.PeerCount(), (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
-				if cp.Height() > 1 {
-					panic("")
-				}
 			}
 			ob.Unlock()
 
@@ -206,7 +206,8 @@ func (ob *Observer) syncVoteRound() {
 		if ob.round.RemainBlocks > Diff {
 			ob.round.TargetHeight = TargetHeight
 			ob.round.RemainBlocks = ob.round.RemainBlocks - Diff
-			if ob.round.RoundState == BlockWaitState {
+			if ob.round.MinRoundVoteAck != nil {
+				ob.round.RoundState = BlockWaitState
 				br, has := ob.round.BlockRoundMap[TargetHeight]
 				if has {
 					if br.BlockGenMessageWait != nil && br.BlockGenMessage == nil {
@@ -248,6 +249,8 @@ func (ob *Observer) onObserverRecv(p *Peer, m interface{}) error {
 }
 
 func (ob *Observer) onFormulatorRecv(p *Peer, m interface{}, raw []byte) error {
+	cp := ob.cs.cn.Provider()
+
 	switch msg := m.(type) {
 	case *BlockGenMessage:
 		ob.messageQueue.Push(&messageItem{
@@ -261,7 +264,6 @@ func (ob *Observer) onFormulatorRecv(p *Peer, m interface{}, raw []byte) error {
 		enable := false
 
 		if p.GuessHeight() < msg.Height {
-			cp := ob.cs.cn.Provider()
 			CountMap := ob.fs.GuessHeightCountMap()
 			if CountMap[cp.Height()] < 3 {
 				enable = true
@@ -292,6 +294,20 @@ func (ob *Observer) onFormulatorRecv(p *Peer, m interface{}, raw []byte) error {
 			}
 		}
 	case *p2p.StatusMessage:
+		ob.Lock()
+		defer ob.Unlock()
+
+		Height := cp.Height()
+		if Height >= msg.Height {
+			h, err := cp.Hash(msg.Height)
+			if err != nil {
+				return err
+			}
+			if h != msg.LastHash {
+				//TODO : critical error signal
+				panic(chain.ErrFoundForkedBlock)
+			}
+		}
 	default:
 		panic(p2p.ErrUnknownMessage) //TEMP
 		return p2p.ErrUnknownMessage
@@ -350,12 +366,8 @@ func (ob *Observer) handleObserverMessage(SenderPublicHash common.PublicHash, m 
 						if !has {
 							return ErrInvalidVote
 						}
-						if br.BlockGenMessageWait != nil {
-							ob.sendBlockGenTo(br.BlockGenMessageWait, SenderPublicHash)
-						} else if br.BlockGenMessage != nil {
-							ob.sendBlockGenTo(br.BlockGenMessage, SenderPublicHash)
-						}
-						ob.sendBlockVoteTo(br, SenderPublicHash)
+						ob.sendBlockGenTo(br.BlockGenMessage, SenderPublicHash)
+						ob.sendBlockVoteTo(br.BlockGenMessage, SenderPublicHash)
 					}
 					ob.sendRoundVoteTo(SenderPublicHash)
 				}
@@ -547,8 +559,6 @@ func (ob *Observer) handleObserverMessage(SenderPublicHash common.PublicHash, m 
 
 		if br.BlockGenMessageWait != nil {
 			if bh != encoding.Hash(br.BlockGenMessageWait.Block.Header) {
-				log.Println(SenderPublicHash.String(), bh.String(), encoding.Hash(br.BlockGenMessageWait.Block.Header).String(), msg.Block.Header.Height)
-				panic("")
 				return ErrFoundForkedBlockGen
 			}
 		}
@@ -665,12 +675,14 @@ func (ob *Observer) handleObserverMessage(SenderPublicHash common.PublicHash, m 
 		}
 
 		//[check state]
-		if ob.round.RoundState < BlockVoteState {
-			if _, has := ob.ignoreMap[msg.BlockVote.Header.Generator]; has {
-				delete(ob.ignoreMap, msg.BlockVote.Header.Generator)
-				ob.round.VoteFailCount = 0
+		if ob.round.RoundState != BlockVoteState {
+			if ob.round.RoundState < BlockVoteState {
+				if _, has := ob.ignoreMap[msg.BlockVote.Header.Generator]; has {
+					delete(ob.ignoreMap, msg.BlockVote.Header.Generator)
+					ob.round.VoteFailCount = 0
+				}
+				br.BlockVoteMessageWaitMap[SenderPublicHash] = msg
 			}
-			br.BlockVoteMessageWaitMap[SenderPublicHash] = msg
 			return ErrInvalidVote
 		}
 		if TimeoutCount != ob.round.MinRoundVoteAck.TimeoutCount {
@@ -700,7 +712,7 @@ func (ob *Observer) handleObserverMessage(SenderPublicHash common.PublicHash, m 
 
 		if _, has := br.BlockVoteMap[SenderPublicHash]; has {
 			if !msg.BlockVote.IsReply {
-				ob.sendBlockVoteTo(br, SenderPublicHash)
+				ob.sendBlockVoteTo(br.BlockGenMessage, SenderPublicHash)
 			}
 			return ErrAlreadyVoted
 		}
@@ -708,7 +720,7 @@ func (ob *Observer) handleObserverMessage(SenderPublicHash common.PublicHash, m 
 
 		//[check state]
 		if !msg.BlockVote.IsReply && SenderPublicHash != ob.myPublicHash {
-			ob.sendBlockVoteTo(br, SenderPublicHash)
+			ob.sendBlockVoteTo(br.BlockGenMessage, SenderPublicHash)
 		}
 
 		//[apply vote]
@@ -790,7 +802,6 @@ func (ob *Observer) handleObserverMessage(SenderPublicHash common.PublicHash, m 
 					diff = 500 * time.Millisecond
 				}
 				time.Sleep(diff)
-				time.Sleep(time.Duration(rand.Int63n(50)) * time.Millisecond) // TEMP
 			}
 
 			ob.round.RemainBlocks--
