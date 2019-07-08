@@ -143,10 +143,29 @@ func (fr *Formulator) Run() {
 		}(&mch, &ch)
 	}
 
-	select {
-	case <-fr.runEnd:
-		for i := 0; i < WorkerCount; i++ {
-			(*workerEnd[i]) <- struct{}{}
+	blockTimer := time.NewTimer(time.Millisecond)
+	for !fr.isClose {
+		select {
+		case <-blockTimer.C:
+			cp := fr.cs.cn.Provider()
+			fr.Lock()
+			TargetHeight := uint64(cp.Height() + 1)
+			item := fr.blockQ.PopUntil(TargetHeight)
+			for item != nil {
+				b := item.(*types.Block)
+				if err := fr.cs.cn.ConnectBlock(b); err != nil {
+					break
+				}
+				fr.broadcastStatus()
+				TargetHeight++
+				item = fr.blockQ.PopUntil(TargetHeight)
+			}
+			fr.Unlock()
+			blockTimer.Reset(50 * time.Millisecond)
+		case <-fr.runEnd:
+			for i := 0; i < WorkerCount; i++ {
+				(*workerEnd[i]) <- struct{}{}
+			}
 		}
 	}
 }
@@ -174,13 +193,14 @@ func (fr *Formulator) onRecv(p *Peer, m interface{}) error {
 }
 
 func (fr *Formulator) handleMessage(p *Peer, m interface{}, RetryCount int) error {
+	cp := fr.cs.cn.Provider()
+
 	switch msg := m.(type) {
 	case *BlockReqMessage:
-		log.Println("Formulator", "BlockReqMessage", msg.TargetHeight, msg.RemainBlocks)
+		log.Println("Formulator", fr.Config.Formulator.String(), "BlockReqMessage", msg.TargetHeight, msg.RemainBlocks)
 		fr.Lock()
 		defer fr.Unlock()
 
-		cp := fr.cs.cn.Provider()
 		Height := cp.Height()
 		if msg.TargetHeight <= Height {
 			return nil
@@ -286,7 +306,7 @@ func (fr *Formulator) handleMessage(p *Peer, m interface{}, RetryCount int) erro
 			if err := p.Send(nm); err != nil {
 				return err
 			}
-			log.Println("Formulator", "BlockGenMessage", nm.Block.Header.Height)
+			log.Println("Formulator", fr.Config.Formulator.String(), "BlockGenMessage", nm.Block.Header.Height)
 
 			fr.lastGenMessages = append(fr.lastGenMessages, nm)
 			fr.lastContextes = append(fr.lastContextes, ctx)
@@ -353,16 +373,25 @@ func (fr *Formulator) handleMessage(p *Peer, m interface{}, RetryCount int) erro
 			}
 		}
 		return nil
+	case *p2p.RequestMessage:
+		b, err := cp.Block(msg.Height)
+		if err != nil {
+			return err
+		}
+		sm := &p2p.BlockMessage{
+			Block: b,
+		}
+		if err := fr.ms.SendTo(p.pubhash, sm); err != nil {
+			return err
+		}
+		return nil
 	case *p2p.BlockMessage:
 		if msg.Block.Header.Height <= fr.cs.cn.Provider().Height() {
 			return nil
 		}
-		/*
-			if err := fr.cm.AddData(msg.Data); err != nil {
-				return err
-			}
-		*/
-
+		if err := fr.addBlock(msg.Block); err != nil {
+			return err
+		}
 		fr.requestTimer.Remove(msg.Block.Header.Height)
 
 		fr.Lock()
@@ -422,7 +451,7 @@ func (fr *Formulator) handleMessage(p *Peer, m interface{}, RetryCount int) erro
 	}
 }
 
-func (fr *Formulator) addblock(b *types.Block) error {
+func (fr *Formulator) addBlock(b *types.Block) error {
 	cp := fr.cs.cn.Provider()
 	if b.Header.Height <= cp.Height() {
 		h, err := cp.Hash(b.Header.Height)

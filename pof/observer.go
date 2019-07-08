@@ -248,7 +248,13 @@ func (ob *Observer) onObserverRecv(p *Peer, m interface{}) error {
 }
 
 func (ob *Observer) onFormulatorRecv(p *Peer, m interface{}, raw []byte) error {
-	if msg, is := m.(*p2p.RequestMessage); is {
+	switch msg := m.(type) {
+	case *BlockGenMessage:
+		ob.messageQueue.Push(&messageItem{
+			Message: msg,
+			Raw:     raw,
+		})
+	case *p2p.RequestMessage:
 		ob.Lock()
 		defer ob.Unlock()
 
@@ -285,12 +291,8 @@ func (ob *Observer) onFormulatorRecv(p *Peer, m interface{}, raw []byte) error {
 				}
 			}
 		}
-	} else if msg, is := m.(*BlockGenMessage); is {
-		ob.messageQueue.Push(&messageItem{
-			Message: msg,
-			Raw:     raw,
-		})
-	} else {
+	case *p2p.StatusMessage:
+	default:
 		panic(p2p.ErrUnknownMessage) //TEMP
 		return p2p.ErrUnknownMessage
 	}
@@ -840,7 +842,7 @@ func (ob *Observer) handleObserverMessage(SenderPublicHash common.PublicHash, m 
 			}
 		}
 	case *p2p.BlockMessage:
-		if err := ob.addblock(msg.Block); err != nil {
+		if err := ob.addBlock(msg.Block); err != nil {
 			return err
 		}
 		ob.requestTimer.Remove(msg.Block.Header.Height)
@@ -851,7 +853,7 @@ func (ob *Observer) handleObserverMessage(SenderPublicHash common.PublicHash, m 
 	return nil
 }
 
-func (ob *Observer) addblock(b *types.Block) error {
+func (ob *Observer) addBlock(b *types.Block) error {
 	cp := ob.cs.cn.Provider()
 	if b.Header.Height <= cp.Height() {
 		h, err := cp.Hash(b.Header.Height)
