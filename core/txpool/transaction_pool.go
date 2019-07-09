@@ -13,6 +13,7 @@ import (
 // AccountTransaction is an interface that defines common functions of account model based transactions
 type AccountTransaction interface {
 	Seq() uint64
+	From() common.Address
 }
 
 // TransactionPool provides a transaction queue
