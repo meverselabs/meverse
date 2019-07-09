@@ -37,7 +37,7 @@ type FormulatorNode struct {
 	lastReqMessage       *BlockReqMessage
 	txMsgChans           []*chan *txMsgItem
 	txMsgIdx             uint64
-	statusMap            map[common.PublicHash]*p2p.Status
+	statusMap            map[string]*p2p.Status
 	requestTimer         *p2p.RequestTimer
 	requestLock          sync.RWMutex
 	blockQ               *queue.SortedQueue
@@ -56,7 +56,7 @@ func NewFormulator(Config *FormulatorConfig, key key.Key, NetAddressMap map[comm
 		lastGenMessages:      []*BlockGenMessage{},
 		lastObSignMessageMap: map[uint32]*BlockObSignMessage{},
 		lastContextes:        []*types.Context{},
-		statusMap:            map[common.PublicHash]*p2p.Status{},
+		statusMap:            map[string]*p2p.Status{},
 		requestTimer:         p2p.NewRequestTimer(nil),
 		runEnd:               make(chan struct{}),
 		blockQ:               queue.NewSortedQueue(),
@@ -171,21 +171,26 @@ func (fr *FormulatorNode) Run() {
 	}
 }
 
+// OnTimerExpired called when rquest expired
+func (fr *FormulatorNode) OnTimerExpired(height uint32, P interface{}) {
+	go fr.tryRequestNext()
+}
+
 // OnObserverConnected is called after a new observer peer is connected
-func (fr *FormulatorNode) OnObserverConnected(p *Peer) {
+func (fr *FormulatorNode) OnObserverConnected(p *p2p.Peer) {
 	fr.Lock()
-	fr.statusMap[p.pubhash] = &p2p.Status{}
+	fr.statusMap[p.ID] = &p2p.Status{}
 	fr.Unlock()
 }
 
 // OnObserverDisconnected is called when the observer peer is disconnected
-func (fr *FormulatorNode) OnObserverDisconnected(p *Peer) {
+func (fr *FormulatorNode) OnObserverDisconnected(p *p2p.Peer) {
 	fr.Lock()
-	delete(fr.statusMap, p.pubhash)
+	delete(fr.statusMap, p.ID)
 	fr.Unlock()
 }
 
-func (fr *FormulatorNode) onRecv(p *Peer, m interface{}) error {
+func (fr *FormulatorNode) onRecv(p *p2p.Peer, m interface{}) error {
 	if err := fr.handleMessage(p, m, 0); err != nil {
 		//log.Println(err)
 		return nil
@@ -193,7 +198,7 @@ func (fr *FormulatorNode) onRecv(p *Peer, m interface{}) error {
 	return nil
 }
 
-func (fr *FormulatorNode) handleMessage(p *Peer, m interface{}, RetryCount int) error {
+func (fr *FormulatorNode) handleMessage(p *p2p.Peer, m interface{}, RetryCount int) error {
 	cp := fr.cs.cn.Provider()
 
 	switch msg := m.(type) {
@@ -358,7 +363,7 @@ func (fr *FormulatorNode) handleMessage(p *Peer, m interface{}, RetryCount int) 
 					return err
 				}
 
-				if status, has := fr.statusMap[p.pubhash]; has {
+				if status, has := fr.statusMap[p.ID]; has {
 					if status.Height < GenMessage.Block.Header.Height {
 						status.Height = GenMessage.Block.Header.Height
 					}
@@ -382,7 +387,7 @@ func (fr *FormulatorNode) handleMessage(p *Peer, m interface{}, RetryCount int) 
 		sm := &p2p.BlockMessage{
 			Block: b,
 		}
-		if err := fr.ms.SendTo(p.pubhash, sm); err != nil {
+		if err := fr.ms.SendTo(p.ID, sm); err != nil {
 			return err
 		}
 		return nil
@@ -396,7 +401,7 @@ func (fr *FormulatorNode) handleMessage(p *Peer, m interface{}, RetryCount int) 
 		fr.requestTimer.Remove(msg.Block.Header.Height)
 
 		fr.Lock()
-		if status, has := fr.statusMap[p.pubhash]; has {
+		if status, has := fr.statusMap[p.ID]; has {
 			if status.Height < msg.Block.Header.Height {
 				status.Height = msg.Block.Header.Height
 			}
@@ -409,7 +414,7 @@ func (fr *FormulatorNode) handleMessage(p *Peer, m interface{}, RetryCount int) 
 		fr.Lock()
 		defer fr.Unlock()
 
-		if status, has := fr.statusMap[p.pubhash]; has {
+		if status, has := fr.statusMap[p.ID]; has {
 			if status.Height < msg.Height {
 				status.Version = msg.Version
 				status.Height = msg.Height
@@ -427,7 +432,7 @@ func (fr *FormulatorNode) handleMessage(p *Peer, m interface{}, RetryCount int) 
 					if err := p.Send(sm); err != nil {
 						return err
 					}
-					fr.requestTimer.Add(TargetHeight, 10*time.Second, p.pubhash)
+					fr.requestTimer.Add(TargetHeight, 10*time.Second, p.ID)
 				}
 			}
 			TargetHeight++
@@ -493,7 +498,7 @@ func (fr *FormulatorNode) tryRequestNext() {
 					if err := fr.ms.SendTo(pubhash, sm); err != nil {
 						return
 					}
-					fr.requestTimer.Add(TargetHeight, 10*time.Second, pubhash)
+					fr.requestTimer.Add(TargetHeight, 5*time.Second, pubhash)
 					return
 				}
 			}

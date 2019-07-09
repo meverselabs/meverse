@@ -23,14 +23,14 @@ type FormulatorNodeMesh struct {
 	fr            *FormulatorNode
 	key           key.Key
 	netAddressMap map[common.PublicHash]string
-	peerMap       map[common.PublicHash]*Peer
+	peerMap       map[string]*p2p.Peer
 }
 
 func NewFormulatorNodeMesh(key key.Key, NetAddressMap map[common.PublicHash]string, fr *FormulatorNode) *FormulatorNodeMesh {
 	ms := &FormulatorNodeMesh{
 		key:           key,
 		netAddressMap: NetAddressMap,
-		peerMap:       map[common.PublicHash]*Peer{},
+		peerMap:       map[string]*p2p.Peer{},
 		fr:            fr,
 	}
 	return ms
@@ -43,7 +43,7 @@ func (ms *FormulatorNodeMesh) Run() {
 			time.Sleep(1 * time.Second)
 			for {
 				ms.Lock()
-				_, has := ms.peerMap[pubhash]
+				_, has := ms.peerMap[string(pubhash[:])]
 				ms.Unlock()
 				if !has {
 					if err := ms.client(NetAddr, pubhash); err != nil {
@@ -57,11 +57,11 @@ func (ms *FormulatorNodeMesh) Run() {
 }
 
 // Peers returns peers of the formulator mesh
-func (ms *FormulatorNodeMesh) Peers() []*Peer {
+func (ms *FormulatorNodeMesh) Peers() []*p2p.Peer {
 	ms.Lock()
 	defer ms.Unlock()
 
-	peers := []*Peer{}
+	peers := []*p2p.Peer{}
 	for _, p := range ms.peerMap {
 		peers = append(peers, p)
 	}
@@ -69,11 +69,11 @@ func (ms *FormulatorNodeMesh) Peers() []*Peer {
 }
 
 // RemovePeer removes peers from the mesh
-func (ms *FormulatorNodeMesh) RemovePeer(p *Peer) {
+func (ms *FormulatorNodeMesh) RemovePeer(ID string) {
 	ms.Lock()
-	p, has := ms.peerMap[p.pubhash]
+	p, has := ms.peerMap[ID]
 	if has {
-		delete(ms.peerMap, p.pubhash)
+		delete(ms.peerMap, ID)
 	}
 	ms.Unlock()
 
@@ -82,19 +82,10 @@ func (ms *FormulatorNodeMesh) RemovePeer(p *Peer) {
 	}
 }
 
-// RemovePeerInMap removes peers from the mesh in the map
-func (ms *FormulatorNodeMesh) RemovePeerInMap(p *Peer, peerMap map[common.PublicHash]*Peer) {
-	ms.Lock()
-	delete(peerMap, p.pubhash)
-	ms.Unlock()
-
-	p.Close()
-}
-
 // SendTo sends a message to the observer
-func (ms *FormulatorNodeMesh) SendTo(PublicHash common.PublicHash, m interface{}) error {
+func (ms *FormulatorNodeMesh) SendTo(ID string, m interface{}) error {
 	ms.Lock()
-	p, has := ms.peerMap[PublicHash]
+	p, has := ms.peerMap[ID]
 	ms.Unlock()
 	if !has {
 		return ErrNotExistObserverPeer
@@ -102,17 +93,17 @@ func (ms *FormulatorNodeMesh) SendTo(PublicHash common.PublicHash, m interface{}
 
 	if err := p.Send(m); err != nil {
 		log.Println(err)
-		ms.RemovePeer(p)
+		ms.RemovePeer(p.ID)
 	}
 	return nil
 }
 
 // BroadcastRaw sends a message to all peers
 func (ms *FormulatorNodeMesh) BroadcastRaw(bs []byte) {
-	peerMap := map[common.PublicHash]*Peer{}
+	peerMap := map[string]*p2p.Peer{}
 	ms.Lock()
 	for _, p := range ms.peerMap {
-		peerMap[p.pubhash] = p
+		peerMap[p.ID] = p
 	}
 	ms.Unlock()
 
@@ -136,10 +127,10 @@ func (ms *FormulatorNodeMesh) BroadcastMessage(m interface{}) error {
 	}
 	data := buffer.Bytes()
 
-	peerMap := map[common.PublicHash]*Peer{}
+	peerMap := map[string]*p2p.Peer{}
 	ms.Lock()
 	for _, p := range ms.peerMap {
-		peerMap[p.pubhash] = p
+		peerMap[p.ID] = p
 	}
 	ms.Unlock()
 
@@ -172,16 +163,16 @@ func (ms *FormulatorNodeMesh) client(Address string, TargetPubHash common.Public
 		return ErrInvalidObserverKey
 	}
 
-	p := NewPeer(conn)
-	p.pubhash = pubhash
+	ID := string(pubhash[:])
+	p := p2p.NewPeer(conn, ID, pubhash.String())
 	ms.Lock()
-	old, has := ms.peerMap[pubhash]
-	ms.peerMap[pubhash] = p
+	old, has := ms.peerMap[ID]
+	ms.peerMap[ID] = p
 	ms.Unlock()
 	if has {
-		ms.RemovePeerInMap(old, ms.peerMap)
+		ms.RemovePeer(old.ID)
 	}
-	defer ms.RemovePeerInMap(p, ms.peerMap)
+	defer ms.RemovePeer(p.ID)
 
 	if err := ms.handleConnection(p); err != nil {
 		log.Println("[handleConnection]", err)
@@ -189,8 +180,8 @@ func (ms *FormulatorNodeMesh) client(Address string, TargetPubHash common.Public
 	return nil
 }
 
-func (ms *FormulatorNodeMesh) handleConnection(p *Peer) error {
-	log.Println(common.NewPublicHash(ms.key.PublicKey()).String(), "Connected", p.pubhash.String())
+func (ms *FormulatorNodeMesh) handleConnection(p *p2p.Peer) error {
+	log.Println(common.NewPublicHash(ms.key.PublicKey()).String(), "Connected", p.Name)
 
 	ms.fr.OnObserverConnected(p)
 	defer ms.fr.OnObserverDisconnected(p)
@@ -203,11 +194,11 @@ func (ms *FormulatorNodeMesh) handleConnection(p *Peer) error {
 			select {
 			case <-pingTicker.C:
 				if err := p.Send(&p2p.PingMessage{}); err != nil {
-					ms.RemovePeer(p)
+					ms.RemovePeer(p.ID)
 					return
 				}
 				if atomic.AddUint64(&pingCount, 1) > pingCountLimit {
-					ms.RemovePeer(p)
+					ms.RemovePeer(p.ID)
 					return
 				}
 			}

@@ -165,7 +165,7 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 							addr := ob.round.MinRoundVoteAck.Formulator
 							_, has := ob.ignoreMap[addr]
 							if has {
-								ob.fs.RemovePeer(addr)
+								ob.fs.RemovePeer(string(addr[:]))
 								ob.ignoreMap[addr] = time.Now().UnixNano() + int64(120*time.Second)
 							} else {
 								ob.ignoreMap[addr] = time.Now().UnixNano() + int64(30*time.Second)
@@ -190,11 +190,13 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 
 // OnTimerExpired called when rquest expired
 func (ob *ObserverNode) OnTimerExpired(height uint32, P interface{}) {
-	TargetPubHash := P.(common.PublicHash)
+	TargetPublicHash := P.(common.PublicHash)
 	list := ob.ms.Peers()
 	for _, v := range list {
-		if v.pubhash != ob.myPublicHash && v.pubhash != TargetPubHash {
-			ob.sendRequestBlockTo(v.pubhash, height)
+		var pubhash common.PublicHash
+		copy(pubhash[:], []byte(v.ID))
+		if pubhash != ob.myPublicHash && pubhash != TargetPublicHash {
+			ob.sendRequestBlockTo(pubhash, height)
 			break
 		}
 	}
@@ -236,21 +238,23 @@ func (ob *ObserverNode) resetVoteRound(resetStat bool) {
 	}
 }
 
-func (ob *ObserverNode) onObserverRecv(p *Peer, m interface{}) error {
+func (ob *ObserverNode) onObserverRecv(p *p2p.Peer, m interface{}) error {
 	if msg, is := m.(*BlockGenMessage); is {
 		ob.messageQueue.Push(&messageItem{
 			Message: msg,
 		})
 	} else {
+		var pubhash common.PublicHash
+		copy(pubhash[:], []byte(p.ID))
 		ob.messageQueue.Push(&messageItem{
-			PublicHash: p.pubhash,
+			PublicHash: pubhash,
 			Message:    m,
 		})
 	}
 	return nil
 }
 
-func (ob *ObserverNode) onFormulatorRecv(p *Peer, m interface{}, raw []byte) error {
+func (ob *ObserverNode) onFormulatorRecv(p *p2p.Peer, m interface{}, raw []byte) error {
 	cp := ob.cs.cn.Provider()
 
 	switch msg := m.(type) {
@@ -274,11 +278,11 @@ func (ob *ObserverNode) onFormulatorRecv(p *Peer, m interface{}, raw []byte) err
 				if err != nil {
 					return err
 				}
-				rankMap := map[common.Address]bool{}
+				rankMap := map[string]bool{}
 				for _, r := range ranks {
-					rankMap[r.Address] = true
+					rankMap[string(r.Address[:])] = true
 				}
-				enable = rankMap[p.address]
+				enable = rankMap[p.ID]
 			}
 			if enable {
 				p.UpdateGuessHeight(msg.Height)

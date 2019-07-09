@@ -4,8 +4,6 @@ import (
 	"time"
 
 	"github.com/fletaio/fleta/service/p2p"
-
-	"github.com/fletaio/fleta/common"
 )
 
 func (fr *FormulatorNode) broadcastStatus() error {
@@ -19,11 +17,11 @@ func (fr *FormulatorNode) broadcastStatus() error {
 	return nil
 }
 
-func (fr *FormulatorNode) sendRequestBlockTo(TargetPubHash common.PublicHash, Height uint32) error {
+func (fr *FormulatorNode) sendRequestBlockTo(TargetID string, Height uint32) error {
 	nm := &p2p.RequestMessage{
 		Height: Height,
 	}
-	fr.ms.SendTo(TargetPubHash, nm)
-	fr.requestTimer.Add(Height, 10*time.Second, TargetPubHash)
+	fr.ms.SendTo(TargetID, nm)
+	fr.requestTimer.Add(Height, 10*time.Second, TargetID)
 	return nil
 }

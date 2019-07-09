@@ -1,4 +1,4 @@
-package pof
+package p2p
 
 import (
 	"bytes"
@@ -9,28 +9,31 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/queue"
 	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/encoding"
-	"github.com/fletaio/fleta/service/p2p"
 )
 
 // Peer is a formulator peer
 type Peer struct {
 	sync.Mutex
 	conn        net.Conn
-	pubhash     common.PublicHash
-	address     common.Address
+	ID          string
+	Name        string
 	guessHeight uint32
 	writeQueue  *queue.Queue
 	isClose     bool
 }
 
 // NewPeer returns a ormulatorPeer
-func NewPeer(conn net.Conn) *Peer {
+func NewPeer(conn net.Conn, ID string, Name string) *Peer {
+	if len(Name) == 0 {
+		Name = ID
+	}
 	p := &Peer{
 		conn:       conn,
+		ID:         ID,
+		Name:       Name,
 		writeQueue: queue.NewQueue(),
 	}
 	go func() {
@@ -78,19 +81,19 @@ func (p *Peer) Close() {
 // ReadMessageData returns a message data
 func (p *Peer) ReadMessageData() (interface{}, []byte, error) {
 	var t uint16
-	if v, _, err := p2p.ReadUint16(p.conn); err != nil {
+	if v, _, err := ReadUint16(p.conn); err != nil {
 		return nil, nil, err
 	} else {
 		t = v
 	}
 
-	if Len, _, err := p2p.ReadUint32(p.conn); err != nil {
+	if Len, _, err := ReadUint32(p.conn); err != nil {
 		return nil, nil, err
 	} else if Len == 0 {
-		return nil, nil, p2p.ErrUnknownMessage
+		return nil, nil, ErrUnknownMessage
 	} else {
 		zbs := make([]byte, Len)
-		if _, err := p2p.FillBytes(p.conn, zbs); err != nil {
+		if _, err := FillBytes(p.conn, zbs); err != nil {
 			return nil, nil, err
 		}
 		zr, err := gzip.NewReader(bytes.NewReader(zbs))

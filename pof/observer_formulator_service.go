@@ -23,7 +23,7 @@ type FormulatorService struct {
 	sync.Mutex
 	key     key.Key
 	ob      *ObserverNode
-	peerMap map[common.Address]*Peer
+	peerMap map[string]*p2p.Peer
 }
 
 // NewFormulatorService returns a FormulatorService
@@ -31,7 +31,7 @@ func NewFormulatorService(ob *ObserverNode) *FormulatorService {
 	ms := &FormulatorService{
 		key:     ob.key,
 		ob:      ob,
-		peerMap: map[common.Address]*Peer{},
+		peerMap: map[string]*p2p.Peer{},
 	}
 	return ms
 }
@@ -52,11 +52,11 @@ func (ms *FormulatorService) PeerCount() int {
 }
 
 // RemovePeer removes peers from the mesh
-func (ms *FormulatorService) RemovePeer(addr common.Address) {
+func (ms *FormulatorService) RemovePeer(ID string) {
 	ms.Lock()
-	p, has := ms.peerMap[addr]
+	p, has := ms.peerMap[ID]
 	if has {
-		delete(ms.peerMap, addr)
+		delete(ms.peerMap, ID)
 	}
 	ms.Unlock()
 
@@ -66,9 +66,9 @@ func (ms *FormulatorService) RemovePeer(addr common.Address) {
 }
 
 // SendTo sends a message to the formulator
-func (ms *FormulatorService) SendTo(Formulator common.Address, m interface{}) error {
+func (ms *FormulatorService) SendTo(addr common.Address, m interface{}) error {
 	ms.Lock()
-	p, has := ms.peerMap[Formulator]
+	p, has := ms.peerMap[string(addr[:])]
 	ms.Unlock()
 	if !has {
 		return ErrNotExistFormulatorPeer
@@ -76,7 +76,7 @@ func (ms *FormulatorService) SendTo(Formulator common.Address, m interface{}) er
 
 	if err := p.Send(m); err != nil {
 		log.Println(err)
-		ms.RemovePeer(p.address)
+		ms.RemovePeer(p.ID)
 	}
 	return nil
 }
@@ -96,7 +96,7 @@ func (ms *FormulatorService) BroadcastMessage(m interface{}) error {
 	}
 	data := buffer.Bytes()
 
-	peers := []*Peer{}
+	peers := []*p2p.Peer{}
 	ms.Lock()
 	for _, p := range ms.peerMap {
 		peers = append(peers, p)
@@ -121,9 +121,9 @@ func (ms *FormulatorService) GuessHeightCountMap() map[uint32]int {
 }
 
 // GuessHeight returns the guess height of the fomrulator
-func (ms *FormulatorService) GuessHeight(Formulator common.Address) (uint32, error) {
+func (ms *FormulatorService) GuessHeight(addr common.Address) (uint32, error) {
 	ms.Lock()
-	p, has := ms.peerMap[Formulator]
+	p, has := ms.peerMap[string(addr[:])]
 	ms.Unlock()
 	if !has {
 		return 0, ErrNotExistFormulatorPeer
@@ -132,9 +132,9 @@ func (ms *FormulatorService) GuessHeight(Formulator common.Address) (uint32, err
 }
 
 // UpdateGuessHeight updates the guess height of the fomrulator
-func (ms *FormulatorService) UpdateGuessHeight(Formulator common.Address, height uint32) {
+func (ms *FormulatorService) UpdateGuessHeight(addr common.Address, height uint32) {
 	ms.Lock()
-	p, has := ms.peerMap[Formulator]
+	p, has := ms.peerMap[string(addr[:])]
 	ms.Unlock()
 	if has {
 		p.UpdateGuessHeight(height)
@@ -171,17 +171,16 @@ func (ms *FormulatorService) server(BindAddress string) error {
 				return
 			}
 
-			p := NewPeer(conn)
-			p.pubhash = pubhash
-			p.address = Formulator
+			ID := string(Formulator[:])
+			p := p2p.NewPeer(conn, ID, Formulator.String())
 			ms.Lock()
-			old, has := ms.peerMap[Formulator]
-			ms.peerMap[Formulator] = p
+			old, has := ms.peerMap[ID]
+			ms.peerMap[ID] = p
 			ms.Unlock()
 			if has {
-				ms.RemovePeer(old.address)
+				ms.RemovePeer(old.ID)
 			}
-			defer ms.RemovePeer(p.address)
+			defer ms.RemovePeer(p.ID)
 
 			if err := ms.handleConnection(p); err != nil {
 				log.Println("[handleConnection]", err)
@@ -190,8 +189,8 @@ func (ms *FormulatorService) server(BindAddress string) error {
 	}
 }
 
-func (ms *FormulatorService) handleConnection(p *Peer) error {
-	log.Println("Observer", common.NewPublicHash(ms.key.PublicKey()).String(), "Fromulator Connected", p.address.String())
+func (ms *FormulatorService) handleConnection(p *p2p.Peer) error {
+	log.Println("Observer", common.NewPublicHash(ms.key.PublicKey()).String(), "Fromulator Connected", p.Name)
 
 	cp := ms.ob.cs.cn.Provider()
 	p.Send(&p2p.StatusMessage{
@@ -295,7 +294,9 @@ func (ms *FormulatorService) FormulatorMap() map[common.Address]bool {
 
 	FormulatorMap := map[common.Address]bool{}
 	for _, p := range ms.peerMap {
-		FormulatorMap[p.address] = true
+		var addr common.Address
+		copy(addr[:], []byte(p.ID))
+		FormulatorMap[addr] = true
 	}
 	return FormulatorMap
 }
