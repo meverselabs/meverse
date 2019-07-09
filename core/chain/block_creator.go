@@ -89,9 +89,14 @@ func (bc *BlockCreator) AddTx(tx types.Transaction, sigs []common.Signature) err
 	if err := tx.Validate(p, ctw, signers); err != nil {
 		return err
 	}
+
+	sn := ctw.Snapshot()
 	if err := tx.Execute(p, ctw, uint16(len(bc.b.Transactions))); err != nil {
+		ctw.Revert(sn)
 		return err
 	}
+	ctw.Commit(sn)
+
 	bc.b.TransactionTypes = append(bc.b.TransactionTypes, t)
 	bc.b.Transactions = append(bc.b.Transactions, tx)
 	bc.b.TranactionSignatures = append(bc.b.TranactionSignatures, sigs)

@@ -14,6 +14,7 @@ import (
 type CreateOmega struct {
 	Timestamp_       uint64
 	Seq_             uint64
+	From_            common.Address
 	SigmaFormulators []common.Address
 }
 
@@ -27,6 +28,11 @@ func (tx *CreateOmega) Seq() uint64 {
 	return tx.Seq_
 }
 
+// From returns the from address of the transaction
+func (tx *CreateOmega) From() common.Address {
+	return tx.From_
+}
+
 // Fee returns the fee of the transaction
 func (tx *CreateOmega) Fee(loader types.LoaderWrapper) *amount.Amount {
 	return amount.COIN.DivC(10)
@@ -34,6 +40,9 @@ func (tx *CreateOmega) Fee(loader types.LoaderWrapper) *amount.Amount {
 
 // Validate validates signatures of the transaction
 func (tx *CreateOmega) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
+	if tx.From() != tx.SigmaFormulators[0] {
+		return ErrInvalidFormulatorAddress
+	}
 	if tx.Seq() <= loader.Seq(tx.SigmaFormulators[0]) {
 		return types.ErrInvalidSequence
 	}
@@ -61,6 +70,15 @@ func (tx *CreateOmega) Validate(p types.Process, loader types.LoaderWrapper, sig
 func (tx *CreateOmega) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
+	if tx.From() != tx.SigmaFormulators[0] {
+		return ErrInvalidFormulatorAddress
+	}
+
+	if tx.Seq() != ctw.Seq(tx.SigmaFormulators[0])+1 {
+		return types.ErrInvalidSequence
+	}
+	ctw.AddSeq(tx.SigmaFormulators[0])
+
 	policy := &OmegaPolicy{}
 	if err := encoding.Unmarshal(ctw.ProcessData(tagOmegaPolicy), &policy); err != nil {
 		return err
@@ -68,14 +86,6 @@ func (tx *CreateOmega) Execute(p types.Process, ctw *types.ContextWrapper, index
 	if len(tx.SigmaFormulators) != int(policy.OmegaRequiredSigmaCount) {
 		return ErrInvalidFormulatorCount
 	}
-
-	sn := ctw.Snapshot()
-	defer ctw.Revert(sn)
-
-	if tx.Seq() != ctw.Seq(tx.SigmaFormulators[0])+1 {
-		return types.ErrInvalidSequence
-	}
-	ctw.AddSeq(tx.SigmaFormulators[0])
 
 	acc, err := ctw.Account(tx.SigmaFormulators[0])
 	if err != nil {
@@ -108,8 +118,6 @@ func (tx *CreateOmega) Execute(p types.Process, ctw *types.ContextWrapper, index
 	}
 	frAcc.FormulatorType = OmegaFormulatorType
 	frAcc.UpdatedHeight = ctw.TargetHeight()
-
-	ctw.Commit(sn)
 	return nil
 }
 
@@ -126,6 +134,13 @@ func (tx *CreateOmega) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"seq":`)
 	if bs, err := json.Marshal(tx.Seq_); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"from":`)
+	if bs, err := tx.From_.MarshalJSON(); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

@@ -13,7 +13,7 @@ import (
 type Withdraw struct {
 	Timestamp_ uint64
 	Seq_       uint64
-	From       common.Address
+	From_      common.Address
 	Vout       []*types.TxOut
 }
 
@@ -27,6 +27,11 @@ func (tx *Withdraw) Seq() uint64 {
 	return tx.Seq_
 }
 
+// From returns the from address of the transaction
+func (tx *Withdraw) From() common.Address {
+	return tx.From_
+}
+
 // Fee returns the fee of the transaction
 func (tx *Withdraw) Fee(loader types.LoaderWrapper) *amount.Amount {
 	return amount.COIN.DivC(10)
@@ -34,11 +39,11 @@ func (tx *Withdraw) Fee(loader types.LoaderWrapper) *amount.Amount {
 
 // Validate validates signatures of the transaction
 func (tx *Withdraw) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
-	if tx.Seq() <= loader.Seq(tx.From) {
+	if tx.Seq() <= loader.Seq(tx.From()) {
 		return types.ErrInvalidSequence
 	}
 
-	fromAcc, err := loader.Account(tx.From)
+	fromAcc, err := loader.Account(tx.From())
 	if err != nil {
 		return err
 	}
@@ -52,15 +57,12 @@ func (tx *Withdraw) Validate(p types.Process, loader types.LoaderWrapper, signer
 func (tx *Withdraw) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Vault)
 
-	sn := ctw.Snapshot()
-	defer ctw.Revert(sn)
-
-	if tx.Seq() != ctw.Seq(tx.From)+1 {
+	if tx.Seq() != ctw.Seq(tx.From())+1 {
 		return types.ErrInvalidSequence
 	}
-	ctw.AddSeq(tx.From)
+	ctw.AddSeq(tx.From())
 
-	if has, err := ctw.HasAccount(tx.From); err != nil {
+	if has, err := ctw.HasAccount(tx.From()); err != nil {
 		return err
 	} else if !has {
 		return types.ErrNotExistAccount
@@ -75,11 +77,9 @@ func (tx *Withdraw) Execute(p types.Process, ctw *types.ContextWrapper, index ui
 			return err
 		}
 	}
-	if err := sp.SubBalance(ctw, tx.From, outsum); err != nil {
+	if err := sp.SubBalance(ctw, tx.From(), outsum); err != nil {
 		return err
 	}
-
-	ctw.Commit(sn)
 	return nil
 }
 
@@ -102,7 +102,7 @@ func (tx *Withdraw) MarshalJSON() ([]byte, error) {
 	}
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"from":`)
-	if bs, err := tx.From.MarshalJSON(); err != nil {
+	if bs, err := tx.From_.MarshalJSON(); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

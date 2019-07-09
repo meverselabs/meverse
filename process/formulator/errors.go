@@ -15,6 +15,7 @@ var (
 	ErrOmegaPolicyShouldBeSetupInApplication   = errors.New("OmegaPolicy should be setup in application")
 	ErrHyperPolicyShouldBeSetupInApplication   = errors.New("HyperPolicy should be setup in application")
 	ErrStakingPolicyShouldBeSetupInApplication = errors.New("StakingPolicy should be setup in application")
+	ErrInvalidFormulatorAddress                = errors.New("invalid formulator address")
 	ErrInvalidFormulatorCount                  = errors.New("invalid formulator count")
 	ErrInsufficientFormulatorBlocks            = errors.New("insufficient formulator blocks")
 	ErrUnauthorizedTransaction                 = errors.New("unauthorized transaction")

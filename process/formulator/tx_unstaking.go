@@ -14,7 +14,7 @@ import (
 type Unstaking struct {
 	Timestamp_      uint64
 	Seq_            uint64
-	From            common.Address
+	From_           common.Address
 	HyperFormulator common.Address
 	Amount          *amount.Amount
 }
@@ -29,6 +29,11 @@ func (tx *Unstaking) Seq() uint64 {
 	return tx.Seq_
 }
 
+// From returns the from address of the transaction
+func (tx *Unstaking) From() common.Address {
+	return tx.From_
+}
+
 // Fee returns the fee of the transaction
 func (tx *Unstaking) Fee(loader types.LoaderWrapper) *amount.Amount {
 	return amount.COIN.DivC(10)
@@ -36,7 +41,7 @@ func (tx *Unstaking) Fee(loader types.LoaderWrapper) *amount.Amount {
 
 // Validate validates signatures of the transaction
 func (tx *Unstaking) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
-	if tx.Seq() <= loader.Seq(tx.From) {
+	if tx.Seq() <= loader.Seq(tx.From()) {
 		return types.ErrInvalidSequence
 	}
 
@@ -56,7 +61,7 @@ func (tx *Unstaking) Validate(p types.Process, loader types.LoaderWrapper, signe
 		return types.ErrInvalidAccountType
 	}
 
-	fromAcc, err := loader.Account(tx.From)
+	fromAcc, err := loader.Account(tx.From())
 	if err != nil {
 		return err
 	}
@@ -71,13 +76,10 @@ func (tx *Unstaking) Validate(p types.Process, loader types.LoaderWrapper, signe
 func (tx *Unstaking) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	sn := ctw.Snapshot()
-	defer ctw.Revert(sn)
-
-	if tx.Seq() != ctw.Seq(tx.From)+1 {
+	if tx.Seq() != ctw.Seq(tx.From())+1 {
 		return types.ErrInvalidSequence
 	}
-	ctw.AddSeq(tx.From)
+	ctw.AddSeq(tx.From())
 
 	if tx.Amount.Less(amount.COIN.DivC(10)) {
 		return ErrInvalidStakingAmount
@@ -85,7 +87,7 @@ func (tx *Unstaking) Execute(p types.Process, ctw *types.ContextWrapper, index u
 
 	//UnlockEnableRequiredBlocks
 
-	fromAcc, err := ctw.Account(tx.From)
+	fromAcc, err := ctw.Account(tx.From())
 	if err != nil {
 		return err
 	}
@@ -105,15 +107,15 @@ func (tx *Unstaking) Execute(p types.Process, ctw *types.ContextWrapper, index u
 		return types.ErrInvalidAccountType
 	}
 
-	fromStakingAmount := sp.getStakingAmount(ctw, tx.HyperFormulator, tx.From)
+	fromStakingAmount := sp.getStakingAmount(ctw, tx.HyperFormulator, tx.From())
 	if fromStakingAmount.Less(tx.Amount) {
 		return ErrInsufficientStakingAmount
 	}
 	fromStakingAmount.Sub(tx.Amount)
 	if fromStakingAmount.IsZero() {
-		sp.removeStakingAmount(ctw, tx.HyperFormulator, tx.From)
+		sp.removeStakingAmount(ctw, tx.HyperFormulator, tx.From())
 	} else {
-		sp.setStakingAmount(ctw, tx.HyperFormulator, tx.From, fromStakingAmount)
+		sp.setStakingAmount(ctw, tx.HyperFormulator, tx.From(), fromStakingAmount)
 	}
 	if frAcc.StakingAmount.Less(tx.Amount) {
 		return ErrInsufficientStakingAmount
@@ -127,8 +129,6 @@ func (tx *Unstaking) Execute(p types.Process, ctw *types.ContextWrapper, index u
 	if err := sp.vault.AddLockedBalance(ctw, fromAcc.Address(), ctw.TargetHeight()+policy.StakingUnlockRequiredBlocks, tx.Amount); err != nil {
 		return err
 	}
-
-	ctw.Commit(sn)
 	return nil
 }
 
@@ -151,7 +151,7 @@ func (tx *Unstaking) MarshalJSON() ([]byte, error) {
 	}
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"from":`)
-	if bs, err := tx.From.MarshalJSON(); err != nil {
+	if bs, err := tx.From_.MarshalJSON(); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

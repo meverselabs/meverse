@@ -13,7 +13,7 @@ import (
 type Staking struct {
 	Timestamp_      uint64
 	Seq_            uint64
-	From            common.Address
+	From_           common.Address
 	HyperFormulator common.Address
 	Amount          *amount.Amount
 }
@@ -28,6 +28,11 @@ func (tx *Staking) Seq() uint64 {
 	return tx.Seq_
 }
 
+// From returns the from address of the transaction
+func (tx *Staking) From() common.Address {
+	return tx.From_
+}
+
 // Fee returns the fee of the transaction
 func (tx *Staking) Fee(loader types.LoaderWrapper) *amount.Amount {
 	return amount.COIN.DivC(10)
@@ -35,7 +40,7 @@ func (tx *Staking) Fee(loader types.LoaderWrapper) *amount.Amount {
 
 // Validate validates signatures of the transaction
 func (tx *Staking) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
-	if tx.Seq() <= loader.Seq(tx.From) {
+	if tx.Seq() <= loader.Seq(tx.From()) {
 		return types.ErrInvalidSequence
 	}
 
@@ -58,7 +63,7 @@ func (tx *Staking) Validate(p types.Process, loader types.LoaderWrapper, signers
 		return ErrInvalidStakingAmount
 	}
 
-	fromAcc, err := loader.Account(tx.From)
+	fromAcc, err := loader.Account(tx.From())
 	if err != nil {
 		return err
 	}
@@ -72,13 +77,10 @@ func (tx *Staking) Validate(p types.Process, loader types.LoaderWrapper, signers
 func (tx *Staking) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	sn := ctw.Snapshot()
-	defer ctw.Revert(sn)
-
-	if tx.Seq() != ctw.Seq(tx.From)+1 {
+	if tx.Seq() != ctw.Seq(tx.From())+1 {
 		return types.ErrInvalidSequence
 	}
-	ctw.AddSeq(tx.From)
+	ctw.AddSeq(tx.From())
 
 	if tx.Amount.Less(amount.COIN.DivC(10)) {
 		return ErrInvalidStakingAmount
@@ -99,7 +101,7 @@ func (tx *Staking) Execute(p types.Process, ctw *types.ContextWrapper, index uin
 		return ErrInsufficientStakingAmount
 	}
 
-	fromAcc, err := ctw.Account(tx.From)
+	fromAcc, err := ctw.Account(tx.From())
 	if err != nil {
 		return err
 	}
@@ -110,10 +112,8 @@ func (tx *Staking) Execute(p types.Process, ctw *types.ContextWrapper, index uin
 		return err
 	}
 
-	sp.addStakingAmount(ctw, tx.HyperFormulator, tx.From, tx.Amount)
+	sp.addStakingAmount(ctw, tx.HyperFormulator, tx.From(), tx.Amount)
 	frAcc.StakingAmount = frAcc.StakingAmount.Add(tx.Amount)
-
-	ctw.Commit(sn)
 	return nil
 }
 
@@ -136,7 +136,7 @@ func (tx *Staking) MarshalJSON() ([]byte, error) {
 	}
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"from":`)
-	if bs, err := tx.From.MarshalJSON(); err != nil {
+	if bs, err := tx.From_.MarshalJSON(); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

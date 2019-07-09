@@ -14,7 +14,7 @@ import (
 type CreateHyper struct {
 	Timestamp_ uint64
 	Seq_       uint64
-	From       common.Address
+	From_      common.Address
 	Name       string
 	KeyHash    common.PublicHash
 }
@@ -27,6 +27,11 @@ func (tx *CreateHyper) Timestamp() uint64 {
 // Seq returns the sequence of the transaction
 func (tx *CreateHyper) Seq() uint64 {
 	return tx.Seq_
+}
+
+// From returns the from address of the transaction
+func (tx *CreateHyper) From() common.Address {
+	return tx.From_
 }
 
 // Fee returns the fee of the transaction
@@ -42,15 +47,15 @@ func (tx *CreateHyper) Validate(p types.Process, loader types.LoaderWrapper, sig
 		return types.ErrInvalidAccountName
 	}
 
-	if tx.Seq() <= loader.Seq(tx.From) {
+	if tx.Seq() <= loader.Seq(tx.From()) {
 		return types.ErrInvalidSequence
 	}
 
-	if tx.From != sp.adminAddress {
+	if tx.From() != sp.adminAddress {
 		return ErrUnauthorizedTransaction
 	}
 
-	fromAcc, err := loader.Account(tx.From)
+	fromAcc, err := loader.Account(tx.From())
 	if err != nil {
 		return err
 	}
@@ -73,23 +78,20 @@ func (tx *CreateHyper) Execute(p types.Process, ctw *types.ContextWrapper, index
 		return err
 	}
 
-	sn := ctw.Snapshot()
-	defer ctw.Revert(sn)
-
-	if tx.Seq() != ctw.Seq(tx.From)+1 {
+	if tx.Seq() != ctw.Seq(tx.From())+1 {
 		return types.ErrInvalidSequence
 	}
-	ctw.AddSeq(tx.From)
+	ctw.AddSeq(tx.From())
 
-	if has, err := ctw.HasAccount(tx.From); err != nil {
+	if has, err := ctw.HasAccount(tx.From()); err != nil {
 		return err
 	} else if !has {
 		return types.ErrNotExistAccount
 	}
-	if err := sp.vault.SubBalance(ctw, tx.From, tx.Fee(ctw)); err != nil {
+	if err := sp.vault.SubBalance(ctw, tx.From(), tx.Fee(ctw)); err != nil {
 		return err
 	}
-	if err := sp.vault.SubBalance(ctw, tx.From, policy.HyperCreationAmount); err != nil {
+	if err := sp.vault.SubBalance(ctw, tx.From(), policy.HyperCreationAmount); err != nil {
 		return err
 	}
 
@@ -113,7 +115,6 @@ func (tx *CreateHyper) Execute(p types.Process, ctw *types.ContextWrapper, index
 		}
 		ctw.CreateAccount(acc)
 	}
-	ctw.Commit(sn)
 	return nil
 }
 
@@ -136,7 +137,7 @@ func (tx *CreateHyper) MarshalJSON() ([]byte, error) {
 	}
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"from":`)
-	if bs, err := tx.From.MarshalJSON(); err != nil {
+	if bs, err := tx.From_.MarshalJSON(); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

@@ -320,9 +320,14 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 		if err != nil {
 			return err
 		}
-		if err := tx.Execute(p, types.NewContextWrapper(pid, ctx), uint16(i)); err != nil {
+		ctw := types.NewContextWrapper(pid, ctx)
+
+		sn := ctw.Snapshot()
+		if err := tx.Execute(p, ctw, uint16(i)); err != nil {
+			ctw.Revert(sn)
 			return err
 		}
+		ctw.Commit(sn)
 	}
 
 	// AfterExecuteTransactions

@@ -13,7 +13,7 @@ import (
 type CreateMultiAccount struct {
 	Timestamp_ uint64
 	Seq_       uint64
-	From       common.Address
+	From_      common.Address
 	Name       string
 	Requried   uint8
 	KeyHashes  []common.PublicHash
@@ -27,6 +27,11 @@ func (tx *CreateMultiAccount) Timestamp() uint64 {
 // Seq returns the sequence of the transaction
 func (tx *CreateMultiAccount) Seq() uint64 {
 	return tx.Seq_
+}
+
+// From returns the from address of the transaction
+func (tx *CreateMultiAccount) From() common.Address {
+	return tx.From_
 }
 
 // Fee returns the fee of the transaction
@@ -59,11 +64,11 @@ func (tx *CreateMultiAccount) Validate(p types.Process, loader types.LoaderWrapp
 		return ErrInvalidRequiredKeyHashCount
 	}
 
-	if tx.Seq() <= loader.Seq(tx.From) {
+	if tx.Seq() <= loader.Seq(tx.From()) {
 		return types.ErrInvalidSequence
 	}
 
-	fromAcc, err := loader.Account(tx.From)
+	fromAcc, err := loader.Account(tx.From())
 	if err != nil {
 		return err
 	}
@@ -100,20 +105,17 @@ func (tx *CreateMultiAccount) Execute(p types.Process, ctw *types.ContextWrapper
 		return ErrInvalidRequiredKeyHashCount
 	}
 
-	sn := ctw.Snapshot()
-	defer ctw.Revert(sn)
-
-	if tx.Seq() != ctw.Seq(tx.From)+1 {
+	if tx.Seq() != ctw.Seq(tx.From())+1 {
 		return types.ErrInvalidSequence
 	}
-	ctw.AddSeq(tx.From)
+	ctw.AddSeq(tx.From())
 
-	if has, err := ctw.HasAccount(tx.From); err != nil {
+	if has, err := ctw.HasAccount(tx.From()); err != nil {
 		return err
 	} else if !has {
 		return types.ErrNotExistAccount
 	}
-	if err := sp.SubBalance(ctw, tx.From, tx.Fee(ctw)); err != nil {
+	if err := sp.SubBalance(ctw, tx.From(), tx.Fee(ctw)); err != nil {
 		return err
 	}
 
@@ -135,7 +137,6 @@ func (tx *CreateMultiAccount) Execute(p types.Process, ctw *types.ContextWrapper
 		}
 		ctw.CreateAccount(acc)
 	}
-	ctw.Commit(sn)
 	return nil
 }
 
@@ -158,7 +159,7 @@ func (tx *CreateMultiAccount) MarshalJSON() ([]byte, error) {
 	}
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"from":`)
-	if bs, err := tx.From.MarshalJSON(); err != nil {
+	if bs, err := tx.From_.MarshalJSON(); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

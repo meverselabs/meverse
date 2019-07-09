@@ -14,7 +14,7 @@ import (
 type Revoke struct {
 	Timestamp_ uint64
 	Seq_       uint64
-	From       common.Address
+	From_      common.Address
 	Heritor    common.Address
 }
 
@@ -28,6 +28,11 @@ func (tx *Revoke) Seq() uint64 {
 	return tx.Seq_
 }
 
+// From returns the from address of the transaction
+func (tx *Revoke) From() common.Address {
+	return tx.From_
+}
+
 // Fee returns the fee of the transaction
 func (tx *Revoke) Fee(loader types.LoaderWrapper) *amount.Amount {
 	return amount.COIN.DivC(10)
@@ -35,11 +40,11 @@ func (tx *Revoke) Fee(loader types.LoaderWrapper) *amount.Amount {
 
 // Validate validates signatures of the transaction
 func (tx *Revoke) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
-	if tx.Seq() <= loader.Seq(tx.From) {
+	if tx.Seq() <= loader.Seq(tx.From()) {
 		return types.ErrInvalidSequence
 	}
 
-	acc, err := loader.Account(tx.From)
+	acc, err := loader.Account(tx.From())
 	if err != nil {
 		return err
 	}
@@ -60,17 +65,17 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 	sn := ctw.Snapshot()
 	defer ctw.Revert(sn)
 
-	if tx.Seq() != ctw.Seq(tx.From)+1 {
+	if tx.Seq() != ctw.Seq(tx.From())+1 {
 		return types.ErrInvalidSequence
 	}
-	ctw.AddSeq(tx.From)
+	ctw.AddSeq(tx.From())
 
-	heritorAcc, err := ctw.Account(tx.From)
+	heritorAcc, err := ctw.Account(tx.From())
 	if err != nil {
 		return err
 	}
 
-	acc, err := ctw.Account(tx.From)
+	acc, err := ctw.Account(tx.From())
 	if err != nil {
 		return err
 	}
@@ -139,7 +144,7 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 			return err
 		}
 
-		PowerMap, err := sp.getStakingAmountMap(ctw, tx.From)
+		PowerMap, err := sp.getStakingAmountMap(ctw, tx.From())
 		if err != nil {
 			return err
 		}
@@ -187,7 +192,7 @@ func (tx *Revoke) MarshalJSON() ([]byte, error) {
 	}
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"from":`)
-	if bs, err := tx.From.MarshalJSON(); err != nil {
+	if bs, err := tx.From_.MarshalJSON(); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

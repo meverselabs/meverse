@@ -14,7 +14,7 @@ import (
 type CreateAlpha struct {
 	Timestamp_ uint64
 	Seq_       uint64
-	From       common.Address
+	From_      common.Address
 	Name       string
 	KeyHash    common.PublicHash
 }
@@ -29,6 +29,11 @@ func (tx *CreateAlpha) Seq() uint64 {
 	return tx.Seq_
 }
 
+// From returns the from address of the transaction
+func (tx *CreateAlpha) From() common.Address {
+	return tx.From_
+}
+
 // Fee returns the fee of the transaction
 func (tx *CreateAlpha) Fee(loader types.LoaderWrapper) *amount.Amount {
 	return amount.COIN.DivC(10)
@@ -40,11 +45,11 @@ func (tx *CreateAlpha) Validate(p types.Process, loader types.LoaderWrapper, sig
 		return types.ErrInvalidAccountName
 	}
 
-	if tx.Seq() <= loader.Seq(tx.From) {
+	if tx.Seq() <= loader.Seq(tx.From()) {
 		return types.ErrInvalidSequence
 	}
 
-	fromAcc, err := loader.Account(tx.From)
+	fromAcc, err := loader.Account(tx.From())
 	if err != nil {
 		return err
 	}
@@ -62,6 +67,11 @@ func (tx *CreateAlpha) Execute(p types.Process, ctw *types.ContextWrapper, index
 		return types.ErrInvalidAccountName
 	}
 
+	if tx.Seq() != ctw.Seq(tx.From())+1 {
+		return types.ErrInvalidSequence
+	}
+	ctw.AddSeq(tx.From())
+
 	policy := &AlphaPolicy{}
 	if err := encoding.Unmarshal(ctw.ProcessData(tagAlphaPolicy), &policy); err != nil {
 		return err
@@ -70,23 +80,15 @@ func (tx *CreateAlpha) Execute(p types.Process, ctw *types.ContextWrapper, index
 		return ErrAlphaCreationLimited
 	}
 
-	sn := ctw.Snapshot()
-	defer ctw.Revert(sn)
-
-	if tx.Seq() != ctw.Seq(tx.From)+1 {
-		return types.ErrInvalidSequence
-	}
-	ctw.AddSeq(tx.From)
-
-	if has, err := ctw.HasAccount(tx.From); err != nil {
+	if has, err := ctw.HasAccount(tx.From()); err != nil {
 		return err
 	} else if !has {
 		return types.ErrNotExistAccount
 	}
-	if err := sp.vault.SubBalance(ctw, tx.From, tx.Fee(ctw)); err != nil {
+	if err := sp.vault.SubBalance(ctw, tx.From(), tx.Fee(ctw)); err != nil {
 		return err
 	}
-	if err := sp.vault.SubBalance(ctw, tx.From, policy.AlphaCreationAmount); err != nil {
+	if err := sp.vault.SubBalance(ctw, tx.From(), policy.AlphaCreationAmount); err != nil {
 		return err
 	}
 
@@ -110,7 +112,6 @@ func (tx *CreateAlpha) Execute(p types.Process, ctw *types.ContextWrapper, index
 		}
 		ctw.CreateAccount(acc)
 	}
-	ctw.Commit(sn)
 	return nil
 }
 
@@ -133,7 +134,7 @@ func (tx *CreateAlpha) MarshalJSON() ([]byte, error) {
 	}
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"from":`)
-	if bs, err := tx.From.MarshalJSON(); err != nil {
+	if bs, err := tx.From_.MarshalJSON(); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

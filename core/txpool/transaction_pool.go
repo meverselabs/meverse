@@ -13,12 +13,6 @@ import (
 // AccountTransaction is an interface that defines common functions of account model based transactions
 type AccountTransaction interface {
 	Seq() uint64
-	From() common.Address
-}
-
-// UTXOTransaction is an interface that defines common functions of utxo model based transactions
-type UTXOTransaction interface {
-	VinIDs() []uint64
 }
 
 // TransactionPool provides a transaction queue
