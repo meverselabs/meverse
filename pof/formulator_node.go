@@ -129,7 +129,7 @@ func (fr *FormulatorNode) Run() {
 			for {
 				select {
 				case item := <-(*pMsgCh):
-					if err := fr.addTx(item.Message.TxType, item.Message.Tx, item.Message.Sigs); err != nil {
+					if err := fr.AddTx(item.Message.Tx, item.Message.Sigs); err != nil {
 						if err != txpool.ErrPastSeq || err != txpool.ErrTooFarSeq {
 							(*item.pErrCh) <- err
 						} else {
@@ -179,9 +179,16 @@ func (fr *FormulatorNode) Run() {
 	}
 }
 
-func (fr *FormulatorNode) addTx(t uint16, tx types.Transaction, sigs []common.Signature) error {
+// AddTx adds tx to txpool that only have valid signatures
+func (fr *FormulatorNode) AddTx(tx types.Transaction, sigs []common.Signature) error {
 	if fr.txpool.Size() > 65535 {
 		return txpool.ErrTransactionPoolOverflowed
+	}
+
+	fc := encoding.Factory("transaction")
+	t, err := fc.TypeOf(tx)
+	if err != nil {
+		return err
 	}
 
 	TxHash := chain.HashTransactionByType(t, tx)
@@ -402,7 +409,7 @@ func (fr *FormulatorNode) handleMessage(p *p2p.Peer, m interface{}, RetryCount i
 			if err := p.Send(nm); err != nil {
 				return err
 			}
-			log.Println("Formulator", fr.Config.Formulator.String(), "BlockGenMessage", nm.Block.Header.Height)
+			log.Println("Formulator", fr.Config.Formulator.String(), "BlockGenMessage", nm.Block.Header.Height, len(nm.Block.Transactions))
 
 			fr.lastGenMessages = append(fr.lastGenMessages, nm)
 			fr.lastContextes = append(fr.lastContextes, ctx)
@@ -452,6 +459,7 @@ func (fr *FormulatorNode) handleMessage(p *p2p.Peer, m interface{}, RetryCount i
 				if err := fr.cs.ct.ConnectBlockWithContext(b, ctx); err != nil {
 					return err
 				}
+				log.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Height, len(b.Transactions))
 
 				if status, has := fr.statusMap[p.ID]; has {
 					if status.Height < GenMessage.Block.Header.Height {

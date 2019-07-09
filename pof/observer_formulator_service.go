@@ -201,17 +201,17 @@ func (ms *FormulatorService) handleConnection(p *p2p.Peer) error {
 
 	var pingCount uint64
 	pingCountLimit := uint64(3)
-	pingTimer := time.NewTimer(10 * time.Second)
+	pingTicker := time.NewTicker(10 * time.Second)
 	go func() {
 		for {
 			select {
-			case <-pingTimer.C:
+			case <-pingTicker.C:
 				if err := p.Send(&p2p.PingMessage{}); err != nil {
-					p.Close()
+					ms.RemovePeer(p.ID)
 					return
 				}
 				if atomic.AddUint64(&pingCount, 1) > pingCountLimit {
-					p.Close()
+					ms.RemovePeer(p.ID)
 					return
 				}
 			}
@@ -222,7 +222,7 @@ func (ms *FormulatorService) handleConnection(p *p2p.Peer) error {
 		if err != nil {
 			return err
 		}
-		atomic.SwapUint64(&pingCount, 0)
+		atomic.StoreUint64(&pingCount, 0)
 		if _, is := m.(*p2p.PingMessage); is {
 			continue
 		} else if m == nil {

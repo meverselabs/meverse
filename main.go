@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
@@ -101,6 +102,7 @@ func test() error {
 	}
 
 	frs := []*pof.FormulatorNode{}
+	cns := []*chain.Chain{}
 	for i, frkey := range frkeys {
 		st, err := chain.NewStore("./_data/f"+strconv.Itoa(i+1), "FLEAT Mainnet", 0x0001, true)
 		if err != nil {
@@ -127,10 +129,32 @@ func test() error {
 			return err
 		}
 		frs = append(frs, fr)
+		cns = append(cns, cn)
 	}
 
 	for _, fr := range frs {
 		go fr.Run()
+	}
+
+	From := common.NewAddress(0, 1, 0)
+	seq := cns[0].Seq(From)
+	for i := 0; i < 100; i++ {
+		seq++
+		tx := &vault.Transfer{
+			Timestamp_: uint64(time.Now().UnixNano()),
+			Seq_:       seq,
+			From_:      From,
+			To:         common.NewAddress(0, 2, 0),
+			Amount:     amount.COIN,
+		}
+		sig, err := frkeys[0].Sign(chain.HashTransaction(tx))
+		if err != nil {
+			return err
+		}
+		sigs := []common.Signature{sig}
+		if err := frs[0].AddTx(tx, sigs); err != nil {
+			return err
+		}
 	}
 	select {}
 	return nil

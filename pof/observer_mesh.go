@@ -277,7 +277,7 @@ func (ms *ObserverNodeMesh) server(BindAddress string) error {
 }
 
 func (ms *ObserverNodeMesh) handleConnection(p *p2p.Peer) error {
-	log.Println(common.NewPublicHash(ms.key.PublicKey()).String(), "Connected", p.Name)
+	log.Println("Observer", common.NewPublicHash(ms.key.PublicKey()).String(), "Observer Connected", p.Name)
 
 	var pingCount uint64
 	pingCountLimit := uint64(3)
@@ -302,7 +302,7 @@ func (ms *ObserverNodeMesh) handleConnection(p *p2p.Peer) error {
 		if err != nil {
 			return err
 		}
-		atomic.SwapUint64(&pingCount, 0)
+		atomic.StoreUint64(&pingCount, 0)
 		if _, is := m.(*p2p.PingMessage); is {
 			continue
 		} else if m == nil {
