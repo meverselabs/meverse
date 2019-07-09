@@ -10,7 +10,7 @@ import (
 	"github.com/fletaio/fleta/encoding"
 )
 
-func (ob *Observer) sendRoundVote() error {
+func (ob *ObserverNode) sendRoundVote() error {
 	Top, TimeoutCount, err := ob.cs.rt.TopRankInMap(ob.adjustFormulatorMap())
 	if err != nil {
 		return err
@@ -59,7 +59,7 @@ func (ob *Observer) sendRoundVote() error {
 	return nil
 }
 
-func (ob *Observer) sendRoundVoteTo(TargetPubHash common.PublicHash) error {
+func (ob *ObserverNode) sendRoundVoteTo(TargetPubHash common.PublicHash) error {
 	if TargetPubHash == ob.myPublicHash {
 		return nil
 	}
@@ -91,7 +91,7 @@ func (ob *Observer) sendRoundVoteTo(TargetPubHash common.PublicHash) error {
 	return nil
 }
 
-func (ob *Observer) sendRoundVoteAck() error {
+func (ob *ObserverNode) sendRoundVoteAck() error {
 	MinRoundVote := ob.round.RoundVoteMessageMap[ob.round.MinVotePublicHash].RoundVote
 	nm := &RoundVoteAckMessage{
 		RoundVoteAck: &RoundVoteAck{
@@ -121,7 +121,7 @@ func (ob *Observer) sendRoundVoteAck() error {
 	return nil
 }
 
-func (ob *Observer) sendRoundVoteAckTo(TargetPubHash common.PublicHash) error {
+func (ob *ObserverNode) sendRoundVoteAckTo(TargetPubHash common.PublicHash) error {
 	if TargetPubHash == ob.myPublicHash {
 		return nil
 	}
@@ -154,7 +154,7 @@ func (ob *Observer) sendRoundVoteAckTo(TargetPubHash common.PublicHash) error {
 	return nil
 }
 
-func (ob *Observer) sendBlockVote(gen *BlockGenMessage) error {
+func (ob *ObserverNode) sendBlockVote(gen *BlockGenMessage) error {
 	nm := &BlockVoteMessage{
 		BlockVote: &BlockVote{
 			TargetHeight:       ob.round.TargetHeight,
@@ -188,7 +188,7 @@ func (ob *Observer) sendBlockVote(gen *BlockGenMessage) error {
 	return nil
 }
 
-func (ob *Observer) sendBlockGenTo(gen *BlockGenMessage, TargetPubHash common.PublicHash) error {
+func (ob *ObserverNode) sendBlockGenTo(gen *BlockGenMessage, TargetPubHash common.PublicHash) error {
 	if TargetPubHash == ob.myPublicHash {
 		return nil
 	}
@@ -196,7 +196,7 @@ func (ob *Observer) sendBlockGenTo(gen *BlockGenMessage, TargetPubHash common.Pu
 	return nil
 }
 
-func (ob *Observer) sendBlockVoteTo(gen *BlockGenMessage, TargetPubHash common.PublicHash) error {
+func (ob *ObserverNode) sendBlockVoteTo(gen *BlockGenMessage, TargetPubHash common.PublicHash) error {
 	if TargetPubHash == ob.myPublicHash {
 		return nil
 	}
@@ -228,7 +228,7 @@ func (ob *Observer) sendBlockVoteTo(gen *BlockGenMessage, TargetPubHash common.P
 	return nil
 }
 
-func (ob *Observer) sendStatusTo(TargetPubHash common.PublicHash) error {
+func (ob *ObserverNode) sendStatusTo(TargetPubHash common.PublicHash) error {
 	if TargetPubHash == ob.myPublicHash {
 		return nil
 	}
@@ -243,7 +243,7 @@ func (ob *Observer) sendStatusTo(TargetPubHash common.PublicHash) error {
 	return nil
 }
 
-func (ob *Observer) broadcastStatus() error {
+func (ob *ObserverNode) broadcastStatus() error {
 	cp := ob.cs.cn.Provider()
 	nm := &p2p.StatusMessage{
 		Version:  cp.Version(),
@@ -254,7 +254,7 @@ func (ob *Observer) broadcastStatus() error {
 	return nil
 }
 
-func (ob *Observer) sendRequestBlockTo(TargetPubHash common.PublicHash, Height uint32) error {
+func (ob *ObserverNode) sendRequestBlockTo(TargetPubHash common.PublicHash, Height uint32) error {
 	if TargetPubHash == ob.myPublicHash {
 		return nil
 	}

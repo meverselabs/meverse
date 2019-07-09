@@ -18,16 +18,16 @@ import (
 	"github.com/fletaio/fleta/service/p2p"
 )
 
-type FormulatorMesh struct {
+type FormulatorNodeMesh struct {
 	sync.Mutex
-	fr            *Formulator
+	fr            *FormulatorNode
 	key           key.Key
 	netAddressMap map[common.PublicHash]string
 	peerMap       map[common.PublicHash]*Peer
 }
 
-func NewFormulatorMesh(key key.Key, NetAddressMap map[common.PublicHash]string, fr *Formulator) *FormulatorMesh {
-	ms := &FormulatorMesh{
+func NewFormulatorNodeMesh(key key.Key, NetAddressMap map[common.PublicHash]string, fr *FormulatorNode) *FormulatorNodeMesh {
+	ms := &FormulatorNodeMesh{
 		key:           key,
 		netAddressMap: NetAddressMap,
 		peerMap:       map[common.PublicHash]*Peer{},
@@ -37,7 +37,7 @@ func NewFormulatorMesh(key key.Key, NetAddressMap map[common.PublicHash]string, 
 }
 
 // Run starts the formulator mesh
-func (ms *FormulatorMesh) Run() {
+func (ms *FormulatorNodeMesh) Run() {
 	for PubHash, v := range ms.netAddressMap {
 		go func(pubhash common.PublicHash, NetAddr string) {
 			time.Sleep(1 * time.Second)
@@ -57,7 +57,7 @@ func (ms *FormulatorMesh) Run() {
 }
 
 // Peers returns peers of the formulator mesh
-func (ms *FormulatorMesh) Peers() []*Peer {
+func (ms *FormulatorNodeMesh) Peers() []*Peer {
 	ms.Lock()
 	defer ms.Unlock()
 
@@ -69,7 +69,7 @@ func (ms *FormulatorMesh) Peers() []*Peer {
 }
 
 // RemovePeer removes peers from the mesh
-func (ms *FormulatorMesh) RemovePeer(p *Peer) {
+func (ms *FormulatorNodeMesh) RemovePeer(p *Peer) {
 	ms.Lock()
 	p, has := ms.peerMap[p.pubhash]
 	if has {
@@ -83,7 +83,7 @@ func (ms *FormulatorMesh) RemovePeer(p *Peer) {
 }
 
 // RemovePeerInMap removes peers from the mesh in the map
-func (ms *FormulatorMesh) RemovePeerInMap(p *Peer, peerMap map[common.PublicHash]*Peer) {
+func (ms *FormulatorNodeMesh) RemovePeerInMap(p *Peer, peerMap map[common.PublicHash]*Peer) {
 	ms.Lock()
 	delete(peerMap, p.pubhash)
 	ms.Unlock()
@@ -92,7 +92,7 @@ func (ms *FormulatorMesh) RemovePeerInMap(p *Peer, peerMap map[common.PublicHash
 }
 
 // SendTo sends a message to the observer
-func (ms *FormulatorMesh) SendTo(PublicHash common.PublicHash, m interface{}) error {
+func (ms *FormulatorNodeMesh) SendTo(PublicHash common.PublicHash, m interface{}) error {
 	ms.Lock()
 	p, has := ms.peerMap[PublicHash]
 	ms.Unlock()
@@ -108,7 +108,7 @@ func (ms *FormulatorMesh) SendTo(PublicHash common.PublicHash, m interface{}) er
 }
 
 // BroadcastRaw sends a message to all peers
-func (ms *FormulatorMesh) BroadcastRaw(bs []byte) {
+func (ms *FormulatorNodeMesh) BroadcastRaw(bs []byte) {
 	peerMap := map[common.PublicHash]*Peer{}
 	ms.Lock()
 	for _, p := range ms.peerMap {
@@ -122,7 +122,7 @@ func (ms *FormulatorMesh) BroadcastRaw(bs []byte) {
 }
 
 // BroadcastMessage sends a message to all peers
-func (ms *FormulatorMesh) BroadcastMessage(m interface{}) error {
+func (ms *FormulatorNodeMesh) BroadcastMessage(m interface{}) error {
 	var buffer bytes.Buffer
 	fc := encoding.Factory("pof.message")
 	t, err := fc.TypeOf(m)
@@ -149,7 +149,7 @@ func (ms *FormulatorMesh) BroadcastMessage(m interface{}) error {
 	return nil
 }
 
-func (ms *FormulatorMesh) client(Address string, TargetPubHash common.PublicHash) error {
+func (ms *FormulatorNodeMesh) client(Address string, TargetPubHash common.PublicHash) error {
 	conn, err := net.DialTimeout("tcp", Address, 10*time.Second)
 	if err != nil {
 		return err
@@ -189,7 +189,7 @@ func (ms *FormulatorMesh) client(Address string, TargetPubHash common.PublicHash
 	return nil
 }
 
-func (ms *FormulatorMesh) handleConnection(p *Peer) error {
+func (ms *FormulatorNodeMesh) handleConnection(p *Peer) error {
 	log.Println(common.NewPublicHash(ms.key.PublicKey()).String(), "Connected", p.pubhash.String())
 
 	ms.fr.OnObserverConnected(p)
@@ -229,7 +229,7 @@ func (ms *FormulatorMesh) handleConnection(p *Peer) error {
 	}
 }
 
-func (ms *FormulatorMesh) recvHandshake(conn net.Conn) error {
+func (ms *FormulatorNodeMesh) recvHandshake(conn net.Conn) error {
 	//log.Println("recvHandshake")
 	req := make([]byte, 40)
 	if _, err := p2p.FillBytes(conn, req); err != nil {
@@ -253,7 +253,7 @@ func (ms *FormulatorMesh) recvHandshake(conn net.Conn) error {
 	return nil
 }
 
-func (ms *FormulatorMesh) sendHandshake(conn net.Conn) (common.PublicHash, error) {
+func (ms *FormulatorNodeMesh) sendHandshake(conn net.Conn) (common.PublicHash, error) {
 	//log.Println("sendHandshake")
 	req := make([]byte, 60)
 	if _, err := crand.Read(req[:32]); err != nil {

@@ -24,12 +24,12 @@ type FormulatorConfig struct {
 	Formulator common.Address
 }
 
-// Formulator procudes a block by the consensus
-type Formulator struct {
+// FormulatorNode procudes a block by the consensus
+type FormulatorNode struct {
 	sync.Mutex
 	Config               *FormulatorConfig
 	cs                   *Consensus
-	ms                   *FormulatorMesh
+	ms                   *FormulatorNodeMesh
 	key                  key.Key
 	lastGenMessages      []*BlockGenMessage
 	lastObSignMessageMap map[uint32]*BlockObSignMessage
@@ -47,9 +47,9 @@ type Formulator struct {
 	isClose              bool
 }
 
-// NewFormulator returns a Formulator
-func NewFormulator(Config *FormulatorConfig, key key.Key, NetAddressMap map[common.PublicHash]string, cs *Consensus) *Formulator {
-	fr := &Formulator{
+// NewFormulatorNode returns a FormulatorNode
+func NewFormulator(Config *FormulatorConfig, key key.Key, NetAddressMap map[common.PublicHash]string, cs *Consensus) *FormulatorNode {
+	fr := &FormulatorNode{
 		Config:               Config,
 		cs:                   cs,
 		key:                  key,
@@ -61,12 +61,12 @@ func NewFormulator(Config *FormulatorConfig, key key.Key, NetAddressMap map[comm
 		runEnd:               make(chan struct{}),
 		blockQ:               queue.NewSortedQueue(),
 	}
-	fr.ms = NewFormulatorMesh(key, NetAddressMap, fr)
+	fr.ms = NewFormulatorNodeMesh(key, NetAddressMap, fr)
 	return fr
 }
 
 // Close terminates the formulator
-func (fr *Formulator) Close() {
+func (fr *FormulatorNode) Close() {
 	fr.closeLock.Lock()
 	defer fr.closeLock.Unlock()
 
@@ -79,7 +79,7 @@ func (fr *Formulator) Close() {
 }
 
 // Init initializes formulator
-func (fr *Formulator) Init() error {
+func (fr *FormulatorNode) Init() error {
 	fc := encoding.Factory("pof.message")
 	fc.Register(types.DefineHashedType("pof.BlockReqMessage"), &BlockReqMessage{})
 	fc.Register(types.DefineHashedType("pof.BlockGenMessage"), &BlockGenMessage{})
@@ -92,7 +92,7 @@ func (fr *Formulator) Init() error {
 }
 
 // Run runs the formulator
-func (fr *Formulator) Run() {
+func (fr *FormulatorNode) Run() {
 	fr.Lock()
 	if fr.isRunning {
 		fr.Unlock()
@@ -172,20 +172,20 @@ func (fr *Formulator) Run() {
 }
 
 // OnObserverConnected is called after a new observer peer is connected
-func (fr *Formulator) OnObserverConnected(p *Peer) {
+func (fr *FormulatorNode) OnObserverConnected(p *Peer) {
 	fr.Lock()
 	fr.statusMap[p.pubhash] = &p2p.Status{}
 	fr.Unlock()
 }
 
 // OnObserverDisconnected is called when the observer peer is disconnected
-func (fr *Formulator) OnObserverDisconnected(p *Peer) {
+func (fr *FormulatorNode) OnObserverDisconnected(p *Peer) {
 	fr.Lock()
 	delete(fr.statusMap, p.pubhash)
 	fr.Unlock()
 }
 
-func (fr *Formulator) onRecv(p *Peer, m interface{}) error {
+func (fr *FormulatorNode) onRecv(p *Peer, m interface{}) error {
 	if err := fr.handleMessage(p, m, 0); err != nil {
 		//log.Println(err)
 		return nil
@@ -193,7 +193,7 @@ func (fr *Formulator) onRecv(p *Peer, m interface{}) error {
 	return nil
 }
 
-func (fr *Formulator) handleMessage(p *Peer, m interface{}, RetryCount int) error {
+func (fr *FormulatorNode) handleMessage(p *Peer, m interface{}, RetryCount int) error {
 	cp := fr.cs.cn.Provider()
 
 	switch msg := m.(type) {
@@ -452,7 +452,7 @@ func (fr *Formulator) handleMessage(p *Peer, m interface{}, RetryCount int) erro
 	}
 }
 
-func (fr *Formulator) addBlock(b *types.Block) error {
+func (fr *FormulatorNode) addBlock(b *types.Block) error {
 	cp := fr.cs.cn.Provider()
 	if b.Header.Height <= cp.Height() {
 		h, err := cp.Hash(b.Header.Height)
@@ -475,7 +475,7 @@ func (fr *Formulator) addBlock(b *types.Block) error {
 	return nil
 }
 
-func (fr *Formulator) tryRequestNext() {
+func (fr *FormulatorNode) tryRequestNext() {
 	fr.requestLock.Lock()
 	defer fr.requestLock.Unlock()
 

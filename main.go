@@ -67,7 +67,7 @@ func test() error {
 
 	MaxBlocksPerFormulator := uint32(10)
 
-	obs := []*pof.Observer{}
+	obs := []*pof.ObserverNode{}
 	for i, obkey := range obkeys {
 		st, err := chain.NewStore("./_data/o"+strconv.Itoa(i+1), "FLEAT Mainnet", 0x0001, true)
 		if err != nil {
@@ -85,7 +85,7 @@ func test() error {
 		if err := cn.Init(); err != nil {
 			return err
 		}
-		ob := pof.NewObserver(obkey, NetAddressMap, cs, ObserverKeys[i])
+		ob := pof.NewObserverNode(obkey, NetAddressMap, cs, ObserverKeys[i])
 		if err := ob.Init(); err != nil {
 			return err
 		}
@@ -99,7 +99,7 @@ func test() error {
 		)
 	}
 
-	frs := []*pof.Formulator{}
+	frs := []*pof.FormulatorNode{}
 	for i, frkey := range frkeys {
 		st, err := chain.NewStore("./_data/f"+strconv.Itoa(i+1), "FLEAT Mainnet", 0x0001, true)
 		if err != nil {
@@ -137,17 +137,12 @@ func test() error {
 // DApp is app
 type DApp struct {
 	sync.Mutex
-	*types.ProcessBase
+	*types.ApplicationBase
 	pm           types.ProcessManager
 	cn           types.Provider
 	frkey        key.Key
 	frkey2       key.Key
 	adminAddress common.Address
-}
-
-// ID must returns 255
-func (app *DApp) ID() uint8 {
-	return 255
 }
 
 // Name returns the name of the application

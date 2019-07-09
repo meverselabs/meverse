@@ -22,12 +22,12 @@ import (
 type FormulatorService struct {
 	sync.Mutex
 	key     key.Key
-	ob      *Observer
+	ob      *ObserverNode
 	peerMap map[common.Address]*Peer
 }
 
 // NewFormulatorService returns a FormulatorService
-func NewFormulatorService(ob *Observer) *FormulatorService {
+func NewFormulatorService(ob *ObserverNode) *FormulatorService {
 	ms := &FormulatorService{
 		key:     ob.key,
 		ob:      ob,

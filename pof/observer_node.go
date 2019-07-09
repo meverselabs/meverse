@@ -23,10 +23,11 @@ type messageItem struct {
 	Raw        []byte
 }
 
-type Observer struct {
+// ObserverNode observes a block by the consensus
+type ObserverNode struct {
 	sync.Mutex
 	key              key.Key
-	ms               *ObserverMesh
+	ms               *ObserverNodeMesh
 	fs               *FormulatorService
 	cs               *Consensus
 	round            *VoteRound
@@ -45,8 +46,9 @@ type Observer struct {
 	prevRoundEndTime int64 // FOR DEBUG
 }
 
-func NewObserver(key key.Key, NetAddressMap map[common.PublicHash]string, cs *Consensus, MyPublicHash common.PublicHash) *Observer {
-	ob := &Observer{
+// NewObserverNode returns a ObserverNode
+func NewObserverNode(key key.Key, NetAddressMap map[common.PublicHash]string, cs *Consensus, MyPublicHash common.PublicHash) *ObserverNode {
+	ob := &ObserverNode{
 		key:          key,
 		cs:           cs,
 		round:        NewVoteRound(cs.cn.Provider().Height()+1, cs.maxBlocksPerFormulator-cs.blocksBySameFormulator),
@@ -55,14 +57,14 @@ func NewObserver(key key.Key, NetAddressMap map[common.PublicHash]string, cs *Co
 		messageQueue: queue.NewQueue(),
 		blockQ:       queue.NewSortedQueue(),
 	}
-	ob.ms = NewObserverMesh(key, NetAddressMap, ob)
+	ob.ms = NewObserverNodeMesh(key, NetAddressMap, ob)
 	ob.fs = NewFormulatorService(ob)
 	ob.requestTimer = p2p.NewRequestTimer(ob)
 	return ob
 }
 
 // Init initializes observer
-func (ob *Observer) Init() error {
+func (ob *ObserverNode) Init() error {
 	fc := encoding.Factory("pof.message")
 	fc.Register(types.DefineHashedType("pof.RoundVoteMessage"), &RoundVoteMessage{})
 	fc.Register(types.DefineHashedType("pof.RoundVoteAckMessage"), &RoundVoteAckMessage{})
@@ -78,7 +80,7 @@ func (ob *Observer) Init() error {
 }
 
 // Close terminates the observer
-func (ob *Observer) Close() {
+func (ob *ObserverNode) Close() {
 	ob.closeLock.Lock()
 	defer ob.closeLock.Unlock()
 
@@ -91,7 +93,7 @@ func (ob *Observer) Close() {
 }
 
 // Run starts the pof consensus on the observer
-func (ob *Observer) Run(BindObserver string, BindFormulator string) {
+func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 	ob.Lock()
 	if ob.isRunning {
 		ob.Unlock()
@@ -187,7 +189,7 @@ func (ob *Observer) Run(BindObserver string, BindFormulator string) {
 }
 
 // OnTimerExpired called when rquest expired
-func (ob *Observer) OnTimerExpired(height uint32, P interface{}) {
+func (ob *ObserverNode) OnTimerExpired(height uint32, P interface{}) {
 	TargetPubHash := P.(common.PublicHash)
 	list := ob.ms.Peers()
 	for _, v := range list {
@@ -198,7 +200,7 @@ func (ob *Observer) OnTimerExpired(height uint32, P interface{}) {
 	}
 }
 
-func (ob *Observer) syncVoteRound() {
+func (ob *ObserverNode) syncVoteRound() {
 	cp := ob.cs.cn.Provider()
 	TargetHeight := cp.Height() + 1
 	if ob.round.TargetHeight < TargetHeight {
@@ -225,7 +227,7 @@ func (ob *Observer) syncVoteRound() {
 	}
 }
 
-func (ob *Observer) resetVoteRound(resetStat bool) {
+func (ob *ObserverNode) resetVoteRound(resetStat bool) {
 	ob.round = NewVoteRound(ob.cs.cn.Provider().Height()+1, ob.cs.maxBlocksPerFormulator-ob.cs.blocksBySameFormulator)
 	ob.prevRoundEndTime = time.Now().UnixNano()
 	if resetStat {
@@ -234,7 +236,7 @@ func (ob *Observer) resetVoteRound(resetStat bool) {
 	}
 }
 
-func (ob *Observer) onObserverRecv(p *Peer, m interface{}) error {
+func (ob *ObserverNode) onObserverRecv(p *Peer, m interface{}) error {
 	if msg, is := m.(*BlockGenMessage); is {
 		ob.messageQueue.Push(&messageItem{
 			Message: msg,
@@ -248,7 +250,7 @@ func (ob *Observer) onObserverRecv(p *Peer, m interface{}) error {
 	return nil
 }
 
-func (ob *Observer) onFormulatorRecv(p *Peer, m interface{}, raw []byte) error {
+func (ob *ObserverNode) onFormulatorRecv(p *Peer, m interface{}, raw []byte) error {
 	cp := ob.cs.cn.Provider()
 
 	switch msg := m.(type) {
@@ -315,7 +317,7 @@ func (ob *Observer) onFormulatorRecv(p *Peer, m interface{}, raw []byte) error {
 	return nil
 }
 
-func (ob *Observer) handleObserverMessage(SenderPublicHash common.PublicHash, m interface{}, raw []byte) error {
+func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash, m interface{}, raw []byte) error {
 	cp := ob.cs.cn.Provider()
 
 	ob.syncVoteRound()
@@ -864,7 +866,7 @@ func (ob *Observer) handleObserverMessage(SenderPublicHash common.PublicHash, m 
 	return nil
 }
 
-func (ob *Observer) addBlock(b *types.Block) error {
+func (ob *ObserverNode) addBlock(b *types.Block) error {
 	cp := ob.cs.cn.Provider()
 	if b.Header.Height <= cp.Height() {
 		h, err := cp.Hash(b.Header.Height)
@@ -887,7 +889,7 @@ func (ob *Observer) addBlock(b *types.Block) error {
 	return nil
 }
 
-func (ob *Observer) adjustFormulatorMap() map[common.Address]bool {
+func (ob *ObserverNode) adjustFormulatorMap() map[common.Address]bool {
 	FormulatorMap := ob.fs.FormulatorMap()
 	now := time.Now().UnixNano()
 	for addr := range FormulatorMap {

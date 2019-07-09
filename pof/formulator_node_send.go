@@ -8,7 +8,7 @@ import (
 	"github.com/fletaio/fleta/common"
 )
 
-func (fr *Formulator) broadcastStatus() error {
+func (fr *FormulatorNode) broadcastStatus() error {
 	cp := fr.cs.cn.Provider()
 	nm := &p2p.StatusMessage{
 		Version:  cp.Version(),
@@ -19,7 +19,7 @@ func (fr *Formulator) broadcastStatus() error {
 	return nil
 }
 
-func (fr *Formulator) sendRequestBlockTo(TargetPubHash common.PublicHash, Height uint32) error {
+func (fr *FormulatorNode) sendRequestBlockTo(TargetPubHash common.PublicHash, Height uint32) error {
 	nm := &p2p.RequestMessage{
 		Height: Height,
 	}
