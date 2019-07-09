@@ -46,8 +46,8 @@ func test() error {
 			obkeys = append(obkeys, Key)
 			pubhash := common.NewPublicHash(Key.PublicKey())
 			ObserverKeys = append(ObserverKeys, pubhash)
-			NetAddressMap[pubhash] = "localhost:1390" + strconv.Itoa(i+1)
-			FrNetAddressMap[pubhash] = "localhost:1490" + strconv.Itoa(i+1)
+			NetAddressMap[pubhash] = "ws://localhost:390" + strconv.Itoa(i+1)
+			FrNetAddressMap[pubhash] = "ws://localhost:490" + strconv.Itoa(i+1)
 		}
 	}
 
@@ -96,8 +96,8 @@ func test() error {
 
 	for i, ob := range obs {
 		go ob.Run(
-			"localhost:1390"+strconv.Itoa(i+1),
-			"localhost:1490"+strconv.Itoa(i+1),
+			":390"+strconv.Itoa(i+1),
+			":490"+strconv.Itoa(i+1),
 		)
 	}
 

@@ -5,19 +5,19 @@ import (
 	"compress/gzip"
 	"encoding/binary"
 	"io/ioutil"
-	"net"
 	"sync"
 	"time"
 
 	"github.com/fletaio/fleta/common/queue"
 	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/encoding"
+	"github.com/gorilla/websocket"
 )
 
 // Peer manages send and recv of the connection
 type Peer struct {
 	sync.Mutex
-	conn        net.Conn
+	conn        *websocket.Conn
 	ID          string
 	Name        string
 	guessHeight uint32
@@ -26,7 +26,7 @@ type Peer struct {
 }
 
 // NewPeer returns a Peer
-func NewPeer(conn net.Conn, ID string, Name string) *Peer {
+func NewPeer(conn *websocket.Conn, ID string, Name string) *Peer {
 	if len(Name) == 0 {
 		Name = ID
 	}
@@ -63,8 +63,7 @@ func NewPeer(conn net.Conn, ID string, Name string) *Peer {
 			if err := p.conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
 				return
 			}
-			_, err := p.conn.Write(wbs)
-			if err != nil {
+			if err := p.conn.WriteMessage(websocket.BinaryMessage, wbs); err != nil {
 				return
 			}
 		}
@@ -80,22 +79,22 @@ func (p *Peer) Close() {
 
 // ReadMessageData returns a message data
 func (p *Peer) ReadMessageData() (interface{}, []byte, error) {
-	var t uint16
-	if v, _, err := ReadUint16(p.conn); err != nil {
+	_, bs, err := p.conn.ReadMessage()
+	if err != nil {
 		return nil, nil, err
-	} else {
-		t = v
+	}
+	if len(bs) < 6 {
+		return nil, nil, ErrInvalidLength
 	}
 
-	if Len, _, err := ReadUint32(p.conn); err != nil {
-		return nil, nil, err
-	} else if Len == 0 {
+	t := util.BytesToUint16(bs)
+	Len := util.BytesToUint32(bs[2:])
+	if Len == 0 {
 		return nil, nil, ErrUnknownMessage
+	} else if len(bs) != 6+int(Len) {
+		return nil, nil, ErrInvalidLength
 	} else {
-		zbs := make([]byte, Len)
-		if _, err := FillBytes(p.conn, zbs); err != nil {
-			return nil, nil, err
-		}
+		zbs := bs[6:]
 		zr, err := gzip.NewReader(bytes.NewReader(zbs))
 		if err != nil {
 			return nil, nil, err

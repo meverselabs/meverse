@@ -5,7 +5,6 @@ import (
 	crand "crypto/rand"
 	"encoding/binary"
 	"log"
-	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -16,6 +15,8 @@ import (
 	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/service/p2p"
+	"github.com/gorilla/websocket"
+	"github.com/labstack/echo"
 )
 
 type ObserverNodeMesh struct {
@@ -191,7 +192,7 @@ func (ms *ObserverNodeMesh) BroadcastMessage(m interface{}) error {
 }
 
 func (ms *ObserverNodeMesh) client(Address string, TargetPubHash common.PublicHash) error {
-	conn, err := net.DialTimeout("tcp", Address, 10*time.Second)
+	conn, _, err := websocket.DefaultDialer.Dial(Address, nil)
 	if err != nil {
 		return err
 	}
@@ -231,49 +232,50 @@ func (ms *ObserverNodeMesh) client(Address string, TargetPubHash common.PublicHa
 }
 
 func (ms *ObserverNodeMesh) server(BindAddress string) error {
-	lstn, err := net.Listen("tcp", BindAddress)
-	if err != nil {
-		return err
-	}
-	log.Println(common.NewPublicHash(ms.key.PublicKey()), "Start to Listen", BindAddress)
-	for {
-		conn, err := lstn.Accept()
+	log.Println("Observer", common.NewPublicHash(ms.key.PublicKey()), "Start to Listen", BindAddress)
+
+	var upgrader = websocket.Upgrader{}
+	e := echo.New()
+	e.GET("/", func(c echo.Context) error {
+		conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
 		if err != nil {
+			log.Print("upgrade:", err)
 			return err
 		}
-		go func() {
-			defer conn.Close()
+		defer conn.Close()
 
-			pubhash, err := ms.sendHandshake(conn)
-			if err != nil {
-				log.Println("[sendHandshake]", err)
-				return
-			}
-			if _, has := ms.netAddressMap[pubhash]; !has {
-				log.Println("ErrInvalidPublicHash")
-				return
-			}
-			if err := ms.recvHandshake(conn); err != nil {
-				log.Println("[recvHandshakeAck]", err)
-				return
-			}
+		pubhash, err := ms.sendHandshake(conn)
+		if err != nil {
+			log.Println("[sendHandshake]", err)
+			return err
+		}
+		if _, has := ms.netAddressMap[pubhash]; !has {
+			log.Println("ErrInvalidPublicHash")
+			return err
+		}
+		if err := ms.recvHandshake(conn); err != nil {
+			log.Println("[recvHandshakeAck]", err)
+			return err
+		}
 
-			ID := string(pubhash[:])
-			p := p2p.NewPeer(conn, ID, pubhash.String())
-			ms.Lock()
-			old, has := ms.serverPeerMap[ID]
-			ms.serverPeerMap[ID] = p
-			ms.Unlock()
-			if has {
-				ms.removePeerInMap(old.ID, ms.serverPeerMap)
-			}
-			defer ms.removePeerInMap(p.ID, ms.serverPeerMap)
+		ID := string(pubhash[:])
+		p := p2p.NewPeer(conn, ID, pubhash.String())
+		ms.Lock()
+		old, has := ms.serverPeerMap[ID]
+		ms.serverPeerMap[ID] = p
+		ms.Unlock()
+		if has {
+			ms.removePeerInMap(old.ID, ms.serverPeerMap)
+		}
+		defer ms.removePeerInMap(p.ID, ms.serverPeerMap)
 
-			if err := ms.handleConnection(p); err != nil {
-				log.Println("[handleConnection]", err)
-			}
-		}()
-	}
+		if err := ms.handleConnection(p); err != nil {
+			log.Println("[handleConnection]", err)
+			return err
+		}
+		return nil
+	})
+	return e.Start(BindAddress)
 }
 
 func (ms *ObserverNodeMesh) handleConnection(p *p2p.Peer) error {
@@ -315,11 +317,14 @@ func (ms *ObserverNodeMesh) handleConnection(p *p2p.Peer) error {
 	}
 }
 
-func (ms *ObserverNodeMesh) recvHandshake(conn net.Conn) error {
+func (ms *ObserverNodeMesh) recvHandshake(conn *websocket.Conn) error {
 	//log.Println("recvHandshake")
-	req := make([]byte, 40)
-	if _, err := p2p.FillBytes(conn, req); err != nil {
+	_, req, err := conn.ReadMessage()
+	if err != nil {
 		return err
+	}
+	if len(req) != 40 {
+		return p2p.ErrInvalidHandshake
 	}
 	timestamp := binary.LittleEndian.Uint64(req[32:])
 	diff := time.Duration(uint64(time.Now().UnixNano()) - timestamp)
@@ -333,31 +338,33 @@ func (ms *ObserverNodeMesh) recvHandshake(conn net.Conn) error {
 	h := hash.Hash(req)
 	if sig, err := ms.key.Sign(h); err != nil {
 		return err
-	} else if _, err := conn.Write(sig[:]); err != nil {
+	} else if err := conn.WriteMessage(websocket.BinaryMessage, sig[:]); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (ms *ObserverNodeMesh) sendHandshake(conn net.Conn) (common.PublicHash, error) {
+func (ms *ObserverNodeMesh) sendHandshake(conn *websocket.Conn) (common.PublicHash, error) {
 	//log.Println("sendHandshake")
 	req := make([]byte, 40)
 	if _, err := crand.Read(req[:32]); err != nil {
 		return common.PublicHash{}, err
 	}
 	binary.LittleEndian.PutUint64(req[32:], uint64(time.Now().UnixNano()))
-	if _, err := conn.Write(req); err != nil {
+	if err := conn.WriteMessage(websocket.BinaryMessage, req); err != nil {
 		return common.PublicHash{}, err
 	}
 	//log.Println("recvHandshakeAsk")
-	h := hash.Hash(req)
-	bs := make([]byte, common.SignatureSize)
-	if _, err := p2p.FillBytes(conn, bs); err != nil {
+	_, bs, err := conn.ReadMessage()
+	if err != nil {
 		return common.PublicHash{}, err
+	}
+	if len(bs) != common.SignatureSize {
+		return common.PublicHash{}, p2p.ErrInvalidHandshake
 	}
 	var sig common.Signature
 	copy(sig[:], bs)
-	pubkey, err := common.RecoverPubkey(h, sig)
+	pubkey, err := common.RecoverPubkey(hash.Hash(req), sig)
 	if err != nil {
 		return common.PublicHash{}, err
 	}

@@ -5,7 +5,6 @@ import (
 	crand "crypto/rand"
 	"encoding/binary"
 	"log"
-	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/service/p2p"
+	"github.com/gorilla/websocket"
 )
 
 type FormulatorNodeMesh struct {
@@ -141,7 +141,7 @@ func (ms *FormulatorNodeMesh) BroadcastMessage(m interface{}) error {
 }
 
 func (ms *FormulatorNodeMesh) client(Address string, TargetPubHash common.PublicHash) error {
-	conn, err := net.DialTimeout("tcp", Address, 10*time.Second)
+	conn, _, err := websocket.DefaultDialer.Dial(Address, nil)
 	if err != nil {
 		return err
 	}
@@ -220,11 +220,14 @@ func (ms *FormulatorNodeMesh) handleConnection(p *p2p.Peer) error {
 	}
 }
 
-func (ms *FormulatorNodeMesh) recvHandshake(conn net.Conn) error {
+func (ms *FormulatorNodeMesh) recvHandshake(conn *websocket.Conn) error {
 	//log.Println("recvHandshake")
-	req := make([]byte, 40)
-	if _, err := p2p.FillBytes(conn, req); err != nil {
+	_, req, err := conn.ReadMessage()
+	if err != nil {
 		return err
+	}
+	if len(req) != 40 {
+		return p2p.ErrInvalidHandshake
 	}
 	timestamp := binary.LittleEndian.Uint64(req[32:])
 	diff := time.Duration(uint64(time.Now().UnixNano()) - timestamp)
@@ -238,13 +241,13 @@ func (ms *FormulatorNodeMesh) recvHandshake(conn net.Conn) error {
 	h := hash.Hash(req)
 	if sig, err := ms.key.Sign(h); err != nil {
 		return err
-	} else if _, err := conn.Write(sig[:]); err != nil {
+	} else if err := conn.WriteMessage(websocket.BinaryMessage, sig[:]); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (ms *FormulatorNodeMesh) sendHandshake(conn net.Conn) (common.PublicHash, error) {
+func (ms *FormulatorNodeMesh) sendHandshake(conn *websocket.Conn) (common.PublicHash, error) {
 	//log.Println("sendHandshake")
 	req := make([]byte, 60)
 	if _, err := crand.Read(req[:32]); err != nil {
@@ -252,18 +255,20 @@ func (ms *FormulatorNodeMesh) sendHandshake(conn net.Conn) (common.PublicHash, e
 	}
 	copy(req[32:], ms.fr.Config.Formulator[:])
 	binary.LittleEndian.PutUint64(req[52:], uint64(time.Now().UnixNano()))
-	if _, err := conn.Write(req); err != nil {
+	if err := conn.WriteMessage(websocket.BinaryMessage, req); err != nil {
 		return common.PublicHash{}, err
 	}
 	//log.Println("recvHandshakeAsk")
-	h := hash.Hash(req)
-	bs := make([]byte, common.SignatureSize)
-	if _, err := p2p.FillBytes(conn, bs); err != nil {
+	_, bs, err := conn.ReadMessage()
+	if err != nil {
 		return common.PublicHash{}, err
+	}
+	if len(bs) != common.SignatureSize {
+		return common.PublicHash{}, p2p.ErrInvalidHandshake
 	}
 	var sig common.Signature
 	copy(sig[:], bs)
-	pubkey, err := common.RecoverPubkey(h, sig)
+	pubkey, err := common.RecoverPubkey(hash.Hash(req), sig)
 	if err != nil {
 		return common.PublicHash{}, err
 	}
