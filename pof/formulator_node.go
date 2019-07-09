@@ -234,7 +234,7 @@ func (fr *FormulatorNode) AddTx(tx types.Transaction, sigs []common.Signature) e
 }
 
 // OnTimerExpired called when rquest expired
-func (fr *FormulatorNode) OnTimerExpired(height uint32, P interface{}) {
+func (fr *FormulatorNode) OnTimerExpired(height uint32, value interface{}) {
 	go fr.tryRequestNext()
 }
 
@@ -254,20 +254,20 @@ func (fr *FormulatorNode) OnItemExpired(Interval time.Duration, Key string, Item
 }
 
 // OnObserverConnected is called after a new observer peer is connected
-func (fr *FormulatorNode) OnObserverConnected(p *p2p.Peer) {
+func (fr *FormulatorNode) OnObserverConnected(p p2p.Peer) {
 	fr.Lock()
-	fr.statusMap[p.ID] = &p2p.Status{}
+	fr.statusMap[p.ID()] = &p2p.Status{}
 	fr.Unlock()
 }
 
 // OnObserverDisconnected is called when the observer peer is disconnected
-func (fr *FormulatorNode) OnObserverDisconnected(p *p2p.Peer) {
+func (fr *FormulatorNode) OnObserverDisconnected(p p2p.Peer) {
 	fr.Lock()
-	delete(fr.statusMap, p.ID)
+	delete(fr.statusMap, p.ID())
 	fr.Unlock()
 }
 
-func (fr *FormulatorNode) onRecv(p *p2p.Peer, m interface{}) error {
+func (fr *FormulatorNode) onRecv(p p2p.Peer, m interface{}) error {
 	if err := fr.handleMessage(p, m, 0); err != nil {
 		//log.Println(err)
 		return nil
@@ -275,7 +275,7 @@ func (fr *FormulatorNode) onRecv(p *p2p.Peer, m interface{}) error {
 	return nil
 }
 
-func (fr *FormulatorNode) handleMessage(p *p2p.Peer, m interface{}, RetryCount int) error {
+func (fr *FormulatorNode) handleMessage(p p2p.Peer, m interface{}, RetryCount int) error {
 	cp := fr.cs.cn.Provider()
 
 	switch msg := m.(type) {
@@ -461,7 +461,7 @@ func (fr *FormulatorNode) handleMessage(p *p2p.Peer, m interface{}, RetryCount i
 				}
 				log.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Height, len(b.Transactions))
 
-				if status, has := fr.statusMap[p.ID]; has {
+				if status, has := fr.statusMap[p.ID()]; has {
 					if status.Height < GenMessage.Block.Header.Height {
 						status.Height = GenMessage.Block.Header.Height
 					}
@@ -485,7 +485,7 @@ func (fr *FormulatorNode) handleMessage(p *p2p.Peer, m interface{}, RetryCount i
 		sm := &p2p.BlockMessage{
 			Block: b,
 		}
-		if err := fr.ms.SendTo(p.ID, sm); err != nil {
+		if err := fr.ms.SendTo(p.ID(), sm); err != nil {
 			return err
 		}
 		return nil
@@ -499,7 +499,7 @@ func (fr *FormulatorNode) handleMessage(p *p2p.Peer, m interface{}, RetryCount i
 		fr.requestTimer.Remove(msg.Block.Header.Height)
 
 		fr.Lock()
-		if status, has := fr.statusMap[p.ID]; has {
+		if status, has := fr.statusMap[p.ID()]; has {
 			if status.Height < msg.Block.Header.Height {
 				status.Height = msg.Block.Header.Height
 			}
@@ -512,7 +512,7 @@ func (fr *FormulatorNode) handleMessage(p *p2p.Peer, m interface{}, RetryCount i
 		fr.Lock()
 		defer fr.Unlock()
 
-		if status, has := fr.statusMap[p.ID]; has {
+		if status, has := fr.statusMap[p.ID()]; has {
 			if status.Height < msg.Height {
 				status.Version = msg.Version
 				status.Height = msg.Height
@@ -530,7 +530,7 @@ func (fr *FormulatorNode) handleMessage(p *p2p.Peer, m interface{}, RetryCount i
 					if err := p.Send(sm); err != nil {
 						return err
 					}
-					fr.requestTimer.Add(TargetHeight, 10*time.Second, p.ID)
+					fr.requestTimer.Add(TargetHeight, 10*time.Second, p.ID())
 				}
 			}
 			TargetHeight++

@@ -192,12 +192,12 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 }
 
 // OnTimerExpired called when rquest expired
-func (ob *ObserverNode) OnTimerExpired(height uint32, P interface{}) {
-	TargetPublicHash := P.(common.PublicHash)
+func (ob *ObserverNode) OnTimerExpired(height uint32, value interface{}) {
+	TargetPublicHash := value.(common.PublicHash)
 	list := ob.ms.Peers()
-	for _, v := range list {
+	for _, p := range list {
 		var pubhash common.PublicHash
-		copy(pubhash[:], []byte(v.ID))
+		copy(pubhash[:], []byte(p.ID()))
 		if pubhash != ob.myPublicHash && pubhash != TargetPublicHash {
 			ob.sendRequestBlockTo(pubhash, height)
 			break
@@ -241,14 +241,14 @@ func (ob *ObserverNode) resetVoteRound(resetStat bool) {
 	}
 }
 
-func (ob *ObserverNode) onObserverRecv(p *p2p.Peer, m interface{}) error {
+func (ob *ObserverNode) onObserverRecv(p p2p.Peer, m interface{}) error {
 	if msg, is := m.(*BlockGenMessage); is {
 		ob.messageQueue.Push(&messageItem{
 			Message: msg,
 		})
 	} else {
 		var pubhash common.PublicHash
-		copy(pubhash[:], []byte(p.ID))
+		copy(pubhash[:], []byte(p.ID()))
 		ob.messageQueue.Push(&messageItem{
 			PublicHash: pubhash,
 			Message:    m,
@@ -257,7 +257,7 @@ func (ob *ObserverNode) onObserverRecv(p *p2p.Peer, m interface{}) error {
 	return nil
 }
 
-func (ob *ObserverNode) onFormulatorRecv(p *p2p.Peer, m interface{}, raw []byte) error {
+func (ob *ObserverNode) onFormulatorRecv(p p2p.Peer, m interface{}, raw []byte) error {
 	cp := ob.cs.cn.Provider()
 
 	switch msg := m.(type) {
@@ -285,7 +285,7 @@ func (ob *ObserverNode) onFormulatorRecv(p *p2p.Peer, m interface{}, raw []byte)
 				for _, r := range ranks {
 					rankMap[string(r.Address[:])] = true
 				}
-				enable = rankMap[p.ID]
+				enable = rankMap[p.ID()]
 			}
 			if enable {
 				p.UpdateGuessHeight(msg.Height)

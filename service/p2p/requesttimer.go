@@ -7,7 +7,7 @@ import (
 
 // RequestExpireHandler handles a request expire event
 type RequestExpireHandler interface {
-	OnTimerExpired(height uint32, P interface{})
+	OnTimerExpired(height uint32, value interface{})
 }
 
 // RequestTimer triggers a event when a request is expired
@@ -36,14 +36,14 @@ func (rm *RequestTimer) Exist(height uint32) bool {
 }
 
 // Add adds the timer of the request
-func (rm *RequestTimer) Add(height uint32, t time.Duration, p interface{}) {
+func (rm *RequestTimer) Add(height uint32, t time.Duration, value interface{}) {
 	rm.Lock()
 	defer rm.Unlock()
 
 	rm.timerMap[height] = &requestTimerItem{
 		Height:    height,
 		ExpiredAt: uint64(time.Now().UnixNano()) + uint64(t),
-		P:         p,
+		Value:     value,
 	}
 }
 
@@ -77,7 +77,7 @@ func (rm *RequestTimer) Run() {
 
 			if rm.handler != nil {
 				for _, v := range expired {
-					rm.handler.OnTimerExpired(v.Height, v.P)
+					rm.handler.OnTimerExpired(v.Height, v.Value)
 				}
 			}
 			timer.Reset(100 * time.Millisecond)
@@ -88,5 +88,5 @@ func (rm *RequestTimer) Run() {
 type requestTimerItem struct {
 	Height    uint32
 	ExpiredAt uint64
-	P         interface{}
+	Value     interface{}
 }

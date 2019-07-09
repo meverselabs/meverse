@@ -5,6 +5,7 @@ import (
 	crand "crypto/rand"
 	"encoding/binary"
 	"log"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,8 +16,6 @@ import (
 	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/service/p2p"
-	"github.com/gorilla/websocket"
-	"github.com/labstack/echo"
 )
 
 type ObserverNodeMesh struct {
@@ -24,16 +23,16 @@ type ObserverNodeMesh struct {
 	ob            *ObserverNode
 	key           key.Key
 	netAddressMap map[common.PublicHash]string
-	clientPeerMap map[string]*p2p.Peer
-	serverPeerMap map[string]*p2p.Peer
+	clientPeerMap map[string]p2p.Peer
+	serverPeerMap map[string]p2p.Peer
 }
 
 func NewObserverNodeMesh(key key.Key, NetAddressMap map[common.PublicHash]string, ob *ObserverNode) *ObserverNodeMesh {
 	ms := &ObserverNodeMesh{
 		key:           key,
 		netAddressMap: NetAddressMap,
-		clientPeerMap: map[string]*p2p.Peer{},
-		serverPeerMap: map[string]*p2p.Peer{},
+		clientPeerMap: map[string]p2p.Peer{},
+		serverPeerMap: map[string]p2p.Peer{},
 		ob:            ob,
 	}
 	return ms
@@ -68,18 +67,18 @@ func (ms *ObserverNodeMesh) Run(BindAddress string) {
 }
 
 // Peers returns peers of the observer mesh
-func (ms *ObserverNodeMesh) Peers() []*p2p.Peer {
-	peerMap := map[string]*p2p.Peer{}
+func (ms *ObserverNodeMesh) Peers() []p2p.Peer {
+	peerMap := map[string]p2p.Peer{}
 	ms.Lock()
 	for _, p := range ms.clientPeerMap {
-		peerMap[p.ID] = p
+		peerMap[p.ID()] = p
 	}
 	for _, p := range ms.serverPeerMap {
-		peerMap[p.ID] = p
+		peerMap[p.ID()] = p
 	}
 	ms.Unlock()
 
-	peers := []*p2p.Peer{}
+	peers := []p2p.Peer{}
 	for _, p := range peerMap {
 		peers = append(peers, p)
 	}
@@ -107,7 +106,7 @@ func (ms *ObserverNodeMesh) RemovePeer(ID string) {
 	}
 }
 
-func (ms *ObserverNodeMesh) removePeerInMap(ID string, peerMap map[string]*p2p.Peer) {
+func (ms *ObserverNodeMesh) removePeerInMap(ID string, peerMap map[string]p2p.Peer) {
 	ms.Lock()
 	p, has := ms.clientPeerMap[ID]
 	if has {
@@ -125,7 +124,7 @@ func (ms *ObserverNodeMesh) SendTo(pubhash common.PublicHash, m interface{}) err
 	ID := string(pubhash[:])
 
 	ms.Lock()
-	var p *p2p.Peer
+	var p p2p.Peer
 	if cp, has := ms.clientPeerMap[ID]; has {
 		p = cp
 	} else if sp, has := ms.serverPeerMap[ID]; has {
@@ -138,20 +137,20 @@ func (ms *ObserverNodeMesh) SendTo(pubhash common.PublicHash, m interface{}) err
 
 	if err := p.Send(m); err != nil {
 		log.Println(err)
-		ms.RemovePeer(p.ID)
+		ms.RemovePeer(p.ID())
 	}
 	return nil
 }
 
 // BroadcastRaw sends a message to all peers
 func (ms *ObserverNodeMesh) BroadcastRaw(bs []byte) {
-	peerMap := map[string]*p2p.Peer{}
+	peerMap := map[string]p2p.Peer{}
 	ms.Lock()
 	for _, p := range ms.clientPeerMap {
-		peerMap[p.ID] = p
+		peerMap[p.ID()] = p
 	}
 	for _, p := range ms.serverPeerMap {
-		peerMap[p.ID] = p
+		peerMap[p.ID()] = p
 	}
 	ms.Unlock()
 
@@ -175,13 +174,13 @@ func (ms *ObserverNodeMesh) BroadcastMessage(m interface{}) error {
 	}
 	data := buffer.Bytes()
 
-	peerMap := map[string]*p2p.Peer{}
+	peerMap := map[string]p2p.Peer{}
 	ms.Lock()
 	for _, p := range ms.clientPeerMap {
-		peerMap[p.ID] = p
+		peerMap[p.ID()] = p
 	}
 	for _, p := range ms.serverPeerMap {
-		peerMap[p.ID] = p
+		peerMap[p.ID()] = p
 	}
 	ms.Unlock()
 
@@ -192,7 +191,7 @@ func (ms *ObserverNodeMesh) BroadcastMessage(m interface{}) error {
 }
 
 func (ms *ObserverNodeMesh) client(Address string, TargetPubHash common.PublicHash) error {
-	conn, _, err := websocket.DefaultDialer.Dial(Address, nil)
+	conn, err := net.DialTimeout("tcp", Address, 10*time.Second)
 	if err != nil {
 		return err
 	}
@@ -215,15 +214,15 @@ func (ms *ObserverNodeMesh) client(Address string, TargetPubHash common.PublicHa
 	}
 
 	ID := string(pubhash[:])
-	p := p2p.NewPeer(conn, ID, pubhash.String())
+	p := p2p.NewTCPPeer(conn, ID, pubhash.String())
 	ms.Lock()
 	old, has := ms.clientPeerMap[ID]
 	ms.clientPeerMap[ID] = p
 	ms.Unlock()
 	if has {
-		ms.removePeerInMap(old.ID, ms.clientPeerMap)
+		ms.removePeerInMap(old.ID(), ms.clientPeerMap)
 	}
-	defer ms.removePeerInMap(p.ID, ms.clientPeerMap)
+	defer ms.removePeerInMap(p.ID(), ms.clientPeerMap)
 
 	if err := ms.handleConnection(p); err != nil {
 		log.Println("[handleConnection]", err)
@@ -232,53 +231,52 @@ func (ms *ObserverNodeMesh) client(Address string, TargetPubHash common.PublicHa
 }
 
 func (ms *ObserverNodeMesh) server(BindAddress string) error {
-	log.Println("Observer", common.NewPublicHash(ms.key.PublicKey()), "Start to Listen", BindAddress)
-
-	var upgrader = websocket.Upgrader{}
-	e := echo.New()
-	e.GET("/", func(c echo.Context) error {
-		conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
+	lstn, err := net.Listen("tcp", BindAddress)
+	if err != nil {
+		return err
+	}
+	log.Println(common.NewPublicHash(ms.key.PublicKey()), "Start to Listen", BindAddress)
+	for {
+		conn, err := lstn.Accept()
 		if err != nil {
-			log.Print("upgrade:", err)
 			return err
 		}
-		defer conn.Close()
+		go func() {
+			defer conn.Close()
 
-		pubhash, err := ms.sendHandshake(conn)
-		if err != nil {
-			log.Println("[sendHandshake]", err)
-			return err
-		}
-		if _, has := ms.netAddressMap[pubhash]; !has {
-			log.Println("ErrInvalidPublicHash")
-			return err
-		}
-		if err := ms.recvHandshake(conn); err != nil {
-			log.Println("[recvHandshakeAck]", err)
-			return err
-		}
+			pubhash, err := ms.sendHandshake(conn)
+			if err != nil {
+				log.Println("[sendHandshake]", err)
+				return
+			}
+			if _, has := ms.netAddressMap[pubhash]; !has {
+				log.Println("ErrInvalidPublicHash")
+				return
+			}
+			if err := ms.recvHandshake(conn); err != nil {
+				log.Println("[recvHandshakeAck]", err)
+				return
+			}
 
-		ID := string(pubhash[:])
-		p := p2p.NewPeer(conn, ID, pubhash.String())
-		ms.Lock()
-		old, has := ms.serverPeerMap[ID]
-		ms.serverPeerMap[ID] = p
-		ms.Unlock()
-		if has {
-			ms.removePeerInMap(old.ID, ms.serverPeerMap)
-		}
-		defer ms.removePeerInMap(p.ID, ms.serverPeerMap)
+			ID := string(pubhash[:])
+			p := p2p.NewTCPPeer(conn, ID, pubhash.String())
+			ms.Lock()
+			old, has := ms.serverPeerMap[ID]
+			ms.serverPeerMap[ID] = p
+			ms.Unlock()
+			if has {
+				ms.removePeerInMap(old.ID(), ms.serverPeerMap)
+			}
+			defer ms.removePeerInMap(p.ID(), ms.serverPeerMap)
 
-		if err := ms.handleConnection(p); err != nil {
-			log.Println("[handleConnection]", err)
-			return err
-		}
-		return nil
-	})
-	return e.Start(BindAddress)
+			if err := ms.handleConnection(p); err != nil {
+				log.Println("[handleConnection]", err)
+			}
+		}()
+	}
 }
 
-func (ms *ObserverNodeMesh) handleConnection(p *p2p.Peer) error {
+func (ms *ObserverNodeMesh) handleConnection(p p2p.Peer) error {
 	log.Println("Observer", common.NewPublicHash(ms.key.PublicKey()).String(), "Observer Connected", p.Name)
 
 	var pingCount uint64
@@ -289,11 +287,11 @@ func (ms *ObserverNodeMesh) handleConnection(p *p2p.Peer) error {
 			select {
 			case <-pingTicker.C:
 				if err := p.Send(&p2p.PingMessage{}); err != nil {
-					ms.RemovePeer(p.ID)
+					ms.RemovePeer(p.ID())
 					return
 				}
 				if atomic.AddUint64(&pingCount, 1) > pingCountLimit {
-					ms.RemovePeer(p.ID)
+					ms.RemovePeer(p.ID())
 					return
 				}
 			}
@@ -317,14 +315,11 @@ func (ms *ObserverNodeMesh) handleConnection(p *p2p.Peer) error {
 	}
 }
 
-func (ms *ObserverNodeMesh) recvHandshake(conn *websocket.Conn) error {
+func (ms *ObserverNodeMesh) recvHandshake(conn net.Conn) error {
 	//log.Println("recvHandshake")
-	_, req, err := conn.ReadMessage()
-	if err != nil {
+	req := make([]byte, 40)
+	if _, err := p2p.FillBytes(conn, req); err != nil {
 		return err
-	}
-	if len(req) != 40 {
-		return p2p.ErrInvalidHandshake
 	}
 	timestamp := binary.LittleEndian.Uint64(req[32:])
 	diff := time.Duration(uint64(time.Now().UnixNano()) - timestamp)
@@ -338,33 +333,31 @@ func (ms *ObserverNodeMesh) recvHandshake(conn *websocket.Conn) error {
 	h := hash.Hash(req)
 	if sig, err := ms.key.Sign(h); err != nil {
 		return err
-	} else if err := conn.WriteMessage(websocket.BinaryMessage, sig[:]); err != nil {
+	} else if _, err := conn.Write(sig[:]); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (ms *ObserverNodeMesh) sendHandshake(conn *websocket.Conn) (common.PublicHash, error) {
+func (ms *ObserverNodeMesh) sendHandshake(conn net.Conn) (common.PublicHash, error) {
 	//log.Println("sendHandshake")
 	req := make([]byte, 40)
 	if _, err := crand.Read(req[:32]); err != nil {
 		return common.PublicHash{}, err
 	}
 	binary.LittleEndian.PutUint64(req[32:], uint64(time.Now().UnixNano()))
-	if err := conn.WriteMessage(websocket.BinaryMessage, req); err != nil {
+	if _, err := conn.Write(req); err != nil {
 		return common.PublicHash{}, err
 	}
 	//log.Println("recvHandshakeAsk")
-	_, bs, err := conn.ReadMessage()
-	if err != nil {
+	h := hash.Hash(req)
+	bs := make([]byte, common.SignatureSize)
+	if _, err := p2p.FillBytes(conn, bs); err != nil {
 		return common.PublicHash{}, err
-	}
-	if len(bs) != common.SignatureSize {
-		return common.PublicHash{}, p2p.ErrInvalidHandshake
 	}
 	var sig common.Signature
 	copy(sig[:], bs)
-	pubkey, err := common.RecoverPubkey(hash.Hash(req), sig)
+	pubkey, err := common.RecoverPubkey(h, sig)
 	if err != nil {
 		return common.PublicHash{}, err
 	}

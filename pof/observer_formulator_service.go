@@ -24,7 +24,7 @@ type FormulatorService struct {
 	sync.Mutex
 	key     key.Key
 	ob      *ObserverNode
-	peerMap map[string]*p2p.Peer
+	peerMap map[string]p2p.Peer
 }
 
 // NewFormulatorService returns a FormulatorService
@@ -32,7 +32,7 @@ func NewFormulatorService(ob *ObserverNode) *FormulatorService {
 	ms := &FormulatorService{
 		key:     ob.key,
 		ob:      ob,
-		peerMap: map[string]*p2p.Peer{},
+		peerMap: map[string]p2p.Peer{},
 	}
 	return ms
 }
@@ -77,7 +77,7 @@ func (ms *FormulatorService) SendTo(addr common.Address, m interface{}) error {
 
 	if err := p.Send(m); err != nil {
 		log.Println(err)
-		ms.RemovePeer(p.ID)
+		ms.RemovePeer(p.ID())
 	}
 	return nil
 }
@@ -97,7 +97,7 @@ func (ms *FormulatorService) BroadcastMessage(m interface{}) error {
 	}
 	data := buffer.Bytes()
 
-	peers := []*p2p.Peer{}
+	peers := []p2p.Peer{}
 	ms.Lock()
 	for _, p := range ms.peerMap {
 		peers = append(peers, p)
@@ -170,15 +170,15 @@ func (ms *FormulatorService) server(BindAddress string) error {
 		}
 
 		ID := string(Formulator[:])
-		p := p2p.NewPeer(conn, ID, Formulator.String())
+		p := p2p.NewWebsocketPeer(conn, ID, Formulator.String())
 		ms.Lock()
 		old, has := ms.peerMap[ID]
 		ms.peerMap[ID] = p
 		ms.Unlock()
 		if has {
-			ms.RemovePeer(old.ID)
+			ms.RemovePeer(old.ID())
 		}
-		defer ms.RemovePeer(p.ID)
+		defer ms.RemovePeer(p.ID())
 
 		if err := ms.handleConnection(p); err != nil {
 			log.Println("[handleConnection]", err)
@@ -189,7 +189,7 @@ func (ms *FormulatorService) server(BindAddress string) error {
 	return e.Start(BindAddress)
 }
 
-func (ms *FormulatorService) handleConnection(p *p2p.Peer) error {
+func (ms *FormulatorService) handleConnection(p p2p.Peer) error {
 	log.Println("Observer", common.NewPublicHash(ms.key.PublicKey()).String(), "Fromulator Connected", p.Name)
 
 	cp := ms.ob.cs.cn.Provider()
@@ -207,11 +207,11 @@ func (ms *FormulatorService) handleConnection(p *p2p.Peer) error {
 			select {
 			case <-pingTicker.C:
 				if err := p.Send(&p2p.PingMessage{}); err != nil {
-					ms.RemovePeer(p.ID)
+					ms.RemovePeer(p.ID())
 					return
 				}
 				if atomic.AddUint64(&pingCount, 1) > pingCountLimit {
-					ms.RemovePeer(p.ID)
+					ms.RemovePeer(p.ID())
 					return
 				}
 			}
@@ -300,7 +300,7 @@ func (ms *FormulatorService) FormulatorMap() map[common.Address]bool {
 	FormulatorMap := map[common.Address]bool{}
 	for _, p := range ms.peerMap {
 		var addr common.Address
-		copy(addr[:], []byte(p.ID))
+		copy(addr[:], []byte(p.ID()))
 		FormulatorMap[addr] = true
 	}
 	return FormulatorMap
