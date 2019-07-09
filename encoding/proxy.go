@@ -50,12 +50,12 @@ func NewDecoder(r io.Reader) *Decoder {
 	}
 }
 
-// Encoder is a encoding data
+// Encoder provides encoding functions
 type Encoder struct {
 	*msgpack.Encoder
 }
 
-// Decoder is a decoding data
+// Decoder provides decoding functions
 type Decoder struct {
 	*msgpack.Decoder
 }

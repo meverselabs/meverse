@@ -6,7 +6,7 @@ import (
 	"github.com/fletaio/fleta/common"
 )
 
-// Account is a interface that defines common account functions
+// Account defines common account functions
 type Account interface {
 	json.Marshaler
 	Address() common.Address

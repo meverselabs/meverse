@@ -1,6 +1,6 @@
 package types
 
-// Service is a interface of the chain service
+// Service defines service functions
 type Service interface {
 	Name() string
 	Init(pm ProcessManager, cn Provider) error

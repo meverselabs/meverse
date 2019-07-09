@@ -14,7 +14,7 @@ import (
 	"github.com/fletaio/fleta/encoding"
 )
 
-// Peer is a formulator peer
+// Peer manages send and recv of the connection
 type Peer struct {
 	sync.Mutex
 	conn        net.Conn
@@ -25,7 +25,7 @@ type Peer struct {
 	isClose     bool
 }
 
-// NewPeer returns a ormulatorPeer
+// NewPeer returns a Peer
 func NewPeer(conn net.Conn, ID string, Name string) *Peer {
 	if len(Name) == 0 {
 		Name = ID

@@ -1,6 +1,6 @@
 package types
 
-// Application is a interface of the chain application
+// Application defines chain application functions
 type Application interface {
 	Process
 	InitGenesis(ctw *ContextWrapper) error

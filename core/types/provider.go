@@ -5,7 +5,7 @@ import (
 	"github.com/fletaio/fleta/common/hash"
 )
 
-// Provider is a interface to give a chain data
+// Provider defines functions that loads chain data from the chain
 type Provider interface {
 	Version() uint16
 	Height() uint32

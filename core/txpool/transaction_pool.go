@@ -10,7 +10,7 @@ import (
 	"github.com/fletaio/fleta/core/types"
 )
 
-// AccountTransaction is an interface that defines common functions of account model based transactions
+// AccountTransaction defines common functions of account model based transactions
 type AccountTransaction interface {
 	Seq() uint64
 	From() common.Address

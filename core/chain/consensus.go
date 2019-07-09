@@ -5,7 +5,7 @@ import (
 	"github.com/fletaio/fleta/core/types"
 )
 
-// Consensus is a interface of the chain Consensus
+// Consensus defines chain consensus functions
 type Consensus interface {
 	Init(cn *Chain, ct Committer) error
 	InitGenesis(ctw *types.ContextWrapper) error
@@ -14,7 +14,7 @@ type Consensus interface {
 	OnSaveData(b *types.Block, ctw *types.ContextWrapper) error
 }
 
-// ConsensusBase is a base handler of the chain Consensus
+// ConsensusBase is a base handler of the chain consensus
 type ConsensusBase struct{}
 
 // InitGenesis initializes genesis data

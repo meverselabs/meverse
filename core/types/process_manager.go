@@ -1,6 +1,6 @@
 package types
 
-// ProcessManager is a interface to give a chain data
+// ProcessManager managers processes in the chain
 type ProcessManager interface {
 	Processes() []Process
 	Process(id uint8) (Process, error)

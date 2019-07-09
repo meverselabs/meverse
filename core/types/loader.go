@@ -5,7 +5,7 @@ import (
 	"github.com/fletaio/fleta/common/hash"
 )
 
-// Loader is an interface to load state data from the target chain
+// Loader defines functions that loads state data from the target chain
 type Loader interface {
 	Name() string
 	Version() uint16

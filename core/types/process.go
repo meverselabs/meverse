@@ -1,6 +1,6 @@
 package types
 
-// Process is a interface of the chain Process
+// Process defines process functions
 type Process interface {
 	ID() uint8
 	Version() string

@@ -5,7 +5,7 @@ import (
 	"github.com/fletaio/fleta/common/hash"
 )
 
-// Key is an interface that defines crypto key functions
+// Key defines crypto key functions
 type Key interface {
 	Sign(h hash.Hash256) (common.Signature, error)
 	SignWithPassphrase(h hash.Hash256, passphrase []byte) (common.Signature, error)

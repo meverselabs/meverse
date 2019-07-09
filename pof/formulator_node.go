@@ -18,7 +18,7 @@ import (
 	"github.com/fletaio/fleta/service/p2p"
 )
 
-// FormulatorConfig is a configuration of the formulator
+// FormulatorConfig defines configuration of the formulator
 type FormulatorConfig struct {
 	SeedNodes  []string
 	Formulator common.Address
