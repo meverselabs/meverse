@@ -47,13 +47,13 @@ type ObserverNode struct {
 }
 
 // NewObserverNode returns a ObserverNode
-func NewObserverNode(key key.Key, NetAddressMap map[common.PublicHash]string, cs *Consensus, MyPublicHash common.PublicHash) *ObserverNode {
+func NewObserverNode(key key.Key, NetAddressMap map[common.PublicHash]string, cs *Consensus) *ObserverNode {
 	ob := &ObserverNode{
 		key:          key,
 		cs:           cs,
 		round:        NewVoteRound(cs.cn.Provider().Height()+1, cs.maxBlocksPerFormulator-cs.blocksBySameFormulator),
 		ignoreMap:    map[common.Address]int64{},
-		myPublicHash: MyPublicHash,
+		myPublicHash: common.NewPublicHash(key.PublicKey()),
 		messageQueue: queue.NewQueue(),
 		blockQ:       queue.NewSortedQueue(),
 	}
@@ -123,6 +123,7 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 					panic(err)
 					break
 				}
+				log.Println("Observer", ob.myPublicHash.String(), cp.Height(), "BlockConnected", ob.round.RoundState, b.Header.Height, (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
 				ob.broadcastStatus()
 				TargetHeight++
 				item = ob.blockQ.PopUntil(TargetHeight)

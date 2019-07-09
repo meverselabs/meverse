@@ -1,4 +1,4 @@
-package pof
+package p2p
 
 import (
 	"bytes"
@@ -15,48 +15,61 @@ import (
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/encoding"
-	"github.com/fletaio/fleta/service/p2p"
 )
 
-type ObserverNodeMesh struct {
-	sync.Mutex
-	ob            *ObserverNode
-	key           key.Key
-	netAddressMap map[common.PublicHash]string
-	clientPeerMap map[string]p2p.Peer
-	serverPeerMap map[string]p2p.Peer
+type Handler interface {
+	OnRecv(p Peer, m interface{}) error
 }
 
-func NewObserverNodeMesh(key key.Key, NetAddressMap map[common.PublicHash]string, ob *ObserverNode) *ObserverNodeMesh {
-	ms := &ObserverNodeMesh{
+type NodeConfig struct {
+}
+
+type NodeMesh struct {
+	sync.Mutex
+	key           key.Key
+	handler       Handler
+	nodeSet       map[common.PublicHash]string
+	clientPeerMap map[string]Peer
+	serverPeerMap map[string]Peer
+}
+
+func NewNodeMesh(key key.Key, SeedNodeMap map[common.PublicHash]string, handler Handler) *NodeMesh {
+	ms := &NodeMesh{
 		key:           key,
-		netAddressMap: NetAddressMap,
-		clientPeerMap: map[string]p2p.Peer{},
-		serverPeerMap: map[string]p2p.Peer{},
-		ob:            ob,
+		handler:       handler,
+		nodeSet:       map[common.PublicHash]string{},
+		clientPeerMap: map[string]Peer{},
+		serverPeerMap: map[string]Peer{},
+	}
+	for PubHash, v := range SeedNodeMap {
+		ms.nodeSet[PubHash] = v
 	}
 	return ms
 }
 
-// Run starts the observer mesh
-func (ms *ObserverNodeMesh) Run(BindAddress string) {
+// Run starts the node mesh
+func (ms *NodeMesh) Run(BindAddress string) {
 	myPublicHash := common.NewPublicHash(ms.key.PublicKey())
-	for PubHash, v := range ms.netAddressMap {
+	for PubHash, v := range ms.nodeSet {
 		if PubHash != myPublicHash {
 			go func(pubhash common.PublicHash, NetAddr string) {
 				time.Sleep(1 * time.Second)
 				for {
 					ID := string(pubhash[:])
 					ms.Lock()
+					_, hasInSet := ms.nodeSet[pubhash]
 					_, hasC := ms.clientPeerMap[ID]
 					_, hasS := ms.serverPeerMap[ID]
 					ms.Unlock()
+					if !hasInSet {
+						return
+					}
 					if !hasC && !hasS {
 						if err := ms.client(NetAddr, pubhash); err != nil {
 							log.Println("[client]", err, NetAddr)
 						}
 					}
-					time.Sleep(1 * time.Second)
+					time.Sleep(30 * time.Second)
 				}
 			}(PubHash, v)
 		}
@@ -66,9 +79,9 @@ func (ms *ObserverNodeMesh) Run(BindAddress string) {
 	}
 }
 
-// Peers returns peers of the observer mesh
-func (ms *ObserverNodeMesh) Peers() []p2p.Peer {
-	peerMap := map[string]p2p.Peer{}
+// Peers returns peers of the node mesh
+func (ms *NodeMesh) Peers() []Peer {
+	peerMap := map[string]Peer{}
 	ms.Lock()
 	for _, p := range ms.clientPeerMap {
 		peerMap[p.ID()] = p
@@ -78,7 +91,7 @@ func (ms *ObserverNodeMesh) Peers() []p2p.Peer {
 	}
 	ms.Unlock()
 
-	peers := []p2p.Peer{}
+	peers := []Peer{}
 	for _, p := range peerMap {
 		peers = append(peers, p)
 	}
@@ -86,7 +99,7 @@ func (ms *ObserverNodeMesh) Peers() []p2p.Peer {
 }
 
 // RemovePeer removes peers from the mesh
-func (ms *ObserverNodeMesh) RemovePeer(ID string) {
+func (ms *NodeMesh) RemovePeer(ID string) {
 	ms.Lock()
 	pc, hasClient := ms.clientPeerMap[ID]
 	if hasClient {
@@ -106,7 +119,7 @@ func (ms *ObserverNodeMesh) RemovePeer(ID string) {
 	}
 }
 
-func (ms *ObserverNodeMesh) removePeerInMap(ID string, peerMap map[string]p2p.Peer) {
+func (ms *NodeMesh) removePeerInMap(ID string, peerMap map[string]Peer) {
 	ms.Lock()
 	p, has := ms.clientPeerMap[ID]
 	if has {
@@ -119,12 +132,12 @@ func (ms *ObserverNodeMesh) removePeerInMap(ID string, peerMap map[string]p2p.Pe
 	}
 }
 
-// SendTo sends a message to the observer
-func (ms *ObserverNodeMesh) SendTo(pubhash common.PublicHash, m interface{}) error {
+// SendTo sends a message to the node
+func (ms *NodeMesh) SendTo(pubhash common.PublicHash, m interface{}) error {
 	ID := string(pubhash[:])
 
 	ms.Lock()
-	var p p2p.Peer
+	var p Peer
 	if cp, has := ms.clientPeerMap[ID]; has {
 		p = cp
 	} else if sp, has := ms.serverPeerMap[ID]; has {
@@ -132,7 +145,7 @@ func (ms *ObserverNodeMesh) SendTo(pubhash common.PublicHash, m interface{}) err
 	}
 	ms.Unlock()
 	if p == nil {
-		return ErrNotExistObserverPeer
+		return ErrNotExistPeer
 	}
 
 	if err := p.Send(m); err != nil {
@@ -143,8 +156,8 @@ func (ms *ObserverNodeMesh) SendTo(pubhash common.PublicHash, m interface{}) err
 }
 
 // BroadcastRaw sends a message to all peers
-func (ms *ObserverNodeMesh) BroadcastRaw(bs []byte) {
-	peerMap := map[string]p2p.Peer{}
+func (ms *NodeMesh) BroadcastRaw(bs []byte) {
+	peerMap := map[string]Peer{}
 	ms.Lock()
 	for _, p := range ms.clientPeerMap {
 		peerMap[p.ID()] = p
@@ -160,7 +173,7 @@ func (ms *ObserverNodeMesh) BroadcastRaw(bs []byte) {
 }
 
 // BroadcastMessage sends a message to all peers
-func (ms *ObserverNodeMesh) BroadcastMessage(m interface{}) error {
+func (ms *NodeMesh) BroadcastMessage(m interface{}) error {
 	var buffer bytes.Buffer
 	fc := encoding.Factory("pof.message")
 	t, err := fc.TypeOf(m)
@@ -174,7 +187,7 @@ func (ms *ObserverNodeMesh) BroadcastMessage(m interface{}) error {
 	}
 	data := buffer.Bytes()
 
-	peerMap := map[string]p2p.Peer{}
+	peerMap := map[string]Peer{}
 	ms.Lock()
 	for _, p := range ms.clientPeerMap {
 		peerMap[p.ID()] = p
@@ -190,7 +203,7 @@ func (ms *ObserverNodeMesh) BroadcastMessage(m interface{}) error {
 	return nil
 }
 
-func (ms *ObserverNodeMesh) client(Address string, TargetPubHash common.PublicHash) error {
+func (ms *NodeMesh) client(Address string, TargetPubHash common.PublicHash) error {
 	conn, err := net.DialTimeout("tcp", Address, 10*time.Second)
 	if err != nil {
 		return err
@@ -209,12 +222,9 @@ func (ms *ObserverNodeMesh) client(Address string, TargetPubHash common.PublicHa
 	if pubhash != TargetPubHash {
 		return common.ErrInvalidPublicHash
 	}
-	if _, has := ms.netAddressMap[pubhash]; !has {
-		return ErrInvalidObserverKey
-	}
 
 	ID := string(pubhash[:])
-	p := p2p.NewTCPPeer(conn, ID, pubhash.String())
+	p := NewTCPPeer(conn, ID, pubhash.String())
 	ms.Lock()
 	old, has := ms.clientPeerMap[ID]
 	ms.clientPeerMap[ID] = p
@@ -230,7 +240,7 @@ func (ms *ObserverNodeMesh) client(Address string, TargetPubHash common.PublicHa
 	return nil
 }
 
-func (ms *ObserverNodeMesh) server(BindAddress string) error {
+func (ms *NodeMesh) server(BindAddress string) error {
 	lstn, err := net.Listen("tcp", BindAddress)
 	if err != nil {
 		return err
@@ -249,17 +259,13 @@ func (ms *ObserverNodeMesh) server(BindAddress string) error {
 				log.Println("[sendHandshake]", err)
 				return
 			}
-			if _, has := ms.netAddressMap[pubhash]; !has {
-				log.Println("ErrInvalidPublicHash")
-				return
-			}
 			if err := ms.recvHandshake(conn); err != nil {
 				log.Println("[recvHandshakeAck]", err)
 				return
 			}
 
 			ID := string(pubhash[:])
-			p := p2p.NewTCPPeer(conn, ID, pubhash.String())
+			p := NewTCPPeer(conn, ID, pubhash.String())
 			ms.Lock()
 			old, has := ms.serverPeerMap[ID]
 			ms.serverPeerMap[ID] = p
@@ -276,8 +282,8 @@ func (ms *ObserverNodeMesh) server(BindAddress string) error {
 	}
 }
 
-func (ms *ObserverNodeMesh) handleConnection(p p2p.Peer) error {
-	log.Println("Observer", common.NewPublicHash(ms.key.PublicKey()).String(), "Observer Connected", p.Name())
+func (ms *NodeMesh) handleConnection(p Peer) error {
+	log.Println("Node", common.NewPublicHash(ms.key.PublicKey()).String(), "Node Connected", p.Name())
 
 	var pingCount uint64
 	pingCountLimit := uint64(3)
@@ -286,7 +292,7 @@ func (ms *ObserverNodeMesh) handleConnection(p p2p.Peer) error {
 		for {
 			select {
 			case <-pingTicker.C:
-				if err := p.Send(&p2p.PingMessage{}); err != nil {
+				if err := p.Send(&PingMessage{}); err != nil {
 					ms.RemovePeer(p.ID())
 					return
 				}
@@ -303,22 +309,22 @@ func (ms *ObserverNodeMesh) handleConnection(p p2p.Peer) error {
 			return err
 		}
 		atomic.StoreUint64(&pingCount, 0)
-		if _, is := m.(*p2p.PingMessage); is {
+		if _, is := m.(*PingMessage); is {
 			continue
 		} else if m == nil {
-			return p2p.ErrUnknownMessage
+			return ErrUnknownMessage
 		}
 
-		if err := ms.ob.onObserverRecv(p, m); err != nil {
+		if err := ms.handler.OnRecv(p, m); err != nil {
 			return err
 		}
 	}
 }
 
-func (ms *ObserverNodeMesh) recvHandshake(conn net.Conn) error {
+func (ms *NodeMesh) recvHandshake(conn net.Conn) error {
 	//log.Println("recvHandshake")
 	req := make([]byte, 40)
-	if _, err := p2p.FillBytes(conn, req); err != nil {
+	if _, err := FillBytes(conn, req); err != nil {
 		return err
 	}
 	timestamp := binary.LittleEndian.Uint64(req[32:])
@@ -327,7 +333,7 @@ func (ms *ObserverNodeMesh) recvHandshake(conn net.Conn) error {
 		diff = -diff
 	}
 	if diff > time.Second*30 {
-		return p2p.ErrInvalidHandshake
+		return ErrInvalidHandshake
 	}
 	//log.Println("sendHandshakeAck")
 	h := hash.Hash(req)
@@ -339,7 +345,7 @@ func (ms *ObserverNodeMesh) recvHandshake(conn net.Conn) error {
 	return nil
 }
 
-func (ms *ObserverNodeMesh) sendHandshake(conn net.Conn) (common.PublicHash, error) {
+func (ms *NodeMesh) sendHandshake(conn net.Conn) (common.PublicHash, error) {
 	//log.Println("sendHandshake")
 	req := make([]byte, 40)
 	if _, err := crand.Read(req[:32]); err != nil {
@@ -352,7 +358,7 @@ func (ms *ObserverNodeMesh) sendHandshake(conn net.Conn) (common.PublicHash, err
 	//log.Println("recvHandshakeAsk")
 	h := hash.Hash(req)
 	bs := make([]byte, common.SignatureSize)
-	if _, err := p2p.FillBytes(conn, bs); err != nil {
+	if _, err := FillBytes(conn, bs); err != nil {
 		return common.PublicHash{}, err
 	}
 	var sig common.Signature

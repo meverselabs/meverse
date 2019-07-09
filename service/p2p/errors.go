@@ -7,4 +7,5 @@ var (
 	ErrInvalidHandshake = errors.New("invalid handshake")
 	ErrInvalidLength    = errors.New("invalid length")
 	ErrUnknownMessage   = errors.New("unknown message")
+	ErrNotExistPeer     = errors.New("not exist peer")
 )

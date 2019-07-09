@@ -15,6 +15,7 @@ import (
 	"github.com/fletaio/fleta/pof"
 	"github.com/fletaio/fleta/process/formulator"
 	"github.com/fletaio/fleta/process/vault"
+	"github.com/fletaio/fleta/service/p2p"
 )
 
 func main() {
@@ -87,7 +88,7 @@ func test() error {
 		if err := cn.Init(); err != nil {
 			return err
 		}
-		ob := pof.NewObserverNode(obkey, NetAddressMap, cs, ObserverKeys[i])
+		ob := pof.NewObserverNode(obkey, NetAddressMap, cs)
 		if err := ob.Init(); err != nil {
 			return err
 		}
@@ -103,6 +104,7 @@ func test() error {
 
 	frs := []*pof.FormulatorNode{}
 	cns := []*chain.Chain{}
+	NdNetAddressMap := map[common.PublicHash]string{}
 	for i, frkey := range frkeys {
 		st, err := chain.NewStore("./_data/f"+strconv.Itoa(i+1), "FLEAT Mainnet", 0x0001, true)
 		if err != nil {
@@ -121,19 +123,64 @@ func test() error {
 			return err
 		}
 		fr := pof.NewFormulatorNode(&pof.FormulatorConfig{
-			SeedNodes:               []string{},
 			Formulator:              common.NewAddress(0, 2+uint16(i), 0),
 			MaxTransactionsPerBlock: 10000,
-		}, frkey, FrNetAddressMap, cs)
+		}, frkey, FrNetAddressMap, NdNetAddressMap, cs)
 		if err := fr.Init(); err != nil {
 			return err
 		}
 		frs = append(frs, fr)
 		cns = append(cns, cn)
+
+		NdNetAddressMap[common.NewPublicHash(frkey.PublicKey())] = ":1590" + strconv.Itoa(i+1)
 	}
 
-	for _, fr := range frs {
-		go fr.Run()
+	for i, fr := range frs {
+		go fr.Run(":1590" + strconv.Itoa(i+1))
+	}
+
+	ndstrs := []string{
+		"67466852dd6586fa8b473452a66c43f3ce17bd4ec409f1fff036a617bb38f063",
+		"a9378ff3837700079fbf187c86ad22f1c123543a96cd11c53b70fedc3813c27b",
+	}
+
+	ndkeys := make([]key.Key, 0, len(ndstrs))
+	for _, v := range ndstrs {
+		if bs, err := hex.DecodeString(v); err != nil {
+			panic(err)
+		} else if Key, err := key.NewMemoryKeyFromBytes(bs); err != nil {
+			panic(err)
+		} else {
+			ndkeys = append(ndkeys, Key)
+		}
+	}
+
+	nds := []*p2p.Node{}
+	for i, ndkey := range ndkeys {
+		st, err := chain.NewStore("./_data/n"+strconv.Itoa(i+1), "FLEAT Mainnet", 0x0001, true)
+		if err != nil {
+			return err
+		}
+		cs := pof.NewConsensus(MaxBlocksPerFormulator, ObserverKeys)
+		app := &DApp{
+			frkey:        frkeys[0],
+			frkey2:       frkeys[1],
+			adminAddress: common.NewAddress(0, 1, 0),
+		}
+		cn := chain.NewChain(cs, app, st)
+		cn.MustAddProcess(vault.NewVault(1))
+		cn.MustAddProcess(formulator.NewFormulator(2, app.adminAddress))
+		if err := cn.Init(); err != nil {
+			return err
+		}
+		nd := p2p.NewNode(ndkey, NdNetAddressMap, cn)
+		if err := nd.Init(); err != nil {
+			return err
+		}
+		nds = append(nds, nd)
+	}
+	for i, nd := range nds {
+		go nd.Run(":1591" + strconv.Itoa(i+1))
 	}
 
 	From := common.NewAddress(0, 1, 0)

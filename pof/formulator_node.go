@@ -21,7 +21,6 @@ import (
 
 // FormulatorConfig defines configuration of the formulator
 type FormulatorConfig struct {
-	SeedNodes               []string
 	Formulator              common.Address
 	MaxTransactionsPerBlock int
 }
@@ -32,7 +31,9 @@ type FormulatorNode struct {
 	Config               *FormulatorConfig
 	cs                   *Consensus
 	ms                   *FormulatorNodeMesh
+	nm                   *p2p.NodeMesh
 	key                  key.Key
+	myPublicHash         common.PublicHash
 	lastGenMessages      []*BlockGenMessage
 	lastObSignMessageMap map[uint32]*BlockObSignMessage
 	lastContextes        []*types.Context
@@ -52,11 +53,12 @@ type FormulatorNode struct {
 }
 
 // NewFormulatorNode returns a FormulatorNode
-func NewFormulatorNode(Config *FormulatorConfig, key key.Key, NetAddressMap map[common.PublicHash]string, cs *Consensus) *FormulatorNode {
+func NewFormulatorNode(Config *FormulatorConfig, key key.Key, NetAddressMap map[common.PublicHash]string, SeedNodeMap map[common.PublicHash]string, cs *Consensus) *FormulatorNode {
 	fr := &FormulatorNode{
 		Config:               Config,
 		cs:                   cs,
 		key:                  key,
+		myPublicHash:         common.NewPublicHash(key.PublicKey()),
 		lastGenMessages:      []*BlockGenMessage{},
 		lastObSignMessageMap: map[uint32]*BlockObSignMessage{},
 		lastContextes:        []*types.Context{},
@@ -68,6 +70,7 @@ func NewFormulatorNode(Config *FormulatorConfig, key key.Key, NetAddressMap map[
 		txQ:                  queue.NewExpireQueue(),
 	}
 	fr.ms = NewFormulatorNodeMesh(key, NetAddressMap, fr)
+	fr.nm = p2p.NewNodeMesh(key, SeedNodeMap, fr)
 	fr.txQ.AddGroup(60 * time.Second)
 	fr.txQ.AddGroup(600 * time.Second)
 	fr.txQ.AddGroup(3600 * time.Second)
@@ -102,7 +105,7 @@ func (fr *FormulatorNode) Init() error {
 }
 
 // Run runs the formulator
-func (fr *FormulatorNode) Run() {
+func (fr *FormulatorNode) Run(BindAddress string) {
 	fr.Lock()
 	if fr.isRunning {
 		fr.Unlock()
@@ -112,6 +115,7 @@ func (fr *FormulatorNode) Run() {
 	fr.Unlock()
 
 	go fr.ms.Run()
+	go fr.nm.Run(BindAddress)
 	go fr.requestTimer.Run()
 
 	WorkerCount := runtime.NumCPU() - 1
@@ -267,6 +271,56 @@ func (fr *FormulatorNode) OnObserverDisconnected(p p2p.Peer) {
 	fr.Unlock()
 }
 
+// OnRecv called when message received
+func (fr *FormulatorNode) OnRecv(p p2p.Peer, m interface{}) error {
+	cp := fr.cs.cn.Provider()
+
+	var SenderPublicHash common.PublicHash
+	copy(SenderPublicHash[:], []byte(p.ID()))
+
+	switch msg := m.(type) {
+	case *p2p.RequestMessage:
+		b, err := cp.Block(msg.Height)
+		if err != nil {
+			return err
+		}
+		sm := &p2p.BlockMessage{
+			Block: b,
+		}
+		if err := fr.nm.SendTo(SenderPublicHash, sm); err != nil {
+			return err
+		}
+	case *p2p.StatusMessage:
+		Height := cp.Height()
+		if Height < msg.Height {
+			for i := Height + 1; i <= Height+100 && i <= msg.Height; i++ {
+				if !fr.requestTimer.Exist(i) {
+					fr.sendRequestBlockToNode(SenderPublicHash, i)
+				}
+			}
+		} else {
+			h, err := cp.Hash(msg.Height)
+			if err != nil {
+				return err
+			}
+			if h != msg.LastHash {
+				//TODO : critical error signal
+				log.Println(p.Name(), h.String(), msg.LastHash.String(), msg.Height)
+				panic(chain.ErrFoundForkedBlock)
+			}
+		}
+	case *p2p.BlockMessage:
+		if err := fr.addBlock(msg.Block); err != nil {
+			return err
+		}
+		fr.requestTimer.Remove(msg.Block.Header.Height)
+	default:
+		panic(p2p.ErrUnknownMessage) //TEMP
+		return p2p.ErrUnknownMessage
+	}
+	return nil
+}
+
 func (fr *FormulatorNode) onRecv(p p2p.Peer, m interface{}) error {
 	if err := fr.handleMessage(p, m, 0); err != nil {
 		//log.Println(err)
@@ -347,7 +401,8 @@ func (fr *FormulatorNode) handleMessage(p p2p.Peer, m interface{}, RetryCount in
 				ctx = fr.cs.ct.NewContext()
 				TimeoutCount = msg.TimeoutCount
 			} else {
-				ctx = ctx.NextContext(encoding.Hash(fr.lastGenMessages[len(fr.lastGenMessages)-1].Block.Header))
+				lastHeader := fr.lastGenMessages[len(fr.lastGenMessages)-1].Block.Header
+				ctx = ctx.NextContext(encoding.Hash(lastHeader), lastHeader.Timestamp)
 			}
 			Timestamp := StartBlockTime
 			if bNoDelay {
@@ -459,6 +514,7 @@ func (fr *FormulatorNode) handleMessage(p p2p.Peer, m interface{}, RetryCount in
 				if err := fr.cs.ct.ConnectBlockWithContext(b, ctx); err != nil {
 					return err
 				}
+				fr.broadcastStatus()
 				log.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Height, len(b.Transactions))
 
 				if status, has := fr.statusMap[p.ID()]; has {

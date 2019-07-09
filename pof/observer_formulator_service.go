@@ -190,7 +190,7 @@ func (ms *FormulatorService) server(BindAddress string) error {
 }
 
 func (ms *FormulatorService) handleConnection(p p2p.Peer) error {
-	log.Println("Observer", common.NewPublicHash(ms.key.PublicKey()).String(), "Fromulator Connected", p.Name)
+	log.Println("Observer", common.NewPublicHash(ms.key.PublicKey()).String(), "Fromulator Connected", p.Name())
 
 	cp := ms.ob.cs.cn.Provider()
 	p.Send(&p2p.StatusMessage{

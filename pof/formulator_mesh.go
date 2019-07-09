@@ -181,7 +181,7 @@ func (ms *FormulatorNodeMesh) client(Address string, TargetPubHash common.Public
 }
 
 func (ms *FormulatorNodeMesh) handleConnection(p p2p.Peer) error {
-	log.Println("Formulator", common.NewPublicHash(ms.key.PublicKey()).String(), "Observer Connected", p.Name)
+	log.Println("Formulator", common.NewPublicHash(ms.key.PublicKey()).String(), "Observer Connected", p.Name())
 
 	ms.fr.OnObserverConnected(p)
 	defer ms.fr.OnObserverDisconnected(p)

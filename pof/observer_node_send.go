@@ -3,11 +3,10 @@ package pof
 import (
 	"time"
 
-	"github.com/fletaio/fleta/service/p2p"
-
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
+	"github.com/fletaio/fleta/service/p2p"
 )
 
 func (ob *ObserverNode) sendRoundVote() error {

@@ -10,6 +10,7 @@ type Context struct {
 	loader          internalLoader
 	genTargetHeight uint32
 	genLastHash     hash.Hash256
+	genTimestamp    uint64
 	cache           *contextCache
 	stack           []*ContextData
 	isLatestHash    bool
@@ -22,6 +23,7 @@ func NewContext(loader internalLoader) *Context {
 		loader:          loader,
 		genTargetHeight: loader.TargetHeight(),
 		genLastHash:     loader.LastHash(),
+		genTimestamp:    loader.LastTimestamp(),
 	}
 	ctx.cache = newContextCache(ctx)
 	ctx.stack = []*ContextData{NewContextData(ctx.cache, nil)}
@@ -44,10 +46,11 @@ func (ctx *Context) Version() uint16 {
 }
 
 // NextContext returns the next Context of the Context
-func (ctx *Context) NextContext(NextHash hash.Hash256) *Context {
+func (ctx *Context) NextContext(NextHash hash.Hash256, Timestamp uint64) *Context {
 	nctx := NewContext(ctx)
 	nctx.genTargetHeight = ctx.genTargetHeight + 1
 	nctx.genLastHash = NextHash
+	nctx.genTimestamp = Timestamp
 	nctx.cache = newContextCache(ctx)
 	return nctx
 }
@@ -73,7 +76,7 @@ func (ctx *Context) LastHash() hash.Hash256 {
 
 // LastTimestamp returns the last timestamp of the chain
 func (ctx *Context) LastTimestamp() uint64 {
-	return ctx.loader.LastTimestamp()
+	return ctx.genTimestamp
 }
 
 // Top returns the top snapshot
