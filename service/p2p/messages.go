@@ -29,7 +29,7 @@ type BlockMessage struct {
 
 // TransactionMessage is a message for a transaction
 type TransactionMessage struct {
-	TxType uint8
+	TxType uint16
 	Tx     types.Transaction
 	Sigs   []common.Signature
 }

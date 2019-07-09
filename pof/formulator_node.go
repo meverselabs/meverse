@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/common/queue"
 	"github.com/fletaio/fleta/core/chain"
@@ -20,8 +21,9 @@ import (
 
 // FormulatorConfig defines configuration of the formulator
 type FormulatorConfig struct {
-	SeedNodes  []string
-	Formulator common.Address
+	SeedNodes               []string
+	Formulator              common.Address
+	MaxTransactionsPerBlock int
 }
 
 // FormulatorNode procudes a block by the consensus
@@ -41,6 +43,8 @@ type FormulatorNode struct {
 	requestTimer         *p2p.RequestTimer
 	requestLock          sync.RWMutex
 	blockQ               *queue.SortedQueue
+	txpool               *txpool.TransactionPool
+	txQ                  *queue.ExpireQueue
 	isRunning            bool
 	closeLock            sync.RWMutex
 	runEnd               chan struct{}
@@ -48,7 +52,7 @@ type FormulatorNode struct {
 }
 
 // NewFormulatorNode returns a FormulatorNode
-func NewFormulator(Config *FormulatorConfig, key key.Key, NetAddressMap map[common.PublicHash]string, cs *Consensus) *FormulatorNode {
+func NewFormulatorNode(Config *FormulatorConfig, key key.Key, NetAddressMap map[common.PublicHash]string, cs *Consensus) *FormulatorNode {
 	fr := &FormulatorNode{
 		Config:               Config,
 		cs:                   cs,
@@ -60,8 +64,14 @@ func NewFormulator(Config *FormulatorConfig, key key.Key, NetAddressMap map[comm
 		requestTimer:         p2p.NewRequestTimer(nil),
 		runEnd:               make(chan struct{}),
 		blockQ:               queue.NewSortedQueue(),
+		txpool:               txpool.NewTransactionPool(),
+		txQ:                  queue.NewExpireQueue(),
 	}
 	fr.ms = NewFormulatorNodeMesh(key, NetAddressMap, fr)
+	fr.txQ.AddGroup(60 * time.Second)
+	fr.txQ.AddGroup(600 * time.Second)
+	fr.txQ.AddGroup(3600 * time.Second)
+	fr.txQ.AddHandler(fr)
 	return fr
 }
 
@@ -119,16 +129,14 @@ func (fr *FormulatorNode) Run() {
 			for {
 				select {
 				case item := <-(*pMsgCh):
-					/*
-						if err := fr.kn.AddTransaction(item.Message.Tx, item.Message.Sigs); err != nil {
-							if err != ErrProcessingTransaction && err != ErrPastSeq {
-								(*item.pErrCh) <- err
-							} else {
-								(*item.pErrCh) <- nil
-							}
-							break
+					if err := fr.addTx(item.Message.TxType, item.Message.Tx, item.Message.Sigs); err != nil {
+						if err != txpool.ErrPastSeq || err != txpool.ErrTooFarSeq {
+							(*item.pErrCh) <- err
+						} else {
+							(*item.pErrCh) <- nil
 						}
-					*/
+						break
+					}
 					(*item.pErrCh) <- nil
 					if len(item.PeerID) > 0 {
 						//fr.pm.ExceptCast(item.PeerID, item.Message)
@@ -171,9 +179,71 @@ func (fr *FormulatorNode) Run() {
 	}
 }
 
+func (fr *FormulatorNode) addTx(t uint16, tx types.Transaction, sigs []common.Signature) error {
+	if fr.txpool.Size() > 65535 {
+		return txpool.ErrTransactionPoolOverflowed
+	}
+
+	TxHash := chain.HashTransactionByType(t, tx)
+
+	ctx := fr.cs.ct.NewContext()
+	if fr.txpool.IsExist(TxHash) {
+		return txpool.ErrExistTransaction
+	}
+	if atx, is := tx.(txpool.AccountTransaction); is {
+		seq := ctx.Seq(atx.From())
+		if atx.Seq() <= seq {
+			return txpool.ErrPastSeq
+		} else if atx.Seq() > seq+100 {
+			return txpool.ErrTooFarSeq
+		}
+	}
+	signers := make([]common.PublicHash, 0, len(sigs))
+	for _, sig := range sigs {
+		pubkey, err := common.RecoverPubkey(TxHash, sig)
+		if err != nil {
+			return err
+		}
+		signers = append(signers, common.NewPublicHash(pubkey))
+	}
+	pid := uint8(t >> 8)
+	p, err := fr.cs.cn.Process(pid)
+	if err != nil {
+		return err
+	}
+	ctw := types.NewContextWrapper(pid, ctx)
+	if err := tx.Validate(p, ctw, signers); err != nil {
+		return err
+	}
+	if err := fr.txpool.Push(t, TxHash, tx, sigs, signers); err != nil {
+		return err
+	}
+	fr.txQ.Push(string(TxHash[:]), &p2p.TransactionMessage{
+		TxType: t,
+		Tx:     tx,
+		Sigs:   sigs,
+	})
+	return nil
+}
+
 // OnTimerExpired called when rquest expired
 func (fr *FormulatorNode) OnTimerExpired(height uint32, P interface{}) {
 	go fr.tryRequestNext()
+}
+
+// OnItemExpired is called when the item is expired
+func (fr *FormulatorNode) OnItemExpired(Interval time.Duration, Key string, Item interface{}, IsLast bool) {
+	msg := Item.(*p2p.TransactionMessage)
+	/*
+		for _, eh := range kn.eventHandlers {
+			eh.DoTransactionBroadcast(kn, msg)
+		}
+	*/
+	if IsLast {
+		var TxHash hash.Hash256
+		copy(TxHash[:], []byte(Key))
+		fr.txpool.Remove(TxHash, msg.Tx)
+	}
 }
 
 // OnObserverConnected is called after a new observer peer is connected
@@ -288,12 +358,32 @@ func (fr *FormulatorNode) handleMessage(p *p2p.Peer, m interface{}, RetryCount i
 			if err := bc.Init(); err != nil {
 				return err
 			}
-			/*
-				// TODO : fill tx from txpool
-				if err := bc.AddTx(txs[i], sigs[i]); err != nil {
-					return err
+
+			timer := time.NewTimer(200 * time.Millisecond)
+
+			fr.txpool.Lock() // Prevent delaying from TxPool.Push
+			Count := 0
+		TxLoop:
+			for {
+				select {
+				case <-timer.C:
+					break TxLoop
+				default:
+					item := fr.txpool.UnsafePop(ctx)
+					if item == nil {
+						break TxLoop
+					}
+					if err := bc.UnsafeAddTx(item.TxType, item.TxHash, item.Transaction, item.Signatures, item.Signers); err != nil {
+						return err
+					}
+					Count++
+					if Count > fr.Config.MaxTransactionsPerBlock {
+						break TxLoop
+					}
 				}
-			*/
+			}
+			fr.txpool.Unlock() // Prevent delaying from TxPool.Push
+
 			b, err := bc.Finalize()
 			if err != nil {
 				return err

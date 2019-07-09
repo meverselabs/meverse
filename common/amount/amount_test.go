@@ -6,7 +6,6 @@ import (
 )
 
 func Test_Amount(t *testing.T) {
-	//TEMP
 	a := COIN.DivC(1000)
 	b := COIN.MulC(10000)
 	log.Println(a.String())

@@ -67,32 +67,33 @@ func (tp *TransactionPool) Size() int {
 // Push inserts the transaction and signatures of it by base model and sequence
 // An UTXO model based transaction will be handled by FIFO
 // An account model based transaction will be sorted by the sequence value
-func (tp *TransactionPool) Push(t types.Transaction, sigs []common.Signature) error {
+func (tp *TransactionPool) Push(t uint16, TxHash hash.Hash256, tx types.Transaction, sigs []common.Signature, signers []common.PublicHash) error {
 	tp.Lock()
 	defer tp.Unlock()
 
-	TxHash := chain.HashTransaction(t)
 	if tp.txidMap[TxHash] {
 		return ErrExistTransaction
 	}
 
 	item := &PoolItem{
-		Transaction: t,
+		TxType:      t,
 		TxHash:      TxHash,
+		Transaction: tx,
 		Signatures:  sigs,
+		Signers:     signers,
 	}
-	tx, is := t.(AccountTransaction)
+	atx, is := tx.(AccountTransaction)
 	if !is {
 		tp.utxoQ.Push(TxHash, item)
 		tp.turnQ.Push(true)
 	} else {
-		addr := tx.From()
+		addr := atx.From()
 		q, has := tp.bucketMap[addr]
 		if !has {
 			q = queue.NewSortedQueue()
 			tp.bucketMap[addr] = q
 		}
-		q.Insert(item, tx.Seq())
+		q.Insert(item, atx.Seq())
 		tp.numberQ.Push(addr)
 		tp.turnQ.Push(false)
 	}
@@ -220,7 +221,9 @@ func (tp *TransactionPool) UnsafePop(SeqCache SeqCache) *PoolItem {
 
 // PoolItem represents the item of the queue
 type PoolItem struct {
-	Transaction types.Transaction
+	TxType      uint16
 	TxHash      hash.Hash256
+	Transaction types.Transaction
 	Signatures  []common.Signature
+	Signers     []common.PublicHash
 }

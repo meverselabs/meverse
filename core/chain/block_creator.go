@@ -10,8 +10,6 @@ import (
 	"github.com/fletaio/fleta/encoding"
 )
 
-// TODO : BlockCreator에 txpool 연동해서 이미 서명 검사한 것은 signers 목록을 받아올 수 있도록 처리
-
 // BlockCreator helps to create block
 type BlockCreator struct {
 	cn        *Chain
@@ -69,17 +67,20 @@ func (bc *BlockCreator) AddTx(tx types.Transaction, sigs []common.Signature) err
 	if err != nil {
 		return err
 	}
-
-	th := HashTransactionByType(t, tx)
-
+	TxHash := HashTransactionByType(t, tx)
 	signers := []common.PublicHash{}
 	for _, sig := range sigs {
-		if pubkey, err := common.RecoverPubkey(th, sig); err != nil {
+		if pubkey, err := common.RecoverPubkey(TxHash, sig); err != nil {
 			return err
 		} else {
 			signers = append(signers, common.NewPublicHash(pubkey))
 		}
 	}
+	return bc.UnsafeAddTx(t, TxHash, tx, sigs, signers)
+}
+
+// UnsafeAddTx adds transactions without signer validation if signers is not empty
+func (bc *BlockCreator) UnsafeAddTx(t uint16, TxHsah hash.Hash256, tx types.Transaction, sigs []common.Signature, signers []common.PublicHash) error {
 	ctw := types.NewContextWrapper(uint8(t>>8), bc.ctx)
 	pid := uint8(t >> 8)
 	p, err := bc.cn.Process(pid)
@@ -100,7 +101,7 @@ func (bc *BlockCreator) AddTx(tx types.Transaction, sigs []common.Signature) err
 	bc.b.TransactionTypes = append(bc.b.TransactionTypes, t)
 	bc.b.Transactions = append(bc.b.Transactions, tx)
 	bc.b.TranactionSignatures = append(bc.b.TranactionSignatures, sigs)
-	bc.txHashes = append(bc.txHashes, th)
+	bc.txHashes = append(bc.txHashes, TxHsah)
 	return nil
 }
 

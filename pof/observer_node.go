@@ -177,6 +177,9 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 					}
 				}
 			} else {
+				if cp.Height() > 0 {
+					panic("HERE") //TEMP
+				}
 				log.Println("Observer", ob.myPublicHash.String(), cp.Height(), "No Formulator", ob.round.RoundState, len(ob.adjustFormulatorMap()), ob.fs.PeerCount(), (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
 			}
 			ob.Unlock()
@@ -809,6 +812,8 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 				}
 				time.Sleep(diff)
 			}
+
+			log.Println("Observer", ob.myPublicHash.String(), cp.Height(), "BlockConnected", ob.round.RoundState, msg.BlockVote.Header.Height, (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
 
 			ob.round.RemainBlocks--
 			if ob.round.RemainBlocks > 0 {

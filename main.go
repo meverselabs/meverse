@@ -2,6 +2,7 @@ package main // import "github.com/fletaio/fleta"
 
 import (
 	"encoding/hex"
+	"os"
 	"strconv"
 	"sync"
 
@@ -22,7 +23,7 @@ func main() {
 }
 
 func test() error {
-	//os.RemoveAll("./_data")
+	os.RemoveAll("./_data")
 
 	obstrs := []string{
 		"cd7cca6359869f4f58bb31aa11c2c4825d4621406f7b514058bc4dbe788c29be",
@@ -117,9 +118,10 @@ func test() error {
 		if err := cn.Init(); err != nil {
 			return err
 		}
-		fr := pof.NewFormulator(&pof.FormulatorConfig{
-			SeedNodes:  []string{},
-			Formulator: common.NewAddress(0, 2+uint16(i), 0),
+		fr := pof.NewFormulatorNode(&pof.FormulatorConfig{
+			SeedNodes:               []string{},
+			Formulator:              common.NewAddress(0, 2+uint16(i), 0),
+			MaxTransactionsPerBlock: 10000,
 		}, frkey, FrNetAddressMap, cs)
 		if err := fr.Init(); err != nil {
 			return err
