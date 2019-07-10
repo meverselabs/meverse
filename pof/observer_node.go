@@ -65,7 +65,7 @@ func NewObserverNode(key key.Key, NetAddressMap map[common.PublicHash]string, cs
 
 // Init initializes observer
 func (ob *ObserverNode) Init() error {
-	fc := encoding.Factory("pof.message")
+	fc := encoding.Factory("message")
 	fc.Register(types.DefineHashedType("pof.RoundVoteMessage"), &RoundVoteMessage{})
 	fc.Register(types.DefineHashedType("pof.RoundVoteAckMessage"), &RoundVoteAckMessage{})
 	fc.Register(types.DefineHashedType("pof.BlockReqMessage"), &BlockReqMessage{})

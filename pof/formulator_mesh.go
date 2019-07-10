@@ -115,7 +115,7 @@ func (ms *FormulatorNodeMesh) BroadcastRaw(bs []byte) {
 // BroadcastMessage sends a message to all peers
 func (ms *FormulatorNodeMesh) BroadcastMessage(m interface{}) error {
 	var buffer bytes.Buffer
-	fc := encoding.Factory("pof.message")
+	fc := encoding.Factory("message")
 	t, err := fc.TypeOf(m)
 	if err != nil {
 		return err

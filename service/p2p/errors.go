@@ -8,4 +8,5 @@ var (
 	ErrInvalidLength    = errors.New("invalid length")
 	ErrUnknownMessage   = errors.New("unknown message")
 	ErrNotExistPeer     = errors.New("not exist peer")
+	ErrInvalidUTXO      = errors.New("invalid UTXO")
 )

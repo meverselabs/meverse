@@ -38,7 +38,7 @@ type FormulatorNode struct {
 	lastObSignMessageMap map[uint32]*BlockObSignMessage
 	lastContextes        []*types.Context
 	lastReqMessage       *BlockReqMessage
-	txMsgChans           []*chan *txMsgItem
+	txMsgChans           []*chan *p2p.TxMsgItem
 	txMsgIdx             uint64
 	statusMap            map[string]*p2p.Status
 	requestTimer         *p2p.RequestTimer
@@ -93,7 +93,7 @@ func (fr *FormulatorNode) Close() {
 
 // Init initializes formulator
 func (fr *FormulatorNode) Init() error {
-	fc := encoding.Factory("pof.message")
+	fc := encoding.Factory("message")
 	fc.Register(types.DefineHashedType("pof.BlockReqMessage"), &BlockReqMessage{})
 	fc.Register(types.DefineHashedType("pof.BlockGenMessage"), &BlockGenMessage{})
 	fc.Register(types.DefineHashedType("pof.BlockObSignMessage"), &BlockObSignMessage{})
@@ -123,25 +123,25 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 		WorkerCount = 1
 	}
 	workerEnd := make([]*chan struct{}, WorkerCount)
-	fr.txMsgChans = make([]*chan *txMsgItem, WorkerCount)
+	fr.txMsgChans = make([]*chan *p2p.TxMsgItem, WorkerCount)
 	for i := 0; i < WorkerCount; i++ {
-		mch := make(chan *txMsgItem)
+		mch := make(chan *p2p.TxMsgItem)
 		fr.txMsgChans[i] = &mch
 		ch := make(chan struct{})
 		workerEnd[i] = &ch
-		go func(pMsgCh *chan *txMsgItem, pEndCh *chan struct{}) {
+		go func(pMsgCh *chan *p2p.TxMsgItem, pEndCh *chan struct{}) {
 			for {
 				select {
 				case item := <-(*pMsgCh):
 					if err := fr.AddTx(item.Message.Tx, item.Message.Sigs); err != nil {
 						if err != txpool.ErrPastSeq || err != txpool.ErrTooFarSeq {
-							(*item.pErrCh) <- err
+							(*item.ErrCh) <- err
 						} else {
-							(*item.pErrCh) <- nil
+							(*item.ErrCh) <- nil
 						}
 						break
 					}
-					(*item.pErrCh) <- nil
+					(*item.ErrCh) <- nil
 					if len(item.PeerID) > 0 {
 						//fr.pm.ExceptCast(item.PeerID, item.Message)
 						//fr.pm.ExceptCastLimit(item.PeerID, item.Message, 7)
@@ -170,6 +170,7 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 					break
 				}
 				fr.broadcastStatus()
+				fr.cleanPool(b)
 				TargetHeight++
 				item = fr.blockQ.PopUntil(TargetHeight)
 			}
@@ -245,11 +246,8 @@ func (fr *FormulatorNode) OnTimerExpired(height uint32, value interface{}) {
 // OnItemExpired is called when the item is expired
 func (fr *FormulatorNode) OnItemExpired(Interval time.Duration, Key string, Item interface{}, IsLast bool) {
 	msg := Item.(*p2p.TransactionMessage)
-	/*
-		for _, eh := range kn.eventHandlers {
-			eh.DoTransactionBroadcast(kn, msg)
-		}
-	*/
+	fr.ms.BroadcastMessage(msg)
+	fr.nm.BroadcastMessage(msg)
 	if IsLast {
 		var TxHash hash.Hash256
 		copy(TxHash[:], []byte(Key))
@@ -515,6 +513,7 @@ func (fr *FormulatorNode) handleMessage(p p2p.Peer, m interface{}, RetryCount in
 					return err
 				}
 				fr.broadcastStatus()
+				fr.cleanPool(b)
 				log.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Height, len(b.Transactions))
 
 				if status, has := fr.statusMap[p.ID()]; has {
@@ -595,13 +594,13 @@ func (fr *FormulatorNode) handleMessage(p p2p.Peer, m interface{}, RetryCount in
 	case *p2p.TransactionMessage:
 		errCh := make(chan error)
 		idx := atomic.AddUint64(&fr.txMsgIdx, 1) % uint64(len(fr.txMsgChans))
-		(*fr.txMsgChans[idx]) <- &txMsgItem{
+		(*fr.txMsgChans[idx]) <- &p2p.TxMsgItem{
 			Message: msg,
 			PeerID:  "",
-			pErrCh:  &errCh,
+			ErrCh:   &errCh,
 		}
 		err := <-errCh
-		if err != ErrInvalidUTXO && err != txpool.ErrExistTransaction {
+		if err != p2p.ErrInvalidUTXO && err != txpool.ErrExistTransaction {
 			return err
 		}
 		return nil
@@ -660,8 +659,11 @@ func (fr *FormulatorNode) tryRequestNext() {
 	}
 }
 
-type txMsgItem struct {
-	Message *p2p.TransactionMessage
-	PeerID  string
-	pErrCh  *chan error
+func (fr *FormulatorNode) cleanPool(b *types.Block) {
+	for i, tx := range b.Transactions {
+		t := b.TransactionTypes[i]
+		TxHash := chain.HashTransactionByType(t, tx)
+		fr.txpool.Remove(TxHash, tx)
+		fr.txQ.Remove(string(TxHash[:]))
+	}
 }

@@ -184,7 +184,8 @@ func test() error {
 	}
 
 	From := common.NewAddress(0, 1, 0)
-	seq := cns[0].Seq(From)
+	ctx := cns[0].NewContext()
+	seq := ctx.Seq(From)
 	for i := 0; i < 100; i++ {
 		seq++
 		tx := &vault.Transfer{

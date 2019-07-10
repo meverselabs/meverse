@@ -225,9 +225,9 @@ func (cn *Chain) MustAddService(s types.Service) {
 	cn.serviceMap[s.Name()] = s
 }
 
-// Seq returns the squence of the address
-func (cn *Chain) Seq(addr common.Address) uint64 {
-	return cn.store.Seq(addr)
+// NewContext returns the context of the chain
+func (cn *Chain) NewContext() *types.Context {
+	return types.NewContext(cn.store)
 }
 
 // ConnectBlock try to connect block to the chain

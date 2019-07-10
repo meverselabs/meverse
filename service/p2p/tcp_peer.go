@@ -112,7 +112,7 @@ func (p *TCPPeer) ReadMessageData() (interface{}, []byte, error) {
 		}
 		defer zr.Close()
 
-		fc := encoding.Factory("pof.message")
+		fc := encoding.Factory("message")
 		m, err := fc.Create(t)
 		if err != nil {
 			return nil, nil, err
@@ -131,7 +131,7 @@ func (p *TCPPeer) ReadMessageData() (interface{}, []byte, error) {
 // Send sends a message to the TCPPeer
 func (p *TCPPeer) Send(m interface{}) error {
 	var buffer bytes.Buffer
-	fc := encoding.Factory("pof.message")
+	fc := encoding.Factory("message")
 	t, err := fc.TypeOf(m)
 	if err != nil {
 		return err

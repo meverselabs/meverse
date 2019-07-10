@@ -20,5 +20,4 @@ var (
 	ErrAlreadyVoted                  = errors.New("already voted")
 	ErrNotExistObserverPeer          = errors.New("not exist observer peer")
 	ErrNotExistFormulatorPeer        = errors.New("not exist formulator peer")
-	ErrInvalidUTXO                   = errors.New("invalid UTXO")
 )
