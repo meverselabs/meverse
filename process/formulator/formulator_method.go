@@ -7,6 +7,36 @@ import (
 	"github.com/fletaio/fleta/core/types"
 )
 
+func (p *Formulator) addGenCount(ctw *types.ContextWrapper, addr common.Address) {
+	ctw.SetProcessData(toGenCountKey(addr), util.Uint64ToBytes(p.getGenCount(ctw, addr)+1))
+}
+
+func (p *Formulator) getGenCount(ctw *types.ContextWrapper, addr common.Address) uint64 {
+	if bs := ctw.ProcessData(toGenCountKey(addr)); len(bs) > 0 {
+		return util.BytesToUint64(bs)
+	} else {
+		return 0
+	}
+}
+
+func (p *Formulator) removeGenCount(ctw *types.ContextWrapper, addr common.Address) {
+	ctw.SetProcessData(toGenCountKey(addr), nil)
+}
+
+func (p *Formulator) getGenCountMap(ctw *types.ContextWrapper) (map[common.Address]uint64, error) {
+	keys, err := ctw.ProcessDataKeys(tagGenCount)
+	if err != nil {
+		return nil, err
+	}
+	CountMap := map[common.Address]uint64{}
+	for _, k := range keys {
+		if addr, is := fromGenCountKey(k); is {
+			CountMap[addr] = p.getGenCount(ctw, addr)
+		}
+	}
+	return CountMap, nil
+}
+
 func (p *Formulator) getStakingAmount(ctw *types.ContextWrapper, HyperAddress common.Address, StakingAddress common.Address) *amount.Amount {
 	if bs := ctw.AccountData(HyperAddress, toStakingAmountKey(StakingAddress)); len(bs) > 0 {
 		return amount.NewAmountFromBytes(bs)
@@ -71,41 +101,6 @@ func (p *Formulator) getRewardPowerMap(ctw *types.ContextWrapper) (map[common.Ad
 	return PowerMap, nil
 }
 
-func (p *Formulator) getStakingPower(ctw *types.ContextWrapper, HyperAddress common.Address, StakingAddress common.Address) *amount.Amount {
-	if bs := ctw.ProcessData(toStakingPowerKey(HyperAddress, StakingAddress)); len(bs) > 0 {
-		return amount.NewAmountFromBytes(bs)
-	} else {
-		return amount.NewCoinAmount(0, 0)
-	}
-}
-
-func (p *Formulator) addStakingPower(ctw *types.ContextWrapper, HyperAddress common.Address, StakingAddress common.Address, Power *amount.Amount) {
-	ctw.SetProcessData(toStakingPowerKey(HyperAddress, StakingAddress), p.getStakingPower(ctw, HyperAddress, StakingAddress).Add(Power).Bytes())
-}
-
-func (p *Formulator) removeStakingPower(ctw *types.ContextWrapper, HyperAddress common.Address, StakingAddress common.Address) {
-	ctw.SetProcessData(toStakingPowerKey(HyperAddress, StakingAddress), nil)
-}
-
-func (p *Formulator) getStakingPowerMap(ctw *types.ContextWrapper) (map[common.Address]map[common.Address]*amount.Amount, error) {
-	keys, err := ctw.ProcessDataKeys(tagStakingPower)
-	if err != nil {
-		return nil, err
-	}
-	StakingPowerMap := map[common.Address]map[common.Address]*amount.Amount{}
-	for _, k := range keys {
-		if HyperAddress, StakingAddress, is := fromStakingPowerKey(k); is {
-			PowerMap, has := StakingPowerMap[HyperAddress]
-			if !has {
-				PowerMap = map[common.Address]*amount.Amount{}
-				StakingPowerMap[HyperAddress] = PowerMap
-			}
-			PowerMap[StakingAddress] = p.getStakingPower(ctw, HyperAddress, StakingAddress)
-		}
-	}
-	return StakingPowerMap, nil
-}
-
 func (p *Formulator) getLastPaidHeight(ctw *types.ContextWrapper) uint32 {
 	if bs := ctw.ProcessData(tagLastPaidHeight); len(bs) > 0 {
 		return util.BytesToUint32(bs)
@@ -116,4 +111,32 @@ func (p *Formulator) getLastPaidHeight(ctw *types.ContextWrapper) uint32 {
 
 func (p *Formulator) setLastPaidHeight(ctw *types.ContextWrapper, lastPaidHeight uint32) {
 	ctw.SetProcessData(tagLastPaidHeight, util.Uint32ToBytes(lastPaidHeight))
+}
+
+func (p *Formulator) getLastStakingPaidHeight(ctw *types.ContextWrapper, Address common.Address) uint32 {
+	if bs := ctw.AccountData(Address, tagLastStakingPaidHeight); len(bs) > 0 {
+		return util.BytesToUint32(bs)
+	} else {
+		return 0
+	}
+}
+
+func (p *Formulator) setLastStakingPaidHeight(ctw *types.ContextWrapper, Address common.Address, lastPaidHeight uint32) {
+	ctw.SetAccountData(Address, tagLastStakingPaidHeight, util.Uint32ToBytes(lastPaidHeight))
+}
+
+func (p *Formulator) getUserAutoStaking(ctw *types.ContextWrapper, HyperAddress common.Address, StakingAddress common.Address) bool {
+	if bs := ctw.AccountData(HyperAddress, toAutoStakingKey(StakingAddress)); len(bs) > 0 {
+		return bs[0] == 1
+	} else {
+		return true
+	}
+}
+
+func (p *Formulator) setUserAutoStakingUser(ctw *types.ContextWrapper, HyperAddress common.Address, StakingAddress common.Address, IsAutoStaking bool) {
+	if IsAutoStaking {
+		ctw.SetAccountData(HyperAddress, toAutoStakingKey(StakingAddress), []byte{1})
+	} else {
+		ctw.SetAccountData(HyperAddress, toAutoStakingKey(StakingAddress), nil)
+	}
 }

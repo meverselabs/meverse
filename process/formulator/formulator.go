@@ -125,107 +125,230 @@ func (p *Formulator) BeforeExecuteTransactions(ctw *types.ContextWrapper) error 
 
 // AfterExecuteTransactions called after processes transactions of the block
 func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.ContextWrapper) error {
-	return nil
+	p.addGenCount(ctw, b.Header.Generator)
 
 	policy := &RewardPolicy{}
 	if err := encoding.Unmarshal(ctw.ProcessData(tagRewardPolicy), &policy); err != nil {
 		return err
 	}
 
-	if true {
-		acc, err := ctw.Account(b.Header.Generator)
+	lastPaidHeight := p.getLastPaidHeight(ctw)
+	if ctw.TargetHeight() >= lastPaidHeight+policy.PayRewardEveryBlocks {
+		CountMap, err := p.getGenCountMap(ctw)
 		if err != nil {
 			return err
 		}
 
-		frAcc, is := acc.(*FormulatorAccount)
-		if !is {
-			return types.ErrInvalidAccountType
-		}
-		switch frAcc.FormulatorType {
-		case AlphaFormulatorType:
-			p.addRewardPower(ctw, b.Header.Generator, frAcc.Amount.MulC(int64(policy.AlphaEfficiency1000)).DivC(1000))
-		case SigmaFormulatorType:
-			p.addRewardPower(ctw, b.Header.Generator, frAcc.Amount.MulC(int64(policy.SigmaEfficiency1000)).DivC(1000))
-		case OmegaFormulatorType:
-			p.addRewardPower(ctw, b.Header.Generator, frAcc.Amount.MulC(int64(policy.OmegaEfficiency1000)).DivC(1000))
-		case HyperFormulatorType:
-			PowerSum := frAcc.Amount.MulC(int64(policy.HyperEfficiency1000)).DivC(1000)
+		RewardPowerSum := amount.NewCoinAmount(0, 0)
+		RewardPowerMap := map[common.Address]*amount.Amount{}
+		StakingRewardPowerMap := map[common.Address]*amount.Amount{}
+		Hypers := []*FormulatorAccount{}
+		for GenAddress, GenCount := range CountMap {
+			p.removeGenCount(ctw, GenAddress)
 
-			AmountMap, err := p.getStakingAmountMap(ctw, b.Header.Generator)
+			acc, err := ctw.Account(GenAddress)
 			if err != nil {
 				return err
 			}
-			for StakingAddress, StakingAmount := range AmountMap {
-				if StakingAmount.IsZero() {
-					return ErrInvalidStakingAddress
-				}
+			frAcc, is := acc.(*FormulatorAccount)
+			if !is {
+				return types.ErrInvalidAccountType
+			}
+			switch frAcc.FormulatorType {
+			case AlphaFormulatorType:
+				am := frAcc.Amount.MulC(int64(GenCount)).MulC(int64(policy.AlphaEfficiency1000)).DivC(1000)
+				RewardPowerSum = RewardPowerSum.Add(am)
+				RewardPowerMap[GenAddress] = am
+			case SigmaFormulatorType:
+				am := frAcc.Amount.MulC(int64(GenCount)).MulC(int64(policy.SigmaEfficiency1000)).DivC(1000)
+				RewardPowerSum = RewardPowerSum.Add(am)
+				RewardPowerMap[GenAddress] = am
+			case OmegaFormulatorType:
+				am := frAcc.Amount.MulC(int64(GenCount)).MulC(int64(policy.OmegaEfficiency1000)).DivC(1000)
+				RewardPowerSum = RewardPowerSum.Add(am)
+				RewardPowerMap[GenAddress] = am
+			case HyperFormulatorType:
+				Hypers = append(Hypers, frAcc)
 
-				if _, err := ctw.Account(StakingAddress); err != nil {
-					if err != types.ErrNotExistAccount {
+				am := frAcc.Amount.MulC(int64(GenCount)).MulC(int64(policy.HyperEfficiency1000)).DivC(1000)
+				RewardPowerSum = RewardPowerSum.Add(am)
+				RewardPowerMap[GenAddress] = am
+
+				PrevAmountMap := types.NewAddressAmountMap()
+				if bs := ctw.AccountData(b.Header.Generator, tagStakingAmountMap); len(bs) > 0 {
+					if err := encoding.Unmarshal(bs, &PrevAmountMap); err != nil {
 						return err
 					}
-					p.removeRewardPower(ctw, StakingAddress)
+				}
+				AmountMap, err := p.getStakingAmountMap(ctw, b.Header.Generator)
+				if err != nil {
+					return err
+				}
+				CurrentAmountMap := types.NewAddressAmountMap()
+				CrossAmountMap := map[common.Address]*amount.Amount{}
+				for StakingAddress, StakingAmount := range AmountMap {
+					CurrentAmountMap.Put(StakingAddress, StakingAmount)
+					if PrevStakingAmount, has := PrevAmountMap.Get(StakingAddress); has {
+						if !PrevStakingAmount.IsZero() && !StakingAmount.IsZero() {
+							if StakingAmount.Less(PrevStakingAmount) {
+								CrossAmountMap[StakingAddress] = StakingAmount
+							} else {
+								CrossAmountMap[StakingAddress] = PrevStakingAmount
+							}
+						}
+					}
+				}
+				if bs, err := encoding.Marshal(CurrentAmountMap); err != nil {
+					return err
 				} else {
-					StakingPower := StakingAmount.MulC(int64(policy.StakingEfficiency1000)).DivC(1000)
-					ComissionPower := StakingPower.MulC(int64(frAcc.Policy.CommissionRatio1000)).DivC(1000)
+					ctw.SetAccountData(b.Header.Generator, tagStakingAmountMap, bs)
+				}
 
-					if bs := ctw.AccountData(b.Header.Generator, toAutoStakingKey(StakingAddress)); len(bs) > 0 && bs[0] == 1 {
-						p.addStakingPower(ctw, b.Header.Generator, StakingAddress, StakingPower.Sub(ComissionPower))
-						PowerSum = PowerSum.Add(StakingPower)
+				StakingRewardPower := amount.NewCoinAmount(0, 0)
+				StakingPowerMap := types.NewAddressAmountMap()
+				if bs := ctw.AccountData(b.Header.Generator, tagStakingPowerMap); len(bs) > 0 {
+					if err := encoding.Unmarshal(bs, &StakingPowerMap); err != nil {
+						return err
+					}
+				}
+				for StakingAddress, StakingAmount := range CrossAmountMap {
+					if sm, has := StakingPowerMap.Get(StakingAddress); has {
+						StakingPowerMap.Put(StakingAddress, sm.Add(StakingAmount))
 					} else {
-						p.addRewardPower(ctw, StakingAddress, StakingPower.Sub(ComissionPower))
-						PowerSum = PowerSum.Add(ComissionPower)
+						StakingPowerMap.Put(StakingAddress, StakingAmount)
+					}
+					StakingRewardPower = StakingRewardPower.Add(StakingAmount.MulC(int64(policy.StakingEfficiency1000)).DivC(1000))
+				}
+				if bs, err := encoding.Marshal(StakingPowerMap); err != nil {
+					return err
+				} else {
+					ctw.SetAccountData(b.Header.Generator, tagStakingPowerMap, bs)
+				}
+				StakingRewardPowerMap[GenAddress] = StakingRewardPower
+				RewardPowerSum = RewardPowerSum.Add(StakingRewardPower)
+			default:
+				return types.ErrInvalidAccountType
+			}
+		}
+
+		StackRewardMap := types.NewAddressAmountMap()
+		if bs := ctw.AccountData(b.Header.Generator, tagStackRewardMap); len(bs) > 0 {
+			if err := encoding.Unmarshal(bs, &StackRewardMap); err != nil {
+				return err
+			}
+		}
+		if true {
+			TotalReward := policy.RewardPerBlock.MulC(int64(ctw.TargetHeight() - lastPaidHeight))
+			Ratio := TotalReward.Mul(amount.COIN).Div(RewardPowerSum)
+			for RewardAddress, RewardPower := range RewardPowerMap {
+				if acc, err := ctw.Account(RewardAddress); err != nil {
+					return err
+				} else {
+					IsStaked := false
+					if frAcc, is := acc.(*FormulatorAccount); is {
+						if frAcc.FormulatorType == HyperFormulatorType {
+							if frAcc.Policy.AutoStakingSelf {
+								RewardAmount := RewardPower.Mul(Ratio).Div(amount.COIN)
+								frAcc.Amount = frAcc.Amount.Add(RewardAmount)
+								IsStaked = true
+							}
+						}
+					}
+					if !IsStaked {
+						RewardAmount := RewardPower.Mul(Ratio).Div(amount.COIN)
+						if !RewardAmount.IsZero() {
+							if err := p.vault.AddBalance(ctw, RewardAddress, RewardAmount); err != nil {
+								return err
+							}
+						}
 					}
 				}
 			}
-			p.addRewardPower(ctw, b.Header.Generator, PowerSum)
-		default:
-			return types.ErrInvalidAccountType
-		}
-	}
-
-	lastPaidHeight := p.getLastPaidHeight(ctw)
-	if ctw.TargetHeight() >= lastPaidHeight+policy.PayRewardEveryBlocks {
-		TotalPower := amount.NewCoinAmount(0, 0)
-		powerMap, err := p.getRewardPowerMap(ctw)
-		if err != nil {
-			return err
-		}
-		for _, PowerSum := range powerMap {
-			TotalPower = TotalPower.Add(PowerSum)
-		}
-		TotalReward := policy.RewardPerBlock.MulC(int64(ctw.TargetHeight() - lastPaidHeight))
-		Ratio := TotalReward.Mul(amount.COIN).Div(TotalPower)
-		for addr, PowerSum := range powerMap {
-			acc, err := ctw.Account(addr)
-			if err != nil {
-				if err != types.ErrNotExistAccount {
+			for GenAddress, StakingRewardPower := range StakingRewardPowerMap {
+				if has, err := ctw.HasAccount(GenAddress); err != nil {
 					return err
-				}
-			} else {
-				frAcc := acc.(*FormulatorAccount)
-				if err := p.vault.AddBalance(ctw, frAcc.Address(), PowerSum.Mul(Ratio).Div(amount.COIN)); err != nil {
-					return err
+				} else if has {
+					RewardAmount := StakingRewardPower.Mul(Ratio).Div(amount.COIN)
+					if sm, has := StackRewardMap.Get(GenAddress); has {
+						StackRewardMap.Put(GenAddress, sm.Add(RewardAmount))
+					} else {
+						StackRewardMap.Put(GenAddress, RewardAmount)
+					}
 				}
 			}
-			p.removeRewardPower(ctw, addr)
 		}
+		for _, frAcc := range Hypers {
+			if StackReward, has := StackRewardMap.Get(frAcc.Address()); has {
+				lastStakingPaidHeight := p.getLastStakingPaidHeight(ctw, frAcc.Address())
+				if ctw.TargetHeight() >= lastStakingPaidHeight+frAcc.Policy.PayOutInterval {
+					StakingPowerMap := types.NewAddressAmountMap()
+					if bs := ctw.AccountData(b.Header.Generator, tagStakingPowerMap); len(bs) > 0 {
+						if err := encoding.Unmarshal(bs, &StakingPowerMap); err != nil {
+							return err
+						}
+					}
 
-		StakingPowerMap, err := p.getStakingPowerMap(ctw)
-		if err != nil {
-			return err
-		}
-		for HyperAddress, PowerMap := range StakingPowerMap {
-			for StakingAddress, PowerSum := range PowerMap {
-				p.addStakingAmount(ctw, HyperAddress, StakingAddress, PowerSum.Mul(Ratio).Div(amount.COIN))
-				p.removeStakingPower(ctw, HyperAddress, StakingAddress)
+					StakingPowerSum := amount.NewCoinAmount(0, 0)
+					StakingPowerMap.EachAll(func(StakingAddress common.Address, StakingPower *amount.Amount) bool {
+						StakingPowerSum = StakingPowerSum.Add(StakingPower)
+						return true
+					})
+
+					CommissionSum := amount.NewCoinAmount(0, 0)
+					var inErr error
+					Ratio := StackReward.Mul(amount.COIN).Div(StakingPowerSum)
+					StakingPowerMap.EachAll(func(StakingAddress common.Address, StakingPower *amount.Amount) bool {
+						RewardAmount := StakingPower.Mul(Ratio).Div(amount.COIN)
+						if !RewardAmount.IsZero() {
+							Commission := RewardAmount.MulC(int64(frAcc.Policy.CommissionRatio1000)).DivC(1000)
+							CommissionSum = CommissionSum.Add(Commission)
+							RewardAmount = RewardAmount.Sub(Commission)
+							if p.getUserAutoStaking(ctw, frAcc.Address(), StakingAddress) {
+								p.addStakingAmount(ctw, frAcc.Address(), StakingAddress, RewardAmount)
+							} else {
+								if err := p.vault.AddBalance(ctw, StakingAddress, RewardAmount); err != nil {
+									inErr = err
+									return false
+								}
+							}
+						}
+						return true
+					})
+					if inErr != nil {
+						return inErr
+					}
+
+					if frAcc.Policy.AutoStakingSelf {
+						frAcc.Amount = frAcc.Amount.Add(CommissionSum)
+					} else {
+						if err := p.vault.AddBalance(ctw, frAcc.Address(), CommissionSum); err != nil {
+							return err
+						}
+					}
+
+					StackRewardMap.Delete(frAcc.Address())
+					p.setLastStakingPaidHeight(ctw, frAcc.Address(), ctw.TargetHeight())
+				}
 			}
+		}
+		if bs, err := encoding.Marshal(StackRewardMap); err != nil {
+			return err
+		} else {
+			ctw.SetAccountData(b.Header.Generator, tagStackRewardMap, bs)
 		}
 
 		//log.Println("Paid at", ctw.TargetHeight())
 		p.setLastPaidHeight(ctw, ctw.TargetHeight())
 	}
+	return nil
+
+	/*
+		Validator는 정산 시 본인 비율에 대한 부분을 자동 스테이킹 시 스테이킹에, 아닐 시 계좌에 수령
+		Validator는 정산 시 스테이킹 비율에 대한 부분을 내부에 축적
+		Validator 설정 값에 따른 정산 주기에 보상 대기 파워에 따라 Deligator에게 정산 처리
+		Deligator에 정산 시 자동 스테이킹 시 스테이킹에, 아닐 시 계좌에 수령
+	*/
+
 	return nil
 }
 

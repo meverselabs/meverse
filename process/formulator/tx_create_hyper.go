@@ -49,6 +49,13 @@ func (tx *CreateHyper) Validate(p types.Process, loader types.LoaderWrapper, sig
 		return types.ErrInvalidAccountName
 	}
 
+	if tx.Policy == nil {
+		return ErrInvalidPolicy
+	}
+	if tx.Policy.CommissionRatio1000 > 1000 {
+		return ErrInvalidPolicy
+	}
+
 	if tx.Seq() <= loader.Seq(tx.From()) {
 		return types.ErrInvalidSequence
 	}
@@ -73,6 +80,13 @@ func (tx *CreateHyper) Execute(p types.Process, ctw *types.ContextWrapper, index
 
 	if len(tx.Name) < 8 || len(tx.Name) > 16 {
 		return types.ErrInvalidAccountName
+	}
+
+	if tx.Policy == nil {
+		return ErrInvalidPolicy
+	}
+	if tx.Policy.CommissionRatio1000 > 1000 {
+		return ErrInvalidPolicy
 	}
 
 	policy := &HyperPolicy{}

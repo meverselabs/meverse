@@ -21,4 +21,6 @@ var (
 	ErrUnauthorizedTransaction                 = errors.New("unauthorized transaction")
 	ErrCriticalStakingAmount                   = errors.New("critical staking amount")
 	ErrInsufficientStakingAmount               = errors.New("insufficient staking amount")
+	ErrInvalidPolicy                           = errors.New("invalid policy")
+	ErrNotHyperFormulator                      = errors.New("not hyper formulator")
 )

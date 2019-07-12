@@ -216,17 +216,19 @@ func (pc *HyperPolicy) MarshalJSON() ([]byte, error) {
 
 // ValidatorPolicy defines a policy of Hyper formulator
 type ValidatorPolicy struct {
-	CommissionRatio1000        uint32
-	UnlockEnableRequiredBlocks uint32
-	MinimumStaking             *amount.Amount
+	CommissionRatio1000 uint32
+	MinimumStaking      *amount.Amount
+	PayOutInterval      uint32
+	AutoStakingSelf     bool
 }
 
 // Clone returns the clonend value of it
 func (pc *ValidatorPolicy) Clone() *ValidatorPolicy {
 	return &ValidatorPolicy{
-		CommissionRatio1000:        pc.CommissionRatio1000,
-		UnlockEnableRequiredBlocks: pc.UnlockEnableRequiredBlocks,
-		MinimumStaking:             pc.MinimumStaking.Clone(),
+		CommissionRatio1000: pc.CommissionRatio1000,
+		MinimumStaking:      pc.MinimumStaking.Clone(),
+		PayOutInterval:      pc.PayOutInterval,
+		AutoStakingSelf:     pc.AutoStakingSelf,
 	}
 }
 
@@ -241,34 +243,22 @@ func (pc *ValidatorPolicy) MarshalJSON() ([]byte, error) {
 		buffer.Write(bs)
 	}
 	buffer.WriteString(`,`)
-	buffer.WriteString(`"unlock_enable_required_blocks":`)
-	if bs, err := json.Marshal(pc.UnlockEnableRequiredBlocks); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
 	buffer.WriteString(`"minimum_staking":`)
 	if bs, err := json.Marshal(pc.MinimumStaking); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)
 	}
-	buffer.WriteString(`}`)
-	return buffer.Bytes(), nil
-}
-
-// UserPolicy defines a user policy
-type UserPolicy struct {
-	AutoStaking bool
-}
-
-// MarshalJSON is a marshaler function
-func (pc *UserPolicy) MarshalJSON() ([]byte, error) {
-	var buffer bytes.Buffer
-	buffer.WriteString(`{`)
-	buffer.WriteString(`"auto_staking":`)
-	if bs, err := json.Marshal(pc.AutoStaking); err != nil {
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"pay_out_interval":`)
+	if bs, err := json.Marshal(pc.PayOutInterval); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"auto_staking_self":`)
+	if bs, err := json.Marshal(pc.AutoStakingSelf); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

@@ -5,7 +5,6 @@ import (
 	"os"
 	"strconv"
 	"sync"
-	"time"
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
@@ -205,27 +204,29 @@ func test() error {
 		go nd.Run(":591" + strconv.Itoa(i+1))
 	}
 
-	From := common.NewAddress(0, 2, 0)
-	ctx := cns[0].NewContext()
-	seq := ctx.Seq(From)
-	for i := 0; i < 100; i++ {
-		seq++
-		tx := &vault.Transfer{
-			Timestamp_: uint64(time.Now().UnixNano()),
-			Seq_:       seq,
-			From_:      From,
-			To:         common.NewAddress(0, 3, 0),
-			Amount:     amount.COIN,
+	/*
+		From := common.NewAddress(0, 2, 0)
+		ctx := cns[0].NewContext()
+		seq := ctx.Seq(From)
+		for i := 0; i < 100; i++ {
+			seq++
+			tx := &vault.Transfer{
+				Timestamp_: uint64(time.Now().UnixNano()),
+				Seq_:       seq,
+				From_:      From,
+				To:         common.NewAddress(0, 3, 0),
+				Amount:     amount.COIN,
+			}
+			sig, err := frkeys[0].Sign(chain.HashTransaction(tx))
+			if err != nil {
+				return err
+			}
+			sigs := []common.Signature{sig}
+			if err := frs[0].AddTx(tx, sigs); err != nil {
+				return err
+			}
 		}
-		sig, err := frkeys[0].Sign(chain.HashTransaction(tx))
-		if err != nil {
-			return err
-		}
-		sigs := []common.Signature{sig}
-		if err := frs[0].AddTx(tx, sigs); err != nil {
-			return err
-		}
-	}
+	*/
 	select {}
 	return nil
 }
@@ -272,7 +273,7 @@ func (app *DApp) InitGenesis(ctw *types.ContextWrapper) error {
 	} else {
 		if err := fp.InitPolicy(ctw, &formulator.RewardPolicy{
 			RewardPerBlock:        amount.NewCoinAmount(0, 500000000000000000),
-			PayRewardEveryBlocks:  500,
+			PayRewardEveryBlocks:  50,
 			AlphaEfficiency1000:   1000,
 			SigmaEfficiency1000:   1500,
 			OmegaEfficiency1000:   2000,
