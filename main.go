@@ -47,8 +47,8 @@ func test() error {
 			obkeys = append(obkeys, Key)
 			pubhash := common.NewPublicHash(Key.PublicKey())
 			ObserverKeys = append(ObserverKeys, pubhash)
-			NetAddressMap[pubhash] = "localhost:1390" + strconv.Itoa(i+1)
-			FrNetAddressMap[pubhash] = "ws://localhost:1490" + strconv.Itoa(i+1)
+			NetAddressMap[pubhash] = "localhost:390" + strconv.Itoa(i+1)
+			FrNetAddressMap[pubhash] = "ws://localhost:490" + strconv.Itoa(i+1)
 		}
 	}
 
@@ -68,6 +68,22 @@ func test() error {
 		}
 	}
 
+	genstrs := []string{
+		"57066852dd6586fa8b473452a66c43f3ce17bd4ec409f1fff036a617bb38f063",
+		"b9878ff3837700079fbf187c86ad22f1c123543a96cd11c53b70fedc3813c27b",
+	}
+
+	genkeys := make([]key.Key, 0, len(genstrs))
+	for _, v := range genstrs {
+		if bs, err := hex.DecodeString(v); err != nil {
+			panic(err)
+		} else if Key, err := key.NewMemoryKeyFromBytes(bs); err != nil {
+			panic(err)
+		} else {
+			genkeys = append(genkeys, Key)
+		}
+	}
+
 	MaxBlocksPerFormulator := uint32(10)
 
 	obs := []*pof.ObserverNode{}
@@ -80,6 +96,8 @@ func test() error {
 		app := &DApp{
 			frkey:        frkeys[0],
 			frkey2:       frkeys[1],
+			genkey:       genkeys[0],
+			genkey2:      genkeys[1],
 			adminAddress: common.NewAddress(0, 1, 0),
 		}
 		cn := chain.NewChain(cs, app, st)
@@ -97,15 +115,15 @@ func test() error {
 
 	for i, ob := range obs {
 		go ob.Run(
-			":1390"+strconv.Itoa(i+1),
-			":1490"+strconv.Itoa(i+1),
+			":390"+strconv.Itoa(i+1),
+			":490"+strconv.Itoa(i+1),
 		)
 	}
 
 	frs := []*pof.FormulatorNode{}
 	cns := []*chain.Chain{}
 	NdNetAddressMap := map[common.PublicHash]string{}
-	for i, frkey := range frkeys {
+	for i, genkey := range genkeys {
 		st, err := chain.NewStore("./_data/f"+strconv.Itoa(i+1), "FLEAT Mainnet", 0x0001, true)
 		if err != nil {
 			return err
@@ -114,6 +132,8 @@ func test() error {
 		app := &DApp{
 			frkey:        frkeys[0],
 			frkey2:       frkeys[1],
+			genkey:       genkeys[0],
+			genkey2:      genkeys[1],
 			adminAddress: common.NewAddress(0, 1, 0),
 		}
 		cn := chain.NewChain(cs, app, st)
@@ -125,18 +145,18 @@ func test() error {
 		fr := pof.NewFormulatorNode(&pof.FormulatorConfig{
 			Formulator:              common.NewAddress(0, 2+uint16(i), 0),
 			MaxTransactionsPerBlock: 10000,
-		}, frkey, FrNetAddressMap, NdNetAddressMap, cs)
+		}, genkey, FrNetAddressMap, NdNetAddressMap, cs)
 		if err := fr.Init(); err != nil {
 			return err
 		}
 		frs = append(frs, fr)
 		cns = append(cns, cn)
 
-		NdNetAddressMap[common.NewPublicHash(frkey.PublicKey())] = ":1590" + strconv.Itoa(i+1)
+		NdNetAddressMap[common.NewPublicHash(genkey.PublicKey())] = ":590" + strconv.Itoa(i+1)
 	}
 
 	for i, fr := range frs {
-		go fr.Run(":1590" + strconv.Itoa(i+1))
+		go fr.Run(":590" + strconv.Itoa(i+1))
 	}
 
 	ndstrs := []string{
@@ -165,6 +185,8 @@ func test() error {
 		app := &DApp{
 			frkey:        frkeys[0],
 			frkey2:       frkeys[1],
+			genkey:       genkeys[0],
+			genkey2:      genkeys[1],
 			adminAddress: common.NewAddress(0, 1, 0),
 		}
 		cn := chain.NewChain(cs, app, st)
@@ -180,10 +202,10 @@ func test() error {
 		nds = append(nds, nd)
 	}
 	for i, nd := range nds {
-		go nd.Run(":1591" + strconv.Itoa(i+1))
+		go nd.Run(":591" + strconv.Itoa(i+1))
 	}
 
-	From := common.NewAddress(0, 1, 0)
+	From := common.NewAddress(0, 2, 0)
 	ctx := cns[0].NewContext()
 	seq := ctx.Seq(From)
 	for i := 0; i < 100; i++ {
@@ -192,7 +214,7 @@ func test() error {
 			Timestamp_: uint64(time.Now().UnixNano()),
 			Seq_:       seq,
 			From_:      From,
-			To:         common.NewAddress(0, 2, 0),
+			To:         common.NewAddress(0, 3, 0),
 			Amount:     amount.COIN,
 		}
 		sig, err := frkeys[0].Sign(chain.HashTransaction(tx))
@@ -216,6 +238,8 @@ type DApp struct {
 	cn           types.Provider
 	frkey        key.Key
 	frkey2       key.Key
+	genkey       key.Key
+	genkey2      key.Key
 	adminAddress common.Address
 }
 
@@ -279,38 +303,43 @@ func (app *DApp) InitGenesis(ctw *types.ContextWrapper) error {
 	} else if sp, is := p.(*vault.Vault); !is {
 		return types.ErrNotExistProcess
 	} else {
-		acc := &vault.SingleAccount{
-			Address_: common.NewAddress(0, 1, 0),
-			Name_:    "admin",
-			KeyHash:  common.NewPublicHash(app.frkey.PublicKey()),
+		if true {
+			acc := &vault.SingleAccount{
+				Address_: common.NewAddress(0, 1, 0),
+				Name_:    "admin",
+				KeyHash:  common.NewPublicHash(app.frkey.PublicKey()),
+			}
+			if err := ctw.CreateAccount(acc); err != nil {
+				return err
+			}
+			sp.AddBalance(ctw, acc.Address(), amount.NewCoinAmount(100000000000, 0))
 		}
-		if err := ctw.CreateAccount(acc); err != nil {
-			return err
+		if true {
+			acc := &formulator.FormulatorAccount{
+				Address_:       common.NewAddress(0, 2, 0),
+				Name_:          "fleta.001",
+				FormulatorType: formulator.AlphaFormulatorType,
+				KeyHash:        common.NewPublicHash(app.frkey.PublicKey()),
+				GenHash:        common.NewPublicHash(app.genkey.PublicKey()),
+				Amount:         amount.NewCoinAmount(1000, 0),
+			}
+			if err := ctw.CreateAccount(acc); err != nil {
+				return err
+			}
+			sp.AddBalance(ctw, acc.Address(), amount.NewCoinAmount(100000000000, 0))
 		}
-		sp.AddBalance(ctw, acc.Address(), amount.NewCoinAmount(100000000000, 0))
-	}
-	if true {
-		acc := &formulator.FormulatorAccount{
-			Address_:       common.NewAddress(0, 2, 0),
-			Name_:          "fleta.001",
-			FormulatorType: formulator.AlphaFormulatorType,
-			KeyHash:        common.NewPublicHash(app.frkey.PublicKey()),
-			Amount:         amount.NewCoinAmount(1000, 0),
-		}
-		if err := ctw.CreateAccount(acc); err != nil {
-			return err
-		}
-	}
-	if true {
-		acc := &formulator.FormulatorAccount{
-			Address_:       common.NewAddress(0, 3, 0),
-			Name_:          "fleta.002",
-			FormulatorType: formulator.AlphaFormulatorType,
-			KeyHash:        common.NewPublicHash(app.frkey2.PublicKey()),
-			Amount:         amount.NewCoinAmount(1000, 0),
-		}
-		if err := ctw.CreateAccount(acc); err != nil {
-			return err
+		if true {
+			acc := &formulator.FormulatorAccount{
+				Address_:       common.NewAddress(0, 3, 0),
+				Name_:          "fleta.002",
+				FormulatorType: formulator.AlphaFormulatorType,
+				KeyHash:        common.NewPublicHash(app.frkey2.PublicKey()),
+				GenHash:        common.NewPublicHash(app.genkey2.PublicKey()),
+				Amount:         amount.NewCoinAmount(1000, 0),
+			}
+			if err := ctw.CreateAccount(acc); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

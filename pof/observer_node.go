@@ -511,6 +511,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 			if MinRoundVoteAck != nil {
 				ob.round.RoundState = BlockWaitState
 				ob.round.MinRoundVoteAck = MinRoundVoteAck
+				log.Println("MinRoundVoteAck", MinRoundVoteAck.TimeoutCount, MinRoundVoteAck.Formulator.String())
 
 				if ob.round.MinRoundVoteAck.PublicHash == ob.myPublicHash {
 					log.Println("Observer", "BlockReqMessage", ob.round.MinRoundVoteAck.PublicHash.String(), ob.myPublicHash.String(), cp.Height())

@@ -434,7 +434,8 @@ func (fr *FormulatorNode) handleMessage(p p2p.Peer, m interface{}, RetryCount in
 						break TxLoop
 					}
 					if err := bc.UnsafeAddTx(item.TxType, item.TxHash, item.Transaction, item.Signatures, item.Signers); err != nil {
-						return err
+						log.Println(err)
+						continue
 					}
 					Count++
 					if Count > fr.Config.MaxTransactionsPerBlock {
