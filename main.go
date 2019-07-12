@@ -145,7 +145,7 @@ func test() error {
 		fr := pof.NewFormulatorNode(&pof.FormulatorConfig{
 			Formulator:              common.NewAddress(0, 2+uint16(i), 0),
 			MaxTransactionsPerBlock: 10000,
-		}, genkey, FrNetAddressMap, NdNetAddressMap, cs)
+		}, genkey, FrNetAddressMap, NdNetAddressMap, cs, "./_data/_peer/f"+strconv.Itoa(i+1))
 		if err := fr.Init(); err != nil {
 			return err
 		}
@@ -195,7 +195,7 @@ func test() error {
 		if err := cn.Init(); err != nil {
 			return err
 		}
-		nd := p2p.NewNode(ndkey, NdNetAddressMap, cn)
+		nd := p2p.NewNode(ndkey, NdNetAddressMap, cn, "./_data/_peer/n"+strconv.Itoa(i+1))
 		if err := nd.Init(); err != nil {
 			return err
 		}

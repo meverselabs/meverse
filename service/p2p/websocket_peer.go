@@ -17,24 +17,28 @@ import (
 // WebsocketPeer manages send and recv of the connection
 type WebsocketPeer struct {
 	sync.Mutex
-	conn        *websocket.Conn
-	id          string
-	name        string
-	guessHeight uint32
-	writeQueue  *queue.Queue
-	isClose     bool
+	conn          *websocket.Conn
+	id            string
+	name          string
+	guessHeight   uint32
+	writeQueue    *queue.Queue
+	isClose       bool
+	connectedTime int64
+	pingTime      time.Duration
 }
 
 // NewWebsocketPeer returns a WebsocketPeer
-func NewWebsocketPeer(conn *websocket.Conn, ID string, Name string) *WebsocketPeer {
+func NewWebsocketPeer(conn *websocket.Conn, ID string, Name string, connectedTime int64, pingTime time.Duration) *WebsocketPeer {
 	if len(Name) == 0 {
 		Name = ID
 	}
 	p := &WebsocketPeer{
-		conn:       conn,
-		id:         ID,
-		name:       Name,
-		writeQueue: queue.NewQueue(),
+		conn:          conn,
+		id:            ID,
+		name:          Name,
+		writeQueue:    queue.NewQueue(),
+		connectedTime: connectedTime,
+		pingTime:      pingTime,
 	}
 	go func() {
 		defer p.conn.Close()
@@ -160,4 +164,14 @@ func (p *WebsocketPeer) UpdateGuessHeight(height uint32) {
 // GuessHeight updates the guess height of the WebsocketPeer
 func (p *WebsocketPeer) GuessHeight() uint32 {
 	return p.guessHeight
+}
+
+// ConnectedTime returns peer connected time
+func (p *WebsocketPeer) ConnectedTime() int64 {
+	return p.connectedTime
+}
+
+// PingTime returns peer ping time
+func (p *WebsocketPeer) PingTime() time.Duration {
+	return p.pingTime
 }

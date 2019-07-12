@@ -4,6 +4,7 @@ import (
 	"bytes"
 	crand "crypto/rand"
 	"encoding/binary"
+	"github.com/fletaio/fleta/service/p2p/nodepoolmanage"
 	"log"
 	"net"
 	"sync"
@@ -15,10 +16,11 @@ import (
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/encoding"
+	"github.com/fletaio/fleta/service/p2p/peer"
 )
 
 type Handler interface {
-	OnRecv(p Peer, m interface{}) error
+	OnRecv(p peer.Peer, m interface{}) error
 }
 
 type NodeConfig struct {
@@ -26,21 +28,29 @@ type NodeConfig struct {
 
 type NodeMesh struct {
 	sync.Mutex
-	key           key.Key
-	handler       Handler
-	nodeSet       map[common.PublicHash]string
-	clientPeerMap map[string]Peer
-	serverPeerMap map[string]Peer
+	BindAddress     string
+	key             key.Key
+	handler         Handler
+	nodeSet         map[common.PublicHash]string
+	clientPeerMap   map[string]peer.Peer
+	serverPeerMap   map[string]peer.Peer
+	nodePoolManager nodepoolmanage.Manager
 }
 
-func NewNodeMesh(key key.Key, SeedNodeMap map[common.PublicHash]string, handler Handler) *NodeMesh {
+func NewNodeMesh(key key.Key, SeedNodeMap map[common.PublicHash]string, handler Handler, peerStorePath string) *NodeMesh {
 	ms := &NodeMesh{
 		key:           key,
 		handler:       handler,
 		nodeSet:       map[common.PublicHash]string{},
-		clientPeerMap: map[string]Peer{},
-		serverPeerMap: map[string]Peer{},
+		clientPeerMap: map[string]peer.Peer{},
+		serverPeerMap: map[string]peer.Peer{},
 	}
+	manager, err := nodepoolmanage.NewNodePoolManage(peerStorePath, ms)
+	if err != nil {
+		panic(err)
+	}
+	ms.nodePoolManager = manager
+
 	for PubHash, v := range SeedNodeMap {
 		ms.nodeSet[PubHash] = v
 	}
@@ -49,6 +59,7 @@ func NewNodeMesh(key key.Key, SeedNodeMap map[common.PublicHash]string, handler 
 
 // Run starts the node mesh
 func (ms *NodeMesh) Run(BindAddress string) {
+	ms.BindAddress = BindAddress
 	myPublicHash := common.NewPublicHash(ms.key.PublicKey())
 	for PubHash, v := range ms.nodeSet {
 		if PubHash != myPublicHash {
@@ -80,8 +91,8 @@ func (ms *NodeMesh) Run(BindAddress string) {
 }
 
 // Peers returns peers of the node mesh
-func (ms *NodeMesh) Peers() []Peer {
-	peerMap := map[string]Peer{}
+func (ms *NodeMesh) Peers() []peer.Peer {
+	peerMap := map[string]peer.Peer{}
 	ms.Lock()
 	for _, p := range ms.clientPeerMap {
 		peerMap[p.ID()] = p
@@ -91,7 +102,7 @@ func (ms *NodeMesh) Peers() []Peer {
 	}
 	ms.Unlock()
 
-	peers := []Peer{}
+	peers := []peer.Peer{}
 	for _, p := range peerMap {
 		peers = append(peers, p)
 	}
@@ -119,7 +130,7 @@ func (ms *NodeMesh) RemovePeer(ID string) {
 	}
 }
 
-func (ms *NodeMesh) removePeerInMap(ID string, peerMap map[string]Peer) {
+func (ms *NodeMesh) removePeerInMap(ID string, peerMap map[string]peer.Peer) {
 	ms.Lock()
 	p, has := ms.clientPeerMap[ID]
 	if has {
@@ -132,12 +143,26 @@ func (ms *NodeMesh) removePeerInMap(ID string, peerMap map[string]Peer) {
 	}
 }
 
+// Has returns whether there is a connected peer
+func (ms *NodeMesh) GetPeer(ID string) peer.Peer {
+	ms.Lock()
+	defer ms.Unlock()
+
+	if cp, has := ms.clientPeerMap[ID]; has {
+		return cp
+	} else if sp, has := ms.serverPeerMap[ID]; has {
+		return sp
+	}
+
+	return nil
+}
+
 // SendTo sends a message to the node
 func (ms *NodeMesh) SendTo(pubhash common.PublicHash, m interface{}) error {
 	ID := string(pubhash[:])
 
 	ms.Lock()
-	var p Peer
+	var p peer.Peer
 	if cp, has := ms.clientPeerMap[ID]; has {
 		p = cp
 	} else if sp, has := ms.serverPeerMap[ID]; has {
@@ -157,7 +182,7 @@ func (ms *NodeMesh) SendTo(pubhash common.PublicHash, m interface{}) error {
 
 // BroadcastRaw sends a message to all peers
 func (ms *NodeMesh) BroadcastRaw(bs []byte) {
-	peerMap := map[string]Peer{}
+	peerMap := map[string]peer.Peer{}
 	ms.Lock()
 	for _, p := range ms.clientPeerMap {
 		peerMap[p.ID()] = p
@@ -187,7 +212,7 @@ func (ms *NodeMesh) BroadcastMessage(m interface{}) error {
 	}
 	data := buffer.Bytes()
 
-	peerMap := map[string]Peer{}
+	peerMap := map[string]peer.Peer{}
 	ms.Lock()
 	for _, p := range ms.clientPeerMap {
 		peerMap[p.ID()] = p
@@ -203,18 +228,49 @@ func (ms *NodeMesh) BroadcastMessage(m interface{}) error {
 	return nil
 }
 
+func (ms *NodeMesh) RequestConnect(Address string, TargetPubHash common.PublicHash) {
+	go ms.client(Address, TargetPubHash)
+}
+
+func (ms *NodeMesh) RequestPeerList(targetHash string) {
+	pm := &RequestPeerListMessage{}
+
+	var ph common.PublicHash
+	copy(ph[:], []byte(targetHash))
+	ms.SendTo(ph, pm)
+}
+
+func (ms *NodeMesh) SendPeerList(targetHash string) {
+	ips, hashs := ms.nodePoolManager.GetPeerList()
+	pm := &PeerListMessage{
+		Ips:   ips,
+		Hashs: hashs,
+	}
+
+	var ph common.PublicHash
+	copy(ph[:], []byte(targetHash))
+	ms.SendTo(ph, pm)
+}
+
+func (ms *NodeMesh) AddPeerList(ips []string, hashs []string) {
+	go ms.nodePoolManager.AddPeerList(ips, hashs)
+}
+
 func (ms *NodeMesh) client(Address string, TargetPubHash common.PublicHash) error {
 	conn, err := net.DialTimeout("tcp", Address, 10*time.Second)
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func(addr string) {
+		conn.Close()
+	}(Address)
 
+	start := time.Now()
 	if err := ms.recvHandshake(conn); err != nil {
 		log.Println("[recvHandshake]", err)
 		return err
 	}
-	pubhash, err := ms.sendHandshake(conn)
+	pubhash, bindAddress, err := ms.sendHandshake(conn)
 	if err != nil {
 		log.Println("[sendHandshake]", err)
 		return err
@@ -222,9 +278,17 @@ func (ms *NodeMesh) client(Address string, TargetPubHash common.PublicHash) erro
 	if pubhash != TargetPubHash {
 		return common.ErrInvalidPublicHash
 	}
+	duration := time.Since(start)
+	var ipAddress string
+	if addr, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
+		ipAddress = addr.IP.String()
+	}
+	ipAddress += bindAddress
 
 	ID := string(pubhash[:])
-	p := NewTCPPeer(conn, ID, pubhash.String())
+	ms.nodePoolManager.NewNode(ipAddress, ID, duration)
+	p := NewTCPPeer(conn, ID, pubhash.String(), start.UnixNano(), duration)
+
 	ms.Lock()
 	old, has := ms.clientPeerMap[ID]
 	ms.clientPeerMap[ID] = p
@@ -254,7 +318,8 @@ func (ms *NodeMesh) server(BindAddress string) error {
 		go func() {
 			defer conn.Close()
 
-			pubhash, err := ms.sendHandshake(conn)
+			start := time.Now()
+			pubhash, bindAddress, err := ms.sendHandshake(conn)
 			if err != nil {
 				log.Println("[sendHandshake]", err)
 				return
@@ -263,9 +328,17 @@ func (ms *NodeMesh) server(BindAddress string) error {
 				log.Println("[recvHandshakeAck]", err)
 				return
 			}
+			duration := time.Since(start)
+			var ipAddress string
+			if addr, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
+				ipAddress = addr.IP.String()
+			}
+			ipAddress += bindAddress
 
 			ID := string(pubhash[:])
-			p := NewTCPPeer(conn, ID, pubhash.String())
+			ms.nodePoolManager.NewNode(ipAddress, ID, duration)
+			p := NewTCPPeer(conn, ID, pubhash.String(), start.UnixNano(), duration)
+
 			ms.Lock()
 			old, has := ms.serverPeerMap[ID]
 			ms.serverPeerMap[ID] = p
@@ -282,8 +355,8 @@ func (ms *NodeMesh) server(BindAddress string) error {
 	}
 }
 
-func (ms *NodeMesh) handleConnection(p Peer) error {
-	log.Println("Node", common.NewPublicHash(ms.key.PublicKey()).String(), "Node Connected", p.Name())
+func (ms *NodeMesh) handleConnection(p peer.Peer) error {
+	// log.Println("Node", common.NewPublicHash(ms.key.PublicKey()).String(), "Node Connected", p.Name())
 
 	var pingCount uint64
 	pingCountLimit := uint64(3)
@@ -342,31 +415,52 @@ func (ms *NodeMesh) recvHandshake(conn net.Conn) error {
 	} else if _, err := conn.Write(sig[:]); err != nil {
 		return err
 	}
+
+	ba := []byte(ms.BindAddress)
+	length := byte(uint8(len(ba)))
+	if _, err := conn.Write([]byte{length}); err != nil {
+		return err
+	}
+	if _, err := conn.Write(ba); err != nil {
+		return err
+	}
 	return nil
 }
 
-func (ms *NodeMesh) sendHandshake(conn net.Conn) (common.PublicHash, error) {
+func (ms *NodeMesh) sendHandshake(conn net.Conn) (common.PublicHash, string, error) {
 	//log.Println("sendHandshake")
 	req := make([]byte, 40)
 	if _, err := crand.Read(req[:32]); err != nil {
-		return common.PublicHash{}, err
+		return common.PublicHash{}, "", err
 	}
 	binary.LittleEndian.PutUint64(req[32:], uint64(time.Now().UnixNano()))
 	if _, err := conn.Write(req); err != nil {
-		return common.PublicHash{}, err
+		return common.PublicHash{}, "", err
 	}
 	//log.Println("recvHandshakeAsk")
 	h := hash.Hash(req)
 	bs := make([]byte, common.SignatureSize)
 	if _, err := FillBytes(conn, bs); err != nil {
-		return common.PublicHash{}, err
+		return common.PublicHash{}, "", err
 	}
 	var sig common.Signature
 	copy(sig[:], bs)
 	pubkey, err := common.RecoverPubkey(h, sig)
 	if err != nil {
-		return common.PublicHash{}, err
+		return common.PublicHash{}, "", err
 	}
 	pubhash := common.NewPublicHash(pubkey)
-	return pubhash, nil
+
+	bs = make([]byte, 1)
+	if _, err := FillBytes(conn, bs); err != nil {
+		return common.PublicHash{}, "", err
+	}
+	length := uint8(bs[0])
+	bs = make([]byte, length)
+	if _, err := FillBytes(conn, bs); err != nil {
+		return common.PublicHash{}, "", err
+	}
+	bindAddres := string(bs)
+
+	return pubhash, bindAddres, nil
 }

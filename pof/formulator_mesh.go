@@ -4,6 +4,7 @@ import (
 	"bytes"
 	crand "crypto/rand"
 	"encoding/binary"
+	"github.com/fletaio/fleta/common/debug"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -15,6 +16,7 @@ import (
 	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/service/p2p"
+	"github.com/fletaio/fleta/service/p2p/peer"
 	"github.com/gorilla/websocket"
 )
 
@@ -23,14 +25,14 @@ type FormulatorNodeMesh struct {
 	fr            *FormulatorNode
 	key           key.Key
 	netAddressMap map[common.PublicHash]string
-	peerMap       map[string]p2p.Peer
+	peerMap       map[string]peer.Peer
 }
 
 func NewFormulatorNodeMesh(key key.Key, NetAddressMap map[common.PublicHash]string, fr *FormulatorNode) *FormulatorNodeMesh {
 	ms := &FormulatorNodeMesh{
 		key:           key,
 		netAddressMap: NetAddressMap,
-		peerMap:       map[string]p2p.Peer{},
+		peerMap:       map[string]peer.Peer{},
 		fr:            fr,
 	}
 	return ms
@@ -57,11 +59,11 @@ func (ms *FormulatorNodeMesh) Run() {
 }
 
 // Peers returns peers of the formulator mesh
-func (ms *FormulatorNodeMesh) Peers() []p2p.Peer {
+func (ms *FormulatorNodeMesh) Peers() []peer.Peer {
 	ms.Lock()
 	defer ms.Unlock()
 
-	peers := []p2p.Peer{}
+	peers := []peer.Peer{}
 	for _, p := range ms.peerMap {
 		peers = append(peers, p)
 	}
@@ -100,7 +102,7 @@ func (ms *FormulatorNodeMesh) SendTo(ID string, m interface{}) error {
 
 // BroadcastRaw sends a message to all peers
 func (ms *FormulatorNodeMesh) BroadcastRaw(bs []byte) {
-	peerMap := map[string]p2p.Peer{}
+	peerMap := map[string]peer.Peer{}
 	ms.Lock()
 	for _, p := range ms.peerMap {
 		peerMap[p.ID()] = p
@@ -127,7 +129,7 @@ func (ms *FormulatorNodeMesh) BroadcastMessage(m interface{}) error {
 	}
 	data := buffer.Bytes()
 
-	peerMap := map[string]p2p.Peer{}
+	peerMap := map[string]peer.Peer{}
 	ms.Lock()
 	for _, p := range ms.peerMap {
 		peerMap[p.ID()] = p
@@ -164,7 +166,7 @@ func (ms *FormulatorNodeMesh) client(Address string, TargetPubHash common.Public
 	}
 
 	ID := string(pubhash[:])
-	p := p2p.NewWebsocketPeer(conn, ID, pubhash.String())
+	p := p2p.NewWebsocketPeer(conn, ID, pubhash.String(), time.Now().UnixNano(), 0)
 	ms.Lock()
 	old, has := ms.peerMap[ID]
 	ms.peerMap[ID] = p
@@ -180,8 +182,10 @@ func (ms *FormulatorNodeMesh) client(Address string, TargetPubHash common.Public
 	return nil
 }
 
-func (ms *FormulatorNodeMesh) handleConnection(p p2p.Peer) error {
-	log.Println("Formulator", common.NewPublicHash(ms.key.PublicKey()).String(), "Observer Connected", p.Name())
+func (ms *FormulatorNodeMesh) handleConnection(p peer.Peer) error {
+	if debug.DEBUG {
+		log.Println("Formulator", common.NewPublicHash(ms.key.PublicKey()).String(), "Observer Connected", p.Name())
+	}
 
 	ms.fr.OnObserverConnected(p)
 	defer ms.fr.OnObserverDisconnected(p)

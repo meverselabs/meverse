@@ -17,24 +17,28 @@ import (
 // TCPPeer manages send and recv of the connection
 type TCPPeer struct {
 	sync.Mutex
-	conn        net.Conn
-	id          string
-	name        string
-	guessHeight uint32
-	writeQueue  *queue.Queue
-	isClose     bool
+	conn          net.Conn
+	id            string
+	name          string
+	guessHeight   uint32
+	writeQueue    *queue.Queue
+	isClose       bool
+	connectedTime int64
+	pingTime      time.Duration
 }
 
 // NewTCPPeer returns a TCPPeer
-func NewTCPPeer(conn net.Conn, ID string, Name string) *TCPPeer {
+func NewTCPPeer(conn net.Conn, ID string, Name string, connectedTime int64, pingTime time.Duration) *TCPPeer {
 	if len(Name) == 0 {
 		Name = ID
 	}
 	p := &TCPPeer{
-		conn:       conn,
-		id:         ID,
-		name:       Name,
-		writeQueue: queue.NewQueue(),
+		conn:          conn,
+		id:            ID,
+		name:          Name,
+		writeQueue:    queue.NewQueue(),
+		connectedTime: connectedTime,
+		pingTime:      pingTime,
 	}
 	go func() {
 		defer p.conn.Close()
@@ -161,4 +165,14 @@ func (p *TCPPeer) UpdateGuessHeight(height uint32) {
 // GuessHeight updates the guess height of the TCPPeer
 func (p *TCPPeer) GuessHeight() uint32 {
 	return p.guessHeight
+}
+
+// ConnectedTime returns peer connected time
+func (p *TCPPeer) ConnectedTime() int64 {
+	return p.connectedTime
+}
+
+// PingTime returns peer ping time
+func (p *TCPPeer) PingTime() time.Duration {
+	return p.pingTime
 }

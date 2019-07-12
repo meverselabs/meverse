@@ -33,3 +33,13 @@ type TransactionMessage struct {
 	Tx     types.Transaction
 	Sigs   []common.Signature
 }
+
+// PeerListMessage is a message for a peer list
+type PeerListMessage struct {
+	Ips   []string
+	Hashs []string
+}
+
+// RequestPeerListMessage is a request message for a peer list
+type RequestPeerListMessage struct {
+}

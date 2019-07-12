@@ -4,6 +4,7 @@ import (
 	"bytes"
 	crand "crypto/rand"
 	"encoding/binary"
+	"github.com/fletaio/fleta/common/debug"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -15,6 +16,7 @@ import (
 	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/service/p2p"
+	"github.com/fletaio/fleta/service/p2p/peer"
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo"
 )
@@ -24,7 +26,7 @@ type FormulatorService struct {
 	sync.Mutex
 	key     key.Key
 	ob      *ObserverNode
-	peerMap map[string]p2p.Peer
+	peerMap map[string]peer.Peer
 }
 
 // NewFormulatorService returns a FormulatorService
@@ -32,7 +34,7 @@ func NewFormulatorService(ob *ObserverNode) *FormulatorService {
 	ms := &FormulatorService{
 		key:     ob.key,
 		ob:      ob,
-		peerMap: map[string]p2p.Peer{},
+		peerMap: map[string]peer.Peer{},
 	}
 	return ms
 }
@@ -97,7 +99,7 @@ func (ms *FormulatorService) BroadcastMessage(m interface{}) error {
 	}
 	data := buffer.Bytes()
 
-	peers := []p2p.Peer{}
+	peers := []peer.Peer{}
 	ms.Lock()
 	for _, p := range ms.peerMap {
 		peers = append(peers, p)
@@ -143,7 +145,9 @@ func (ms *FormulatorService) UpdateGuessHeight(addr common.Address, height uint3
 }
 
 func (ms *FormulatorService) server(BindAddress string) error {
-	log.Println("FormulatorService", common.NewPublicHash(ms.key.PublicKey()), "Start to Listen", BindAddress)
+	if debug.DEBUG {
+		log.Println("FormulatorService", common.NewPublicHash(ms.key.PublicKey()), "Start to Listen", BindAddress)
+	}
 
 	var upgrader = websocket.Upgrader{}
 	e := echo.New()
@@ -170,7 +174,7 @@ func (ms *FormulatorService) server(BindAddress string) error {
 		}
 
 		ID := string(Formulator[:])
-		p := p2p.NewWebsocketPeer(conn, ID, Formulator.String())
+		p := p2p.NewWebsocketPeer(conn, ID, Formulator.String(), time.Now().UnixNano(), 0)
 		ms.Lock()
 		old, has := ms.peerMap[ID]
 		ms.peerMap[ID] = p
@@ -189,8 +193,10 @@ func (ms *FormulatorService) server(BindAddress string) error {
 	return e.Start(BindAddress)
 }
 
-func (ms *FormulatorService) handleConnection(p p2p.Peer) error {
-	log.Println("Observer", common.NewPublicHash(ms.key.PublicKey()).String(), "Fromulator Connected", p.Name())
+func (ms *FormulatorService) handleConnection(p peer.Peer) error {
+	if debug.DEBUG {
+		log.Println("Observer", common.NewPublicHash(ms.key.PublicKey()).String(), "Fromulator Connected", p.Name())
+	}
 
 	cp := ms.ob.cs.cn.Provider()
 	p.Send(&p2p.StatusMessage{

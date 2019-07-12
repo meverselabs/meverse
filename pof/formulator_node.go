@@ -17,6 +17,7 @@ import (
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/service/p2p"
+	"github.com/fletaio/fleta/service/p2p/peer"
 )
 
 // FormulatorConfig defines configuration of the formulator
@@ -54,7 +55,7 @@ type FormulatorNode struct {
 }
 
 // NewFormulatorNode returns a FormulatorNode
-func NewFormulatorNode(Config *FormulatorConfig, key key.Key, NetAddressMap map[common.PublicHash]string, SeedNodeMap map[common.PublicHash]string, cs *Consensus) *FormulatorNode {
+func NewFormulatorNode(Config *FormulatorConfig, key key.Key, NetAddressMap map[common.PublicHash]string, SeedNodeMap map[common.PublicHash]string, cs *Consensus, peerStorePath string) *FormulatorNode {
 	fr := &FormulatorNode{
 		Config:               Config,
 		cs:                   cs,
@@ -71,7 +72,7 @@ func NewFormulatorNode(Config *FormulatorConfig, key key.Key, NetAddressMap map[
 		txQ:                  queue.NewExpireQueue(),
 	}
 	fr.ms = NewFormulatorNodeMesh(key, NetAddressMap, fr)
-	fr.nm = p2p.NewNodeMesh(key, SeedNodeMap, fr)
+	fr.nm = p2p.NewNodeMesh(key, SeedNodeMap, fr, peerStorePath)
 	fr.txQ.AddGroup(60 * time.Second)
 	fr.txQ.AddGroup(600 * time.Second)
 	fr.txQ.AddGroup(3600 * time.Second)
@@ -102,6 +103,8 @@ func (fr *FormulatorNode) Init() error {
 	fc.Register(types.DefineHashedType("p2p.StatusMessage"), &p2p.StatusMessage{})
 	fc.Register(types.DefineHashedType("p2p.BlockMessage"), &p2p.BlockMessage{})
 	fc.Register(types.DefineHashedType("p2p.TransactionMessage"), &p2p.TransactionMessage{})
+	fc.Register(types.DefineHashedType("p2p.PeerListMessage"), &p2p.PeerListMessage{})
+	fc.Register(types.DefineHashedType("p2p.RequestPeerListMessage"), &p2p.RequestPeerListMessage{})
 	return nil
 }
 
@@ -257,21 +260,21 @@ func (fr *FormulatorNode) OnItemExpired(Interval time.Duration, Key string, Item
 }
 
 // OnObserverConnected is called after a new observer peer is connected
-func (fr *FormulatorNode) OnObserverConnected(p p2p.Peer) {
+func (fr *FormulatorNode) OnObserverConnected(p peer.Peer) {
 	fr.Lock()
 	fr.statusMap[p.ID()] = &p2p.Status{}
 	fr.Unlock()
 }
 
 // OnObserverDisconnected is called when the observer peer is disconnected
-func (fr *FormulatorNode) OnObserverDisconnected(p p2p.Peer) {
+func (fr *FormulatorNode) OnObserverDisconnected(p peer.Peer) {
 	fr.Lock()
 	delete(fr.statusMap, p.ID())
 	fr.Unlock()
 }
 
 // OnRecv called when message received
-func (fr *FormulatorNode) OnRecv(p p2p.Peer, m interface{}) error {
+func (fr *FormulatorNode) OnRecv(p peer.Peer, m interface{}) error {
 	cp := fr.cs.cn.Provider()
 
 	var SenderPublicHash common.PublicHash
@@ -313,6 +316,12 @@ func (fr *FormulatorNode) OnRecv(p p2p.Peer, m interface{}) error {
 			return err
 		}
 		fr.requestTimer.Remove(msg.Block.Header.Height)
+	case *p2p.PeerListMessage:
+		fr.nm.AddPeerList(msg.Ips, msg.Hashs)
+		return nil
+	case *p2p.RequestPeerListMessage:
+		fr.nm.SendPeerList(p.ID())
+		return nil
 	default:
 		panic(p2p.ErrUnknownMessage) //TEMP
 		return p2p.ErrUnknownMessage
@@ -320,7 +329,7 @@ func (fr *FormulatorNode) OnRecv(p p2p.Peer, m interface{}) error {
 	return nil
 }
 
-func (fr *FormulatorNode) onRecv(p p2p.Peer, m interface{}) error {
+func (fr *FormulatorNode) onRecv(p peer.Peer, m interface{}) error {
 	if err := fr.handleMessage(p, m, 0); err != nil {
 		//log.Println(err)
 		return nil
@@ -328,7 +337,7 @@ func (fr *FormulatorNode) onRecv(p p2p.Peer, m interface{}) error {
 	return nil
 }
 
-func (fr *FormulatorNode) handleMessage(p p2p.Peer, m interface{}, RetryCount int) error {
+func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount int) error {
 	cp := fr.cs.cn.Provider()
 
 	switch msg := m.(type) {

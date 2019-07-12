@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"github.com/fletaio/fleta/service/p2p/peer"
 	"log"
 	"runtime"
 	"sync"
@@ -37,7 +38,7 @@ type Node struct {
 }
 
 // NewNode returns a Node
-func NewNode(key key.Key, SeedNodeMap map[common.PublicHash]string, cn *chain.Chain) *Node {
+func NewNode(key key.Key, SeedNodeMap map[common.PublicHash]string, cn *chain.Chain, peerStorePath string) *Node {
 	nd := &Node{
 		key:          key,
 		cn:           cn,
@@ -46,7 +47,7 @@ func NewNode(key key.Key, SeedNodeMap map[common.PublicHash]string, cn *chain.Ch
 		txpool:       txpool.NewTransactionPool(),
 		txQ:          queue.NewExpireQueue(),
 	}
-	nd.ms = NewNodeMesh(key, SeedNodeMap, nd)
+	nd.ms = NewNodeMesh(key, SeedNodeMap, nd, peerStorePath)
 	nd.requestTimer = NewRequestTimer(nd)
 	nd.txQ.AddGroup(60 * time.Second)
 	nd.txQ.AddGroup(600 * time.Second)
@@ -62,6 +63,8 @@ func (nd *Node) Init() error {
 	fc.Register(types.DefineHashedType("p2p.StatusMessage"), &StatusMessage{})
 	fc.Register(types.DefineHashedType("p2p.BlockMessage"), &BlockMessage{})
 	fc.Register(types.DefineHashedType("p2p.TransactionMessage"), &TransactionMessage{})
+	fc.Register(types.DefineHashedType("p2p.PeerListMessage"), &PeerListMessage{})
+	fc.Register(types.DefineHashedType("p2p.RequestPeerListMessage"), &RequestPeerListMessage{})
 	return nil
 }
 
@@ -183,7 +186,7 @@ func (nd *Node) OnTimerExpired(height uint32, value interface{}) {
 }
 
 // OnRecv called when message received
-func (nd *Node) OnRecv(p Peer, m interface{}) error {
+func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
 	cp := nd.cn.Provider()
 
 	var SenderPublicHash common.PublicHash
@@ -240,6 +243,12 @@ func (nd *Node) OnRecv(p Peer, m interface{}) error {
 		if err != ErrInvalidUTXO && err != txpool.ErrExistTransaction {
 			return err
 		}
+		return nil
+	case *PeerListMessage:
+		nd.ms.AddPeerList(msg.Ips, msg.Hashs)
+		return nil
+	case *RequestPeerListMessage:
+		nd.ms.SendPeerList(p.ID())
 		return nil
 	default:
 		panic(ErrUnknownMessage) //TEMP

@@ -1,4 +1,8 @@
-package p2p
+package peer
+
+import (
+	"time"
+)
 
 // Peer manages send and recv of the connection
 type Peer interface {
@@ -10,4 +14,6 @@ type Peer interface {
 	SendRaw(bs []byte)
 	UpdateGuessHeight(height uint32)
 	GuessHeight() uint32
+	ConnectedTime() int64
+	PingTime() time.Duration
 }
