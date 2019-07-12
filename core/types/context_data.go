@@ -412,11 +412,12 @@ func (ctd *ContextData) ProcessDataKeys(pid uint8, Prefix []byte) ([][]byte, err
 			keyMap.Put(string(k), true)
 		}
 	}
-	ctd.ProcessDataMap.EachPrefix(string(pid), func(key string, value []byte) bool {
+	pre := string(pid) + string(Prefix)
+	ctd.ProcessDataMap.EachPrefix(pre, func(key string, value []byte) bool {
 		keyMap.Put(key[1:], true)
 		return true
 	})
-	ctd.DeletedProcessDataMap.EachPrefix(string(pid), func(key string, value bool) bool {
+	ctd.DeletedProcessDataMap.EachPrefix(pre, func(key string, value bool) bool {
 		keyMap.Delete(key[1:])
 		return true
 	})
