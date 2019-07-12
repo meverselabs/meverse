@@ -9,43 +9,37 @@ import (
 	"github.com/fletaio/fleta/core/types"
 )
 
-// UpdateValidatorPolicy is used to update validator policy of the hyper formulator
-type UpdateValidatorPolicy struct {
-	Timestamp_ uint64
-	Seq_       uint64
-	From_      common.Address
-	Policy     *ValidatorPolicy
+// UpdateUserAutoStaking is used to update autostaking setup of the account at the hyper formulator
+type UpdateUserAutoStaking struct {
+	Timestamp_      uint64
+	Seq_            uint64
+	From_           common.Address
+	HyperFormulator common.Address
+	AutoStaking     bool
 }
 
 // Timestamp returns the timestamp of the transaction
-func (tx *UpdateValidatorPolicy) Timestamp() uint64 {
+func (tx *UpdateUserAutoStaking) Timestamp() uint64 {
 	return tx.Timestamp_
 }
 
 // Seq returns the sequence of the transaction
-func (tx *UpdateValidatorPolicy) Seq() uint64 {
+func (tx *UpdateUserAutoStaking) Seq() uint64 {
 	return tx.Seq_
 }
 
 // From returns the from address of the transaction
-func (tx *UpdateValidatorPolicy) From() common.Address {
+func (tx *UpdateUserAutoStaking) From() common.Address {
 	return tx.From_
 }
 
 // Fee returns the fee of the transaction
-func (tx *UpdateValidatorPolicy) Fee(loader types.LoaderWrapper) *amount.Amount {
+func (tx *UpdateUserAutoStaking) Fee(loader types.LoaderWrapper) *amount.Amount {
 	return amount.COIN.DivC(10)
 }
 
 // Validate validates signatures of the transaction
-func (tx *UpdateValidatorPolicy) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
-	if tx.Policy == nil {
-		return ErrInvalidPolicy
-	}
-	if tx.Policy.CommissionRatio1000 > 1000 {
-		return ErrInvalidPolicy
-	}
-
+func (tx *UpdateUserAutoStaking) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	if tx.Seq() <= loader.Seq(tx.From()) {
 		return types.ErrInvalidSequence
 	}
@@ -65,20 +59,15 @@ func (tx *UpdateValidatorPolicy) Validate(p types.Process, loader types.LoaderWr
 }
 
 // Execute updates the context by the transaction
-func (tx *UpdateValidatorPolicy) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
-	if tx.Policy == nil {
-		return ErrInvalidPolicy
-	}
-	if tx.Policy.CommissionRatio1000 > 1000 {
-		return ErrInvalidPolicy
-	}
+func (tx *UpdateUserAutoStaking) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
+	sp := p.(*Formulator)
 
 	if tx.Seq() != ctw.Seq(tx.From())+1 {
 		return types.ErrInvalidSequence
 	}
 	ctw.AddSeq(tx.From())
 
-	acc, err := ctw.Account(tx.From())
+	acc, err := ctw.Account(tx.HyperFormulator)
 	if err != nil {
 		return err
 	}
@@ -89,12 +78,12 @@ func (tx *UpdateValidatorPolicy) Execute(p types.Process, ctw *types.ContextWrap
 	if frAcc.FormulatorType != HyperFormulatorType {
 		return ErrNotHyperFormulator
 	}
-	frAcc.Policy = tx.Policy
+	sp.setUserAutoStaking(ctw, frAcc.Address(), tx.From(), tx.AutoStaking)
 	return nil
 }
 
 // MarshalJSON is a marshaler function
-func (tx *UpdateValidatorPolicy) MarshalJSON() ([]byte, error) {
+func (tx *UpdateUserAutoStaking) MarshalJSON() ([]byte, error) {
 	var buffer bytes.Buffer
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
@@ -118,8 +107,15 @@ func (tx *UpdateValidatorPolicy) MarshalJSON() ([]byte, error) {
 		buffer.Write(bs)
 	}
 	buffer.WriteString(`,`)
-	buffer.WriteString(`"policy":`)
-	if bs, err := tx.Policy.MarshalJSON(); err != nil {
+	buffer.WriteString(`"hyper_formulator":`)
+	if bs, err := tx.HyperFormulator.MarshalJSON(); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"auto_staking":`)
+	if bs, err := json.Marshal(tx.AutoStaking); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

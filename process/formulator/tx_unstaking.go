@@ -112,6 +112,7 @@ func (tx *Unstaking) Execute(p types.Process, ctw *types.ContextWrapper, index u
 	fromStakingAmount = fromStakingAmount.Sub(tx.Amount)
 	if fromStakingAmount.IsZero() {
 		sp.removeStakingAmount(ctw, tx.HyperFormulator, tx.From())
+		sp.setUserAutoStaking(ctw, tx.HyperFormulator, tx.From(), false)
 	} else {
 		sp.setStakingAmount(ctw, tx.HyperFormulator, tx.From(), fromStakingAmount)
 	}

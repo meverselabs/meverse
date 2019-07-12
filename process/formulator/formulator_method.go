@@ -133,7 +133,7 @@ func (p *Formulator) getUserAutoStaking(ctw *types.ContextWrapper, HyperAddress 
 	}
 }
 
-func (p *Formulator) setUserAutoStakingUser(ctw *types.ContextWrapper, HyperAddress common.Address, StakingAddress common.Address, IsAutoStaking bool) {
+func (p *Formulator) setUserAutoStaking(ctw *types.ContextWrapper, HyperAddress common.Address, StakingAddress common.Address, IsAutoStaking bool) {
 	if IsAutoStaking {
 		ctw.SetAccountData(HyperAddress, toAutoStakingKey(StakingAddress), []byte{1})
 	} else {
