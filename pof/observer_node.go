@@ -811,7 +811,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 				if diff > 500*time.Millisecond {
 					diff = 500 * time.Millisecond
 				}
-				//time.Sleep(diff)
+				time.Sleep(diff)
 			}
 
 			log.Println("Observer", ob.myPublicHash.String(), cp.Height(), "BlockConnected", b.Header.Generator.String(), ob.round.RoundState, msg.BlockVote.Header.Height, (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))

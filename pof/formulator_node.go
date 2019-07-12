@@ -38,6 +38,7 @@ type FormulatorNode struct {
 	lastObSignMessageMap map[uint32]*BlockObSignMessage
 	lastContextes        []*types.Context
 	lastReqMessage       *BlockReqMessage
+	lastGenHeight        uint32
 	txMsgChans           []*chan *p2p.TxMsgItem
 	txMsgIdx             uint64
 	statusMap            map[string]*p2p.Status
@@ -337,6 +338,9 @@ func (fr *FormulatorNode) handleMessage(p p2p.Peer, m interface{}, RetryCount in
 		defer fr.Unlock()
 
 		Height := cp.Height()
+		if msg.TargetHeight <= fr.lastGenHeight {
+			return nil
+		}
 		if msg.TargetHeight <= Height {
 			return nil
 		}
@@ -402,6 +406,7 @@ func (fr *FormulatorNode) handleMessage(p p2p.Peer, m interface{}, RetryCount in
 				lastHeader := fr.lastGenMessages[len(fr.lastGenMessages)-1].Block.Header
 				ctx = ctx.NextContext(encoding.Hash(lastHeader), lastHeader.Timestamp)
 			}
+
 			Timestamp := StartBlockTime
 			if bNoDelay {
 				Timestamp += uint64(i) * uint64(time.Millisecond)
@@ -467,11 +472,12 @@ func (fr *FormulatorNode) handleMessage(p p2p.Peer, m interface{}, RetryCount in
 
 			fr.lastGenMessages = append(fr.lastGenMessages, nm)
 			fr.lastContextes = append(fr.lastContextes, ctx)
+			fr.lastGenHeight = ctx.TargetHeight()
 
 			ExpectedTime := time.Duration(i+1) * 200 * time.Millisecond
 			PastTime := time.Duration(time.Now().UnixNano() - start)
 			if ExpectedTime > PastTime {
-				//time.Sleep(ExpectedTime - PastTime)
+				time.Sleep(ExpectedTime - PastTime)
 			}
 		}
 		return nil
