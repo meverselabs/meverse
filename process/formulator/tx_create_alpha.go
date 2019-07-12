@@ -17,6 +17,7 @@ type CreateAlpha struct {
 	From_      common.Address
 	Name       string
 	KeyHash    common.PublicHash
+	GenHash    common.PublicHash
 }
 
 // Timestamp returns the timestamp of the transaction
@@ -107,6 +108,7 @@ func (tx *CreateAlpha) Execute(p types.Process, ctw *types.ContextWrapper, index
 			Name_:          tx.Name,
 			FormulatorType: AlphaFormulatorType,
 			KeyHash:        tx.KeyHash,
+			GenHash:        tx.GenHash,
 			Amount:         policy.AlphaCreationAmount,
 			UpdatedHeight:  ctw.TargetHeight(),
 		}
@@ -149,6 +151,13 @@ func (tx *CreateAlpha) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"key_hash":`)
 	if bs, err := tx.KeyHash.MarshalJSON(); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"gen_hash":`)
+	if bs, err := tx.GenHash.MarshalJSON(); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

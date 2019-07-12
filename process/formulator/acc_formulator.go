@@ -27,6 +27,7 @@ type FormulatorAccount struct {
 	Name_          string
 	FormulatorType FormulatorType
 	KeyHash        common.PublicHash
+	GenHash        common.PublicHash
 	Amount         *amount.Amount
 	UpdatedHeight  uint32
 	StakingAmount  *amount.Amount
@@ -50,6 +51,7 @@ func (acc *FormulatorAccount) Clone() types.Account {
 		Name_:          acc.Name_,
 		FormulatorType: acc.FormulatorType,
 		KeyHash:        acc.KeyHash.Clone(),
+		GenHash:        acc.GenHash.Clone(),
 		Amount:         acc.Amount.Clone(),
 		UpdatedHeight:  acc.UpdatedHeight,
 	}
@@ -98,6 +100,13 @@ func (acc *FormulatorAccount) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"key_hash":`)
 	if bs, err := acc.KeyHash.MarshalJSON(); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"gen_hash":`)
+	if bs, err := acc.GenHash.MarshalJSON(); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

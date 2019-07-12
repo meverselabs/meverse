@@ -25,7 +25,7 @@ func (cs *Consensus) updateFormulatorList(ctw *types.ContextWrapper) error {
 		if a.Address().Coordinate().Height == ctw.TargetHeight() {
 			if acc, is := a.(*formulator.FormulatorAccount); is {
 				addr := acc.Address()
-				if err := cs.rt.addRank(NewRank(addr, acc.KeyHash, phase, hash.DoubleHash(addr[:]))); err != nil {
+				if err := cs.rt.addRank(NewRank(addr, acc.GenHash, phase, hash.DoubleHash(addr[:]))); err != nil {
 					inErr = err
 					return false
 				}
