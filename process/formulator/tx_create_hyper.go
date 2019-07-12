@@ -18,6 +18,7 @@ type CreateHyper struct {
 	Name       string
 	KeyHash    common.PublicHash
 	GenHash    common.PublicHash
+	Policy     *ValidatorPolicy
 }
 
 // Timestamp returns the timestamp of the transaction
@@ -114,6 +115,8 @@ func (tx *CreateHyper) Execute(p types.Process, ctw *types.ContextWrapper, index
 			GenHash:        tx.GenHash,
 			Amount:         policy.HyperCreationAmount,
 			UpdatedHeight:  ctw.TargetHeight(),
+			StakingAmount:  amount.NewCoinAmount(0, 0),
+			Policy:         tx.Policy,
 		}
 		ctw.CreateAccount(acc)
 	}
@@ -161,6 +164,13 @@ func (tx *CreateHyper) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"gen_hash":`)
 	if bs, err := tx.GenHash.MarshalJSON(); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"policy":`)
+	if bs, err := tx.Policy.MarshalJSON(); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)
