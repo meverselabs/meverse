@@ -72,9 +72,6 @@ func (tx *Deposit) Execute(p types.Process, ctw *types.ContextWrapper, index uin
 		return types.ErrDustAmount
 	}
 
-	sn := ctw.Snapshot()
-	defer ctw.Revert(sn)
-
 	insum := amount.NewCoinAmount(0, 0)
 	for _, vin := range tx.Vin {
 		if utxo, err := ctw.UTXO(vin.ID()); err != nil {
@@ -111,8 +108,6 @@ func (tx *Deposit) Execute(p types.Process, ctw *types.ContextWrapper, index uin
 	if err := sp.AddBalance(ctw, tx.To, tx.Amount); err != nil {
 		return err
 	}
-
-	ctw.Commit(sn)
 	return nil
 }
 

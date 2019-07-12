@@ -61,9 +61,6 @@ func (tx *Assign) Validate(p types.Process, loader types.LoaderWrapper, signers 
 
 // Execute updates the context by the transaction
 func (tx *Assign) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
-	sn := ctw.Snapshot()
-	defer ctw.Revert(sn)
-
 	insum := amount.NewCoinAmount(0, 0)
 	for _, vin := range tx.Vin {
 		if utxo, err := ctw.UTXO(vin.ID()); err != nil {
@@ -90,8 +87,6 @@ func (tx *Assign) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 	if !insum.Equal(outsum) {
 		return types.ErrInvalidOutputAmount
 	}
-
-	ctw.Commit(sn)
 	return nil
 }
 

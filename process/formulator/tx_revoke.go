@@ -62,9 +62,6 @@ func (tx *Revoke) Validate(p types.Process, loader types.LoaderWrapper, signers 
 func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	sn := ctw.Snapshot()
-	defer ctw.Revert(sn)
-
 	if tx.Seq() != ctw.Seq(tx.From())+1 {
 		return types.ErrInvalidSequence
 	}
@@ -168,8 +165,6 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 		return types.ErrInvalidAccountType
 	}
 	ctw.DeleteAccount(acc)
-
-	ctw.Commit(sn)
 	return nil
 }
 

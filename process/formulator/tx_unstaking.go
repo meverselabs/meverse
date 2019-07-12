@@ -85,8 +85,6 @@ func (tx *Unstaking) Execute(p types.Process, ctw *types.ContextWrapper, index u
 		return ErrInvalidStakingAmount
 	}
 
-	//UnlockEnableRequiredBlocks
-
 	fromAcc, err := ctw.Account(tx.From())
 	if err != nil {
 		return err

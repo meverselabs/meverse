@@ -70,9 +70,6 @@ func (tx *OpenAccount) Execute(p types.Process, ctw *types.ContextWrapper, index
 		return types.ErrInvalidAccountName
 	}
 
-	sn := ctw.Snapshot()
-	defer ctw.Revert(sn)
-
 	insum := amount.NewCoinAmount(0, 0)
 	for _, vin := range tx.Vin {
 		if utxo, err := ctw.UTXO(vin.ID()); err != nil {
@@ -117,8 +114,6 @@ func (tx *OpenAccount) Execute(p types.Process, ctw *types.ContextWrapper, index
 		}
 		ctw.CreateAccount(acc)
 	}
-
-	ctw.Commit(sn)
 	return nil
 }
 
