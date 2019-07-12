@@ -155,7 +155,7 @@ func (nd *Node) Run(BindAddress string) {
 					panic(err)
 					break
 				}
-				log.Println("Node", nd.myPublicHash.String(), cp.Height(), "BlockConnected", b.Header.Height)
+				log.Println("Node", nd.myPublicHash.String(), cp.Height(), "BlockConnected", b.Header.Generator.String(), b.Header.Height)
 				nd.broadcastStatus()
 				TargetHeight++
 				item = nd.blockQ.PopUntil(TargetHeight)

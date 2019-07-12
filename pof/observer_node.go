@@ -123,7 +123,7 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 					panic(err)
 					break
 				}
-				log.Println("Observer", ob.myPublicHash.String(), cp.Height(), "BlockConnected", ob.round.RoundState, b.Header.Height, (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
+				log.Println("Observer", ob.myPublicHash.String(), cp.Height(), "BlockConnected", b.Header.Generator.String(), ob.round.RoundState, b.Header.Height, (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
 				ob.broadcastStatus()
 				TargetHeight++
 				item = ob.blockQ.PopUntil(TargetHeight)
@@ -511,7 +511,6 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 			if MinRoundVoteAck != nil {
 				ob.round.RoundState = BlockWaitState
 				ob.round.MinRoundVoteAck = MinRoundVoteAck
-				log.Println("MinRoundVoteAck", MinRoundVoteAck.TimeoutCount, MinRoundVoteAck.Formulator.String())
 
 				if ob.round.MinRoundVoteAck.PublicHash == ob.myPublicHash {
 					log.Println("Observer", "BlockReqMessage", ob.round.MinRoundVoteAck.PublicHash.String(), ob.myPublicHash.String(), cp.Height())
@@ -812,10 +811,10 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 				if diff > 500*time.Millisecond {
 					diff = 500 * time.Millisecond
 				}
-				time.Sleep(diff)
+				//time.Sleep(diff)
 			}
 
-			log.Println("Observer", ob.myPublicHash.String(), cp.Height(), "BlockConnected", ob.round.RoundState, msg.BlockVote.Header.Height, (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
+			log.Println("Observer", ob.myPublicHash.String(), cp.Height(), "BlockConnected", b.Header.Generator.String(), ob.round.RoundState, msg.BlockVote.Header.Height, (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
 
 			ob.round.RemainBlocks--
 			if ob.round.RemainBlocks > 0 {

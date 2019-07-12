@@ -471,7 +471,7 @@ func (fr *FormulatorNode) handleMessage(p p2p.Peer, m interface{}, RetryCount in
 			ExpectedTime := time.Duration(i+1) * 200 * time.Millisecond
 			PastTime := time.Duration(time.Now().UnixNano() - start)
 			if ExpectedTime > PastTime {
-				time.Sleep(ExpectedTime - PastTime)
+				//time.Sleep(ExpectedTime - PastTime)
 			}
 		}
 		return nil
@@ -515,7 +515,7 @@ func (fr *FormulatorNode) handleMessage(p p2p.Peer, m interface{}, RetryCount in
 				}
 				fr.broadcastStatus()
 				fr.cleanPool(b)
-				log.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Height, len(b.Transactions))
+				log.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Transactions))
 
 				if status, has := fr.statusMap[p.ID()]; has {
 					if status.Height < GenMessage.Block.Header.Height {
