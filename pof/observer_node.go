@@ -137,7 +137,11 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 				i++
 				item := v.(*messageItem)
 				ob.Lock()
-				ob.handleObserverMessage(item.PublicHash, item.Message, item.Raw)
+				if err := ob.handleObserverMessage(item.PublicHash, item.Message, item.Raw); err != nil {
+					if m, is := item.Message.(*BlockGenMessage); is {
+						log.Println(err, m)
+					}
+				}
 				ob.Unlock()
 				v = ob.messageQueue.Pop()
 			}

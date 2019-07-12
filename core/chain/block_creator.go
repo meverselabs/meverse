@@ -127,6 +127,10 @@ func (bc *BlockCreator) Finalize() (*types.Block, error) {
 		return nil, err
 	}
 
+	if bc.ctx.StackSize() > 1 {
+		return nil, ErrDirtyContext
+	}
+
 	now := uint64(time.Now().UnixNano())
 	if now <= bc.ctx.LastTimestamp() {
 		now = bc.ctx.LastTimestamp() + 1

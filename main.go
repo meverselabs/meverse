@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
@@ -46,8 +47,8 @@ func test() error {
 			obkeys = append(obkeys, Key)
 			pubhash := common.NewPublicHash(Key.PublicKey())
 			ObserverKeys = append(ObserverKeys, pubhash)
-			NetAddressMap[pubhash] = "localhost:390" + strconv.Itoa(i+1)
-			FrNetAddressMap[pubhash] = "ws://localhost:490" + strconv.Itoa(i+1)
+			NetAddressMap[pubhash] = "localhost:1390" + strconv.Itoa(i+1)
+			FrNetAddressMap[pubhash] = "ws://localhost:1490" + strconv.Itoa(i+1)
 		}
 	}
 
@@ -114,8 +115,8 @@ func test() error {
 
 	for i, ob := range obs {
 		go ob.Run(
-			":390"+strconv.Itoa(i+1),
-			":490"+strconv.Itoa(i+1),
+			":1390"+strconv.Itoa(i+1),
+			":1490"+strconv.Itoa(i+1),
 		)
 	}
 
@@ -151,11 +152,11 @@ func test() error {
 		frs = append(frs, fr)
 		cns = append(cns, cn)
 
-		NdNetAddressMap[common.NewPublicHash(genkey.PublicKey())] = ":590" + strconv.Itoa(i+1)
+		NdNetAddressMap[common.NewPublicHash(genkey.PublicKey())] = ":1590" + strconv.Itoa(i+1)
 	}
 
 	for i, fr := range frs {
-		go fr.Run(":590" + strconv.Itoa(i+1))
+		go fr.Run(":1590" + strconv.Itoa(i+1))
 	}
 
 	ndstrs := []string{
@@ -201,32 +202,30 @@ func test() error {
 		nds = append(nds, nd)
 	}
 	for i, nd := range nds {
-		go nd.Run(":591" + strconv.Itoa(i+1))
+		go nd.Run(":1591" + strconv.Itoa(i+1))
 	}
 
-	/*
-		From := common.NewAddress(0, 2, 0)
-		ctx := cns[0].NewContext()
-		seq := ctx.Seq(From)
-		for i := 0; i < 100; i++ {
-			seq++
-			tx := &vault.Transfer{
-				Timestamp_: uint64(time.Now().UnixNano()),
-				Seq_:       seq,
-				From_:      From,
-				To:         common.NewAddress(0, 3, 0),
-				Amount:     amount.COIN,
-			}
-			sig, err := frkeys[0].Sign(chain.HashTransaction(tx))
-			if err != nil {
-				return err
-			}
-			sigs := []common.Signature{sig}
-			if err := frs[0].AddTx(tx, sigs); err != nil {
-				return err
-			}
+	From := common.NewAddress(0, 2, 0)
+	ctx := cns[0].NewContext()
+	seq := ctx.Seq(From)
+	for i := 0; i < 100; i++ {
+		seq++
+		tx := &vault.Transfer{
+			Timestamp_: uint64(time.Now().UnixNano()),
+			Seq_:       seq,
+			From_:      From,
+			To:         common.NewAddress(0, 3, 0),
+			Amount:     amount.COIN,
 		}
-	*/
+		sig, err := frkeys[0].Sign(chain.HashTransaction(tx))
+		if err != nil {
+			return err
+		}
+		sigs := []common.Signature{sig}
+		if err := frs[0].AddTx(tx, sigs); err != nil {
+			return err
+		}
+	}
 	select {}
 	return nil
 }

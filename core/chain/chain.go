@@ -294,7 +294,8 @@ func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context) err
 }
 
 func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error {
-	if err := cn.validateTransactionSignatures(b, ctx); err != nil {
+	TxSigners, err := cn.validateTransactionSignatures(b, ctx)
+	if err != nil {
 		return err
 	}
 	IDMap := map[int]uint8{}
@@ -314,6 +315,7 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 
 	// Execute Transctions
 	for i, tx := range b.Transactions {
+		signers := TxSigners[i]
 		t := b.TransactionTypes[i]
 		pid := uint8(t >> 8)
 		p, err := cn.Process(pid)
@@ -323,6 +325,10 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 		ctw := types.NewContextWrapper(pid, ctx)
 
 		sn := ctw.Snapshot()
+		if err := tx.Validate(p, types.NewContextWrapper(uint8(t>>8), ctx), signers); err != nil {
+			ctw.Revert(sn)
+			return err
+		}
 		if err := tx.Execute(p, ctw, uint16(i)); err != nil {
 			ctw.Revert(sn)
 			return err
@@ -377,7 +383,7 @@ func (cn *Chain) validateHeader(bh *types.Header) error {
 	return nil
 }
 
-func (cn *Chain) validateTransactionSignatures(b *types.Block, ctx *types.Context) error {
+func (cn *Chain) validateTransactionSignatures(b *types.Block, ctx *types.Context) ([][]common.PublicHash, error) {
 	var wg sync.WaitGroup
 	cpuCnt := runtime.NumCPU()
 	if len(b.Transactions) < 1000 {
@@ -385,6 +391,7 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block, ctx *types.Contex
 	}
 	txUnit := len(b.Transactions) / cpuCnt
 	TxHashes := make([]hash.Hash256, len(b.Transactions)+1)
+	TxSigners := make([][]common.PublicHash, len(b.Transactions))
 	TxHashes[0] = b.Header.PrevHash
 	if len(b.Transactions)%cpuCnt != 0 {
 		txUnit++
@@ -405,7 +412,6 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block, ctx *types.Contex
 
 				TxHash := HashTransactionByType(t, tx)
 				TxHashes[sidx+q+1] = TxHash
-
 				signers := make([]common.PublicHash, 0, len(sigs))
 				for _, sig := range sigs {
 					pubkey, err := common.RecoverPubkey(TxHash, sig)
@@ -415,28 +421,19 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block, ctx *types.Contex
 					}
 					signers = append(signers, common.NewPublicHash(pubkey))
 				}
-				pid := uint8(t >> 8)
-				p, err := cn.Process(pid)
-				if err != nil {
-					errs <- err
-					return
-				}
-				if err := tx.Validate(p, types.NewContextWrapper(uint8(t>>8), ctx), signers); err != nil {
-					errs <- err
-					return
-				}
+				TxSigners[sidx+q] = signers
 			}
 		}(i*txUnit, b.Transactions[i*txUnit:lastCnt])
 	}
 	wg.Wait()
 	if len(errs) > 0 {
 		err := <-errs
-		return err
+		return nil, err
 	}
 	if h, err := BuildLevelRoot(TxHashes); err != nil {
-		return err
+		return nil, err
 	} else if b.Header.LevelRootHash != h {
-		return ErrInvalidLevelRootHash
+		return nil, ErrInvalidLevelRootHash
 	}
-	return nil
+	return TxSigners, nil
 }
