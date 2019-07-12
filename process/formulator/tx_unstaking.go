@@ -111,7 +111,7 @@ func (tx *Unstaking) Execute(p types.Process, ctw *types.ContextWrapper, index u
 	if fromStakingAmount.Less(tx.Amount) {
 		return ErrInsufficientStakingAmount
 	}
-	fromStakingAmount.Sub(tx.Amount)
+	fromStakingAmount = fromStakingAmount.Sub(tx.Amount)
 	if fromStakingAmount.IsZero() {
 		sp.removeStakingAmount(ctw, tx.HyperFormulator, tx.From())
 	} else {

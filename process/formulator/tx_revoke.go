@@ -155,7 +155,7 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 			if frAcc.StakingAmount.Less(StakingAmount) {
 				return ErrCriticalStakingAmount
 			}
-			frAcc.StakingAmount.Sub(StakingAmount)
+			frAcc.StakingAmount = frAcc.StakingAmount.Sub(StakingAmount)
 
 			if err := sp.vault.AddLockedBalance(ctw, addr, ctw.TargetHeight()+policy.StakingUnlockRequiredBlocks, StakingAmount); err != nil {
 				return err
