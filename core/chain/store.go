@@ -509,14 +509,15 @@ func (st *Store) AccountDataKeys(addr common.Address, pid uint8, Prefix []byte) 
 			PrefetchValues: false,
 		})
 		defer it.Close()
-		pre := toAccountDataKey(string(addr[:]) + string(pid))
+		preTag := toAccountDataKey(string(addr[:]) + string(pid))
+		pre := preTag
 		if len(Prefix) > 0 {
 			pre = append(pre, Prefix...)
 		}
 		for it.Seek(pre); it.ValidForPrefix(pre); it.Next() {
 			item := it.Item()
 			key := item.Key()
-			list = append(list, key[len(pre):])
+			list = append(list, key[len(preTag):])
 		}
 		return nil
 	}); err != nil {
@@ -666,14 +667,15 @@ func (st *Store) ProcessDataKeys(pid uint8, Prefix []byte) ([][]byte, error) {
 			PrefetchValues: false,
 		})
 		defer it.Close()
-		pre := toProcessDataKey(string(pid))
+		preTag := toProcessDataKey(string(pid))
+		pre := preTag
 		if len(Prefix) > 0 {
 			pre = append(pre, Prefix...)
 		}
 		for it.Seek(pre); it.ValidForPrefix(pre); it.Next() {
 			item := it.Item()
 			key := item.Key()
-			list = append(list, key[len(pre):])
+			list = append(list, key[len(preTag):])
 		}
 		return nil
 	}); err != nil {
