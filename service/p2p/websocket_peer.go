@@ -41,7 +41,7 @@ func NewWebsocketPeer(conn *websocket.Conn, ID string, Name string, connectedTim
 		pingTime:      pingTime,
 	}
 	go func() {
-		defer p.conn.Close()
+		defer p.Close()
 
 		for {
 			if p.isClose {
