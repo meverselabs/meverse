@@ -50,7 +50,6 @@ type FormulatorNode struct {
 	txQ                  *queue.ExpireQueue
 	isRunning            bool
 	closeLock            sync.RWMutex
-	runEnd               chan struct{}
 	isClose              bool
 }
 
@@ -66,7 +65,6 @@ func NewFormulatorNode(Config *FormulatorConfig, key key.Key, NetAddressMap map[
 		lastContextes:        []*types.Context{},
 		statusMap:            map[string]*p2p.Status{},
 		requestTimer:         p2p.NewRequestTimer(nil),
-		runEnd:               make(chan struct{}),
 		blockQ:               queue.NewSortedQueue(),
 		txpool:               txpool.NewTransactionPool(),
 		txQ:                  queue.NewExpireQueue(),
@@ -90,7 +88,6 @@ func (fr *FormulatorNode) Close() {
 
 	fr.isClose = true
 	fr.cs.cn.Close()
-	fr.runEnd <- struct{}{}
 }
 
 // Init initializes formulator
@@ -180,11 +177,10 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 			}
 			fr.Unlock()
 			blockTimer.Reset(50 * time.Millisecond)
-		case <-fr.runEnd:
-			for i := 0; i < WorkerCount; i++ {
-				(*workerEnd[i]) <- struct{}{}
-			}
 		}
+	}
+	for i := 0; i < WorkerCount; i++ {
+		(*workerEnd[i]) <- struct{}{}
 	}
 }
 

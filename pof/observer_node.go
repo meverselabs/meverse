@@ -2,13 +2,13 @@ package pof
 
 import (
 	"bytes"
-	"github.com/fletaio/fleta/common/debug"
 	"log"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/debug"
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/common/queue"
 	"github.com/fletaio/fleta/common/util"
@@ -42,7 +42,6 @@ type ObserverNode struct {
 	blockQ           *queue.SortedQueue
 	isRunning        bool
 	closeLock        sync.RWMutex
-	runEnd           chan struct{}
 	isClose          bool
 
 	prevRoundEndTime int64 // FOR DEBUG
@@ -91,7 +90,6 @@ func (ob *ObserverNode) Close() {
 
 	ob.isClose = true
 	ob.cs.cn.Close()
-	ob.runEnd <- struct{}{}
 }
 
 // Run starts the pof consensus on the observer
@@ -200,8 +198,6 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 			ob.Unlock()
 
 			voteTimer.Reset(100 * time.Millisecond)
-		case <-ob.runEnd:
-			return
 		}
 	}
 }

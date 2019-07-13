@@ -4,13 +4,14 @@ import (
 	"bytes"
 	crand "crypto/rand"
 	"encoding/binary"
-	"github.com/fletaio/fleta/common/debug"
 	"log"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/debug"
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/common/util"
@@ -149,7 +150,11 @@ func (ms *FormulatorService) server(BindAddress string) error {
 		log.Println("FormulatorService", common.NewPublicHash(ms.key.PublicKey()), "Start to Listen", BindAddress)
 	}
 
-	var upgrader = websocket.Upgrader{}
+	var upgrader = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
 	e := echo.New()
 	e.GET("/", func(c echo.Context) error {
 		conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)

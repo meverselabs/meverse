@@ -88,8 +88,8 @@ func (p *TCPPeer) Name() string {
 
 // Close closes TCPPeer
 func (p *TCPPeer) Close() {
-	p.conn.Close()
 	p.isClose = true
+	p.conn.Close()
 }
 
 // ReadMessageData returns a message data

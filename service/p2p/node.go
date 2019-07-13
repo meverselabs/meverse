@@ -1,12 +1,13 @@
 package p2p
 
 import (
-	"github.com/fletaio/fleta/service/p2p/peer"
 	"log"
 	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/fletaio/fleta/service/p2p/peer"
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
@@ -33,7 +34,6 @@ type Node struct {
 	txQ          *queue.ExpireQueue
 	isRunning    bool
 	closeLock    sync.RWMutex
-	runEnd       chan struct{}
 	isClose      bool
 }
 
@@ -78,7 +78,6 @@ func (nd *Node) Close() {
 
 	nd.isClose = true
 	nd.cn.Close()
-	nd.runEnd <- struct{}{}
 }
 
 // OnItemExpired is called when the item is expired
@@ -165,8 +164,6 @@ func (nd *Node) Run(BindAddress string) {
 			}
 			nd.Unlock()
 			blockTimer.Reset(50 * time.Millisecond)
-		case <-nd.runEnd:
-			return
 		}
 	}
 }

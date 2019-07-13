@@ -4,7 +4,6 @@ import (
 	"bytes"
 	crand "crypto/rand"
 	"encoding/binary"
-	"github.com/fletaio/fleta/common/debug"
 	"log"
 	"net"
 	"sync"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/debug"
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/common/util"

@@ -87,8 +87,8 @@ func (p *WebsocketPeer) Name() string {
 
 // Close closes WebsocketPeer
 func (p *WebsocketPeer) Close() {
-	p.conn.Close()
 	p.isClose = true
+	p.conn.Close()
 }
 
 // ReadMessageData returns a message data
