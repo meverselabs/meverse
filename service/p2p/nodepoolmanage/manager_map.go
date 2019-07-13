@@ -54,9 +54,7 @@ func newNodeStore(dbpath string) (*nodeStore, error) {
 }
 
 func openNodesDB(dbPath string) (*badger.DB, error) {
-	opts := badger.DefaultOptions
-	opts.Dir = dbPath
-	opts.ValueDir = dbPath
+	opts := badger.DefaultOptions(dbPath)
 	opts.Truncate = true
 	opts.SyncWrites = true
 	opts.ValueLogFileSize = 1 << 24

@@ -40,9 +40,7 @@ type storecache struct {
 
 // NewStore returns a Store
 func NewStore(path string, name string, version uint16, bRecover bool) (*Store, error) {
-	opts := badger.DefaultOptions
-	opts.Dir = path
-	opts.ValueDir = path
+	opts := badger.DefaultOptions(path)
 	opts.Truncate = bRecover
 	opts.SyncWrites = true
 	lockfilePath := filepath.Join(opts.Dir, "LOCK")
