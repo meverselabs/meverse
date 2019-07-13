@@ -10,7 +10,6 @@ import (
 type RoundVote struct {
 	LastHash             hash.Hash256
 	TargetHeight         uint32
-	RemainBlocks         uint32
 	TimeoutCount         uint32
 	Formulator           common.Address
 	FormulatorPublicHash common.PublicHash
@@ -28,7 +27,6 @@ type RoundVoteMessage struct {
 type RoundVoteAck struct {
 	LastHash             hash.Hash256
 	TargetHeight         uint32
-	RemainBlocks         uint32
 	TimeoutCount         uint32
 	Formulator           common.Address
 	FormulatorPublicHash common.PublicHash
@@ -47,7 +45,6 @@ type RoundVoteAckMessage struct {
 type BlockReqMessage struct {
 	PrevHash             hash.Hash256
 	TargetHeight         uint32
-	RemainBlocks         uint32
 	TimeoutCount         uint32
 	Formulator           common.Address
 	FormulatorPublicHash common.PublicHash

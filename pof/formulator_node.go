@@ -340,7 +340,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 
 	switch msg := m.(type) {
 	case *BlockReqMessage:
-		log.Println("Formulator", fr.Config.Formulator.String(), "BlockReqMessage", msg.TargetHeight, msg.RemainBlocks)
+		log.Println("Formulator", fr.Config.Formulator.String(), "BlockReqMessage", msg.TargetHeight)
 		fr.Lock()
 		defer fr.Unlock()
 
@@ -392,14 +392,19 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 		StartBlockTime := uint64(time.Now().UnixNano())
 		bNoDelay := false
 
+		RemainBlocks := fr.cs.maxBlocksPerFormulator
+		if msg.TimeoutCount == 0 {
+			RemainBlocks = fr.cs.maxBlocksPerFormulator - fr.cs.blocksBySameFormulator
+		}
+
 		LastTimestamp := cp.LastTimestamp()
 		if StartBlockTime < LastTimestamp {
 			StartBlockTime = LastTimestamp + uint64(time.Millisecond)
-		} else if StartBlockTime > LastTimestamp+uint64(msg.RemainBlocks)*uint64(500*time.Millisecond) {
+		} else if StartBlockTime > LastTimestamp+uint64(RemainBlocks)*uint64(500*time.Millisecond) {
 			bNoDelay = true
 		}
 		ctx := fr.cs.ct.NewContext()
-		for i := uint32(0); i < msg.RemainBlocks; i++ {
+		for i := uint32(0); i < RemainBlocks; i++ {
 			var TimeoutCount uint32
 			if i == 0 {
 				TimeoutCount = msg.TimeoutCount

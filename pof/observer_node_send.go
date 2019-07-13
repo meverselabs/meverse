@@ -20,16 +20,12 @@ func (ob *ObserverNode) sendRoundVote() error {
 		RoundVote: &RoundVote{
 			LastHash:             cp.LastHash(),
 			TargetHeight:         cp.Height() + 1,
-			RemainBlocks:         ob.cs.maxBlocksPerFormulator,
 			TimeoutCount:         uint32(TimeoutCount),
 			Formulator:           Top.Address,
 			FormulatorPublicHash: Top.PublicHash,
 			Timestamp:            uint64(time.Now().UnixNano()),
 			IsReply:              false,
 		},
-	}
-	if TimeoutCount == 0 {
-		nm.RoundVote.RemainBlocks = ob.cs.maxBlocksPerFormulator - ob.cs.blocksBySameFormulator
 	}
 	if gh, err := ob.fs.GuessHeight(Top.Address); err != nil {
 		ob.fs.SendTo(Top.Address, &p2p.StatusMessage{
@@ -74,7 +70,6 @@ func (ob *ObserverNode) sendRoundVoteTo(TargetPubHash common.PublicHash) error {
 		RoundVote: &RoundVote{
 			LastHash:             MyMsg.RoundVote.LastHash,
 			TargetHeight:         MyMsg.RoundVote.TargetHeight,
-			RemainBlocks:         MyMsg.RoundVote.RemainBlocks,
 			TimeoutCount:         MyMsg.RoundVote.TimeoutCount,
 			Formulator:           MyMsg.RoundVote.Formulator,
 			FormulatorPublicHash: MyMsg.RoundVote.FormulatorPublicHash,
@@ -99,7 +94,6 @@ func (ob *ObserverNode) sendRoundVoteAck() error {
 		RoundVoteAck: &RoundVoteAck{
 			LastHash:             MinRoundVote.LastHash,
 			TargetHeight:         MinRoundVote.TargetHeight,
-			RemainBlocks:         MinRoundVote.RemainBlocks,
 			TimeoutCount:         MinRoundVote.TimeoutCount,
 			Formulator:           MinRoundVote.Formulator,
 			FormulatorPublicHash: MinRoundVote.FormulatorPublicHash,
@@ -136,7 +130,6 @@ func (ob *ObserverNode) sendRoundVoteAckTo(TargetPubHash common.PublicHash) erro
 		RoundVoteAck: &RoundVoteAck{
 			LastHash:             MyMsg.RoundVoteAck.LastHash,
 			TargetHeight:         MyMsg.RoundVoteAck.TargetHeight,
-			RemainBlocks:         MyMsg.RoundVoteAck.RemainBlocks,
 			TimeoutCount:         MyMsg.RoundVoteAck.TimeoutCount,
 			Formulator:           MyMsg.RoundVoteAck.Formulator,
 			FormulatorPublicHash: MyMsg.RoundVoteAck.FormulatorPublicHash,
@@ -159,7 +152,7 @@ func (ob *ObserverNode) sendRoundVoteAckTo(TargetPubHash common.PublicHash) erro
 func (ob *ObserverNode) sendBlockVote(gen *BlockGenMessage) error {
 	nm := &BlockVoteMessage{
 		BlockVote: &BlockVote{
-			TargetHeight:       ob.round.TargetHeight,
+			TargetHeight:       gen.Block.Header.Height,
 			Header:             &gen.Block.Header,
 			GeneratorSignature: gen.GeneratorSignature,
 			IsReply:            false,
@@ -205,6 +198,7 @@ func (ob *ObserverNode) sendBlockVoteTo(gen *BlockGenMessage, TargetPubHash comm
 
 	nm := &BlockVoteMessage{
 		BlockVote: &BlockVote{
+			TargetHeight:       gen.Block.Header.Height,
 			Header:             &gen.Block.Header,
 			GeneratorSignature: gen.GeneratorSignature,
 			IsReply:            true,
