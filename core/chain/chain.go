@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"log"
 	"runtime"
 	"sync"
 
@@ -119,6 +120,8 @@ func (cn *Chain) Init() error {
 			return err
 		}
 	}
+
+	log.Println("Chain loaded", cn.store.Height(), ctx.LastHash().String())
 
 	cn.isInit = true
 	return nil
