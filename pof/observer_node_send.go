@@ -20,13 +20,16 @@ func (ob *ObserverNode) sendRoundVote() error {
 		RoundVote: &RoundVote{
 			LastHash:             cp.LastHash(),
 			TargetHeight:         cp.Height() + 1,
-			RemainBlocks:         ob.cs.maxBlocksPerFormulator - ob.cs.blocksBySameFormulator,
+			RemainBlocks:         ob.cs.maxBlocksPerFormulator,
 			TimeoutCount:         uint32(TimeoutCount),
 			Formulator:           Top.Address,
 			FormulatorPublicHash: Top.PublicHash,
 			Timestamp:            uint64(time.Now().UnixNano()),
 			IsReply:              false,
 		},
+	}
+	if TimeoutCount == 0 {
+		nm.RoundVote.RemainBlocks = ob.cs.maxBlocksPerFormulator - ob.cs.blocksBySameFormulator
 	}
 	if gh, err := ob.fs.GuessHeight(Top.Address); err != nil {
 		ob.fs.SendTo(Top.Address, &p2p.StatusMessage{
