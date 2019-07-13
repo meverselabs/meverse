@@ -4,11 +4,14 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/dgraph-io/badger"
 	"github.com/fletaio/fleta/cmd/app"
+	"github.com/fletaio/fleta/cmd/closer"
 	"github.com/fletaio/fleta/cmd/config"
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/key"
@@ -62,6 +65,19 @@ func main() {
 	Name := "FLEAT Mainnet"
 	Version := uint16(0x0001)
 
+	cm := closer.NewManager()
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc,
+		syscall.SIGHUP,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGQUIT)
+	go func() {
+		<-sigc
+		cm.CloseAll()
+	}()
+	defer cm.CloseAll()
+
 	st, err := chain.NewStore(cfg.StoreRoot, Name, Version, cfg.ForceRecover)
 	if err != nil {
 		if cfg.ForceRecover || err != badger.ErrTruncateNeeded {
@@ -82,6 +98,8 @@ func main() {
 			}
 		}
 	}
+	cm.Add("store", st)
+
 	cs := pof.NewConsensus(MaxBlocksPerFormulator, ObserverKeys)
 	app := app.NewFletaApp()
 	cn := chain.NewChain(cs, app, st)
@@ -90,10 +108,17 @@ func main() {
 	if err := cn.Init(); err != nil {
 		panic(err)
 	}
+	cm.RemoveAll()
+	cm.Add("chain", cn)
+
 	ob := pof.NewObserverNode(obkey, NetAddressMap, cs)
 	if err := ob.Init(); err != nil {
 		panic(err)
 	}
+	cm.RemoveAll()
+	cm.Add("observer", ob)
 
-	ob.Run(":"+strconv.Itoa(cfg.ObseverPort), ":"+strconv.Itoa(cfg.FormulatorPort))
+	go ob.Run(":"+strconv.Itoa(cfg.ObseverPort), ":"+strconv.Itoa(cfg.FormulatorPort))
+
+	cm.Wait()
 }

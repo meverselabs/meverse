@@ -11,6 +11,7 @@ import (
 
 	"github.com/dgraph-io/badger"
 	"github.com/fletaio/fleta/cmd/app"
+	"github.com/fletaio/fleta/cmd/closer"
 	"github.com/fletaio/fleta/cmd/config"
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/key"
@@ -18,7 +19,6 @@ import (
 	"github.com/fletaio/fleta/pof"
 	"github.com/fletaio/fleta/process/formulator"
 	"github.com/fletaio/fleta/process/vault"
-	"github.com/fletaio/framework/closer"
 )
 
 // Config is a configuration for the cmd
@@ -58,7 +58,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		NetAddressMap[pubhash] = netAddr
+		NetAddressMap[pubhash] = "ws://" + netAddr
 		ObserverKeys = append(ObserverKeys, pubhash)
 	}
 	SeedNodeMap := map[common.PublicHash]string{}
