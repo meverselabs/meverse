@@ -3,9 +3,6 @@
 This is repository of FLETA project.<br/>
 This repository contains an explanation and contents about the FLETA Daemon, Observer Daemon, Block Explorer, and DApp examples.<br/>
 This v2 of FLETA blockchain provides more easy and convenient way to develop DApp.<br/>
-#### !!!Currently, we are developing FLETA blockchain v2 that reworks whole structure!!!
-#### !!!Currently, consensus by nodes on the network is remained to reworks(already implemented at v1, but conversion required)!!!
-#### !!!Currently, example and explorer is running on single node by local consensus. It will be removed when we finish to convert our consensus by node on the network!!!
 
 ## Related repositories
 * You can find the Explorer at https://github.com/fletaio/explorer.
@@ -19,11 +16,28 @@ C compiler(gcc, mingw etc.)<br/>
 ### Step
 Open the Command line and enter the command below.
 
+Build Node(default, join to the testnet)
 ```
 $ git clone https://github.com/fletaio/fleta
-$ cd ./fleta
+$ cd ./fleta/cmd/node
 $ go build
-$ ./node.exe
+$ ./node
+```
+
+Build Formulator(required to create formulator account for joining to the testnet as a observer)
+```
+$ git clone https://github.com/fletaio/fleta
+$ cd ./fleta/cmd/formulator
+$ go build
+$ ./formulator
+```
+
+Build Observer(buildable, but cannot join to the testnet as a observer)
+```
+$ git clone https://github.com/fletaio/fleta
+$ cd ./fleta/cmd/observer
+$ go build
+$ ./observer
 ```
 
 You can find FLETA binary in GOPATH/bin directory
