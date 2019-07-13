@@ -171,6 +171,7 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 				if err := fr.cs.cn.ConnectBlock(b); err != nil {
 					break
 				}
+				log.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Transactions))
 				fr.broadcastStatus()
 				fr.cleanPool(b)
 				TargetHeight++
@@ -387,26 +388,20 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 		fr.lastContextes = []*types.Context{}
 		fr.lastReqMessage = msg
 
-		var ctx *types.Context
 		start := time.Now().UnixNano()
 		StartBlockTime := uint64(time.Now().UnixNano())
 		bNoDelay := false
-		TargetBlocksInTurn := msg.RemainBlocks
-		if Height > 0 {
-			LastHeader, err := cp.Header(Height)
-			if err != nil {
-				return err
-			}
-			if StartBlockTime < LastHeader.Timestamp {
-				StartBlockTime = LastHeader.Timestamp + uint64(time.Millisecond)
-			} else if LastHeader.Timestamp < uint64(msg.RemainBlocks)*uint64(500*time.Millisecond) {
-				bNoDelay = true
-			}
+
+		LastTimestamp := cp.LastTimestamp()
+		if StartBlockTime < LastTimestamp {
+			StartBlockTime = LastTimestamp + uint64(time.Millisecond)
+		} else if StartBlockTime > LastTimestamp+uint64(msg.RemainBlocks)*uint64(500*time.Millisecond) {
+			bNoDelay = true
 		}
-		for i := uint32(0); i < TargetBlocksInTurn; i++ {
+		ctx := fr.cs.ct.NewContext()
+		for i := uint32(0); i < msg.RemainBlocks; i++ {
 			var TimeoutCount uint32
 			if i == 0 {
-				ctx = fr.cs.ct.NewContext()
 				TimeoutCount = msg.TimeoutCount
 			} else {
 				lastHeader := fr.lastGenMessages[len(fr.lastGenMessages)-1].Block.Header
@@ -418,6 +413,9 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 				Timestamp += uint64(i) * uint64(time.Millisecond)
 			} else {
 				Timestamp += uint64(i) * uint64(500*time.Millisecond)
+			}
+			if Timestamp <= ctx.LastTimestamp() {
+				Timestamp = ctx.LastTimestamp() + 1
 			}
 
 			var buffer bytes.Buffer
@@ -456,7 +454,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 			}
 			fr.txpool.Unlock() // Prevent delaying from TxPool.Push
 
-			b, err := bc.Finalize()
+			b, err := bc.Finalize(Timestamp)
 			if err != nil {
 				return err
 			}
@@ -482,7 +480,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 
 			ExpectedTime := time.Duration(i+1) * 200 * time.Millisecond
 			PastTime := time.Duration(time.Now().UnixNano() - start)
-			if ExpectedTime > PastTime {
+			if !bNoDelay && ExpectedTime > PastTime {
 				time.Sleep(ExpectedTime - PastTime)
 			}
 		}
