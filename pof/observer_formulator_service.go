@@ -191,7 +191,7 @@ func (ms *FormulatorService) server(BindAddress string) error {
 
 		if err := ms.handleConnection(p); err != nil {
 			log.Println("[handleConnection]", err)
-			return err
+			return nil
 		}
 		return nil
 	})
