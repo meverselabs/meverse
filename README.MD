@@ -10,7 +10,7 @@ This v2 of FLETA blockchain provides more easy and convenient way to develop DAp
 ## Building the source
 
 ### Prerequisites
-Golang 1.11 or later<br/>
+Golang 1.12 or later<br/>
 C compiler(gcc, mingw etc.)<br/>
 
 ### Step
@@ -67,11 +67,13 @@ Please see the details in related repositories.
 
 ## Running on FLETA Beta Test network
 
-It will be provided when we finish to convert our consensus on nodes on the network.<br/>
+Just running node will join to the test network.<br/>
+If you want to join as a formulator, you should make formulator account.<br/>
+It will be provided soon.<br/>
 
 ## Running on your own network
 
-It will be provided when we finish to convert our consensus on nodes on the network.<br/>
+It will be provided soon.<br/>
 
 ## License
 
