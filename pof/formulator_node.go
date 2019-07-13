@@ -99,6 +99,7 @@ func (fr *FormulatorNode) Init() error {
 	fc.Register(types.DefineHashedType("p2p.PingMessage"), &p2p.PingMessage{})
 	fc.Register(types.DefineHashedType("p2p.StatusMessage"), &p2p.StatusMessage{})
 	fc.Register(types.DefineHashedType("p2p.BlockMessage"), &p2p.BlockMessage{})
+	fc.Register(types.DefineHashedType("p2p.RequestMessage"), &p2p.RequestMessage{})
 	fc.Register(types.DefineHashedType("p2p.TransactionMessage"), &p2p.TransactionMessage{})
 	fc.Register(types.DefineHashedType("p2p.PeerListMessage"), &p2p.PeerListMessage{})
 	fc.Register(types.DefineHashedType("p2p.RequestPeerListMessage"), &p2p.RequestPeerListMessage{})

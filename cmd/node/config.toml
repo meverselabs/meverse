@@ -13,6 +13,6 @@ ForceRecover = true
 
 [SeedNodeMap]
 3yTFnJJqx3wCiK2Edk9f9JwdvdkC4DP4T1y8xYztMkf = "testnet_seednode1.fleta.io:31000"
-3EjA1hKkfYZ4KL1c4f67CfaNwb9fCqUneiYkyQEhsGi = "testnet_seednode2.fleta.io:31000"
-314AUADxjj7nWjeNpR8XEoAh4DdX3ArNHaipPGMFQ4u = "testnet_seednode3.fleta.io:31000"
-3n8QNWd7M839ouauhdHvmgmk4NsLj4qGM6tpfoaLNxc = "testnet_seednode4.fleta.io:31000"
+3EjA1hKkfYZ4KL1c4f67CfaNwb9fCqUneiYkyQEhsGi = "testnet_seednode3.fleta.io:31000"
+314AUADxjj7nWjeNpR8XEoAh4DdX3ArNHaipPGMFQ4u = "testnet_seednode4.fleta.io:31000"
+3n8QNWd7M839ouauhdHvmgmk4NsLj4qGM6tpfoaLNxc = "testnet_seednode5.fleta.io:31000"

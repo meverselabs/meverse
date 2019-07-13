@@ -61,6 +61,7 @@ func (nd *Node) Init() error {
 	fc := encoding.Factory("message")
 	fc.Register(types.DefineHashedType("p2p.PingMessage"), &PingMessage{})
 	fc.Register(types.DefineHashedType("p2p.StatusMessage"), &StatusMessage{})
+	fc.Register(types.DefineHashedType("p2p.RequestMessage"), &RequestMessage{})
 	fc.Register(types.DefineHashedType("p2p.BlockMessage"), &BlockMessage{})
 	fc.Register(types.DefineHashedType("p2p.TransactionMessage"), &TransactionMessage{})
 	fc.Register(types.DefineHashedType("p2p.PeerListMessage"), &PeerListMessage{})
