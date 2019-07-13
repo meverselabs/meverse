@@ -113,12 +113,10 @@ func (p *peerInfomation) score() (t time.Duration) {
 func (ps *peerStorage) Add(p peermessage.ConnectInfo, score Score) (inserted bool) {
 	addr := p.Hash
 
-	ps.mapLock.RLock()
-	if _, has := ps.peerMap[addr]; has {
+	if ps.Have(addr) {
 		ps.updatePingtime(addr)
 		return
 	}
-	ps.mapLock.RUnlock()
 
 	advantage := ps.getScoreBoard(score)
 	pi := &peerInfomation{
@@ -136,7 +134,6 @@ func (ps *peerStorage) Add(p peermessage.ConnectInfo, score Score) (inserted boo
 
 	ps.mapLock.Lock()
 	defer ps.mapLock.Unlock()
-
 	return ps.insertSort(pi)
 }
 
@@ -161,8 +158,8 @@ func (ps *peerStorage) NotEnoughPeer() bool {
 //Have indicates whether the group peer is included or not.
 func (ps *peerStorage) Have(addr string) bool {
 	ps.mapLock.RLock()
-	defer ps.mapLock.RUnlock()
 	_, has := ps.peerMap[addr]
+	ps.mapLock.RUnlock()
 	return has
 }
 
