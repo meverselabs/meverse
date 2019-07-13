@@ -1,0 +1,19 @@
+Port = 31000
+APIPort = 58000
+KeyHex = "THIS_IS_A_PRIVATE_KEY_THAT_IS_FORMATTED_WITH_HEX"
+Formulator = "THIS_IS_A_ADDRESS_OF_THE_FORMULATOR"
+StoreRoot = "./formulator"
+ForceRecover = true
+
+[ObserverKeyMap]
+3e5PNobd577YEdjeb59zG6N7BBZbyRKMja2s55QQMQE = "testnet_observer1.fleta.io:37000"
+4ry8UmsCbo1BPTmUhqjMWgy9UtLDFcebEsc4Lgjo9ba = "testnet_observer2.fleta.io:37000"
+4KT4crmdp5GDihPXufUonmAujjC1YH4viej8C1udjc4 = "testnet_observer3.fleta.io:37000"
+3suqtMQWdUFUwDGMzH53KRJPFzqaP6YYRqRGMPLhhp5 = "testnet_observer4.fleta.io:37000"
+3HLUjZYeUDc7nGKqCaRyqB8yJHwj3BgFMWUYNmMSYfE = "testnet_observer5.fleta.io:37000"
+
+[SeedNodeMap]
+3yTFnJJqx3wCiK2Edk9f9JwdvdkC4DP4T1y8xYztMkf = "testnet_seednode1.fleta.io:31000"
+3EjA1hKkfYZ4KL1c4f67CfaNwb9fCqUneiYkyQEhsGi = "testnet_seednode2.fleta.io:31000"
+314AUADxjj7nWjeNpR8XEoAh4DdX3ArNHaipPGMFQ4u = "testnet_seednode3.fleta.io:31000"
+3n8QNWd7M839ouauhdHvmgmk4NsLj4qGM6tpfoaLNxc = "testnet_seednode4.fleta.io:31000"

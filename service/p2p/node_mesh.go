@@ -4,12 +4,13 @@ import (
 	"bytes"
 	crand "crypto/rand"
 	"encoding/binary"
-	"github.com/fletaio/fleta/service/p2p/nodepoolmanage"
 	"log"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/fletaio/fleta/service/p2p/nodepoolmanage"
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
