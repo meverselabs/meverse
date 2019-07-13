@@ -1,8 +1,6 @@
 package chain
 
 import (
-	"time"
-
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/factory"
 	"github.com/fletaio/fleta/common/hash"
@@ -105,7 +103,7 @@ func (bc *BlockCreator) UnsafeAddTx(t uint16, TxHsah hash.Hash256, tx types.Tran
 }
 
 // Finalize generates block that has transactions adds by AddTx
-func (bc *BlockCreator) Finalize() (*types.Block, error) {
+func (bc *BlockCreator) Finalize(Timestamp uint64) (*types.Block, error) {
 	IDMap := map[int]uint8{}
 	for id, idx := range bc.cn.processIndexMap {
 		IDMap[idx] = id
@@ -131,11 +129,7 @@ func (bc *BlockCreator) Finalize() (*types.Block, error) {
 		return nil, ErrDirtyContext
 	}
 
-	now := uint64(time.Now().UnixNano())
-	if now <= bc.ctx.LastTimestamp() {
-		now = bc.ctx.LastTimestamp() + 1
-	}
-	bc.b.Header.Timestamp = now
+	bc.b.Header.Timestamp = Timestamp
 	bc.b.Header.ContextHash = bc.ctx.Hash()
 	return bc.b, nil
 }
