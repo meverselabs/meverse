@@ -27,14 +27,12 @@ func init() {
 			return err
 		}
 		for i := 0; i < Len; i++ {
-			if err := enc.Encode(item.TransactionTypes[i]); err != nil {
+			if err := enc.EncodeUint16(item.TransactionTypes[i]); err != nil {
 				return err
 			}
-
 			if err := enc.Encode(item.Transactions[i]); err != nil {
 				return err
 			}
-
 			sigs := item.TranactionSignatures[i]
 			if err := enc.EncodeArrayLen(len(sigs)); err != nil {
 				return err

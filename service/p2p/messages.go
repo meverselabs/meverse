@@ -1,10 +1,69 @@
 package p2p
 
 import (
+	"reflect"
+
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/core/types"
+	"github.com/fletaio/fleta/encoding"
 )
+
+func init() {
+	fc := encoding.Factory("transaction")
+	encoding.Register(TransactionMessage{}, func(enc *encoding.Encoder, rv reflect.Value) error {
+		item := rv.Interface().(TransactionMessage)
+		if err := enc.EncodeUint16(item.TxType); err != nil {
+			return err
+		}
+		if err := enc.Encode(item.Tx); err != nil {
+			return err
+		}
+		if err := enc.EncodeArrayLen(len(item.Sigs)); err != nil {
+			return err
+		}
+		for _, sig := range item.Sigs {
+			if err := enc.Encode(sig); err != nil {
+				return err
+			}
+		}
+		return nil
+	}, func(dec *encoding.Decoder, rv reflect.Value) error {
+		item := &TransactionMessage{}
+
+		t, err := dec.DecodeUint16()
+		if err != nil {
+			return err
+		}
+		item.TxType = t
+
+		tx, err := fc.Create(t)
+		if err != nil {
+			return err
+		}
+		if err := dec.Decode(&tx); err != nil {
+			return err
+		}
+		item.Tx = tx.(types.Transaction)
+
+		SigLen, err := dec.DecodeArrayLen()
+		if err != nil {
+			return err
+		}
+		sigs := make([]common.Signature, 0, SigLen)
+		for j := 0; j < SigLen; j++ {
+			var sig common.Signature
+			if err := dec.Decode(&sig); err != nil {
+				return err
+			}
+			sigs = append(sigs, sig)
+		}
+		item.Sigs = sigs
+
+		rv.Set(reflect.ValueOf(item).Elem())
+		return nil
+	})
+}
 
 // PingMessage is a message for a block generation
 type PingMessage struct {
