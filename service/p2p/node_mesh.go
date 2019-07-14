@@ -1,7 +1,6 @@
 package p2p
 
 import (
-	"bytes"
 	crand "crypto/rand"
 	"encoding/binary"
 	"log"
@@ -15,8 +14,6 @@ import (
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/key"
-	"github.com/fletaio/fleta/common/util"
-	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/service/p2p/peer"
 )
 
@@ -144,7 +141,7 @@ func (ms *NodeMesh) removePeerInMap(ID string, peerMap map[string]peer.Peer) {
 	}
 }
 
-// Has returns whether there is a connected peer
+// GetPeer returns the peer of the id
 func (ms *NodeMesh) GetPeer(ID string) peer.Peer {
 	ms.Lock()
 	defer ms.Unlock()
@@ -181,6 +178,39 @@ func (ms *NodeMesh) SendTo(pubhash common.PublicHash, m interface{}) error {
 	return nil
 }
 
+// ExceptCastLimit sends a message within the given number except the peer
+func (ms *NodeMesh) ExceptCastLimit(ID string, m interface{}, Limit int) error {
+	data, err := MessageToBytes(m)
+	if err != nil {
+		return err
+	}
+
+	peerMap := map[string]peer.Peer{}
+	ms.Lock()
+	for _, p := range ms.clientPeerMap {
+		if len(peerMap) >= Limit {
+			break
+		}
+		if p.ID() != ID {
+			peerMap[p.ID()] = p
+		}
+	}
+	for _, p := range ms.serverPeerMap {
+		if len(peerMap) >= Limit {
+			break
+		}
+		if p.ID() != ID {
+			peerMap[p.ID()] = p
+		}
+	}
+	ms.Unlock()
+
+	for _, p := range peerMap {
+		p.SendRaw(data)
+	}
+	return nil
+}
+
 // BroadcastRaw sends a message to all peers
 func (ms *NodeMesh) BroadcastRaw(bs []byte) {
 	peerMap := map[string]peer.Peer{}
@@ -200,18 +230,10 @@ func (ms *NodeMesh) BroadcastRaw(bs []byte) {
 
 // BroadcastMessage sends a message to all peers
 func (ms *NodeMesh) BroadcastMessage(m interface{}) error {
-	var buffer bytes.Buffer
-	fc := encoding.Factory("message")
-	t, err := fc.TypeOf(m)
+	data, err := MessageToBytes(m)
 	if err != nil {
 		return err
 	}
-	buffer.Write(util.Uint16ToBytes(t))
-	enc := encoding.NewEncoder(&buffer)
-	if err := enc.Encode(m); err != nil {
-		return err
-	}
-	data := buffer.Bytes()
 
 	peerMap := map[string]peer.Peer{}
 	ms.Lock()

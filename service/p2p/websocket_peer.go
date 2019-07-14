@@ -133,18 +133,11 @@ func (p *WebsocketPeer) ReadMessageData() (interface{}, []byte, error) {
 
 // Send sends a message to the WebsocketPeer
 func (p *WebsocketPeer) Send(m interface{}) error {
-	var buffer bytes.Buffer
-	fc := encoding.Factory("message")
-	t, err := fc.TypeOf(m)
+	data, err := MessageToBytes(m)
 	if err != nil {
 		return err
 	}
-	buffer.Write(util.Uint16ToBytes(t))
-	enc := encoding.NewEncoder(&buffer)
-	if err := enc.Encode(m); err != nil {
-		return err
-	}
-	p.SendRaw(buffer.Bytes())
+	p.SendRaw(data)
 	return nil
 }
 
