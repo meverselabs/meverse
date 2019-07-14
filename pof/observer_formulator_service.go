@@ -180,13 +180,10 @@ func (ms *FormulatorService) server(BindAddress string) error {
 
 		ID := string(Formulator[:])
 		p := p2p.NewWebsocketPeer(conn, ID, Formulator.String(), time.Now().UnixNano(), 0)
+		ms.RemovePeer(ID)
 		ms.Lock()
-		old, has := ms.peerMap[ID]
 		ms.peerMap[ID] = p
 		ms.Unlock()
-		if has {
-			ms.RemovePeer(old.ID())
-		}
 		defer ms.RemovePeer(p.ID())
 
 		if err := ms.handleConnection(p); err != nil {

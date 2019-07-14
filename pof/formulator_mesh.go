@@ -4,11 +4,12 @@ import (
 	"bytes"
 	crand "crypto/rand"
 	"encoding/binary"
-	"github.com/fletaio/fleta/common/debug"
 	"log"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/fletaio/fleta/common/debug"
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
@@ -167,13 +168,10 @@ func (ms *FormulatorNodeMesh) client(Address string, TargetPubHash common.Public
 
 	ID := string(pubhash[:])
 	p := p2p.NewWebsocketPeer(conn, ID, pubhash.String(), time.Now().UnixNano(), 0)
+	ms.RemovePeer(ID)
 	ms.Lock()
-	old, has := ms.peerMap[ID]
 	ms.peerMap[ID] = p
 	ms.Unlock()
-	if has {
-		ms.RemovePeer(old.ID())
-	}
 	defer ms.RemovePeer(p.ID())
 
 	if err := ms.handleConnection(p); err != nil {

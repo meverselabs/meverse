@@ -219,13 +219,10 @@ func (ms *ObserverNodeMesh) client(Address string, TargetPubHash common.PublicHa
 
 	ID := string(pubhash[:])
 	p := p2p.NewTCPPeer(conn, ID, pubhash.String(), start.UnixNano(), duration)
+	ms.removePeerInMap(ID, ms.clientPeerMap)
 	ms.Lock()
-	old, has := ms.clientPeerMap[ID]
 	ms.clientPeerMap[ID] = p
 	ms.Unlock()
-	if has {
-		ms.removePeerInMap(old.ID(), ms.clientPeerMap)
-	}
 	defer ms.removePeerInMap(p.ID(), ms.clientPeerMap)
 
 	if err := ms.handleConnection(p); err != nil {
@@ -266,13 +263,10 @@ func (ms *ObserverNodeMesh) server(BindAddress string) error {
 
 			ID := string(pubhash[:])
 			p := p2p.NewTCPPeer(conn, ID, pubhash.String(), start.UnixNano(), duration)
+			ms.removePeerInMap(ID, ms.serverPeerMap)
 			ms.Lock()
-			old, has := ms.serverPeerMap[ID]
 			ms.serverPeerMap[ID] = p
 			ms.Unlock()
-			if has {
-				ms.removePeerInMap(old.ID(), ms.serverPeerMap)
-			}
 			defer ms.removePeerInMap(p.ID(), ms.serverPeerMap)
 
 			if err := ms.handleConnection(p); err != nil {

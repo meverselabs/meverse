@@ -104,7 +104,7 @@ func (cs *Consensus) OnLoadChain(loader types.LoaderWrapper) error {
 
 // ValidateSignature called when required to validate signatures
 func (cs *Consensus) ValidateSignature(bh *types.Header, sigs []common.Signature) error {
-	TimeoutCount, err := cs.decodeConsensusData(bh.ConsensusData)
+	TimeoutCount, err := cs.DecodeConsensusData(bh.ConsensusData)
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func (cs *Consensus) OnSaveData(b *types.Block, ctw *types.ContextWrapper) error
 
 	HeaderHash := encoding.Hash(b.Header)
 
-	TimeoutCount, err := cs.decodeConsensusData(b.Header.ConsensusData)
+	TimeoutCount, err := cs.DecodeConsensusData(b.Header.ConsensusData)
 	if err != nil {
 		return err
 	}

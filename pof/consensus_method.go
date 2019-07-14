@@ -48,7 +48,8 @@ func (cs *Consensus) updateFormulatorList(ctw *types.ContextWrapper) error {
 	return nil
 }
 
-func (cs *Consensus) decodeConsensusData(ConsensusData []byte) (uint32, error) {
+// DecodeConsensusData decodes header's consensus data
+func (cs *Consensus) DecodeConsensusData(ConsensusData []byte) (uint32, error) {
 	dec := encoding.NewDecoder(bytes.NewReader(ConsensusData))
 	TimeoutCount, err := dec.DecodeUint32()
 	if err != nil {

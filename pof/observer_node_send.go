@@ -111,18 +111,11 @@ func (ob *ObserverNode) sendRoundVoteTo(TargetPubHash common.PublicHash) error {
 				IsReply:              true,
 			},
 		}
-		if gh, err := ob.fs.GuessHeight(Top.Address); err != nil {
-			ob.fs.SendTo(Top.Address, &p2p.StatusMessage{
-				Version:  cp.Version(),
-				Height:   cp.Height(),
-				LastHash: cp.LastHash(),
-			})
-		} else if gh < cp.Height() {
-			ob.fs.SendTo(Top.Address, &p2p.StatusMessage{
-				Version:  cp.Version(),
-				Height:   cp.Height(),
-				LastHash: cp.LastHash(),
-			})
+
+		if sig, err := ob.key.Sign(encoding.Hash(nm.RoundVote)); err != nil {
+			return err
+		} else {
+			nm.Signature = sig
 		}
 
 		ob.ms.SendTo(TargetPubHash, nm)
@@ -210,11 +203,6 @@ func (ob *ObserverNode) sendRoundSetup() error {
 	} else {
 		nm.Signature = sig
 	}
-
-	ob.messageQueue.Push(&messageItem{
-		PublicHash: ob.myPublicHash,
-		Message:    nm,
-	})
 
 	ob.ms.BroadcastMessage(nm)
 	return nil
