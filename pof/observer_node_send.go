@@ -157,30 +157,65 @@ func (ob *ObserverNode) sendRoundVoteAckTo(TargetPubHash common.PublicHash) erro
 		return nil
 	}
 
-	MyMsg, has := ob.round.RoundVoteAckMessageMap[ob.myPublicHash]
-	if !has {
-		return nil
-	}
-	nm := &RoundVoteAckMessage{
-		RoundVoteAck: &RoundVoteAck{
-			LastHash:             MyMsg.RoundVoteAck.LastHash,
-			TargetHeight:         MyMsg.RoundVoteAck.TargetHeight,
-			TimeoutCount:         MyMsg.RoundVoteAck.TimeoutCount,
-			Formulator:           MyMsg.RoundVoteAck.Formulator,
-			FormulatorPublicHash: MyMsg.RoundVoteAck.FormulatorPublicHash,
-			PublicHash:           MyMsg.RoundVoteAck.PublicHash,
-			Timestamp:            MyMsg.RoundVoteAck.Timestamp,
-			IsReply:              true,
-		},
-	}
+	if ob.round.RoundState == BlockVoteState {
+		MyMsg, has := ob.round.RoundVoteAckMessageMap[ob.myPublicHash]
+		if !has {
+			return nil
+		}
+		nm := &RoundVoteAckMessage{
+			RoundVoteAck: &RoundVoteAck{
+				LastHash:             MyMsg.RoundVoteAck.LastHash,
+				TargetHeight:         MyMsg.RoundVoteAck.TargetHeight,
+				TimeoutCount:         MyMsg.RoundVoteAck.TimeoutCount,
+				Formulator:           MyMsg.RoundVoteAck.Formulator,
+				FormulatorPublicHash: MyMsg.RoundVoteAck.FormulatorPublicHash,
+				PublicHash:           MyMsg.RoundVoteAck.PublicHash,
+				Timestamp:            MyMsg.RoundVoteAck.Timestamp,
+				IsReply:              true,
+			},
+		}
+		cp := ob.cs.cn.Provider()
+		TargetHeight := cp.Height() + 1
+		if MyMsg.RoundVoteAck.TargetHeight != TargetHeight {
+			nm.RoundVoteAck.TimeoutCount = 0
+			nm.RoundVoteAck.TargetHeight = TargetHeight
+			nm.RoundVoteAck.LastHash = cp.LastHash()
+			nm.RoundVoteAck.Timestamp = uint64(time.Now().UnixNano())
+		}
 
-	if sig, err := ob.key.Sign(encoding.Hash(nm.RoundVoteAck)); err != nil {
-		return err
+		if sig, err := ob.key.Sign(encoding.Hash(nm.RoundVoteAck)); err != nil {
+			return err
+		} else {
+			nm.Signature = sig
+		}
+
+		ob.ms.SendTo(TargetPubHash, nm)
 	} else {
-		nm.Signature = sig
-	}
+		MyMsg, has := ob.round.RoundVoteAckMessageMap[ob.myPublicHash]
+		if !has {
+			return nil
+		}
+		nm := &RoundVoteAckMessage{
+			RoundVoteAck: &RoundVoteAck{
+				LastHash:             MyMsg.RoundVoteAck.LastHash,
+				TargetHeight:         MyMsg.RoundVoteAck.TargetHeight,
+				TimeoutCount:         MyMsg.RoundVoteAck.TimeoutCount,
+				Formulator:           MyMsg.RoundVoteAck.Formulator,
+				FormulatorPublicHash: MyMsg.RoundVoteAck.FormulatorPublicHash,
+				PublicHash:           MyMsg.RoundVoteAck.PublicHash,
+				Timestamp:            MyMsg.RoundVoteAck.Timestamp,
+				IsReply:              true,
+			},
+		}
 
-	ob.ms.SendTo(TargetPubHash, nm)
+		if sig, err := ob.key.Sign(encoding.Hash(nm.RoundVoteAck)); err != nil {
+			return err
+		} else {
+			nm.Signature = sig
+		}
+
+		ob.ms.SendTo(TargetPubHash, nm)
+	}
 	return nil
 }
 
