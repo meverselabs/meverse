@@ -7,13 +7,14 @@ import (
 
 // RequestExpireHandler handles a request expire event
 type RequestExpireHandler interface {
-	OnTimerExpired(height uint32, value interface{})
+	OnTimerExpired(height uint32, value string)
 }
 
 // RequestTimer triggers a event when a request is expired
 type RequestTimer struct {
 	sync.Mutex
 	timerMap map[uint32]*requestTimerItem
+	valueMap map[string]map[uint32]bool
 	handler  RequestExpireHandler
 }
 
@@ -21,6 +22,7 @@ type RequestTimer struct {
 func NewRequestTimer(handler RequestExpireHandler) *RequestTimer {
 	rm := &RequestTimer{
 		timerMap: map[uint32]*requestTimerItem{},
+		valueMap: map[string]map[uint32]bool{},
 		handler:  handler,
 	}
 	return rm
@@ -36,7 +38,7 @@ func (rm *RequestTimer) Exist(height uint32) bool {
 }
 
 // Add adds the timer of the request
-func (rm *RequestTimer) Add(height uint32, t time.Duration, value interface{}) {
+func (rm *RequestTimer) Add(height uint32, t time.Duration, value string) {
 	rm.Lock()
 	defer rm.Unlock()
 
@@ -45,14 +47,26 @@ func (rm *RequestTimer) Add(height uint32, t time.Duration, value interface{}) {
 		ExpiredAt: uint64(time.Now().UnixNano()) + uint64(t),
 		Value:     value,
 	}
+	heightMap, has := rm.valueMap[value]
+	if !has {
+		heightMap = map[uint32]bool{}
+		rm.valueMap[value] = heightMap
+	}
+	heightMap[height] = true
 }
 
-// Remove removes the timer of the request
-func (rm *RequestTimer) Remove(height uint32) {
+// RemovesByValue removes requests by the value
+func (rm *RequestTimer) RemovesByValue(value string) {
 	rm.Lock()
 	defer rm.Unlock()
 
-	delete(rm.timerMap, height)
+	heightMap, has := rm.valueMap[value]
+	if has {
+		for height := range heightMap {
+			delete(rm.timerMap, height)
+		}
+	}
+	delete(rm.valueMap, value)
 }
 
 // Run is the main loop of RequestTimer
@@ -68,6 +82,14 @@ func (rm *RequestTimer) Run() {
 			for h, v := range rm.timerMap {
 				if v.ExpiredAt <= now {
 					expired = append(expired, v)
+
+					heightMap, has := rm.valueMap[v.Value]
+					if has {
+						delete(heightMap, v.Height)
+					}
+					if len(heightMap) == 0 {
+						delete(rm.valueMap, v.Value)
+					}
 				} else {
 					remainMap[h] = v
 				}
@@ -80,6 +102,7 @@ func (rm *RequestTimer) Run() {
 					rm.handler.OnTimerExpired(v.Height, v.Value)
 				}
 			}
+
 			timer.Reset(100 * time.Millisecond)
 		}
 	}
@@ -88,5 +111,5 @@ func (rm *RequestTimer) Run() {
 type requestTimerItem struct {
 	Height    uint32
 	ExpiredAt uint64
-	Value     interface{}
+	Value     string
 }
