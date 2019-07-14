@@ -120,7 +120,7 @@ func (nd *Node) Run(BindAddress string) {
 			for {
 				select {
 				case item := <-(*pMsgCh):
-					if err := nd.AddTx(item.Message.Tx, item.Message.Sigs); err != nil {
+					if err := nd.addTx(item.Message.TxType, item.Message.Tx, item.Message.Sigs); err != nil {
 						if err != txpool.ErrPastSeq || err != txpool.ErrTooFarSeq {
 							(*item.ErrCh) <- err
 						} else {
@@ -287,14 +287,25 @@ func (nd *Node) addBlock(b *types.Block) error {
 
 // AddTx adds tx to txpool that only have valid signatures
 func (nd *Node) AddTx(tx types.Transaction, sigs []common.Signature) error {
-	if nd.txpool.Size() > 65535 {
-		return txpool.ErrTransactionPoolOverflowed
-	}
-
 	fc := encoding.Factory("transaction")
 	t, err := fc.TypeOf(tx)
 	if err != nil {
 		return err
+	}
+	if err := nd.addTx(t, tx, sigs); err != nil {
+		return err
+	}
+	nd.ms.ExceptCastLimit("", &TransactionMessage{
+		TxType: t,
+		Tx:     tx,
+		Sigs:   sigs,
+	}, 7)
+	return nil
+}
+
+func (nd *Node) addTx(t uint16, tx types.Transaction, sigs []common.Signature) error {
+	if nd.txpool.Size() > 65535 {
+		return txpool.ErrTransactionPoolOverflowed
 	}
 
 	TxHash := chain.HashTransactionByType(t, tx)

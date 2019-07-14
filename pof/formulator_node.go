@@ -138,7 +138,7 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 			for {
 				select {
 				case item := <-(*pMsgCh):
-					if err := fr.AddTx(item.Message.Tx, item.Message.Sigs); err != nil {
+					if err := fr.addTx(item.Message.TxType, item.Message.Tx, item.Message.Sigs); err != nil {
 						if err != txpool.ErrPastSeq || err != txpool.ErrTooFarSeq {
 							(*item.ErrCh) <- err
 						} else {
@@ -186,14 +186,25 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 
 // AddTx adds tx to txpool that only have valid signatures
 func (fr *FormulatorNode) AddTx(tx types.Transaction, sigs []common.Signature) error {
-	if fr.txpool.Size() > 65535 {
-		return txpool.ErrTransactionPoolOverflowed
-	}
-
 	fc := encoding.Factory("transaction")
 	t, err := fc.TypeOf(tx)
 	if err != nil {
 		return err
+	}
+	if err := fr.addTx(t, tx, sigs); err != nil {
+		return err
+	}
+	fr.nm.ExceptCastLimit("", &p2p.TransactionMessage{
+		TxType: t,
+		Tx:     tx,
+		Sigs:   sigs,
+	}, 7)
+	return nil
+}
+
+func (fr *FormulatorNode) addTx(t uint16, tx types.Transaction, sigs []common.Signature) error {
+	if fr.txpool.Size() > 65535 {
+		return txpool.ErrTransactionPoolOverflowed
 	}
 
 	TxHash := chain.HashTransactionByType(t, tx)
