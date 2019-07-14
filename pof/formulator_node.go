@@ -481,7 +481,9 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 				case <-timer.C:
 					break TxLoop
 				default:
+					sn := ctx.Snapshot()
 					item := fr.txpool.UnsafePop(ctx)
+					ctx.Revert(sn)
 					if item == nil {
 						break TxLoop
 					}
@@ -520,6 +522,8 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 			fr.lastGenMessages = append(fr.lastGenMessages, nm)
 			fr.lastContextes = append(fr.lastContextes, ctx)
 			fr.lastGenHeight = ctx.TargetHeight()
+
+			log.Println(ctx.Dump())
 
 			ExpectedTime := time.Duration(i+1) * 200 * time.Millisecond
 			PastTime := time.Duration(time.Now().UnixNano() - start)
