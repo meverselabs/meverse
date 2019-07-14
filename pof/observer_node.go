@@ -980,7 +980,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 					if diff > 500*time.Millisecond {
 						diff = 500 * time.Millisecond
 					}
-					//time.Sleep(diff)
+					time.Sleep(diff)
 				}
 
 				ob.round.RoundState = BlockWaitState
