@@ -392,6 +392,14 @@ func addHyperFormulator(sp *vault.Vault, ctw *types.ContextWrapper, hyperPolicy 
 		KeyHash:        KeyHash,
 		GenHash:        GenHash,
 		Amount:         hyperPolicy.HyperCreationAmount,
+		UpdatedHeight:  0,
+		StakingAmount:  amount.NewCoinAmount(0, 0),
+		Policy: &formulator.ValidatorPolicy{
+			AutoStakingSelf:     false,
+			CommissionRatio1000: 60,
+			MinimumStaking:      amount.NewCoinAmount(100, 0),
+			PayOutInterval:      3,
+		},
 	}
 	if err := ctw.CreateAccount(acc); err != nil {
 		panic(err)
