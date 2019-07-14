@@ -691,6 +691,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 		//[check round]
 		br, has := ob.round.BlockRoundMap[msg.BlockVote.Header.Height]
 		if !has {
+			log.Println(encoding.Hash(msg.BlockVote.Header), "br, has := ob.round.BlockRoundMap[msg.BlockVote.Header.Height]")
 			return ErrInvalidVote
 		}
 		TimeoutCount, err := ob.cs.decodeConsensusData(msg.BlockVote.Header.ConsensusData)
@@ -702,6 +703,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 			return err
 		}
 		if msg.BlockVote.Header.Generator != Top.Address {
+			log.Println(encoding.Hash(msg.BlockVote.Header), "if msg.BlockVote.Header.Generator != Top.Address {")
 			return ErrInvalidVote
 		}
 		bh := encoding.Hash(msg.BlockVote.Header)
@@ -711,6 +713,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 		}
 		Signer := common.NewPublicHash(pubkey)
 		if Signer != Top.PublicHash {
+			log.Println(encoding.Hash(msg.BlockVote.Header), "if Signer != Top.PublicHash {")
 			return ErrInvalidTopSignature
 		}
 		if msg.BlockVote.Header.Height != ob.round.TargetHeight {
@@ -721,6 +724,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 					br.BlockVoteMessageWaitMap[SenderPublicHash] = msg
 				}
 			}
+			log.Println(encoding.Hash(msg.BlockVote.Header), "if msg.BlockVote.Header.Height != ob.round.TargetHeight {")
 			return ErrInvalidVote
 		}
 
@@ -735,15 +739,19 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 					br.BlockVoteMessageWaitMap[SenderPublicHash] = msg
 				}
 			}
+			log.Println(encoding.Hash(msg.BlockVote.Header), "if ob.round.RoundState != BlockVoteState {")
 			return ErrInvalidVote
 		}
 		if msg.BlockVote.Header.Generator != ob.round.MinRoundVoteAck.Formulator {
+			log.Println(encoding.Hash(msg.BlockVote.Header), "if msg.BlockVote.Header.Generator != ob.round.MinRoundVoteAck.Formulator {")
 			return ErrInvalidVote
 		}
 		if Signer != ob.round.MinRoundVoteAck.FormulatorPublicHash {
+			log.Println(encoding.Hash(msg.BlockVote.Header), "if Signer != ob.round.MinRoundVoteAck.FormulatorPublicHash {")
 			return ErrInvalidVote
 		}
 		if msg.BlockVote.Header.PrevHash != cp.LastHash() {
+			log.Println(encoding.Hash(msg.BlockVote.Header), "if msg.BlockVote.Header.PrevHash != cp.LastHash() {")
 			return ErrInvalidVote
 		}
 
@@ -753,16 +761,15 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 		}
 		if pubkey, err := common.RecoverPubkey(encoding.Hash(s), msg.BlockVote.ObserverSignature); err != nil {
 			return err
-		} else {
-			if SenderPublicHash != common.NewPublicHash(pubkey) {
-				return ErrInvalidVote
-			}
+		} else if SenderPublicHash != common.NewPublicHash(pubkey) {
+			return ErrInvalidVote
 		}
 
 		if _, has := br.BlockVoteMap[SenderPublicHash]; has {
 			if !msg.BlockVote.IsReply {
 				ob.sendBlockVoteTo(br.BlockGenMessage, SenderPublicHash)
 			}
+			log.Println(encoding.Hash(msg.BlockVote.Header), "if _, has := br.BlockVoteMap[SenderPublicHash]; has {", len(br.BlockVoteMap))
 			return ErrAlreadyVoted
 		}
 		br.BlockVoteMap[SenderPublicHash] = msg.BlockVote
