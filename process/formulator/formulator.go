@@ -239,7 +239,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 				return err
 			}
 		}
-		if true {
+		if !RewardPowerSum.IsZero() {
 			TotalReward := policy.RewardPerBlock.MulC(int64(ctw.TargetHeight() - lastPaidHeight))
 			Ratio := TotalReward.Mul(amount.COIN).Div(RewardPowerSum)
 			for RewardAddress, RewardPower := range RewardPowerMap {
@@ -295,36 +295,37 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 						StakingPowerSum = StakingPowerSum.Add(StakingPower)
 						return true
 					})
-
-					CommissionSum := amount.NewCoinAmount(0, 0)
-					var inErr error
-					Ratio := StackReward.Mul(amount.COIN).Div(StakingPowerSum)
-					StakingPowerMap.EachAll(func(StakingAddress common.Address, StakingPower *amount.Amount) bool {
-						RewardAmount := StakingPower.Mul(Ratio).Div(amount.COIN)
-						if !RewardAmount.IsZero() {
-							Commission := RewardAmount.MulC(int64(frAcc.Policy.CommissionRatio1000)).DivC(1000)
-							CommissionSum = CommissionSum.Add(Commission)
-							RewardAmount = RewardAmount.Sub(Commission)
-							if p.getUserAutoStaking(ctw, frAcc.Address(), StakingAddress) {
-								p.addStakingAmount(ctw, frAcc.Address(), StakingAddress, RewardAmount)
-							} else {
-								if err := p.vault.AddBalance(ctw, StakingAddress, RewardAmount); err != nil {
-									inErr = err
-									return false
+					if !StakingPowerSum.IsZero() {
+						CommissionSum := amount.NewCoinAmount(0, 0)
+						var inErr error
+						Ratio := StackReward.Mul(amount.COIN).Div(StakingPowerSum)
+						StakingPowerMap.EachAll(func(StakingAddress common.Address, StakingPower *amount.Amount) bool {
+							RewardAmount := StakingPower.Mul(Ratio).Div(amount.COIN)
+							if !RewardAmount.IsZero() {
+								Commission := RewardAmount.MulC(int64(frAcc.Policy.CommissionRatio1000)).DivC(1000)
+								CommissionSum = CommissionSum.Add(Commission)
+								RewardAmount = RewardAmount.Sub(Commission)
+								if p.getUserAutoStaking(ctw, frAcc.Address(), StakingAddress) {
+									p.addStakingAmount(ctw, frAcc.Address(), StakingAddress, RewardAmount)
+								} else {
+									if err := p.vault.AddBalance(ctw, StakingAddress, RewardAmount); err != nil {
+										inErr = err
+										return false
+									}
 								}
 							}
+							return true
+						})
+						if inErr != nil {
+							return inErr
 						}
-						return true
-					})
-					if inErr != nil {
-						return inErr
-					}
 
-					if frAcc.Policy.AutoStakingSelf {
-						frAcc.Amount = frAcc.Amount.Add(CommissionSum)
-					} else {
-						if err := p.vault.AddBalance(ctw, frAcc.Address(), CommissionSum); err != nil {
-							return err
+						if frAcc.Policy.AutoStakingSelf {
+							frAcc.Amount = frAcc.Amount.Add(CommissionSum)
+						} else {
+							if err := p.vault.AddBalance(ctw, frAcc.Address(), CommissionSum); err != nil {
+								return err
+							}
 						}
 					}
 
