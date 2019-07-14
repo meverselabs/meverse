@@ -54,7 +54,7 @@ func ParseHash(str string) (Hash256, error) {
 func MustParseHash(str string) Hash256 {
 	h, err := ParseHash(str)
 	if err != nil {
-		//panic(err)
+		panic(err)
 	}
 	return h
 }
