@@ -1,8 +1,6 @@
 package formulator
 
 import (
-	"log"
-
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
 	"github.com/fletaio/fleta/core/types"
@@ -131,18 +129,6 @@ func (p *Formulator) BeforeExecuteTransactions(ctw *types.ContextWrapper) error 
 func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.ContextWrapper) error {
 	p.addGenCount(ctw, b.Header.Generator)
 
-	if true {
-		CountMap, err := p.getGenCountMap(ctw)
-		if err != nil {
-			return err
-		}
-		log.Println("-----")
-		for GenAddress, GenCount := range CountMap {
-			log.Println(GenAddress.String(), GenCount)
-		}
-		log.Println("-----")
-	}
-
 	policy := &RewardPolicy{}
 	if err := encoding.Unmarshal(ctw.ProcessData(tagRewardPolicy), &policy); err != nil {
 		return err
@@ -161,7 +147,6 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 		Hypers := []*FormulatorAccount{}
 		for GenAddress, GenCount := range CountMap {
 			p.removeGenCount(ctw, GenAddress)
-			log.Println(GenAddress.String(), GenCount)
 
 			acc, err := ctw.Account(GenAddress)
 			if err != nil {

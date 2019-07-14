@@ -488,8 +488,6 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 				nm.GeneratorSignature = sig
 			}
 
-			log.Println(ctx.Dump())
-
 			if err := p.Send(nm); err != nil {
 				return err
 			}

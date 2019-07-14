@@ -742,47 +742,6 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 		}
 		if msg.Block.Header.ContextHash != ctx.Hash() {
 			log.Println(msg.Block.Header.Generator.String(), "if msg.Block.Header.ContextHash != ctx.Hash() {")
-			to, _ := ob.cs.DecodeConsensusData(msg.Block.Header.ConsensusData)
-			log.Println(
-				msg.Block.Header.Version,
-				msg.Block.Header.Height,
-				msg.Block.Header.PrevHash.String(),
-				msg.Block.Header.LevelRootHash.String(),
-				msg.Block.Header.ContextHash.String(),
-				msg.Block.Header.Timestamp,
-				msg.Block.Header.Generator.String(),
-				to,
-			)
-			log.Println(ctx.Hash())
-			log.Println(ctx.Dump())
-
-			var buffer bytes.Buffer
-			enc := encoding.NewEncoder(&buffer)
-			if err := enc.EncodeUint32(TimeoutCount); err != nil {
-				return err
-			}
-			ctx2 := ob.cs.cn.NewContext()
-			bc := chain.NewBlockCreator(ob.cs.cn, ctx2, ob.round.MinRoundVoteAck.Formulator, buffer.Bytes())
-			if err := bc.Init(); err != nil {
-				return err
-			}
-			b, err := bc.Finalize(msg.Block.Header.Timestamp)
-			if err != nil {
-				return err
-			}
-			log.Println(
-				b.Header.Version,
-				b.Header.Height,
-				b.Header.PrevHash.String(),
-				b.Header.LevelRootHash.String(),
-				b.Header.ContextHash.String(),
-				b.Header.Timestamp,
-				b.Header.Generator.String(),
-				to,
-			)
-			log.Println(ctx2.Hash())
-			log.Println(ctx2.Dump())
-
 			return chain.ErrInvalidContextHash
 		}
 
