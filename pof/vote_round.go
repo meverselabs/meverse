@@ -40,14 +40,13 @@ func NewVoteRound(TargetHeight uint32, MaxBlocksPerFormulator uint32) *VoteRound
 		BlockRoundMap:              map[uint32]*BlockRound{},
 	}
 	for i := TargetHeight; i < TargetHeight+MaxBlocksPerFormulator; i++ {
-		vr.BlockRoundMap[i] = NewBlockRound(i)
+		vr.BlockRoundMap[i] = NewBlockRound()
 	}
 	return vr
 }
 
 // BlockRound is data for the block round
 type BlockRound struct {
-	TargetHeight            uint32
 	BlockVoteMap            map[common.PublicHash]*BlockVote
 	BlockGenMessage         *BlockGenMessage
 	Context                 *types.Context
@@ -56,9 +55,8 @@ type BlockRound struct {
 }
 
 // NewBlockRound returns a VoteRound
-func NewBlockRound(TargetHeight uint32) *BlockRound {
+func NewBlockRound() *BlockRound {
 	vr := &BlockRound{
-		TargetHeight:            TargetHeight,
 		BlockVoteMap:            map[common.PublicHash]*BlockVote{},
 		BlockVoteMessageWaitMap: map[common.PublicHash]*BlockVoteMessage{},
 	}
