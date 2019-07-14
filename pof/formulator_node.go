@@ -144,13 +144,8 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 						break
 					}
 					(*item.ErrCh) <- nil
-					if len(item.PeerID) > 0 {
-						//fr.pm.ExceptCast(item.PeerID, item.Message)
-						//fr.pm.ExceptCastLimit(item.PeerID, item.Message, 7)
-					} else {
-						//fr.pm.BroadCast(item.Message)
-						//fr.pm.BroadCastLimit(item.Message, 7)
-					}
+
+					fr.nm.ExceptCastLimit(item.PeerID, item.Message, 7)
 				case <-(*pEndCh):
 					return
 				}

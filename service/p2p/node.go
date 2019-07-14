@@ -129,13 +129,8 @@ func (nd *Node) Run(BindAddress string) {
 						break
 					}
 					(*item.ErrCh) <- nil
-					if len(item.PeerID) > 0 {
-						//nd.pm.ExceptCast(item.PeerID, item.Message)
-						//nd.pm.ExceptCastLimit(item.PeerID, item.Message, 7)
-					} else {
-						//nd.pm.BroadCast(item.Message)
-						//nd.pm.BroadCastLimit(item.Message, 7)
-					}
+
+					nd.ms.ExceptCastLimit(item.PeerID, item.Message, 7)
 				case <-(*pEndCh):
 					return
 				}
