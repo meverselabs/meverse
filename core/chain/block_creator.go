@@ -51,10 +51,14 @@ func (bc *BlockCreator) Init() error {
 	for i, p := range bc.cn.processes {
 		if err := p.BeforeExecuteTransactions(types.NewContextWrapper(IDMap[i], bc.ctx)); err != nil {
 			return err
+		} else if bc.ctx.StackSize() > 1 {
+			return ErrDirtyContext
 		}
 	}
 	if err := bc.cn.app.BeforeExecuteTransactions(types.NewContextWrapper(255, bc.ctx)); err != nil {
 		return err
+	} else if bc.ctx.StackSize() > 1 {
+		return ErrDirtyContext
 	}
 	return nil
 }
@@ -79,12 +83,13 @@ func (bc *BlockCreator) AddTx(tx types.Transaction, sigs []common.Signature) err
 
 // UnsafeAddTx adds transactions without signer validation if signers is not empty
 func (bc *BlockCreator) UnsafeAddTx(t uint16, TxHsah hash.Hash256, tx types.Transaction, sigs []common.Signature, signers []common.PublicHash) error {
-	ctw := types.NewContextWrapper(uint8(t>>8), bc.ctx)
 	pid := uint8(t >> 8)
 	p, err := bc.cn.Process(pid)
 	if err != nil {
 		return err
 	}
+	ctw := types.NewContextWrapper(pid, bc.ctx)
+
 	sn := ctw.Snapshot()
 	if err := tx.Validate(p, ctw, signers); err != nil {
 		ctw.Revert(sn)
@@ -116,17 +121,21 @@ func (bc *BlockCreator) Finalize(Timestamp uint64) (*types.Block, error) {
 	}
 	bc.b.Header.LevelRootHash = LevelRootHash
 
+	if bc.ctx.StackSize() > 1 {
+		return nil, ErrDirtyContext
+	}
+
 	// AfterExecuteTransactions
 	for i, p := range bc.cn.processes {
 		if err := p.AfterExecuteTransactions(bc.b, types.NewContextWrapper(IDMap[i], bc.ctx)); err != nil {
 			return nil, err
+		} else if bc.ctx.StackSize() > 1 {
+			return nil, ErrDirtyContext
 		}
 	}
 	if err := bc.cn.app.AfterExecuteTransactions(bc.b, types.NewContextWrapper(255, bc.ctx)); err != nil {
 		return nil, err
-	}
-
-	if bc.ctx.StackSize() > 1 {
+	} else if bc.ctx.StackSize() > 1 {
 		return nil, ErrDirtyContext
 	}
 

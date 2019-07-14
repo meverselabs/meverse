@@ -344,15 +344,6 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 		p.setLastPaidHeight(ctw, ctw.TargetHeight())
 	}
 	return nil
-
-	/*
-		Validator는 정산 시 본인 비율에 대한 부분을 자동 스테이킹 시 스테이킹에, 아닐 시 계좌에 수령
-		Validator는 정산 시 스테이킹 비율에 대한 부분을 내부에 축적
-		Validator 설정 값에 따른 정산 주기에 보상 대기 파워에 따라 Deligator에게 정산 처리
-		Deligator에 정산 시 자동 스테이킹 시 스테이킹에, 아닐 시 계좌에 수령
-	*/
-
-	return nil
 }
 
 // OnSaveData called when the context of the block saved

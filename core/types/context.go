@@ -47,6 +47,7 @@ func (ctx *Context) Version() uint16 {
 
 // NextContext returns the next Context of the Context
 func (ctx *Context) NextContext(NextHash hash.Hash256, Timestamp uint64) *Context {
+	ctx.Top().isTop = false
 	nctx := NewContext(ctx)
 	nctx.genTargetHeight = ctx.genTargetHeight + 1
 	nctx.genLastHash = NextHash
@@ -276,6 +277,7 @@ func (ctx *Context) Commit(sn int) {
 			return true
 		})
 	}
+	ctx.stack[len(ctx.stack)-1].isTop = true
 }
 
 // StackSize returns the size of the context data stack

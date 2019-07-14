@@ -268,22 +268,29 @@ func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context) err
 		return ErrInvalidContextHash
 	}
 
+	if ctx.StackSize() > 1 {
+		return ErrDirtyContext
+	}
+
 	// OnSaveData
 	for i, p := range cn.processes {
 		if err := p.OnSaveData(b, types.NewContextWrapper(IDMap[i], ctx)); err != nil {
 			return err
+		} else if ctx.StackSize() > 1 {
+			return ErrDirtyContext
 		}
 	}
 	if err := cn.app.OnSaveData(b, types.NewContextWrapper(255, ctx)); err != nil {
 		return err
+	} else if ctx.StackSize() > 1 {
+		return ErrDirtyContext
 	}
 	if err := cn.consensus.OnSaveData(b, types.NewContextWrapper(0, ctx)); err != nil {
 		return err
-	}
-
-	if ctx.StackSize() > 1 {
+	} else if ctx.StackSize() > 1 {
 		return ErrDirtyContext
 	}
+
 	top := ctx.Top()
 	if err := cn.store.StoreBlock(b, top); err != nil {
 		return err
@@ -297,7 +304,7 @@ func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context) err
 }
 
 func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error {
-	TxSigners, err := cn.validateTransactionSignatures(b, ctx)
+	TxSigners, err := cn.validateTransactionSignatures(b)
 	if err != nil {
 		return err
 	}
@@ -310,10 +317,14 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 	for i, p := range cn.processes {
 		if err := p.BeforeExecuteTransactions(types.NewContextWrapper(IDMap[i], ctx)); err != nil {
 			return err
+		} else if ctx.StackSize() > 1 {
+			return ErrDirtyContext
 		}
 	}
 	if err := cn.app.BeforeExecuteTransactions(types.NewContextWrapper(255, ctx)); err != nil {
 		return err
+	} else if ctx.StackSize() > 1 {
+		return ErrDirtyContext
 	}
 
 	// Execute Transctions
@@ -328,7 +339,7 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 		ctw := types.NewContextWrapper(pid, ctx)
 
 		sn := ctw.Snapshot()
-		if err := tx.Validate(p, types.NewContextWrapper(uint8(t>>8), ctx), signers); err != nil {
+		if err := tx.Validate(p, ctw, signers); err != nil {
 			ctw.Revert(sn)
 			return err
 		}
@@ -339,15 +350,24 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 		ctw.Commit(sn)
 	}
 
+	if ctx.StackSize() > 1 {
+		return ErrDirtyContext
+	}
+
 	// AfterExecuteTransactions
 	for i, p := range cn.processes {
 		if err := p.AfterExecuteTransactions(b, types.NewContextWrapper(IDMap[i], ctx)); err != nil {
 			return err
+		} else if ctx.StackSize() > 1 {
+			return ErrDirtyContext
 		}
 	}
 	if err := cn.app.AfterExecuteTransactions(b, types.NewContextWrapper(255, ctx)); err != nil {
 		return err
+	} else if ctx.StackSize() > 1 {
+		return ErrDirtyContext
 	}
+
 	return nil
 }
 
@@ -386,7 +406,7 @@ func (cn *Chain) validateHeader(bh *types.Header) error {
 	return nil
 }
 
-func (cn *Chain) validateTransactionSignatures(b *types.Block, ctx *types.Context) ([][]common.PublicHash, error) {
+func (cn *Chain) validateTransactionSignatures(b *types.Block) ([][]common.PublicHash, error) {
 	var wg sync.WaitGroup
 	cpuCnt := runtime.NumCPU()
 	if len(b.Transactions) < 1000 {
