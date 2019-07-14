@@ -636,7 +636,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 		idx := atomic.AddUint64(&fr.txMsgIdx, 1) % uint64(len(fr.txMsgChans))
 		(*fr.txMsgChans[idx]) <- &p2p.TxMsgItem{
 			Message: msg,
-			PeerID:  "",
+			PeerID:  p.ID(),
 			ErrCh:   &errCh,
 		}
 		err := <-errCh

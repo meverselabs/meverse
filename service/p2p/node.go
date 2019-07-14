@@ -241,7 +241,7 @@ func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
 		idx := atomic.AddUint64(&nd.txMsgIdx, 1) % uint64(len(nd.txMsgChans))
 		(*nd.txMsgChans[idx]) <- &TxMsgItem{
 			Message: msg,
-			PeerID:  "",
+			PeerID:  p.ID(),
 			ErrCh:   &errCh,
 		}
 		err := <-errCh
