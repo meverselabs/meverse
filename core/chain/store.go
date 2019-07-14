@@ -515,7 +515,9 @@ func (st *Store) AccountDataKeys(addr common.Address, pid uint8, Prefix []byte) 
 		for it.Seek(pre); it.ValidForPrefix(pre); it.Next() {
 			item := it.Item()
 			key := item.Key()
-			list = append(list, key[len(preTag):])
+			bs := make([]byte, len(key)-len(preTag))
+			copy(bs, key[len(preTag):])
+			list = append(list, bs)
 		}
 		return nil
 	}); err != nil {
@@ -673,7 +675,9 @@ func (st *Store) ProcessDataKeys(pid uint8, Prefix []byte) ([][]byte, error) {
 		for it.Seek(pre); it.ValidForPrefix(pre); it.Next() {
 			item := it.Item()
 			key := item.Key()
-			list = append(list, key[len(preTag):])
+			bs := make([]byte, len(key)-len(preTag))
+			copy(bs, key[len(preTag):])
+			list = append(list, bs)
 		}
 		return nil
 	}); err != nil {
