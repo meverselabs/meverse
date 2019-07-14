@@ -333,6 +333,19 @@ func (fr *FormulatorNode) OnRecv(p peer.Peer, m interface{}) error {
 		if err := fr.addBlock(msg.Block); err != nil {
 			return err
 		}
+	case *p2p.TransactionMessage:
+		errCh := make(chan error)
+		idx := atomic.AddUint64(&fr.txMsgIdx, 1) % uint64(len(fr.txMsgChans))
+		(*fr.txMsgChans[idx]) <- &p2p.TxMsgItem{
+			Message: msg,
+			PeerID:  p.ID(),
+			ErrCh:   &errCh,
+		}
+		err := <-errCh
+		if err != p2p.ErrInvalidUTXO && err != txpool.ErrExistTransaction {
+			return err
+		}
+		return nil
 	case *p2p.PeerListMessage:
 		fr.nm.AddPeerList(msg.Ips, msg.Hashs)
 		return nil
