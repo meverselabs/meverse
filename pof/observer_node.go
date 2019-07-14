@@ -957,7 +957,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 			if h != msg.LastHash {
 				//TODO : critical error signal
 				log.Println(SenderPublicHash.String(), h.String(), msg.LastHash.String(), msg.Height)
-				panic(chain.ErrFoundForkedBlock)
+				panic(chain.ErrFoundForkedBlock) //TEMP
 			}
 		}
 	case *p2p.BlockMessage:
@@ -965,7 +965,6 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 			return err
 		}
 	default:
-		panic(p2p.ErrUnknownMessage) //TEMP
 		return p2p.ErrUnknownMessage
 	}
 	return nil

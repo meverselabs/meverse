@@ -257,8 +257,7 @@ func (fr *FormulatorNode) OnTimerExpired(height uint32, value string) {
 // OnItemExpired is called when the item is expired
 func (fr *FormulatorNode) OnItemExpired(Interval time.Duration, Key string, Item interface{}, IsLast bool) {
 	msg := Item.(*p2p.TransactionMessage)
-	fr.ms.BroadcastMessage(msg)
-	fr.nm.BroadcastMessage(msg)
+	fr.nm.ExceptCastLimit("", msg, 7)
 	if IsLast {
 		var TxHash hash.Hash256
 		copy(TxHash[:], []byte(Key))
@@ -522,8 +521,6 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 			fr.lastGenMessages = append(fr.lastGenMessages, nm)
 			fr.lastContextes = append(fr.lastContextes, ctx)
 			fr.lastGenHeight = ctx.TargetHeight()
-
-			log.Println(ctx.Dump())
 
 			ExpectedTime := time.Duration(i+1) * 200 * time.Millisecond
 			PastTime := time.Duration(time.Now().UnixNano() - start)
