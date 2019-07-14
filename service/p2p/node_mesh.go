@@ -18,6 +18,8 @@ import (
 )
 
 type Handler interface {
+	OnConnected(p peer.Peer)
+	OnDisconnected(p peer.Peer)
 	OnRecv(p peer.Peer, m interface{}) error
 }
 
@@ -380,6 +382,9 @@ func (ms *NodeMesh) server(BindAddress string) error {
 
 func (ms *NodeMesh) handleConnection(p peer.Peer) error {
 	// log.Println("Node", common.NewPublicHash(ms.key.PublicKey()).String(), "Node Connected", p.Name())
+
+	ms.handler.OnConnected(p)
+	defer ms.handler.OnDisconnected(p)
 
 	var pingCount uint64
 	pingCountLimit := uint64(3)

@@ -165,17 +165,30 @@ func (nd *Node) Run(BindAddress string) {
 }
 
 // OnTimerExpired called when rquest expired
-func (nd *Node) OnTimerExpired(height uint32, value interface{}) {
-	TargetPublicHash := value.(common.PublicHash)
-	list := nd.ms.Peers()
-	for _, p := range list {
-		var pubhash common.PublicHash
-		copy(pubhash[:], []byte(p.ID()))
-		if pubhash != nd.myPublicHash && pubhash != TargetPublicHash {
-			nd.sendRequestBlockTo(pubhash, height)
-			break
+func (nd *Node) OnTimerExpired(height uint32, value string) {
+	if height > nd.cn.Provider().Height() {
+		var TargetPublicHash common.PublicHash
+		copy(TargetPublicHash[:], []byte(value))
+		list := nd.ms.Peers()
+		for _, p := range list {
+			var pubhash common.PublicHash
+			copy(pubhash[:], []byte(p.ID()))
+			if pubhash != nd.myPublicHash && pubhash != TargetPublicHash {
+				nd.sendRequestBlockTo(pubhash, height)
+				break
+			}
 		}
 	}
+}
+
+// OnConnected called when peer connected
+func (nd *Node) OnConnected(p peer.Peer) {
+
+}
+
+// OnDisconnected called when peer disconnected
+func (nd *Node) OnDisconnected(p peer.Peer) {
+	nd.requestTimer.RemovesByValue(p.ID())
 }
 
 // OnRecv called when message received
@@ -222,7 +235,6 @@ func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
 		if err := nd.addBlock(msg.Block); err != nil {
 			return err
 		}
-		nd.requestTimer.Remove(msg.Block.Header.Height)
 		return nil
 	case *TransactionMessage:
 		errCh := make(chan error)

@@ -62,29 +62,71 @@ func (ob *ObserverNode) sendRoundVoteTo(TargetPubHash common.PublicHash) error {
 		return nil
 	}
 
-	MyMsg, has := ob.round.RoundVoteMessageMap[ob.myPublicHash]
-	if !has {
-		return nil
-	}
-	nm := &RoundVoteMessage{
-		RoundVote: &RoundVote{
-			LastHash:             MyMsg.RoundVote.LastHash,
-			TargetHeight:         MyMsg.RoundVote.TargetHeight,
-			TimeoutCount:         MyMsg.RoundVote.TimeoutCount,
-			Formulator:           MyMsg.RoundVote.Formulator,
-			FormulatorPublicHash: MyMsg.RoundVote.FormulatorPublicHash,
-			Timestamp:            MyMsg.RoundVote.Timestamp,
-			IsReply:              true,
-		},
-	}
+	cp := ob.cs.cn.Provider()
+	if ob.round.RoundState == BlockVoteState {
+		MyMsg, has := ob.round.RoundVoteMessageMap[ob.myPublicHash]
+		if !has {
+			return nil
+		}
+		nm := &RoundVoteMessage{
+			RoundVote: &RoundVote{
+				LastHash:             MyMsg.RoundVote.LastHash,
+				TargetHeight:         MyMsg.RoundVote.TargetHeight,
+				TimeoutCount:         MyMsg.RoundVote.TimeoutCount,
+				Formulator:           MyMsg.RoundVote.Formulator,
+				FormulatorPublicHash: MyMsg.RoundVote.FormulatorPublicHash,
+				Timestamp:            MyMsg.RoundVote.Timestamp,
+				IsReply:              true,
+			},
+		}
+		TargetHeight := cp.Height() + 1
+		if MyMsg.RoundVote.TargetHeight != TargetHeight {
+			nm.RoundVote.TimeoutCount = 0
+			nm.RoundVote.TargetHeight = TargetHeight
+			nm.RoundVote.LastHash = cp.LastHash()
+			nm.RoundVote.Timestamp = uint64(time.Now().UnixNano())
+		}
 
-	if sig, err := ob.key.Sign(encoding.Hash(nm.RoundVote)); err != nil {
-		return err
+		if sig, err := ob.key.Sign(encoding.Hash(nm.RoundVote)); err != nil {
+			return err
+		} else {
+			nm.Signature = sig
+		}
+
+		ob.ms.SendTo(TargetPubHash, nm)
 	} else {
-		nm.Signature = sig
-	}
+		Top, TimeoutCount, err := ob.cs.rt.TopRankInMap(ob.adjustFormulatorMap())
+		if err != nil {
+			return err
+		}
 
-	ob.ms.SendTo(TargetPubHash, nm)
+		nm := &RoundVoteMessage{
+			RoundVote: &RoundVote{
+				LastHash:             cp.LastHash(),
+				TargetHeight:         cp.Height() + 1,
+				TimeoutCount:         uint32(TimeoutCount),
+				Formulator:           Top.Address,
+				FormulatorPublicHash: Top.PublicHash,
+				Timestamp:            uint64(time.Now().UnixNano()),
+				IsReply:              true,
+			},
+		}
+		if gh, err := ob.fs.GuessHeight(Top.Address); err != nil {
+			ob.fs.SendTo(Top.Address, &p2p.StatusMessage{
+				Version:  cp.Version(),
+				Height:   cp.Height(),
+				LastHash: cp.LastHash(),
+			})
+		} else if gh < cp.Height() {
+			ob.fs.SendTo(Top.Address, &p2p.StatusMessage{
+				Version:  cp.Version(),
+				Height:   cp.Height(),
+				LastHash: cp.LastHash(),
+			})
+		}
+
+		ob.ms.SendTo(TargetPubHash, nm)
+	}
 	return nil
 }
 
@@ -146,6 +188,35 @@ func (ob *ObserverNode) sendRoundVoteAckTo(TargetPubHash common.PublicHash) erro
 	}
 
 	ob.ms.SendTo(TargetPubHash, nm)
+	return nil
+}
+
+func (ob *ObserverNode) sendRoundSetup() error {
+	MinRoundVote := ob.round.RoundVoteMessageMap[ob.round.MinVotePublicHash].RoundVote
+	nm := &RoundSetupMessage{
+		MinRoundVoteAck: &RoundVoteAck{
+			LastHash:             MinRoundVote.LastHash,
+			TargetHeight:         MinRoundVote.TargetHeight,
+			TimeoutCount:         MinRoundVote.TimeoutCount,
+			Formulator:           MinRoundVote.Formulator,
+			FormulatorPublicHash: MinRoundVote.FormulatorPublicHash,
+			PublicHash:           ob.round.MinVotePublicHash,
+			Timestamp:            uint64(time.Now().UnixNano()),
+			IsReply:              false,
+		},
+	}
+	if sig, err := ob.key.Sign(encoding.Hash(nm.MinRoundVoteAck)); err != nil {
+		return err
+	} else {
+		nm.Signature = sig
+	}
+
+	ob.messageQueue.Push(&messageItem{
+		PublicHash: ob.myPublicHash,
+		Message:    nm,
+	})
+
+	ob.ms.BroadcastMessage(nm)
 	return nil
 }
 
@@ -259,6 +330,6 @@ func (ob *ObserverNode) sendRequestBlockTo(TargetPubHash common.PublicHash, Heig
 		Height: Height,
 	}
 	ob.ms.SendTo(TargetPubHash, nm)
-	ob.requestTimer.Add(Height, 2*time.Second, TargetPubHash)
+	ob.requestTimer.Add(Height, 2*time.Second, string(TargetPubHash[:]))
 	return nil
 }

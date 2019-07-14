@@ -44,6 +44,7 @@ type FormulatorNode struct {
 	txMsgIdx             uint64
 	statusMap            map[string]*p2p.Status
 	requestTimer         *p2p.RequestTimer
+	requestNodeTimer     *p2p.RequestTimer
 	requestLock          sync.RWMutex
 	blockQ               *queue.SortedQueue
 	txpool               *txpool.TransactionPool
@@ -65,6 +66,7 @@ func NewFormulatorNode(Config *FormulatorConfig, key key.Key, NetAddressMap map[
 		lastContextes:        []*types.Context{},
 		statusMap:            map[string]*p2p.Status{},
 		requestTimer:         p2p.NewRequestTimer(nil),
+		requestNodeTimer:     p2p.NewRequestTimer(nil),
 		blockQ:               queue.NewSortedQueue(),
 		txpool:               txpool.NewTransactionPool(),
 		txQ:                  queue.NewExpireQueue(),
@@ -119,6 +121,7 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 	go fr.ms.Run()
 	go fr.nm.Run(BindAddress)
 	go fr.requestTimer.Run()
+	go fr.requestNodeTimer.Run()
 
 	WorkerCount := runtime.NumCPU() - 1
 	if WorkerCount < 1 {
@@ -236,7 +239,7 @@ func (fr *FormulatorNode) AddTx(tx types.Transaction, sigs []common.Signature) e
 }
 
 // OnTimerExpired called when rquest expired
-func (fr *FormulatorNode) OnTimerExpired(height uint32, value interface{}) {
+func (fr *FormulatorNode) OnTimerExpired(height uint32, value string) {
 	go fr.tryRequestNext()
 }
 
@@ -264,6 +267,17 @@ func (fr *FormulatorNode) OnObserverDisconnected(p peer.Peer) {
 	fr.Lock()
 	delete(fr.statusMap, p.ID())
 	fr.Unlock()
+	fr.requestTimer.RemovesByValue(p.ID())
+	go fr.tryRequestNext()
+}
+
+// OnConnected is called after a new  peer is connected
+func (fr *FormulatorNode) OnConnected(p peer.Peer) {
+}
+
+// OnDisconnected is called when the  peer is disconnected
+func (fr *FormulatorNode) OnDisconnected(p peer.Peer) {
+	fr.requestNodeTimer.RemovesByValue(p.ID())
 }
 
 // OnRecv called when message received
@@ -289,7 +303,7 @@ func (fr *FormulatorNode) OnRecv(p peer.Peer, m interface{}) error {
 		Height := cp.Height()
 		if Height < msg.Height {
 			for i := Height + 1; i <= Height+100 && i <= msg.Height; i++ {
-				if !fr.requestTimer.Exist(i) {
+				if !fr.requestNodeTimer.Exist(i) {
 					fr.sendRequestBlockToNode(SenderPublicHash, i)
 				}
 			}
@@ -308,7 +322,6 @@ func (fr *FormulatorNode) OnRecv(p peer.Peer, m interface{}) error {
 		if err := fr.addBlock(msg.Block); err != nil {
 			return err
 		}
-		fr.requestTimer.Remove(msg.Block.Header.Height)
 	case *p2p.PeerListMessage:
 		fr.nm.AddPeerList(msg.Ips, msg.Hashs)
 		return nil
@@ -350,8 +363,14 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 			if RetryCount >= 40 {
 				return nil
 			}
+
+			sm := &p2p.RequestMessage{
+				Height: Height + 1,
+			}
+			if err := p.Send(sm); err != nil {
+				return err
+			}
 			go func() {
-				fr.tryRequestNext()
 				time.Sleep(50 * time.Millisecond)
 				fr.handleMessage(p, m, RetryCount+1)
 			}()
@@ -562,7 +581,6 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 		if err := fr.addBlock(msg.Block); err != nil {
 			return err
 		}
-		fr.requestTimer.Remove(msg.Block.Header.Height)
 
 		fr.Lock()
 		if status, has := fr.statusMap[p.ID()]; has {

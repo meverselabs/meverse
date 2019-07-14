@@ -41,6 +41,12 @@ type RoundVoteAckMessage struct {
 	Signature    common.Signature
 }
 
+// RoundSetupMessage is a message for a round vote
+type RoundSetupMessage struct {
+	MinRoundVoteAck *RoundVoteAck
+	Signature       common.Signature
+}
+
 // BlockReqMessage is a message for a block request
 type BlockReqMessage struct {
 	PrevHash             hash.Hash256

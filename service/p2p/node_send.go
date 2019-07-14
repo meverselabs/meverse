@@ -41,6 +41,6 @@ func (nd *Node) sendRequestBlockTo(TargetPubHash common.PublicHash, Height uint3
 		Height: Height,
 	}
 	nd.ms.SendTo(TargetPubHash, nm)
-	nd.requestTimer.Add(Height, 10*time.Second, TargetPubHash)
+	nd.requestTimer.Add(Height, 10*time.Second, string(TargetPubHash[:]))
 	return nil
 }
