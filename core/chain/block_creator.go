@@ -87,6 +87,7 @@ func (bc *BlockCreator) UnsafeAddTx(t uint16, TxHsah hash.Hash256, tx types.Tran
 	}
 	sn := ctw.Snapshot()
 	if err := tx.Validate(p, ctw, signers); err != nil {
+		ctw.Revert(sn)
 		return err
 	}
 	if err := tx.Execute(p, ctw, uint16(len(bc.b.Transactions))); err != nil {

@@ -488,6 +488,8 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 				nm.GeneratorSignature = sig
 			}
 
+			log.Println(ctx.Dump())
+
 			if err := p.Send(nm); err != nil {
 				return err
 			}
@@ -500,7 +502,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 			ExpectedTime := time.Duration(i+1) * 200 * time.Millisecond
 			PastTime := time.Duration(time.Now().UnixNano() - start)
 			if !bNoDelay && ExpectedTime > PastTime {
-				time.Sleep(ExpectedTime - PastTime)
+				//time.Sleep(ExpectedTime - PastTime)
 			}
 		}
 		return nil

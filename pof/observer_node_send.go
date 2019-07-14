@@ -220,15 +220,14 @@ func (ob *ObserverNode) sendRoundVoteAckTo(TargetPubHash common.PublicHash) erro
 }
 
 func (ob *ObserverNode) sendRoundSetup() error {
-	MinRoundVote := ob.round.RoundVoteMessageMap[ob.round.MinVotePublicHash].RoundVote
 	nm := &RoundSetupMessage{
 		MinRoundVoteAck: &RoundVoteAck{
-			LastHash:             MinRoundVote.LastHash,
-			TargetHeight:         MinRoundVote.TargetHeight,
-			TimeoutCount:         MinRoundVote.TimeoutCount,
-			Formulator:           MinRoundVote.Formulator,
-			FormulatorPublicHash: MinRoundVote.FormulatorPublicHash,
-			PublicHash:           ob.round.MinVotePublicHash,
+			LastHash:             ob.round.MinRoundVoteAck.LastHash,
+			TargetHeight:         ob.round.MinRoundVoteAck.TargetHeight,
+			TimeoutCount:         ob.round.MinRoundVoteAck.TimeoutCount,
+			Formulator:           ob.round.MinRoundVoteAck.Formulator,
+			FormulatorPublicHash: ob.round.MinRoundVoteAck.FormulatorPublicHash,
+			PublicHash:           ob.round.MinRoundVoteAck.PublicHash,
 			Timestamp:            uint64(time.Now().UnixNano()),
 			IsReply:              false,
 		},

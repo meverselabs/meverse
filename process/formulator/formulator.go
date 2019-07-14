@@ -1,6 +1,8 @@
 package formulator
 
 import (
+	"log"
+
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
 	"github.com/fletaio/fleta/core/types"
@@ -147,6 +149,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 		Hypers := []*FormulatorAccount{}
 		for GenAddress, GenCount := range CountMap {
 			p.removeGenCount(ctw, GenAddress)
+			log.Println(GenAddress.String(), GenCount)
 
 			acc, err := ctw.Account(GenAddress)
 			if err != nil {
