@@ -63,6 +63,8 @@ func (p *Formulator) Init(reg *types.Register, pm types.ProcessManager, cn types
 	reg.RegisterTransaction(5, &Revoke{})
 	reg.RegisterTransaction(6, &Staking{})
 	reg.RegisterTransaction(7, &Unstaking{})
+	reg.RegisterTransaction(8, &UpdateValidatorPolicy{})
+	reg.RegisterTransaction(9, &UpdateUserAutoStaking{})
 	return nil
 }
 

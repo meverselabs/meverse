@@ -44,7 +44,7 @@ func (tx *UpdateUserAutoStaking) Validate(p types.Process, loader types.LoaderWr
 		return types.ErrInvalidSequence
 	}
 
-	acc, err := loader.Account(tx.From())
+	acc, err := loader.Account(tx.HyperFormulator)
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,15 @@ func (tx *UpdateUserAutoStaking) Validate(p types.Process, loader types.LoaderWr
 	if !is {
 		return types.ErrInvalidAccountType
 	}
-	if err := frAcc.Validate(loader, signers); err != nil {
+	if frAcc.FormulatorType != HyperFormulatorType {
+		return types.ErrInvalidAccountType
+	}
+
+	fromAcc, err := loader.Account(tx.From())
+	if err != nil {
+		return err
+	}
+	if err := fromAcc.Validate(loader, signers); err != nil {
 		return err
 	}
 	return nil
@@ -66,6 +74,14 @@ func (tx *UpdateUserAutoStaking) Execute(p types.Process, ctw *types.ContextWrap
 		return types.ErrInvalidSequence
 	}
 	ctw.AddSeq(tx.From())
+
+	fromAcc, err := ctw.Account(tx.From())
+	if err != nil {
+		return err
+	}
+	if err := sp.vault.SubBalance(ctw, fromAcc.Address(), tx.Fee(ctw)); err != nil {
+		return err
+	}
 
 	acc, err := ctw.Account(tx.HyperFormulator)
 	if err != nil {
