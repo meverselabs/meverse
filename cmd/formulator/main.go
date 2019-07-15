@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"strconv"
@@ -26,6 +27,7 @@ type Config struct {
 	SeedNodeMap    map[string]string
 	ObserverKeyMap map[string]string
 	KeyHex         string
+	NodeKeyHex     string
 	Formulator     string
 	Port           int
 	APIPort        int
@@ -49,6 +51,38 @@ func main() {
 		panic(err)
 	} else {
 		frkey = Key
+	}
+
+	var ndkey key.Key
+	if len(cfg.NodeKeyHex) > 0 {
+		if bs, err := hex.DecodeString(cfg.NodeKeyHex); err != nil {
+			panic(err)
+		} else if Key, err := key.NewMemoryKeyFromBytes(bs); err != nil {
+			panic(err)
+		} else {
+			ndkey = Key
+		}
+	} else {
+		if bs, err := ioutil.ReadFile("./ndkey.key"); err != nil {
+			k, err := key.NewMemoryKey()
+			if err != nil {
+				panic(err)
+			}
+
+			fs, err := os.Create("./ndkey.key")
+			if err != nil {
+				panic(err)
+			}
+			fs.Write(k.Bytes())
+			fs.Close()
+			ndkey = k
+		} else {
+			if Key, err := key.NewMemoryKeyFromBytes(bs); err != nil {
+				panic(err)
+			} else {
+				ndkey = Key
+			}
+		}
 	}
 
 	NetAddressMap := map[common.PublicHash]string{}
@@ -123,7 +157,7 @@ func main() {
 	fr := pof.NewFormulatorNode(&pof.FormulatorConfig{
 		Formulator:              common.MustParseAddress(cfg.Formulator),
 		MaxTransactionsPerBlock: 10000,
-	}, frkey, NetAddressMap, SeedNodeMap, cs, cfg.StoreRoot+"/peer")
+	}, frkey, ndkey, NetAddressMap, SeedNodeMap, cs, cfg.StoreRoot+"/peer")
 	if err := fr.Init(); err != nil {
 		panic(err)
 	}

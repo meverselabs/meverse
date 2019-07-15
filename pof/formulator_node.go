@@ -34,6 +34,7 @@ type FormulatorNode struct {
 	ms                   *FormulatorNodeMesh
 	nm                   *p2p.NodeMesh
 	key                  key.Key
+	ndkey                key.Key
 	myPublicHash         common.PublicHash
 	lastGenMessages      []*BlockGenMessage
 	lastObSignMessageMap map[uint32]*BlockObSignMessage
@@ -55,11 +56,12 @@ type FormulatorNode struct {
 }
 
 // NewFormulatorNode returns a FormulatorNode
-func NewFormulatorNode(Config *FormulatorConfig, key key.Key, NetAddressMap map[common.PublicHash]string, SeedNodeMap map[common.PublicHash]string, cs *Consensus, peerStorePath string) *FormulatorNode {
+func NewFormulatorNode(Config *FormulatorConfig, key key.Key, ndkey key.Key, NetAddressMap map[common.PublicHash]string, SeedNodeMap map[common.PublicHash]string, cs *Consensus, peerStorePath string) *FormulatorNode {
 	fr := &FormulatorNode{
 		Config:               Config,
 		cs:                   cs,
 		key:                  key,
+		ndkey:                ndkey,
 		myPublicHash:         common.NewPublicHash(key.PublicKey()),
 		lastGenMessages:      []*BlockGenMessage{},
 		lastObSignMessageMap: map[uint32]*BlockObSignMessage{},
@@ -72,7 +74,7 @@ func NewFormulatorNode(Config *FormulatorConfig, key key.Key, NetAddressMap map[
 		txQ:                  queue.NewExpireQueue(),
 	}
 	fr.ms = NewFormulatorNodeMesh(key, NetAddressMap, fr)
-	fr.nm = p2p.NewNodeMesh(key, SeedNodeMap, fr, peerStorePath)
+	fr.nm = p2p.NewNodeMesh(ndkey, SeedNodeMap, fr, peerStorePath)
 	fr.txQ.AddGroup(60 * time.Second)
 	fr.txQ.AddGroup(600 * time.Second)
 	fr.txQ.AddGroup(3600 * time.Second)
