@@ -7,7 +7,7 @@ ObserverKeys = [
 ]
 Port = 31000
 APIPort = 58000
-StoreRoot = "./data"
+StoreRoot = "./ndata"
 ForceRecover = true
 
 [SeedNodeMap]

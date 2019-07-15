@@ -2,7 +2,7 @@ Port = 31000
 APIPort = 58000
 GenKeyHex = "THIS_IS_A_PRIVATE_KEY_THAT_IS_FORMATTED_WITH_HEX"
 Formulator = "THIS_IS_A_ADDRESS_OF_THE_FORMULATOR"
-StoreRoot = "./formulator"
+StoreRoot = "./fdata"
 ForceRecover = true
 
 [ObserverKeyMap]

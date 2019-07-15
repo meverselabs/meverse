@@ -3,7 +3,7 @@ APIPort = 58000
 KeyHex = "THIS_IS_A_PRIVATE_KEY_THAT_IS_FORMATTED_WITH_HEX"
 ObseverPort = 35000
 FormulatorPort = 37000
-StoreRoot = "./observer"
+StoreRoot = "./odata"
 ForceRecover = true
 
 [ObserverKeyMap]
