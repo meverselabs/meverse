@@ -12,11 +12,11 @@ type Service interface {
 type ServiceBase struct{}
 
 // OnLoadChain called when the chain loaded
-func (m *ServiceBase) OnLoadChain(loader Loader) error {
+func (s *ServiceBase) OnLoadChain(loader Loader) error {
 	return nil
 }
 
 // OnBlockConnected called when a block is connected to the chain
-func (m *ServiceBase) OnBlockConnected(b *Block, events []Event, loader Loader) error {
+func (s *ServiceBase) OnBlockConnected(b *Block, events []Event, loader Loader) error {
 	return nil
 }

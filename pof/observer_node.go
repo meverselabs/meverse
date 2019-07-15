@@ -330,6 +330,10 @@ func (ob *ObserverNode) onFormulatorRecv(p peer.Peer, m interface{}, raw []byte)
 		ob.Lock()
 		defer ob.Unlock()
 
+		if p.GuessHeight() < msg.Height {
+			p.UpdateGuessHeight(msg.Height)
+		}
+
 		Height := cp.Height()
 		if Height >= msg.Height {
 			h, err := cp.Hash(msg.Height)
