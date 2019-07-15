@@ -27,7 +27,7 @@ import (
 // Config is a configuration for the cmd
 type Config struct {
 	SeedNodeMap  map[string]string
-	KeyHex       string
+	NodeKeyHex   string
 	ObserverKeys []string
 	Port         int
 	APIPort      int
@@ -45,8 +45,8 @@ func main() {
 	}
 
 	var ndkey key.Key
-	if len(cfg.KeyHex) > 0 {
-		if bs, err := hex.DecodeString(cfg.KeyHex); err != nil {
+	if len(cfg.NodeKeyHex) > 0 {
+		if bs, err := hex.DecodeString(cfg.NodeKeyHex); err != nil {
 			panic(err)
 		} else if Key, err := key.NewMemoryKeyFromBytes(bs); err != nil {
 			panic(err)

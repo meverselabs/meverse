@@ -7,7 +7,6 @@ ObserverKeys = [
 ]
 Port = 31000
 APIPort = 58000
-KeyHex = "THIS_IS_A_PRIVATE_KEY_THAT_IS_FORMATTED_WITH_HEX"
 StoreRoot = "./data"
 ForceRecover = true
 

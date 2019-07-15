@@ -27,7 +27,7 @@ import (
 type Config struct {
 	SeedNodeMap    map[string]string
 	ObserverKeyMap map[string]string
-	KeyHex         string
+	GenKeyHex      string
 	NodeKeyHex     string
 	Formulator     string
 	Port           int
@@ -46,7 +46,7 @@ func main() {
 	}
 
 	var frkey key.Key
-	if bs, err := hex.DecodeString(cfg.KeyHex); err != nil {
+	if bs, err := hex.DecodeString(cfg.GenKeyHex); err != nil {
 		panic(err)
 	} else if Key, err := key.NewMemoryKeyFromBytes(bs); err != nil {
 		panic(err)
