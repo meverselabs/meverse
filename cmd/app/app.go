@@ -138,7 +138,7 @@ func (app *FletaApp) InitGenesis(ctw *types.ContextWrapper) error {
 		addAlphaFormulator(sp, ctw, alphaPolicy, common.MustParsePublicHash("3mT9SNvGscpwmDjHnojnVysd9pXUvg1fenVyiBFYTDs"), common.MustParsePublicHash("3mT9SNvGscpwmDjHnojnVysd9pXUvg1fenVyiBFYTDs"), common.MustParseAddress("2HjLbK6CoZ"), "fleta.io.fr00034")
 		addAlphaFormulator(sp, ctw, alphaPolicy, common.MustParsePublicHash("24zn1BgQBmMD8dWap9XbBHdZAivDppVhnYxzZ4ftZw4"), common.MustParsePublicHash("24zn1BgQBmMD8dWap9XbBHdZAivDppVhnYxzZ4ftZw4"), common.MustParseAddress("2KvpTnv82s"), "fleta.io.fr00035")
 		addAlphaFormulator(sp, ctw, alphaPolicy, common.MustParsePublicHash("4TKCbNqM68vKmmXiMsjdb7qND8Qy1DCJKvFge7Dhw16"), common.MustParsePublicHash("4TKCbNqM68vKmmXiMsjdb7qND8Qy1DCJKvFge7Dhw16"), common.MustParseAddress("2N8JLGk3GB"), "fleta.io.fr00036")
-		addSingleAccount(sp, ctw, common.MustParsePublicHash("3Zmc4bGPP7TuMYxZZdUhA9kVjukdsE2S8Xpbj4Laovv"), common.NewAddress(0, 37, 0), "fleta.io")
+		addSingleAccount(sp, ctw, common.MustParsePublicHash("3Zmc4bGPP7TuMYxZZdUhA9kVjukdsE2S8Xpbj4Laovv"), common.MustParseAddress("4kbaAVnrij"), "fleta.io")
 
 		addHyperFormulator(sp, ctw, hyperPolicy, common.MustParsePublicHash("2A3pNbqA5jt299VMavzgZMT7bmno876sRg3LtsPCsYS"), common.MustParsePublicHash("1MrZjju9BLsqNFyzyJzPNyHUGqekQ6WmP7FKo26uRX"), common.MustParseAddress("9uWvXk9fhk"), "validator.001")
 		addSingleAccount(sp, ctw, common.MustParsePublicHash("2A3pNbqA5jt299VMavzgZMT7bmno876sRg3LtsPCsYS"), common.MustParseAddress("99ZK89dJox"), "account.001")
