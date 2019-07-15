@@ -8,6 +8,7 @@ import (
 	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
+	"github.com/fletaio/fleta/process/apiserver"
 )
 
 // Consensus implements the proof of formulator algorithm
@@ -40,6 +41,22 @@ func NewConsensus(MaxBlocksPerFormulator uint32, ObserverKeys []common.PublicHas
 func (cs *Consensus) Init(cn *chain.Chain, ct chain.Committer) error {
 	cs.cn = cn
 	cs.ct = ct
+
+	if vs, err := cn.ServiceByName("fleta.apiserver"); err != nil {
+		//ignore when not loaded
+	} else if v, is := vs.(*apiserver.APIServer); !is {
+		//ignore when not loaded
+	} else {
+		s, err := v.JRPC("consensus")
+		if err != nil {
+			return err
+		}
+		s.Set("getRanks", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+			list := cs.rt.Candidates()
+			return list, nil
+		})
+	}
+
 	return nil
 }
 

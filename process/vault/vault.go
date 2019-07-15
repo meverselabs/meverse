@@ -1,7 +1,9 @@
 package vault
 
 import (
+	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/core/types"
+	"github.com/fletaio/fleta/process/apiserver"
 )
 
 // Vault manages balance of accounts of the chain
@@ -49,6 +51,32 @@ func (p *Vault) Init(reg *types.Register, pm types.ProcessManager, cn types.Prov
 	reg.RegisterTransaction(6, &Assign{})
 	reg.RegisterTransaction(7, &Deposit{})
 	reg.RegisterTransaction(8, &OpenAccount{})
+
+	if vs, err := pm.ServiceByName("fleta.apiserver"); err != nil {
+		//ignore when not loaded
+	} else if v, is := vs.(*apiserver.APIServer); !is {
+		//ignore when not loaded
+	} else {
+		s, err := v.JRPC("vault")
+		if err != nil {
+			return err
+		}
+		s.Set("balance", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+			if arg.Len() != 1 {
+				return nil, apiserver.ErrInvalidArgument
+			}
+			arg0, err := arg.String(0)
+			if err != nil {
+				return nil, err
+			}
+			addr, err := common.ParseAddress(arg0)
+			if err != nil {
+				return nil, err
+			}
+			ctw := cn.NewContextWrapper(p.ID())
+			return p.Balance(ctw, addr), nil
+		})
+	}
 	return nil
 }
 

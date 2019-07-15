@@ -18,6 +18,7 @@ import (
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/pof"
+	"github.com/fletaio/fleta/process/apiserver"
 	"github.com/fletaio/fleta/process/formulator"
 	"github.com/fletaio/fleta/process/vault"
 	"github.com/fletaio/fleta/service/p2p"
@@ -136,6 +137,8 @@ func main() {
 	cn := chain.NewChain(cs, app, st)
 	cn.MustAddProcess(vault.NewVault(1))
 	cn.MustAddProcess(formulator.NewFormulator(2, app.AdminAddress()))
+	as := apiserver.NewAPIServer()
+	cn.MustAddService(as)
 	if err := cn.Init(); err != nil {
 		panic(err)
 	}
@@ -150,6 +153,7 @@ func main() {
 	cm.Add("node", nd)
 
 	go nd.Run(":" + strconv.Itoa(cfg.Port))
+	go as.Run(":" + strconv.Itoa(cfg.APIPort))
 
 	cm.Wait()
 }

@@ -15,4 +15,5 @@ type Provider interface {
 	Header(height uint32) (*Header, error)
 	Block(height uint32) (*Block, error)
 	Seq(addr common.Address) uint64
+	NewContextWrapper(pid uint8) *ContextWrapper
 }

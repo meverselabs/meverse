@@ -108,6 +108,11 @@ func (st *Store) TargetHeight() uint32 {
 	return st.Height() + 1
 }
 
+// NewContextWrapper returns the context wrapper of the chain
+func (st *Store) NewContextWrapper(pid uint8) *types.ContextWrapper {
+	return types.NewContextWrapper(pid, types.NewContext(st))
+}
+
 // LastHash returns the last hash of the chain
 func (st *Store) LastHash() hash.Hash256 {
 	h, err := st.Hash(st.Height())
