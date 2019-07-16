@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"io/ioutil"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fletaio/fleta/common/queue"
@@ -24,11 +25,11 @@ type WebsocketPeer struct {
 	writeQueue    *queue.Queue
 	isClose       bool
 	connectedTime int64
-	pingTime      time.Duration
+	pingCount     uint64
 }
 
 // NewWebsocketPeer returns a WebsocketPeer
-func NewWebsocketPeer(conn *websocket.Conn, ID string, Name string, connectedTime int64, pingTime time.Duration) *WebsocketPeer {
+func NewWebsocketPeer(conn *websocket.Conn, ID string, Name string, connectedTime int64) *WebsocketPeer {
 	if len(Name) == 0 {
 		Name = ID
 	}
@@ -38,21 +39,28 @@ func NewWebsocketPeer(conn *websocket.Conn, ID string, Name string, connectedTim
 		name:          Name,
 		writeQueue:    queue.NewQueue(),
 		connectedTime: connectedTime,
-		pingTime:      pingTime,
 	}
 	conn.EnableWriteCompression(false)
+	conn.SetPongHandler(func(appData string) error {
+		atomic.StoreUint64(&p.pingCount, 0)
+		return nil
+	})
 
 	go func() {
 		defer p.Close()
 
-		ticker := time.NewTicker(10 * time.Second)
+		pingCountLimit := uint64(3)
+		pingTicker := time.NewTicker(10 * time.Second)
 		for {
 			if p.isClose {
 				return
 			}
 			select {
-			case <-ticker.C:
+			case <-pingTicker.C:
 				if err := p.conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(5*time.Second)); err != nil {
+					return
+				}
+				if atomic.AddUint64(&p.pingCount, 1) > pingCountLimit {
 					return
 				}
 			default:
@@ -172,9 +180,4 @@ func (p *WebsocketPeer) GuessHeight() uint32 {
 // ConnectedTime returns peer connected time
 func (p *WebsocketPeer) ConnectedTime() int64 {
 	return p.connectedTime
-}
-
-// PingTime returns peer ping time
-func (p *WebsocketPeer) PingTime() time.Duration {
-	return p.pingTime
 }

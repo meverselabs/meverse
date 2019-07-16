@@ -7,7 +7,6 @@ import (
 	"log"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/fletaio/fleta/common"
@@ -215,10 +214,9 @@ func (ms *ObserverNodeMesh) client(Address string, TargetPubHash common.PublicHa
 	if _, has := ms.netAddressMap[pubhash]; !has {
 		return ErrInvalidObserverKey
 	}
-	duration := time.Since(start)
 
 	ID := string(pubhash[:])
-	p := p2p.NewTCPPeer(conn, ID, pubhash.String(), start.UnixNano(), duration)
+	p := p2p.NewTCPPeer(conn, ID, pubhash.String(), start.UnixNano())
 	ms.removePeerInMap(ID, ms.clientPeerMap)
 	ms.Lock()
 	ms.clientPeerMap[ID] = p
@@ -259,10 +257,9 @@ func (ms *ObserverNodeMesh) server(BindAddress string) error {
 				log.Println("[recvHandshakeAck]", err)
 				return
 			}
-			duration := time.Since(start)
 
 			ID := string(pubhash[:])
-			p := p2p.NewTCPPeer(conn, ID, pubhash.String(), start.UnixNano(), duration)
+			p := p2p.NewTCPPeer(conn, ID, pubhash.String(), start.UnixNano())
 			ms.removePeerInMap(ID, ms.serverPeerMap)
 			ms.Lock()
 			ms.serverPeerMap[ID] = p
@@ -281,34 +278,11 @@ func (ms *ObserverNodeMesh) handleConnection(p peer.Peer) error {
 		log.Println("Observer", common.NewPublicHash(ms.key.PublicKey()).String(), "Observer Connected", p.Name())
 	}
 
-	var pingCount uint64
-	pingCountLimit := uint64(3)
-	pingTicker := time.NewTicker(10 * time.Second)
-	go func() {
-		for {
-			select {
-			case <-pingTicker.C:
-				if err := p.Send(&p2p.PingMessage{}); err != nil {
-					ms.RemovePeer(p.ID())
-					return
-				}
-				if atomic.AddUint64(&pingCount, 1) > pingCountLimit {
-					ms.RemovePeer(p.ID())
-					return
-				}
-			}
-		}
-	}()
 	for {
 		m, _, err := p.ReadMessageData()
 		if err != nil {
 			return err
 		}
-		atomic.StoreUint64(&pingCount, 0)
-		if _, is := m.(*p2p.PingMessage); is {
-			continue
-		}
-
 		if err := ms.ob.onObserverRecv(p, m); err != nil {
 			return err
 		}

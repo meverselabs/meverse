@@ -7,9 +7,12 @@ import (
 	"io/ioutil"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fletaio/fleta/common/queue"
+	"github.com/fletaio/fleta/common/util"
+	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
 )
 
@@ -23,11 +26,12 @@ type TCPPeer struct {
 	writeQueue    *queue.Queue
 	isClose       bool
 	connectedTime int64
-	pingTime      time.Duration
+	pingCount     uint64
+	pingType      uint16
 }
 
 // NewTCPPeer returns a TCPPeer
-func NewTCPPeer(conn net.Conn, ID string, Name string, connectedTime int64, pingTime time.Duration) *TCPPeer {
+func NewTCPPeer(conn net.Conn, ID string, Name string, connectedTime int64) *TCPPeer {
 	if len(Name) == 0 {
 		Name = ID
 	}
@@ -37,38 +41,55 @@ func NewTCPPeer(conn net.Conn, ID string, Name string, connectedTime int64, ping
 		name:          Name,
 		writeQueue:    queue.NewQueue(),
 		connectedTime: connectedTime,
-		pingTime:      pingTime,
+		pingType:      types.DefineHashedType("p2p.PingMessage"),
 	}
-	go func() {
-		defer p.conn.Close()
 
+	go func() {
+		defer p.Close()
+
+		pingCountLimit := uint64(3)
+		pingTicker := time.NewTicker(10 * time.Second)
 		for {
-			if p.isClose {
-				return
-			}
-			v := p.writeQueue.Pop()
-			if v == nil {
-				time.Sleep(50 * time.Millisecond)
-				continue
-			}
-			bs := v.([]byte)
-			var buffer bytes.Buffer
-			buffer.Write(bs[:2])
-			buffer.Write(make([]byte, 4))
-			if len(bs) > 2 {
-				zw := gzip.NewWriter(&buffer)
-				zw.Write(bs[2:])
-				zw.Flush()
-				zw.Close()
-			}
-			wbs := buffer.Bytes()
-			binary.LittleEndian.PutUint32(wbs[2:], uint32(len(wbs)-6))
-			if err := p.conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
-				return
-			}
-			_, err := p.conn.Write(wbs)
-			if err != nil {
-				return
+			select {
+			case <-pingTicker.C:
+				if err := p.conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+					return
+				}
+				_, err := p.conn.Write(util.Uint16ToBytes(p.pingType))
+				if err != nil {
+					return
+				}
+				if atomic.AddUint64(&p.pingCount, 1) > pingCountLimit {
+					return
+				}
+			default:
+				if p.isClose {
+					return
+				}
+				v := p.writeQueue.Pop()
+				if v == nil {
+					time.Sleep(50 * time.Millisecond)
+					continue
+				}
+				bs := v.([]byte)
+				var buffer bytes.Buffer
+				buffer.Write(bs[:2])
+				buffer.Write(make([]byte, 4))
+				if len(bs) > 2 {
+					zw := gzip.NewWriter(&buffer)
+					zw.Write(bs[2:])
+					zw.Flush()
+					zw.Close()
+				}
+				wbs := buffer.Bytes()
+				binary.LittleEndian.PutUint32(wbs[2:], uint32(len(wbs)-6))
+				if err := p.conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+					return
+				}
+				_, err := p.conn.Write(wbs)
+				if err != nil {
+					return
+				}
 			}
 		}
 	}()
@@ -94,10 +115,18 @@ func (p *TCPPeer) Close() {
 // ReadMessageData returns a message data
 func (p *TCPPeer) ReadMessageData() (interface{}, []byte, error) {
 	var t uint16
-	if v, _, err := ReadUint16(p.conn); err != nil {
-		return nil, nil, err
-	} else {
-		t = v
+	for {
+		if v, _, err := ReadUint16(p.conn); err != nil {
+			return nil, nil, err
+		} else {
+			atomic.StoreUint64(&p.pingCount, 0)
+			if v == p.pingType {
+				continue
+			} else {
+				t = v
+				break
+			}
+		}
 	}
 
 	if Len, _, err := ReadUint32(p.conn); err != nil {
@@ -162,9 +191,4 @@ func (p *TCPPeer) GuessHeight() uint32 {
 // ConnectedTime returns peer connected time
 func (p *TCPPeer) ConnectedTime() int64 {
 	return p.connectedTime
-}
-
-// PingTime returns peer ping time
-func (p *TCPPeer) PingTime() time.Duration {
-	return p.pingTime
 }

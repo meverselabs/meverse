@@ -6,7 +6,6 @@ import (
 	"log"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/fletaio/fleta/service/p2p/nodepoolmanage"
@@ -312,7 +311,7 @@ func (ms *NodeMesh) client(Address string, TargetPubHash common.PublicHash) erro
 
 	ID := string(pubhash[:])
 	ms.nodePoolManager.NewNode(ipAddress, ID, duration)
-	p := NewTCPPeer(conn, ID, pubhash.String(), start.UnixNano(), duration)
+	p := NewTCPPeer(conn, ID, pubhash.String(), start.UnixNano())
 
 	ms.Lock()
 	old, has := ms.clientPeerMap[ID]
@@ -362,7 +361,7 @@ func (ms *NodeMesh) server(BindAddress string) error {
 
 			ID := string(pubhash[:])
 			ms.nodePoolManager.NewNode(ipAddress, ID, duration)
-			p := NewTCPPeer(conn, ID, pubhash.String(), start.UnixNano(), duration)
+			p := NewTCPPeer(conn, ID, pubhash.String(), start.UnixNano())
 
 			ms.Lock()
 			old, has := ms.serverPeerMap[ID]
@@ -386,34 +385,11 @@ func (ms *NodeMesh) handleConnection(p peer.Peer) error {
 	ms.handler.OnConnected(p)
 	defer ms.handler.OnDisconnected(p)
 
-	var pingCount uint64
-	pingCountLimit := uint64(3)
-	pingTicker := time.NewTicker(10 * time.Second)
-	go func() {
-		for {
-			select {
-			case <-pingTicker.C:
-				if err := p.Send(&PingMessage{}); err != nil {
-					ms.RemovePeer(p.ID())
-					return
-				}
-				if atomic.AddUint64(&pingCount, 1) > pingCountLimit {
-					ms.RemovePeer(p.ID())
-					return
-				}
-			}
-		}
-	}()
 	for {
 		m, _, err := p.ReadMessageData()
 		if err != nil {
 			return err
 		}
-		atomic.StoreUint64(&pingCount, 0)
-		if _, is := m.(*PingMessage); is {
-			continue
-		}
-
 		if err := ms.handler.OnRecv(p, m); err != nil {
 			return err
 		}

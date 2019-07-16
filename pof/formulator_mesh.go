@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"log"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/fletaio/fleta/common/debug"
@@ -167,7 +166,7 @@ func (ms *FormulatorNodeMesh) client(Address string, TargetPubHash common.Public
 	}
 
 	ID := string(pubhash[:])
-	p := p2p.NewWebsocketPeer(conn, ID, pubhash.String(), time.Now().UnixNano(), 0)
+	p := p2p.NewWebsocketPeer(conn, ID, pubhash.String(), time.Now().UnixNano())
 	ms.RemovePeer(ID)
 	ms.Lock()
 	ms.peerMap[ID] = p
@@ -188,34 +187,11 @@ func (ms *FormulatorNodeMesh) handleConnection(p peer.Peer) error {
 	ms.fr.OnObserverConnected(p)
 	defer ms.fr.OnObserverDisconnected(p)
 
-	var pingCount uint64
-	pingCountLimit := uint64(3)
-	pingTicker := time.NewTicker(10 * time.Second)
-	go func() {
-		for {
-			select {
-			case <-pingTicker.C:
-				if err := p.Send(&p2p.PingMessage{}); err != nil {
-					ms.RemovePeer(p.ID())
-					return
-				}
-				if atomic.AddUint64(&pingCount, 1) > pingCountLimit {
-					ms.RemovePeer(p.ID())
-					return
-				}
-			}
-		}
-	}()
 	for {
 		m, _, err := p.ReadMessageData()
 		if err != nil {
 			return err
 		}
-		atomic.StoreUint64(&pingCount, 0)
-		if _, is := m.(*p2p.PingMessage); is {
-			continue
-		}
-
 		if err := ms.fr.onRecv(p, m); err != nil {
 			return err
 		}
