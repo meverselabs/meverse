@@ -237,8 +237,7 @@ func (ms *FormulatorService) recvHandshake(conn *websocket.Conn) (common.Address
 		return common.Address{}, p2p.ErrInvalidHandshake
 	}
 	//log.Println("sendHandshakeAck")
-	h := hash.Hash(req)
-	if sig, err := ms.key.Sign(h); err != nil {
+	if sig, err := ms.key.Sign(hash.Hash(req)); err != nil {
 		return common.Address{}, err
 	} else if err := conn.WriteMessage(websocket.BinaryMessage, sig[:]); err != nil {
 		return common.Address{}, err

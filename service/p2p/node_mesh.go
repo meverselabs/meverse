@@ -440,20 +440,17 @@ func (ms *NodeMesh) sendHandshake(conn net.Conn) (common.PublicHash, string, err
 		return common.PublicHash{}, "", err
 	}
 	//log.Println("recvHandshakeAsk")
-	h := hash.Hash(req)
-	bs := make([]byte, common.SignatureSize)
-	if _, err := FillBytes(conn, bs); err != nil {
+	var sig common.Signature
+	if _, err := FillBytes(conn, sig[:]); err != nil {
 		return common.PublicHash{}, "", err
 	}
-	var sig common.Signature
-	copy(sig[:], bs)
-	pubkey, err := common.RecoverPubkey(h, sig)
+	pubkey, err := common.RecoverPubkey(hash.Hash(req), sig)
 	if err != nil {
 		return common.PublicHash{}, "", err
 	}
 	pubhash := common.NewPublicHash(pubkey)
 
-	bs = make([]byte, 1)
+	bs := make([]byte, 1)
 	if _, err := FillBytes(conn, bs); err != nil {
 		return common.PublicHash{}, "", err
 	}

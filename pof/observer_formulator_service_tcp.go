@@ -231,8 +231,7 @@ func (ms *FormulatorService) recvHandshake(conn net.Conn) (common.Address, error
 		return common.Address{}, p2p.ErrInvalidHandshake
 	}
 	//log.Println("sendHandshakeAck")
-	h := hash.Hash(req)
-	if sig, err := ms.key.Sign(h); err != nil {
+	if sig, err := ms.key.Sign(hash.Hash(req)); err != nil {
 		return common.Address{}, err
 	} else if _, err := conn.Write(sig[:]); err != nil {
 		return common.Address{}, err
@@ -251,12 +250,10 @@ func (ms *FormulatorService) sendHandshake(conn net.Conn) (common.PublicHash, er
 		return common.PublicHash{}, err
 	}
 	//log.Println("recvHandshakeAsk")
-	bs := make([]byte, common.SignatureSize)
-	if _, err := p2p.FillBytes(conn, bs); err != nil {
+	var sig common.Signature
+	if _, err := p2p.FillBytes(conn, sig[:]); err != nil {
 		return common.PublicHash{}, err
 	}
-	var sig common.Signature
-	copy(sig[:], bs)
 	pubkey, err := common.RecoverPubkey(hash.Hash(req), sig)
 	if err != nil {
 		return common.PublicHash{}, err

@@ -304,8 +304,7 @@ func (ms *ObserverNodeMesh) recvHandshake(conn net.Conn) error {
 		return p2p.ErrInvalidHandshake
 	}
 	//log.Println("sendHandshakeAck")
-	h := hash.Hash(req)
-	if sig, err := ms.key.Sign(h); err != nil {
+	if sig, err := ms.key.Sign(hash.Hash(req)); err != nil {
 		return err
 	} else if _, err := conn.Write(sig[:]); err != nil {
 		return err
@@ -324,12 +323,10 @@ func (ms *ObserverNodeMesh) sendHandshake(conn net.Conn) (common.PublicHash, err
 		return common.PublicHash{}, err
 	}
 	//log.Println("recvHandshakeAsk")
-	bs := make([]byte, common.SignatureSize)
-	if _, err := p2p.FillBytes(conn, bs); err != nil {
+	var sig common.Signature
+	if _, err := p2p.FillBytes(conn, sig[:]); err != nil {
 		return common.PublicHash{}, err
 	}
-	var sig common.Signature
-	copy(sig[:], bs)
 	pubkey, err := common.RecoverPubkey(hash.Hash(req), sig)
 	if err != nil {
 		return common.PublicHash{}, err
