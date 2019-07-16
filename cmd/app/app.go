@@ -395,7 +395,6 @@ func addHyperFormulator(sp *vault.Vault, ctw *types.ContextWrapper, hyperPolicy 
 		UpdatedHeight:  0,
 		StakingAmount:  amount.NewCoinAmount(0, 0),
 		Policy: &formulator.ValidatorPolicy{
-			AutoStakingSelf:     false,
 			CommissionRatio1000: 60,
 			MinimumStaking:      amount.NewCoinAmount(100, 0),
 			PayOutInterval:      3,
