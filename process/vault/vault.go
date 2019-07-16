@@ -98,10 +98,12 @@ func (p *Vault) AfterExecuteTransactions(b *types.Block, ctw *types.ContextWrapp
 	}
 	for _, k := range keys {
 		if addr, is := fromLockedBalancePrefix(k); is {
-			if err := p.AddBalance(ctw, addr, p.LockedBalance(ctw, addr, b.Header.Height)); err != nil {
+			am := p.LockedBalance(ctw, addr, b.Header.Height)
+			if err := p.AddBalance(ctw, addr, am); err != nil {
 				return err
 			}
 			ctw.SetProcessData(k, nil)
+			ctw.SetProcessData(toLockedBalanceSumKey(addr), p.LockedBalanceTotal(ctw, addr).Sub(am).Bytes())
 		}
 	}
 	return nil

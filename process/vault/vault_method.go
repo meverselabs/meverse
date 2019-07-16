@@ -60,6 +60,7 @@ func (p *Vault) AddLockedBalance(ctw *types.ContextWrapper, addr common.Address,
 		return ErrMinusInput
 	}
 	ctw.SetProcessData(toLockedBalanceKey(UnlockedHeight, addr), p.LockedBalance(ctw, addr, UnlockedHeight).Add(am).Bytes())
+	ctw.SetProcessData(toLockedBalanceSumKey(addr), p.LockedBalanceTotal(ctw, addr).Add(am).Bytes())
 	return nil
 }
 
@@ -68,6 +69,17 @@ func (p *Vault) LockedBalance(ctw *types.ContextWrapper, addr common.Address, Un
 	ctw = ctw.Switch(p.pid)
 
 	if bs := ctw.ProcessData(toLockedBalanceKey(UnlockedHeight, addr)); len(bs) > 0 {
+		return amount.NewAmountFromBytes(bs)
+	} else {
+		return amount.NewCoinAmount(0, 0)
+	}
+}
+
+// LockedBalanceTotal returns all locked balance of the account of the address
+func (p *Vault) LockedBalanceTotal(ctw *types.ContextWrapper, addr common.Address) *amount.Amount {
+	ctw = ctw.Switch(p.pid)
+
+	if bs := ctw.ProcessData(toLockedBalanceSumKey(addr)); len(bs) > 0 {
 		return amount.NewAmountFromBytes(bs)
 	} else {
 		return amount.NewCoinAmount(0, 0)

@@ -10,8 +10,9 @@ import (
 
 // tags
 var (
-	tagBalance       = []byte{1, 1}
-	tagLockedBalance = []byte{1, 2}
+	tagBalance          = []byte{1, 1}
+	tagLockedBalance    = []byte{1, 2}
+	tagLockedBalanceSum = []byte{1, 3}
 )
 
 func toLockedBalanceKey(height uint32, addr common.Address) []byte {
@@ -37,4 +38,11 @@ func fromLockedBalancePrefix(bs []byte) (common.Address, bool) {
 	} else {
 		return common.Address{}, false
 	}
+}
+
+func toLockedBalanceSumKey(addr common.Address) []byte {
+	bs := make([]byte, 2+common.AddressSize)
+	copy(bs, tagLockedBalanceSum)
+	copy(bs[2:], addr[:])
+	return bs
 }
