@@ -141,7 +141,7 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 			return err
 		}
 
-		PowerMap, err := sp.getStakingAmountMap(ctw, tx.From())
+		PowerMap, err := sp.GetStakingAmountMap(ctw, tx.From())
 		if err != nil {
 			return err
 		}

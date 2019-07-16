@@ -182,7 +182,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 						return err
 					}
 				}
-				AmountMap, err := p.getStakingAmountMap(ctw, b.Header.Generator)
+				AmountMap, err := p.GetStakingAmountMap(ctw, b.Header.Generator)
 				if err != nil {
 					return err
 				}
@@ -219,7 +219,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 					} else {
 						StakingPowerMap.Put(StakingAddress, StakingAmount)
 					}
-					StakingRewardPower = StakingRewardPower.Add(StakingAmount.MulC(int64(policy.StakingEfficiency1000)).DivC(1000))
+					StakingRewardPower = StakingRewardPower.Add(StakingAmount.MulC(int64(GenCount)).MulC(int64(policy.StakingEfficiency1000)).DivC(1000))
 				}
 				if bs, err := encoding.Marshal(StakingPowerMap); err != nil {
 					return err
@@ -308,6 +308,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 							return err
 						}
 					}
+					ctw.SetAccountData(b.Header.Generator, tagStakingPowerMap, nil)
 
 					StackRewardMap.Delete(frAcc.Address())
 					p.setLastStakingPaidHeight(ctw, frAcc.Address(), ctw.TargetHeight())

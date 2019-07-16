@@ -105,7 +105,7 @@ func (tx *Unstaking) Execute(p types.Process, ctw *types.ContextWrapper, index u
 		return types.ErrInvalidAccountType
 	}
 
-	fromStakingAmount := sp.getStakingAmount(ctw, tx.HyperFormulator, tx.From())
+	fromStakingAmount := sp.GetStakingAmount(ctw, tx.HyperFormulator, tx.From())
 	if fromStakingAmount.Less(tx.Amount) {
 		return ErrInsufficientStakingAmount
 	}

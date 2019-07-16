@@ -7,6 +7,17 @@ import (
 	"github.com/fletaio/fleta/core/types"
 )
 
+// GetStakingAmount returns the staking amount of the address at the hyper formulator
+func (p *Formulator) GetStakingAmount(ctw *types.ContextWrapper, HyperAddress common.Address, StakingAddress common.Address) *amount.Amount {
+	ctw = ctw.Switch(p.pid)
+
+	if bs := ctw.AccountData(HyperAddress, toStakingAmountKey(StakingAddress)); len(bs) > 0 {
+		return amount.NewAmountFromBytes(bs)
+	} else {
+		return amount.NewCoinAmount(0, 0)
+	}
+}
+
 func (p *Formulator) addGenCount(ctw *types.ContextWrapper, addr common.Address) {
 	ctw.SetProcessData(toGenCountKey(addr), util.Uint64ToBytes(p.getGenCount(ctw, addr)+1))
 }
@@ -37,16 +48,8 @@ func (p *Formulator) getGenCountMap(ctw *types.ContextWrapper) (map[common.Addre
 	return CountMap, nil
 }
 
-func (p *Formulator) getStakingAmount(ctw *types.ContextWrapper, HyperAddress common.Address, StakingAddress common.Address) *amount.Amount {
-	if bs := ctw.AccountData(HyperAddress, toStakingAmountKey(StakingAddress)); len(bs) > 0 {
-		return amount.NewAmountFromBytes(bs)
-	} else {
-		return amount.NewCoinAmount(0, 0)
-	}
-}
-
 func (p *Formulator) addStakingAmount(ctw *types.ContextWrapper, HyperAddress common.Address, StakingAddress common.Address, StakingAmount *amount.Amount) {
-	ctw.SetAccountData(HyperAddress, toStakingAmountKey(StakingAddress), p.getStakingAmount(ctw, HyperAddress, StakingAddress).Add(StakingAmount).Bytes())
+	ctw.SetAccountData(HyperAddress, toStakingAmountKey(StakingAddress), p.GetStakingAmount(ctw, HyperAddress, StakingAddress).Add(StakingAmount).Bytes())
 }
 
 func (p *Formulator) setStakingAmount(ctw *types.ContextWrapper, HyperAddress common.Address, StakingAddress common.Address, StakingAmount *amount.Amount) {
@@ -57,7 +60,8 @@ func (p *Formulator) removeStakingAmount(ctw *types.ContextWrapper, HyperAddress
 	ctw.SetAccountData(HyperAddress, toStakingAmountKey(StakingAddress), nil)
 }
 
-func (p *Formulator) getStakingAmountMap(ctw *types.ContextWrapper, HyperAddress common.Address) (map[common.Address]*amount.Amount, error) {
+// GetStakingAmountMap returns all staking amount of the hyper formulator
+func (p *Formulator) GetStakingAmountMap(ctw *types.ContextWrapper, HyperAddress common.Address) (map[common.Address]*amount.Amount, error) {
 	keys, err := ctw.AccountDataKeys(HyperAddress, tagStakingAmount)
 	if err != nil {
 		return nil, err
@@ -65,7 +69,7 @@ func (p *Formulator) getStakingAmountMap(ctw *types.ContextWrapper, HyperAddress
 	PowerMap := map[common.Address]*amount.Amount{}
 	for _, k := range keys {
 		if addr, is := fromStakingAmountKey(k); is {
-			PowerMap[addr] = p.getStakingAmount(ctw, HyperAddress, addr)
+			PowerMap[addr] = p.GetStakingAmount(ctw, HyperAddress, addr)
 		}
 	}
 	return PowerMap, nil
@@ -129,7 +133,7 @@ func (p *Formulator) getUserAutoStaking(ctw *types.ContextWrapper, HyperAddress 
 	if bs := ctw.AccountData(HyperAddress, toAutoStakingKey(StakingAddress)); len(bs) > 0 {
 		return bs[0] == 1
 	} else {
-		return true
+		return false
 	}
 }
 
