@@ -243,26 +243,10 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 			TotalReward := policy.RewardPerBlock.MulC(int64(ctw.TargetHeight() - lastPaidHeight))
 			Ratio := TotalReward.Mul(amount.COIN).Div(RewardPowerSum)
 			for RewardAddress, RewardPower := range RewardPowerMap {
-				if acc, err := ctw.Account(RewardAddress); err != nil {
-					return err
-				} else {
-					IsStaked := false
-					if frAcc, is := acc.(*FormulatorAccount); is {
-						if frAcc.FormulatorType == HyperFormulatorType {
-							if frAcc.Policy.AutoStakingSelf {
-								RewardAmount := RewardPower.Mul(Ratio).Div(amount.COIN)
-								frAcc.Amount = frAcc.Amount.Add(RewardAmount)
-								IsStaked = true
-							}
-						}
-					}
-					if !IsStaked {
-						RewardAmount := RewardPower.Mul(Ratio).Div(amount.COIN)
-						if !RewardAmount.IsZero() {
-							if err := p.vault.AddBalance(ctw, RewardAddress, RewardAmount); err != nil {
-								return err
-							}
-						}
+				RewardAmount := RewardPower.Mul(Ratio).Div(amount.COIN)
+				if !RewardAmount.IsZero() {
+					if err := p.vault.AddBalance(ctw, RewardAddress, RewardAmount); err != nil {
+						return err
 					}
 				}
 			}
@@ -320,12 +304,8 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 							return inErr
 						}
 
-						if frAcc.Policy.AutoStakingSelf {
-							frAcc.Amount = frAcc.Amount.Add(CommissionSum)
-						} else {
-							if err := p.vault.AddBalance(ctw, frAcc.Address(), CommissionSum); err != nil {
-								return err
-							}
+						if err := p.vault.AddBalance(ctw, frAcc.Address(), CommissionSum); err != nil {
+							return err
 						}
 					}
 

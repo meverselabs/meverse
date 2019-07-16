@@ -219,7 +219,6 @@ type ValidatorPolicy struct {
 	CommissionRatio1000 uint32
 	MinimumStaking      *amount.Amount
 	PayOutInterval      uint32
-	AutoStakingSelf     bool
 }
 
 // Clone returns the clonend value of it
@@ -228,7 +227,6 @@ func (pc *ValidatorPolicy) Clone() *ValidatorPolicy {
 		CommissionRatio1000: pc.CommissionRatio1000,
 		MinimumStaking:      pc.MinimumStaking.Clone(),
 		PayOutInterval:      pc.PayOutInterval,
-		AutoStakingSelf:     pc.AutoStakingSelf,
 	}
 }
 
@@ -252,13 +250,6 @@ func (pc *ValidatorPolicy) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"pay_out_interval":`)
 	if bs, err := json.Marshal(pc.PayOutInterval); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"auto_staking_self":`)
-	if bs, err := json.Marshal(pc.AutoStakingSelf); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)
