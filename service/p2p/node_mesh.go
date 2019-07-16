@@ -412,8 +412,6 @@ func (ms *NodeMesh) handleConnection(p peer.Peer) error {
 		atomic.StoreUint64(&pingCount, 0)
 		if _, is := m.(*PingMessage); is {
 			continue
-		} else if m == nil {
-			return ErrUnknownMessage
 		}
 
 		if err := ms.handler.OnRecv(p, m); err != nil {

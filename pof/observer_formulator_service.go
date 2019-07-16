@@ -233,8 +233,6 @@ func (ms *FormulatorService) handleConnection(p peer.Peer) error {
 		atomic.StoreUint64(&pingCount, 0)
 		if _, is := m.(*p2p.PingMessage); is {
 			continue
-		} else if m == nil {
-			return p2p.ErrUnknownMessage
 		}
 
 		if err := ms.ob.onFormulatorRecv(p, m, bs); err != nil {
