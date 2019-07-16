@@ -45,32 +45,40 @@ func NewWebsocketPeer(conn *websocket.Conn, ID string, Name string, connectedTim
 	go func() {
 		defer p.Close()
 
+		ticker := time.NewTicker(10 * time.Second)
 		for {
 			if p.isClose {
 				return
 			}
-			v := p.writeQueue.Pop()
-			if v == nil {
-				time.Sleep(50 * time.Millisecond)
-				continue
-			}
-			bs := v.([]byte)
-			var buffer bytes.Buffer
-			buffer.Write(bs[:2])
-			buffer.Write(make([]byte, 4))
-			if len(bs) > 2 {
-				zw := gzip.NewWriter(&buffer)
-				zw.Write(bs[2:])
-				zw.Flush()
-				zw.Close()
-			}
-			wbs := buffer.Bytes()
-			binary.LittleEndian.PutUint32(wbs[2:], uint32(len(wbs)-6))
-			if err := p.conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
-				return
-			}
-			if err := p.conn.WriteMessage(websocket.BinaryMessage, wbs); err != nil {
-				return
+			select {
+			case <-ticker.C:
+				if err := p.conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(5*time.Second)); err != nil {
+					return
+				}
+			default:
+				v := p.writeQueue.Pop()
+				if v == nil {
+					time.Sleep(50 * time.Millisecond)
+					continue
+				}
+				bs := v.([]byte)
+				var buffer bytes.Buffer
+				buffer.Write(bs[:2])
+				buffer.Write(make([]byte, 4))
+				if len(bs) > 2 {
+					zw := gzip.NewWriter(&buffer)
+					zw.Write(bs[2:])
+					zw.Flush()
+					zw.Close()
+				}
+				wbs := buffer.Bytes()
+				binary.LittleEndian.PutUint32(wbs[2:], uint32(len(wbs)-6))
+				if err := p.conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+					return
+				}
+				if err := p.conn.WriteMessage(websocket.BinaryMessage, wbs); err != nil {
+					return
+				}
 			}
 		}
 	}()
