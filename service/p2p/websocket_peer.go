@@ -40,6 +40,8 @@ func NewWebsocketPeer(conn *websocket.Conn, ID string, Name string, connectedTim
 		connectedTime: connectedTime,
 		pingTime:      pingTime,
 	}
+	conn.EnableWriteCompression(false)
+
 	go func() {
 		defer p.Close()
 
@@ -64,7 +66,7 @@ func NewWebsocketPeer(conn *websocket.Conn, ID string, Name string, connectedTim
 			}
 			wbs := buffer.Bytes()
 			binary.LittleEndian.PutUint32(wbs[2:], uint32(len(wbs)-6))
-			if err := p.conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
+			if err := p.conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
 				return
 			}
 			if err := p.conn.WriteMessage(websocket.BinaryMessage, wbs); err != nil {
