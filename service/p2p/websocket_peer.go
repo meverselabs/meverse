@@ -41,7 +41,7 @@ func NewWebsocketPeer(conn *websocket.Conn, ID string, Name string, connectedTim
 		connectedTime: connectedTime,
 	}
 	conn.EnableWriteCompression(false)
-	conn.SetPongHandler(func(appData string) error {
+	conn.SetPingHandler(func(appData string) error {
 		atomic.StoreUint64(&p.pingCount, 0)
 		return nil
 	})
