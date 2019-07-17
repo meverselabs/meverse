@@ -183,6 +183,7 @@ func (rt *RankTable) removeRank(addr common.Address) {
 				candidates = append(candidates, s)
 			}
 		}
+		rt.candidates = candidates
 	}
 }
 
