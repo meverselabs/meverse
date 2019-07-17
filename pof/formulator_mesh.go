@@ -216,8 +216,7 @@ func (ms *FormulatorNodeMesh) recvHandshake(conn *websocket.Conn) error {
 		return p2p.ErrInvalidHandshake
 	}
 	//log.Println("sendHandshakeAck")
-	h := hash.Hash(req)
-	if sig, err := ms.key.Sign(h); err != nil {
+	if sig, err := ms.key.Sign(hash.Hash(req)); err != nil {
 		return err
 	} else if err := conn.WriteMessage(websocket.BinaryMessage, sig[:]); err != nil {
 		return err
