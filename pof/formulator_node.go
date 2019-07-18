@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/fletaio/fleta/process/formulator"
+
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/key"
@@ -487,6 +489,12 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 					ctx.Revert(sn)
 					if item == nil {
 						break TxLoop
+					}
+					if tx, is := item.Transaction.(*formulator.Revoke); is {
+						if tx.From() == fr.Config.Formulator {
+							// prevent consensus error from revoke self
+							continue
+						}
 					}
 					if err := bc.UnsafeAddTx(item.TxType, item.TxHash, item.Transaction, item.Signatures, item.Signers); err != nil {
 						log.Println(err)
