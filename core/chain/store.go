@@ -427,6 +427,13 @@ func (st *Store) AddressByName(Name string) (common.Address, error) {
 			return err
 		}
 		copy(addr[:], value)
+		if _, err := txn.Get(toAccountKey(addr)); err != nil {
+			if err == badger.ErrKeyNotFound {
+				return types.ErrDeletedAccount
+			} else {
+				return err
+			}
+		}
 		return nil
 	}); err != nil {
 		if err == ErrNotExistKey {
@@ -487,6 +494,21 @@ func (st *Store) HasAccountName(Name string) (bool, error) {
 			}
 		}
 		Has = !item.IsDeletedOrExpired()
+		if Has {
+			var addr common.Address
+			value, err := item.ValueCopy(nil)
+			if err != nil {
+				return err
+			}
+			copy(addr[:], value)
+			if _, err := txn.Get(toAccountKey(addr)); err != nil {
+				if err == badger.ErrKeyNotFound {
+					return types.ErrDeletedAccount
+				} else {
+					return err
+				}
+			}
+		}
 		return nil
 	}); err != nil {
 		if err == ErrNotExistKey {
@@ -910,16 +932,6 @@ func applyContextData(txn *badger.Txn, ctd *types.ContextData) error {
 				inErr = err
 				return false
 			}
-		}
-		return true
-	})
-	if inErr != nil {
-		return inErr
-	}
-	ctd.DeletedAccountNameMap.EachAll(func(key string, value bool) bool {
-		if err := txn.Delete(toAccountNameKey(key)); err != nil {
-			inErr = err
-			return false
 		}
 		return true
 	})

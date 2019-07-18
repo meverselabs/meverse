@@ -235,11 +235,6 @@ func (ctx *Context) Commit(sn int) {
 			top.AccountNameMap.Put(key, addr)
 			return true
 		})
-		ctd.DeletedAccountNameMap.EachAll(func(key string, value bool) bool {
-			top.AccountNameMap.Delete(key)
-			top.DeletedAccountNameMap.Put(key, value)
-			return true
-		})
 		ctd.AccountDataMap.EachAll(func(key string, value []byte) bool {
 			top.AccountDataMap.Put(key, value)
 			return true

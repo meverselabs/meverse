@@ -10,6 +10,7 @@ var (
 	ErrExistAccount                 = errors.New("exist account")
 	ErrExistAccountName             = errors.New("exist account name")
 	ErrNotExistAccount              = errors.New("not exist account")
+	ErrDeletedAccount               = errors.New("deleted account")
 	ErrInvalidProcess               = errors.New("invalid process")
 	ErrExistProcessName             = errors.New("exist process name")
 	ErrExistProcessID               = errors.New("exist process id")

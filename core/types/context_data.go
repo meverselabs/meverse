@@ -18,7 +18,6 @@ type ContextData struct {
 	AccountMap            *AddressAccountMap
 	DeletedAccountMap     *AddressAccountMap
 	AccountNameMap        *StringAddressMap
-	DeletedAccountNameMap *StringBoolMap
 	AccountDataMap        *StringBytesMap
 	DeletedAccountDataMap *StringBoolMap
 	ProcessDataMap        *StringBytesMap
@@ -44,7 +43,6 @@ func NewContextData(loader internalLoader, Parent *ContextData) *ContextData {
 		AccountMap:            NewAddressAccountMap(),
 		DeletedAccountMap:     NewAddressAccountMap(),
 		AccountNameMap:        NewStringAddressMap(),
-		DeletedAccountNameMap: NewStringBoolMap(),
 		AccountDataMap:        NewStringBytesMap(),
 		DeletedAccountDataMap: NewStringBoolMap(),
 		ProcessDataMap:        NewStringBytesMap(),
@@ -125,9 +123,6 @@ func (ctd *ContextData) Account(addr common.Address) (Account, error) {
 
 // AddressByName returns the account address of the name
 func (ctd *ContextData) AddressByName(Name string) (common.Address, error) {
-	if ctd.DeletedAccountNameMap.Has(Name) {
-		return common.Address{}, ErrNotExistAccount
-	}
 	if addr, has := ctd.AccountNameMap.Get(Name); has {
 		return addr, nil
 	} else if ctd.Parent != nil {
@@ -173,9 +168,6 @@ func (ctd *ContextData) HasAccount(addr common.Address) (bool, error) {
 
 // HasAccountName checks that the account of the address is exist or not
 func (ctd *ContextData) HasAccountName(Name string) (bool, error) {
-	if ctd.DeletedAccountNameMap.Has(Name) {
-		return false, nil
-	}
 	if ctd.AccountNameMap.Has(Name) {
 		return true, nil
 	} else if ctd.Parent != nil {
@@ -218,7 +210,6 @@ func (ctd *ContextData) DeleteAccount(acc Account) error {
 		return err
 	}
 	ctd.DeletedAccountMap.Put(acc.Address(), acc)
-	ctd.DeletedAccountNameMap.Put(acc.Name(), true)
 	ctd.AccountMap.Delete(acc.Address())
 	ctd.AccountNameMap.Delete(acc.Name())
 	return nil
@@ -503,11 +494,6 @@ func (ctd *ContextData) Hash() hash.Hash256 {
 	})
 	buffer.WriteString("AccountNameMap")
 	buffer.WriteString(encoding.Hash(ctd.AccountNameMap).String())
-	buffer.WriteString("DeletedAccountNameMap")
-	ctd.DeletedAccountNameMap.EachAll(func(key string, value bool) bool {
-		buffer.WriteString(key)
-		return true
-	})
 	buffer.WriteString("AccountDataMap")
 	buffer.WriteString(encoding.Hash(ctd.AccountDataMap).String())
 	buffer.WriteString("DeletedAccountDataMap")
@@ -587,13 +573,6 @@ func (ctd *ContextData) Dump() string {
 		buffer.WriteString(key)
 		buffer.WriteString(": ")
 		buffer.WriteString(addr.String())
-		buffer.WriteString("\n")
-		return true
-	})
-	buffer.WriteString("\n")
-	buffer.WriteString("DeletedAccountNameMap\n")
-	ctd.DeletedAccountNameMap.EachAll(func(key string, value bool) bool {
-		buffer.WriteString(key)
 		buffer.WriteString("\n")
 		return true
 	})
