@@ -64,7 +64,7 @@ func (bc *BlockCreator) Init() error {
 }
 
 // AddTx validates, executes and adds transactions
-func (bc *BlockCreator) AddTx(tx types.Transaction, sigs []common.Signature) error {
+func (bc *BlockCreator) AddTx(Generator common.Address, tx types.Transaction, sigs []common.Signature) error {
 	t, err := bc.txFactory.TypeOf(tx)
 	if err != nil {
 		return err
@@ -78,11 +78,11 @@ func (bc *BlockCreator) AddTx(tx types.Transaction, sigs []common.Signature) err
 			signers = append(signers, common.NewPublicHash(pubkey))
 		}
 	}
-	return bc.UnsafeAddTx(t, TxHash, tx, sigs, signers)
+	return bc.UnsafeAddTx(Generator, t, TxHash, tx, sigs, signers)
 }
 
 // UnsafeAddTx adds transactions without signer validation if signers is not empty
-func (bc *BlockCreator) UnsafeAddTx(t uint16, TxHsah hash.Hash256, tx types.Transaction, sigs []common.Signature, signers []common.PublicHash) error {
+func (bc *BlockCreator) UnsafeAddTx(Generator common.Address, t uint16, TxHsah hash.Hash256, tx types.Transaction, sigs []common.Signature, signers []common.PublicHash) error {
 	pid := uint8(t >> 8)
 	p, err := bc.cn.Process(pid)
 	if err != nil {
@@ -98,6 +98,17 @@ func (bc *BlockCreator) UnsafeAddTx(t uint16, TxHsah hash.Hash256, tx types.Tran
 	if err := tx.Execute(p, ctw, uint16(len(bc.b.Transactions))); err != nil {
 		ctw.Revert(sn)
 		return err
+	}
+	if Has, err := ctw.HasAccount(Generator); err != nil {
+		ctw.Revert(sn)
+		if err == types.ErrDeletedAccount {
+			return ErrCannotDeleteGeneratorAccount
+		} else {
+			return err
+		}
+	} else if !Has {
+		ctw.Revert(sn)
+		return ErrCannotDeleteGeneratorAccount
 	}
 	ctw.Commit(sn)
 
