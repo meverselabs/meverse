@@ -42,7 +42,7 @@ func (tx *UpdateValidatorPolicy) Validate(p types.Process, loader types.LoaderWr
 	if tx.Policy == nil {
 		return ErrInvalidPolicy
 	}
-	if tx.Policy.CommissionRatio1000 > 1000 {
+	if tx.Policy.CommissionRatio1000 >= 1000 {
 		return ErrInvalidPolicy
 	}
 
@@ -69,7 +69,7 @@ func (tx *UpdateValidatorPolicy) Execute(p types.Process, ctw *types.ContextWrap
 	if tx.Policy == nil {
 		return ErrInvalidPolicy
 	}
-	if tx.Policy.CommissionRatio1000 > 1000 {
+	if tx.Policy.CommissionRatio1000 >= 1000 {
 		return ErrInvalidPolicy
 	}
 
