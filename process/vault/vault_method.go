@@ -7,11 +7,11 @@ import (
 )
 
 // Balance returns balance of the account of the address
-func (p *Vault) Balance(ctw *types.ContextWrapper, addr common.Address) *amount.Amount {
-	ctw = ctw.Switch(p.pid)
+func (p *Vault) Balance(lw types.LoaderWrapper, addr common.Address) *amount.Amount {
+	lw = types.SwitchLoaderWrapper(p.pid, lw)
 
 	var total *amount.Amount
-	if bs := ctw.AccountData(addr, tagBalance); len(bs) > 0 {
+	if bs := lw.AccountData(addr, tagBalance); len(bs) > 0 {
 		total = amount.NewAmountFromBytes(bs)
 	} else {
 		total = amount.NewCoinAmount(0, 0)
@@ -21,7 +21,7 @@ func (p *Vault) Balance(ctw *types.ContextWrapper, addr common.Address) *amount.
 
 // AddBalance adds balance to the account of the address
 func (p *Vault) AddBalance(ctw *types.ContextWrapper, addr common.Address, am *amount.Amount) error {
-	ctw = ctw.Switch(p.pid)
+	ctw = types.SwitchContextWrapper(p.pid, ctw)
 
 	zero := amount.NewCoinAmount(0, 0)
 	if am.Less(zero) {
@@ -34,7 +34,7 @@ func (p *Vault) AddBalance(ctw *types.ContextWrapper, addr common.Address, am *a
 
 // SubBalance subtracts balance to the account of the address
 func (p *Vault) SubBalance(ctw *types.ContextWrapper, addr common.Address, am *amount.Amount) error {
-	ctw = ctw.Switch(p.pid)
+	ctw = types.SwitchContextWrapper(p.pid, ctw)
 
 	total := p.Balance(ctw, addr)
 	if total.Less(am) {
@@ -53,7 +53,7 @@ func (p *Vault) SubBalance(ctw *types.ContextWrapper, addr common.Address, am *a
 
 // AddLockedBalance adds locked balance to the account of the address
 func (p *Vault) AddLockedBalance(ctw *types.ContextWrapper, addr common.Address, UnlockedHeight uint32, am *amount.Amount) error {
-	ctw = ctw.Switch(p.pid)
+	ctw = types.SwitchContextWrapper(p.pid, ctw)
 
 	zero := amount.NewCoinAmount(0, 0)
 	if am.Less(zero) {
@@ -65,10 +65,10 @@ func (p *Vault) AddLockedBalance(ctw *types.ContextWrapper, addr common.Address,
 }
 
 // LockedBalance returns locked balance of the account of the address
-func (p *Vault) LockedBalance(ctw *types.ContextWrapper, addr common.Address, UnlockedHeight uint32) *amount.Amount {
-	ctw = ctw.Switch(p.pid)
+func (p *Vault) LockedBalance(lw types.LoaderWrapper, addr common.Address, UnlockedHeight uint32) *amount.Amount {
+	lw = types.SwitchLoaderWrapper(p.pid, lw)
 
-	if bs := ctw.ProcessData(toLockedBalanceKey(UnlockedHeight, addr)); len(bs) > 0 {
+	if bs := lw.ProcessData(toLockedBalanceKey(UnlockedHeight, addr)); len(bs) > 0 {
 		return amount.NewAmountFromBytes(bs)
 	} else {
 		return amount.NewCoinAmount(0, 0)
@@ -76,10 +76,10 @@ func (p *Vault) LockedBalance(ctw *types.ContextWrapper, addr common.Address, Un
 }
 
 // LockedBalanceTotal returns all locked balance of the account of the address
-func (p *Vault) LockedBalanceTotal(ctw *types.ContextWrapper, addr common.Address) *amount.Amount {
-	ctw = ctw.Switch(p.pid)
+func (p *Vault) LockedBalanceTotal(lw types.LoaderWrapper, addr common.Address) *amount.Amount {
+	lw = types.SwitchLoaderWrapper(p.pid, lw)
 
-	if bs := ctw.ProcessData(toLockedBalanceSumKey(addr)); len(bs) > 0 {
+	if bs := lw.ProcessData(toLockedBalanceSumKey(addr)); len(bs) > 0 {
 		return amount.NewAmountFromBytes(bs)
 	} else {
 		return amount.NewCoinAmount(0, 0)

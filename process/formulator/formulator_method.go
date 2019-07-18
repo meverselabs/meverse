@@ -8,10 +8,10 @@ import (
 )
 
 // GetStakingAmount returns the staking amount of the address at the hyper formulator
-func (p *Formulator) GetStakingAmount(ctw *types.ContextWrapper, HyperAddress common.Address, StakingAddress common.Address) *amount.Amount {
-	ctw = ctw.Switch(p.pid)
+func (p *Formulator) GetStakingAmount(lw types.LoaderWrapper, HyperAddress common.Address, StakingAddress common.Address) *amount.Amount {
+	lw = types.SwitchLoaderWrapper(p.pid, lw)
 
-	if bs := ctw.AccountData(HyperAddress, toStakingAmountKey(StakingAddress)); len(bs) > 0 {
+	if bs := lw.AccountData(HyperAddress, toStakingAmountKey(StakingAddress)); len(bs) > 0 {
 		return amount.NewAmountFromBytes(bs)
 	} else {
 		return amount.NewCoinAmount(0, 0)
@@ -61,15 +61,17 @@ func (p *Formulator) removeStakingAmount(ctw *types.ContextWrapper, HyperAddress
 }
 
 // GetStakingAmountMap returns all staking amount of the hyper formulator
-func (p *Formulator) GetStakingAmountMap(ctw *types.ContextWrapper, HyperAddress common.Address) (map[common.Address]*amount.Amount, error) {
-	keys, err := ctw.AccountDataKeys(HyperAddress, tagStakingAmount)
+func (p *Formulator) GetStakingAmountMap(lw types.LoaderWrapper, HyperAddress common.Address) (map[common.Address]*amount.Amount, error) {
+	lw = types.SwitchLoaderWrapper(p.pid, lw)
+
+	keys, err := lw.AccountDataKeys(HyperAddress, tagStakingAmount)
 	if err != nil {
 		return nil, err
 	}
 	PowerMap := map[common.Address]*amount.Amount{}
 	for _, k := range keys {
 		if addr, is := fromStakingAmountKey(k); is {
-			PowerMap[addr] = p.GetStakingAmount(ctw, HyperAddress, addr)
+			PowerMap[addr] = p.GetStakingAmount(lw, HyperAddress, addr)
 		}
 	}
 	return PowerMap, nil

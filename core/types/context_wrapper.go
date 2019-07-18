@@ -5,6 +5,15 @@ import (
 	"github.com/fletaio/fleta/common/hash"
 )
 
+// SwitchContextWrapper returns a SwitchContextWrapper of the pid
+func SwitchContextWrapper(pid uint8, ctw *ContextWrapper) *ContextWrapper {
+	cts := &ContextWrapper{
+		pid: pid,
+		ctx: ctw.ctx,
+	}
+	return cts
+}
+
 // ContextWrapper is an context for the process
 type ContextWrapper struct {
 	pid uint8
@@ -18,15 +27,6 @@ func NewContextWrapper(pid uint8, ctx *Context) *ContextWrapper {
 		ctx: ctx,
 	}
 	return ctw
-}
-
-// SwitchContextWrapper returns a SwitchContextWrapper of the pid
-func SwitchContextWrapper(pid uint8, ctw *ContextWrapper) *ContextWrapper {
-	cts := &ContextWrapper{
-		pid: pid,
-		ctx: ctw.ctx,
-	}
-	return cts
 }
 
 // Switch returns a SwitchContextWrapper of the pid

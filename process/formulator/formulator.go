@@ -70,7 +70,7 @@ func (p *Formulator) Init(reg *types.Register, pm types.ProcessManager, cn types
 
 // InitPolicy called at OnInitGenesis of an application
 func (p *Formulator) InitPolicy(ctw *types.ContextWrapper, rp *RewardPolicy, ap *AlphaPolicy, sp *SigmaPolicy, op *OmegaPolicy, hp *HyperPolicy) error {
-	ctw = ctw.Switch(p.pid)
+	ctw = types.SwitchContextWrapper(p.pid, ctw)
 
 	if bs, err := encoding.Marshal(rp); err != nil {
 		return err
