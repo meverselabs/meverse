@@ -19,9 +19,11 @@ type FletaApp struct {
 	adminAddress common.Address
 }
 
-// NewApp returns a FletaApp
+// NewFletaApp returns a FletaApp
 func NewFletaApp() *FletaApp {
-	return &FletaApp{}
+	return &FletaApp{
+		adminAddress: common.MustParseAddress("4kbaAVnrij"),
+	}
 }
 
 // Name returns the name of the application
@@ -43,7 +45,6 @@ func (app *FletaApp) AdminAddress() common.Address {
 func (app *FletaApp) Init(reg *types.Register, pm types.ProcessManager, cn types.Provider) error {
 	app.pm = pm
 	app.cn = cn
-	app.adminAddress = common.NewAddress(0, 37, 0)
 	return nil
 }
 
@@ -82,12 +83,15 @@ func (app *FletaApp) InitGenesis(ctw *types.ContextWrapper) error {
 		StakingUnlockRequiredBlocks: 1000,
 	}
 
+	ctw.SetProcessData([]byte("admin_address"), app.adminAddress[:])
+
 	if p, err := app.pm.ProcessByName("fleta.formulator"); err != nil {
 		return err
 	} else if fp, is := p.(*formulator.Formulator); !is {
 		return types.ErrNotExistProcess
 	} else {
 		if err := fp.InitPolicy(ctw,
+			app.adminAddress,
 			rewardPolicy,
 			alphaPolicy,
 			sigmaPolicy,
@@ -340,6 +344,23 @@ func (app *FletaApp) InitGenesis(ctw *types.ContextWrapper) error {
 		addSingleAccount(sp, ctw, common.MustParsePublicHash("81zEFdVNtyH1R9hwWdaPLESyh8cJ2hRNTK293r1ANu"), common.MustParseAddress("3CUsUpvDhq"), "account.099")
 		addHyperFormulator(sp, ctw, hyperPolicy, common.MustParsePublicHash("3fxKBUyyw8z5GecXJ44F8VzkbSRpchARCkM3WGqzKZe"), common.MustParsePublicHash("WPd8cx4Yt3XazEeTEqwDcZKaUBbLGrPjvcMarJwfiL"), common.MustParseAddress("3zdxkuGVpw"), "validator.100")
 		addSingleAccount(sp, ctw, common.MustParsePublicHash("3fxKBUyyw8z5GecXJ44F8VzkbSRpchARCkM3WGqzKZe"), common.MustParseAddress("3EgMMJk8w9"), "account.100")
+	}
+	return nil
+}
+
+// OnLoadChain called when the chain loaded
+func (app *FletaApp) OnLoadChain(loader types.LoaderWrapper) error {
+	app.Lock()
+	defer app.Unlock()
+
+	if bs := loader.ProcessData([]byte("admin_address")); len(bs) == 0 {
+		return formulator.ErrInvalidAdminAddress
+	} else {
+		var addr common.Address
+		copy(addr[:], bs)
+		if addr != app.adminAddress {
+			return formulator.ErrInvalidAdminAddress
+		}
 	}
 	return nil
 }

@@ -23,4 +23,5 @@ var (
 	ErrInsufficientStakingAmount               = errors.New("insufficient staking amount")
 	ErrInvalidPolicy                           = errors.New("invalid policy")
 	ErrNotHyperFormulator                      = errors.New("not hyper formulator")
+	ErrInvalidAdminAddress                     = errors.New("invalid admin address")
 )

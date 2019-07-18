@@ -69,9 +69,12 @@ func (p *Formulator) Init(reg *types.Register, pm types.ProcessManager, cn types
 }
 
 // InitPolicy called at OnInitGenesis of an application
-func (p *Formulator) InitPolicy(ctw *types.ContextWrapper, rp *RewardPolicy, ap *AlphaPolicy, sp *SigmaPolicy, op *OmegaPolicy, hp *HyperPolicy) error {
+func (p *Formulator) InitPolicy(ctw *types.ContextWrapper, adminAddress common.Address, rp *RewardPolicy, ap *AlphaPolicy, sp *SigmaPolicy, op *OmegaPolicy, hp *HyperPolicy) error {
 	ctw = types.SwitchContextWrapper(p.pid, ctw)
 
+	if p.adminAddress != adminAddress {
+		return ErrInvalidAdminAddress
+	}
 	if bs, err := encoding.Marshal(rp); err != nil {
 		return err
 	} else {
