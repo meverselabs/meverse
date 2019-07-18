@@ -42,7 +42,7 @@ func (tx *CreateAlpha) Fee(loader types.LoaderWrapper) *amount.Amount {
 
 // Validate validates signatures of the transaction
 func (tx *CreateAlpha) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
-	if len(tx.Name) < 8 || len(tx.Name) > 16 {
+	if !types.IsAllowedAccountName(tx.Name) {
 		return types.ErrInvalidAccountName
 	}
 
@@ -64,7 +64,7 @@ func (tx *CreateAlpha) Validate(p types.Process, loader types.LoaderWrapper, sig
 func (tx *CreateAlpha) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	if len(tx.Name) < 8 || len(tx.Name) > 16 {
+	if !types.IsAllowedAccountName(tx.Name) {
 		return types.ErrInvalidAccountName
 	}
 

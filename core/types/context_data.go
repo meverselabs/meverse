@@ -190,7 +190,7 @@ func (ctd *ContextData) CreateAccount(acc Account) error {
 	if acc.Address() == common.NewAddress(0, 0, 0) {
 		return ErrNotAllowedZeroAddressAccount
 	}
-	if len(acc.Name()) < 4 {
+	if !IsAllowedAccountName(acc.Name()) {
 		return ErrInvalidAccountName
 	}
 	if _, err := ctd.Account(acc.Address()); err != nil {

@@ -40,7 +40,7 @@ func (tx *CreateAccount) Fee(loader types.LoaderWrapper) *amount.Amount {
 
 // Validate validates signatures of the transaction
 func (tx *CreateAccount) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
-	if len(tx.Name) < 8 || len(tx.Name) > 16 {
+	if !types.IsAllowedAccountName(tx.Name) {
 		return types.ErrInvalidAccountName
 	}
 
@@ -62,7 +62,7 @@ func (tx *CreateAccount) Validate(p types.Process, loader types.LoaderWrapper, s
 func (tx *CreateAccount) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Vault)
 
-	if len(tx.Name) < 8 || len(tx.Name) > 16 {
+	if !types.IsAllowedAccountName(tx.Name) {
 		return types.ErrInvalidAccountName
 	}
 

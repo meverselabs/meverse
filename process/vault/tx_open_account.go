@@ -42,7 +42,7 @@ func (tx *OpenAccount) Validate(p types.Process, loader types.LoaderWrapper, sig
 	if len(signers) > 1 {
 		return types.ErrInvalidSignerCount
 	}
-	if len(tx.Name) < 8 || len(tx.Name) > 16 {
+	if !types.IsAllowedAccountName(tx.Name) {
 		return types.ErrInvalidAccountName
 	}
 
@@ -66,7 +66,7 @@ func (tx *OpenAccount) Validate(p types.Process, loader types.LoaderWrapper, sig
 
 // Execute updates the context by the transaction
 func (tx *OpenAccount) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
-	if len(tx.Name) < 8 || len(tx.Name) > 16 {
+	if !types.IsAllowedAccountName(tx.Name) {
 		return types.ErrInvalidAccountName
 	}
 
