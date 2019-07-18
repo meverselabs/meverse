@@ -35,7 +35,7 @@ func (tx *CreateSigma) From() common.Address {
 
 // Fee returns the fee of the transaction
 func (tx *CreateSigma) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
+	return amount.NewCoinAmount(0, 0)
 }
 
 // Validate validates signatures of the transaction
@@ -46,8 +46,11 @@ func (tx *CreateSigma) Validate(p types.Process, loader types.LoaderWrapper, sig
 	if tx.Seq() <= loader.Seq(tx.AlphaFormulators[0]) {
 		return types.ErrInvalidSequence
 	}
+	if len(tx.AlphaFormulators) != len(signers) {
+		return types.ErrInvalidSignerCount
+	}
 
-	for _, From := range tx.AlphaFormulators {
+	for i, From := range tx.AlphaFormulators {
 		acc, err := loader.Account(From)
 		if err != nil {
 			return err
@@ -59,7 +62,7 @@ func (tx *CreateSigma) Validate(p types.Process, loader types.LoaderWrapper, sig
 		if frAcc.FormulatorType != AlphaFormulatorType {
 			return types.ErrInvalidAccountType
 		}
-		if err := frAcc.Validate(loader, signers); err != nil {
+		if err := frAcc.Validate(loader, []common.PublicHash{signers[i]}); err != nil {
 			return err
 		}
 	}
@@ -69,6 +72,10 @@ func (tx *CreateSigma) Validate(p types.Process, loader types.LoaderWrapper, sig
 // Execute updates the context by the transaction
 func (tx *CreateSigma) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
+
+	if tx.From() != tx.AlphaFormulators[0] {
+		return ErrInvalidFormulatorAddress
+	}
 
 	if tx.Seq() != ctw.Seq(tx.AlphaFormulators[0])+1 {
 		return types.ErrInvalidSequence
@@ -130,6 +137,13 @@ func (tx *CreateSigma) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"seq":`)
 	if bs, err := json.Marshal(tx.Seq_); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"from":`)
+	if bs, err := tx.From_.MarshalJSON(); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

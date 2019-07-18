@@ -38,12 +38,16 @@ func (tx *CreateHyper) From() common.Address {
 
 // Fee returns the fee of the transaction
 func (tx *CreateHyper) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
+	return amount.NewCoinAmount(0, 0)
 }
 
 // Validate validates signatures of the transaction
 func (tx *CreateHyper) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	sp := p.(*Formulator)
+
+	if tx.From() != sp.adminAddress {
+		return ErrUnauthorizedTransaction
+	}
 
 	if !types.IsAllowedAccountName(tx.Name) {
 		return types.ErrInvalidAccountName
@@ -60,10 +64,6 @@ func (tx *CreateHyper) Validate(p types.Process, loader types.LoaderWrapper, sig
 		return types.ErrInvalidSequence
 	}
 
-	if tx.From() != sp.adminAddress {
-		return ErrUnauthorizedTransaction
-	}
-
 	fromAcc, err := loader.Account(tx.From())
 	if err != nil {
 		return err
@@ -77,6 +77,10 @@ func (tx *CreateHyper) Validate(p types.Process, loader types.LoaderWrapper, sig
 // Execute updates the context by the transaction
 func (tx *CreateHyper) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
+
+	if tx.From() != sp.adminAddress {
+		return ErrUnauthorizedTransaction
+	}
 
 	if !types.IsAllowedAccountName(tx.Name) {
 		return types.ErrInvalidAccountName
@@ -103,9 +107,6 @@ func (tx *CreateHyper) Execute(p types.Process, ctw *types.ContextWrapper, index
 		return err
 	} else if !has {
 		return types.ErrNotExistAccount
-	}
-	if err := sp.vault.SubBalance(ctw, tx.From(), tx.Fee(ctw)); err != nil {
-		return err
 	}
 	if err := sp.vault.SubBalance(ctw, tx.From(), policy.HyperCreationAmount); err != nil {
 		return err

@@ -34,7 +34,7 @@ func (tx *UpdateValidatorPolicy) From() common.Address {
 
 // Fee returns the fee of the transaction
 func (tx *UpdateValidatorPolicy) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
+	return amount.NewCoinAmount(0, 0)
 }
 
 // Validate validates signatures of the transaction

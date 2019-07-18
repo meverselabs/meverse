@@ -35,7 +35,7 @@ func (tx *CreateOmega) From() common.Address {
 
 // Fee returns the fee of the transaction
 func (tx *CreateOmega) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
+	return amount.NewCoinAmount(0, 0)
 }
 
 // Validate validates signatures of the transaction
@@ -46,8 +46,11 @@ func (tx *CreateOmega) Validate(p types.Process, loader types.LoaderWrapper, sig
 	if tx.Seq() <= loader.Seq(tx.SigmaFormulators[0]) {
 		return types.ErrInvalidSequence
 	}
+	if len(tx.SigmaFormulators) != len(signers) {
+		return types.ErrInvalidSignerCount
+	}
 
-	for _, From := range tx.SigmaFormulators {
+	for i, From := range tx.SigmaFormulators {
 		acc, err := loader.Account(From)
 		if err != nil {
 			return err
@@ -59,7 +62,7 @@ func (tx *CreateOmega) Validate(p types.Process, loader types.LoaderWrapper, sig
 		if frAcc.FormulatorType != SigmaFormulatorType {
 			return types.ErrInvalidAccountType
 		}
-		if err := frAcc.Validate(loader, signers); err != nil {
+		if err := frAcc.Validate(loader, []common.PublicHash{signers[i]}); err != nil {
 			return err
 		}
 	}
