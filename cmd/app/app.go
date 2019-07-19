@@ -1,18 +1,16 @@
 package app
 
 import (
-	"sync"
-
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
 	"github.com/fletaio/fleta/core/types"
+	"github.com/fletaio/fleta/process/admin"
 	"github.com/fletaio/fleta/process/formulator"
 	"github.com/fletaio/fleta/process/vault"
 )
 
 // FletaApp is app
 type FletaApp struct {
-	sync.Mutex
 	*types.ApplicationBase
 	pm           types.ProcessManager
 	cn           types.Provider
@@ -50,9 +48,6 @@ func (app *FletaApp) Init(reg *types.Register, pm types.ProcessManager, cn types
 
 // InitGenesis initializes genesis data
 func (app *FletaApp) InitGenesis(ctw *types.ContextWrapper) error {
-	app.Lock()
-	defer app.Unlock()
-
 	rewardPolicy := &formulator.RewardPolicy{
 		RewardPerBlock:        amount.NewCoinAmount(0, 500000000000000000),
 		PayRewardEveryBlocks:  50,
@@ -83,21 +78,27 @@ func (app *FletaApp) InitGenesis(ctw *types.ContextWrapper) error {
 		StakingUnlockRequiredBlocks: 1000,
 	}
 
-	ctw.SetProcessData([]byte("admin_address"), app.adminAddress[:])
-
 	if p, err := app.pm.ProcessByName("fleta.formulator"); err != nil {
 		return err
 	} else if fp, is := p.(*formulator.Formulator); !is {
 		return types.ErrNotExistProcess
 	} else {
 		if err := fp.InitPolicy(ctw,
-			app.adminAddress,
 			rewardPolicy,
 			alphaPolicy,
 			sigmaPolicy,
 			omegaPolicy,
 			hyperPolicy,
 		); err != nil {
+			return err
+		}
+	}
+	if p, err := app.pm.ProcessByName("fleta.admin"); err != nil {
+		return err
+	} else if ap, is := p.(*admin.Admin); !is {
+		return types.ErrNotExistProcess
+	} else {
+		if err := ap.InitAdmin(ctw, app.adminAddress); err != nil {
 			return err
 		}
 	}
@@ -350,18 +351,6 @@ func (app *FletaApp) InitGenesis(ctw *types.ContextWrapper) error {
 
 // OnLoadChain called when the chain loaded
 func (app *FletaApp) OnLoadChain(loader types.LoaderWrapper) error {
-	app.Lock()
-	defer app.Unlock()
-
-	if bs := loader.ProcessData([]byte("admin_address")); len(bs) == 0 {
-		return formulator.ErrInvalidAdminAddress
-	} else {
-		var addr common.Address
-		copy(addr[:], bs)
-		if addr != app.adminAddress {
-			return formulator.ErrInvalidAdminAddress
-		}
-	}
 	return nil
 }
 

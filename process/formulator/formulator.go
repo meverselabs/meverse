@@ -5,24 +5,24 @@ import (
 	"github.com/fletaio/fleta/common/amount"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
+	"github.com/fletaio/fleta/process/admin"
 	"github.com/fletaio/fleta/process/vault"
 )
 
 // Formulator manages balance of accounts of the chain
 type Formulator struct {
 	*types.ProcessBase
-	pid          uint8
-	pm           types.ProcessManager
-	cn           types.Provider
-	vault        *vault.Vault
-	adminAddress common.Address
+	pid   uint8
+	pm    types.ProcessManager
+	cn    types.Provider
+	vault *vault.Vault
+	admin *admin.Admin
 }
 
 // NewFormulator returns a Formulator
-func NewFormulator(pid uint8, AdminAddress common.Address) *Formulator {
+func NewFormulator(pid uint8) *Formulator {
 	p := &Formulator{
-		pid:          pid,
-		adminAddress: AdminAddress,
+		pid: pid,
 	}
 	return p
 }
@@ -54,6 +54,13 @@ func (p *Formulator) Init(reg *types.Register, pm types.ProcessManager, cn types
 	} else {
 		p.vault = v
 	}
+	if vp, err := pm.ProcessByName("fleta.admin"); err != nil {
+		return err
+	} else if v, is := vp.(*admin.Admin); !is {
+		return types.ErrInvalidProcess
+	} else {
+		p.admin = v
+	}
 
 	reg.RegisterAccount(1, &FormulatorAccount{})
 	reg.RegisterTransaction(1, &CreateAlpha{})
@@ -69,12 +76,9 @@ func (p *Formulator) Init(reg *types.Register, pm types.ProcessManager, cn types
 }
 
 // InitPolicy called at OnInitGenesis of an application
-func (p *Formulator) InitPolicy(ctw *types.ContextWrapper, adminAddress common.Address, rp *RewardPolicy, ap *AlphaPolicy, sp *SigmaPolicy, op *OmegaPolicy, hp *HyperPolicy) error {
+func (p *Formulator) InitPolicy(ctw *types.ContextWrapper, rp *RewardPolicy, ap *AlphaPolicy, sp *SigmaPolicy, op *OmegaPolicy, hp *HyperPolicy) error {
 	ctw = types.SwitchContextWrapper(p.pid, ctw)
 
-	if p.adminAddress != adminAddress {
-		return ErrInvalidAdminAddress
-	}
 	if bs, err := encoding.Marshal(rp); err != nil {
 		return err
 	} else {

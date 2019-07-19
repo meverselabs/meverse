@@ -8,6 +8,7 @@ import (
 	"github.com/fletaio/fleta/common/amount"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
+	"github.com/fletaio/fleta/process/admin"
 )
 
 // CreateHyper is used to make hyper formulator account
@@ -45,8 +46,8 @@ func (tx *CreateHyper) Fee(loader types.LoaderWrapper) *amount.Amount {
 func (tx *CreateHyper) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	sp := p.(*Formulator)
 
-	if tx.From() != sp.adminAddress {
-		return ErrUnauthorizedTransaction
+	if tx.From() != sp.admin.AdminAddress() {
+		return admin.ErrUnauthorizedTransaction
 	}
 
 	if !types.IsAllowedAccountName(tx.Name) {
@@ -78,8 +79,8 @@ func (tx *CreateHyper) Validate(p types.Process, loader types.LoaderWrapper, sig
 func (tx *CreateHyper) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	if tx.From() != sp.adminAddress {
-		return ErrUnauthorizedTransaction
+	if tx.From() != sp.admin.AdminAddress() {
+		return admin.ErrUnauthorizedTransaction
 	}
 
 	if !types.IsAllowedAccountName(tx.Name) {
