@@ -59,7 +59,7 @@ func openNodesDB(dbPath string) (*badger.DB, error) {
 	opts.SyncWrites = true
 	opts.ValueLogFileSize = 1 << 24
 	lockfilePath := filepath.Join(opts.Dir, "LOCK")
-	os.MkdirAll(dbPath, os.ModeDir)
+	os.MkdirAll(dbPath, os.ModePerm)
 
 	os.Remove(lockfilePath)
 

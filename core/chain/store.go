@@ -44,7 +44,7 @@ func NewStore(path string, name string, version uint16, bRecover bool) (*Store, 
 	opts.Truncate = bRecover
 	opts.SyncWrites = true
 	lockfilePath := filepath.Join(opts.Dir, "LOCK")
-	os.MkdirAll(path, os.ModeDir)
+	os.MkdirAll(path, os.ModePerm)
 
 	os.Remove(lockfilePath)
 
