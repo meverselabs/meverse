@@ -8,7 +8,7 @@ import (
 	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
-	"github.com/fletaio/fleta/process/apiserver"
+	"github.com/fletaio/fleta/service/apiserver"
 )
 
 // Consensus implements the proof of formulator algorithm

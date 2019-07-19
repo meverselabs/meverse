@@ -3,7 +3,7 @@ package vault
 import (
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/core/types"
-	"github.com/fletaio/fleta/process/apiserver"
+	"github.com/fletaio/fleta/service/apiserver"
 )
 
 // Vault manages balance of accounts of the chain

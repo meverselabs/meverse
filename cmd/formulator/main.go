@@ -18,9 +18,9 @@ import (
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/pof"
-	"github.com/fletaio/fleta/process/apiserver"
 	"github.com/fletaio/fleta/process/formulator"
 	"github.com/fletaio/fleta/process/vault"
+	"github.com/fletaio/fleta/service/apiserver"
 )
 
 // Config is a configuration for the cmd
