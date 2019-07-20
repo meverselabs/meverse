@@ -34,11 +34,6 @@ func (tx *CreateMultiAccount) From() common.Address {
 	return tx.From_
 }
 
-// Fee returns the fee of the transaction
-func (tx *CreateMultiAccount) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.MulC(10)
-}
-
 // Validate validates signatures of the transaction
 func (tx *CreateMultiAccount) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	if !types.IsAllowedAccountName(tx.Name) {
@@ -81,7 +76,7 @@ func (tx *CreateMultiAccount) Execute(p types.Process, ctw *types.ContextWrapper
 	}
 	ctw.AddSeq(tx.From())
 
-	if err := sp.SubBalance(ctw, tx.From(), tx.Fee(ctw)); err != nil {
+	if err := sp.SubBalance(ctw, tx.From(), amount.COIN.MulC(10)); err != nil {
 		return err
 	}
 

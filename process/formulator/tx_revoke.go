@@ -33,11 +33,6 @@ func (tx *Revoke) From() common.Address {
 	return tx.From_
 }
 
-// Fee returns the fee of the transaction
-func (tx *Revoke) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
-}
-
 // Validate validates signatures of the transaction
 func (tx *Revoke) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	if tx.Seq() <= loader.Seq(tx.From()) {
@@ -89,7 +84,7 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 		if err := encoding.Unmarshal(ctw.ProcessData(tagAlphaPolicy), &policy); err != nil {
 			return err
 		}
-		if err := sp.vault.SubBalance(ctw, frAcc.Address(), tx.Fee(ctw)); err != nil {
+		if err := sp.vault.SubBalance(ctw, frAcc.Address(), amount.COIN.DivC(10)); err != nil {
 			return err
 		}
 		if err := sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), ctw.TargetHeight()+policy.AlphaUnlockRequiredBlocks, frAcc.Amount); err != nil {
@@ -104,7 +99,7 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 			return err
 		}
 
-		if err := sp.vault.SubBalance(ctw, frAcc.Address(), tx.Fee(ctw)); err != nil {
+		if err := sp.vault.SubBalance(ctw, frAcc.Address(), amount.COIN.DivC(10)); err != nil {
 			return err
 		}
 		if err := sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), ctw.TargetHeight()+policy.SigmaUnlockRequiredBlocks, frAcc.Amount); err != nil {
@@ -119,7 +114,7 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 			return err
 		}
 
-		if err := sp.vault.SubBalance(ctw, frAcc.Address(), tx.Fee(ctw)); err != nil {
+		if err := sp.vault.SubBalance(ctw, frAcc.Address(), amount.COIN.DivC(10)); err != nil {
 			return err
 		}
 		if err := sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), ctw.TargetHeight()+policy.OmegaUnlockRequiredBlocks, frAcc.Amount); err != nil {
@@ -134,7 +129,7 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 			return err
 		}
 
-		if err := sp.vault.SubBalance(ctw, frAcc.Address(), tx.Fee(ctw)); err != nil {
+		if err := sp.vault.SubBalance(ctw, frAcc.Address(), amount.COIN.DivC(10)); err != nil {
 			return err
 		}
 		if err := sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), ctw.TargetHeight()+policy.HyperUnlockRequiredBlocks, frAcc.Amount); err != nil {

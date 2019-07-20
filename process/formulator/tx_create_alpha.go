@@ -35,11 +35,6 @@ func (tx *CreateAlpha) From() common.Address {
 	return tx.From_
 }
 
-// Fee returns the fee of the transaction
-func (tx *CreateAlpha) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
-}
-
 // Validate validates signatures of the transaction
 func (tx *CreateAlpha) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	if !types.IsAllowedAccountName(tx.Name) {
@@ -83,7 +78,7 @@ func (tx *CreateAlpha) Execute(p types.Process, ctw *types.ContextWrapper, index
 		return ErrAlphaCreationLimited
 	}
 
-	if err := sp.vault.SubBalance(ctw, tx.From(), tx.Fee(ctw)); err != nil {
+	if err := sp.vault.SubBalance(ctw, tx.From(), amount.COIN.DivC(10)); err != nil {
 		return err
 	}
 	if err := sp.vault.SubBalance(ctw, tx.From(), policy.AlphaCreationAmount); err != nil {

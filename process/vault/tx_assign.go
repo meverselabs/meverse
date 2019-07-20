@@ -27,11 +27,6 @@ func (tx *Assign) Seq() uint64 {
 	return tx.Seq_
 }
 
-// Fee returns the fee of the transaction
-func (tx *Assign) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
-}
-
 // Validate validates signatures of the transaction
 func (tx *Assign) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	if len(tx.Vin) == 0 {
@@ -53,7 +48,7 @@ func (tx *Assign) Validate(p types.Process, loader types.LoaderWrapper, signers 
 		}
 	}
 
-	outsum := tx.Fee(loader)
+	outsum := amount.COIN.DivC(10)
 	for _, vout := range tx.Vout {
 		if vout.Amount.Less(amount.COIN.DivC(10)) {
 			return types.ErrDustAmount

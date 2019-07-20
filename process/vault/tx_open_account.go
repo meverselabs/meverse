@@ -29,11 +29,6 @@ func (tx *OpenAccount) Seq() uint64 {
 	return tx.Seq_
 }
 
-// Fee returns the fee of the transaction
-func (tx *OpenAccount) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.MulC(10)
-}
-
 // Validate validates signatures of the transaction
 func (tx *OpenAccount) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	if len(tx.Vin) == 0 {
@@ -58,7 +53,7 @@ func (tx *OpenAccount) Validate(p types.Process, loader types.LoaderWrapper, sig
 		}
 	}
 
-	outsum := tx.Fee(loader)
+	outsum := amount.COIN.MulC(10)
 	for _, vout := range tx.Vout {
 		if vout.Amount.Less(amount.COIN.DivC(10)) {
 			return types.ErrDustAmount

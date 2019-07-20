@@ -32,11 +32,6 @@ func (tx *Burn) From() common.Address {
 	return tx.From_
 }
 
-// Fee returns the fee of the transaction
-func (tx *Burn) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
-}
-
 // Validate validates signatures of the transaction
 func (tx *Burn) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	if tx.Seq() <= loader.Seq(tx.From()) {
@@ -62,9 +57,6 @@ func (tx *Burn) Execute(p types.Process, ctw *types.ContextWrapper, index uint16
 	}
 	ctw.AddSeq(tx.From())
 
-	if err := sp.SubBalance(ctw, tx.From(), tx.Fee(ctw)); err != nil {
-		return err
-	}
 	if err := sp.SubBalance(ctw, tx.From(), tx.Amount); err != nil {
 		return err
 	}

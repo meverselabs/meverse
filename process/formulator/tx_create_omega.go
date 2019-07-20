@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	"github.com/fletaio/fleta/common"
-	"github.com/fletaio/fleta/common/amount"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
 )
@@ -31,11 +30,6 @@ func (tx *CreateOmega) Seq() uint64 {
 // From returns the from address of the transaction
 func (tx *CreateOmega) From() common.Address {
 	return tx.From_
-}
-
-// Fee returns the fee of the transaction
-func (tx *CreateOmega) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.NewCoinAmount(0, 0)
 }
 
 // Validate validates signatures of the transaction

@@ -32,11 +32,6 @@ func (tx *Withdraw) From() common.Address {
 	return tx.From_
 }
 
-// Fee returns the fee of the transaction
-func (tx *Withdraw) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
-}
-
 // Validate validates signatures of the transaction
 func (tx *Withdraw) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	if tx.Seq() <= loader.Seq(tx.From()) {
@@ -68,7 +63,7 @@ func (tx *Withdraw) Execute(p types.Process, ctw *types.ContextWrapper, index ui
 	}
 	ctw.AddSeq(tx.From())
 
-	outsum := tx.Fee(ctw)
+	outsum := amount.COIN.DivC(10)
 	for n, vout := range tx.Vout {
 		outsum = outsum.Add(vout.Amount)
 		if err := ctw.CreateUTXO(types.MarshalID(ctw.TargetHeight(), index, uint16(n)), vout); err != nil {

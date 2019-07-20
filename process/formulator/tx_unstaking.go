@@ -34,11 +34,6 @@ func (tx *Unstaking) From() common.Address {
 	return tx.From_
 }
 
-// Fee returns the fee of the transaction
-func (tx *Unstaking) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
-}
-
 // Validate validates signatures of the transaction
 func (tx *Unstaking) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	if tx.Amount.Less(amount.COIN) {
@@ -89,7 +84,7 @@ func (tx *Unstaking) Execute(p types.Process, ctw *types.ContextWrapper, index u
 	if err != nil {
 		return err
 	}
-	if err := sp.vault.SubBalance(ctw, fromAcc.Address(), tx.Fee(ctw)); err != nil {
+	if err := sp.vault.SubBalance(ctw, fromAcc.Address(), amount.COIN.DivC(10)); err != nil {
 		return err
 	}
 

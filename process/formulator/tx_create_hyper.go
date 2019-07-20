@@ -37,11 +37,6 @@ func (tx *CreateHyper) From() common.Address {
 	return tx.From_
 }
 
-// Fee returns the fee of the transaction
-func (tx *CreateHyper) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.NewCoinAmount(0, 0)
-}
-
 // Validate validates signatures of the transaction
 func (tx *CreateHyper) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	sp := p.(*Formulator)

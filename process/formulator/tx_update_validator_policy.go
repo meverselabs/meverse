@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	"github.com/fletaio/fleta/common"
-	"github.com/fletaio/fleta/common/amount"
 	"github.com/fletaio/fleta/core/types"
 )
 
@@ -30,11 +29,6 @@ func (tx *UpdateValidatorPolicy) Seq() uint64 {
 // From returns the from address of the transaction
 func (tx *UpdateValidatorPolicy) From() common.Address {
 	return tx.From_
-}
-
-// Fee returns the fee of the transaction
-func (tx *UpdateValidatorPolicy) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.NewCoinAmount(0, 0)
 }
 
 // Validate validates signatures of the transaction
