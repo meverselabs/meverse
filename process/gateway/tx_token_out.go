@@ -35,11 +35,19 @@ func (tx *TokenOut) From() common.Address {
 
 // Validate validates signatures of the transaction
 func (tx *TokenOut) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
+	sp := p.(*Gateway)
+
 	if tx.Amount.Less(amount.COIN.DivC(10)) {
 		return types.ErrDustAmount
 	}
 	if tx.Seq() <= loader.Seq(tx.From()) {
 		return types.ErrInvalidSequence
+	}
+
+	if has, err := loader.HasAccount(sp.admin.AdminAddress()); err != nil {
+		return err
+	} else if !has {
+		return types.ErrNotExistAccount
 	}
 
 	fromAcc, err := loader.Account(tx.From())
@@ -56,31 +64,11 @@ func (tx *TokenOut) Validate(p types.Process, loader types.LoaderWrapper, signer
 func (tx *TokenOut) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Gateway)
 
-	if tx.Amount.Less(amount.COIN.DivC(10)) {
-		return types.ErrDustAmount
-	}
-
-	if tx.Seq() != ctw.Seq(tx.From())+1 {
-		return types.ErrInvalidSequence
-	}
-	ctw.AddSeq(tx.From())
-
-	if has, err := ctw.HasAccount(tx.From()); err != nil {
-		return err
-	} else if !has {
-		return types.ErrNotExistAccount
-	}
 	if err := sp.vault.SubBalance(ctw, tx.From(), amount.COIN.DivC(10)); err != nil {
 		return err
 	}
 	if err := sp.vault.SubBalance(ctw, tx.From(), tx.Amount); err != nil {
 		return err
-	}
-
-	if has, err := ctw.HasAccount(sp.admin.AdminAddress()); err != nil {
-		return err
-	} else if !has {
-		return types.ErrNotExistAccount
 	}
 	if err := sp.vault.AddBalance(ctw, sp.admin.AdminAddress(), tx.Amount); err != nil {
 		return err

@@ -52,11 +52,6 @@ func (tx *Burn) Validate(p types.Process, loader types.LoaderWrapper, signers []
 func (tx *Burn) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Vault)
 
-	if tx.Seq() != ctw.Seq(tx.From())+1 {
-		return types.ErrInvalidSequence
-	}
-	ctw.AddSeq(tx.From())
-
 	if err := sp.SubBalance(ctw, tx.From(), tx.Amount); err != nil {
 		return err
 	}

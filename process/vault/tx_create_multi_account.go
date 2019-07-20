@@ -71,11 +71,6 @@ func (tx *CreateMultiAccount) Validate(p types.Process, loader types.LoaderWrapp
 func (tx *CreateMultiAccount) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Vault)
 
-	if tx.Seq() != ctw.Seq(tx.From())+1 {
-		return types.ErrInvalidSequence
-	}
-	ctw.AddSeq(tx.From())
-
 	if err := sp.SubBalance(ctw, tx.From(), amount.COIN.MulC(10)); err != nil {
 		return err
 	}

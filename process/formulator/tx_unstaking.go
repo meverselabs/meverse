@@ -71,11 +71,6 @@ func (tx *Unstaking) Validate(p types.Process, loader types.LoaderWrapper, signe
 func (tx *Unstaking) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	if tx.Seq() != ctw.Seq(tx.From())+1 {
-		return types.ErrInvalidSequence
-	}
-	ctw.AddSeq(tx.From())
-
 	if tx.Amount.Less(amount.COIN.DivC(10)) {
 		return ErrInvalidStakingAmount
 	}

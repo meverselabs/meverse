@@ -215,7 +215,7 @@ func (fr *FormulatorNode) addTx(t uint16, tx types.Transaction, sigs []common.Si
 	if fr.txpool.IsExist(TxHash) {
 		return txpool.ErrExistTransaction
 	}
-	if atx, is := tx.(txpool.AccountTransaction); is {
+	if atx, is := tx.(chain.AccountTransaction); is {
 		seq := ctx.Seq(atx.From())
 		if atx.Seq() <= seq {
 			return txpool.ErrPastSeq
@@ -563,7 +563,8 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 					Header:               GenMessage.Block.Header,
 					TransactionTypes:     GenMessage.Block.TransactionTypes,
 					Transactions:         GenMessage.Block.Transactions,
-					TranactionSignatures: GenMessage.Block.TranactionSignatures,
+					TransactionSignatures: GenMessage.Block.TransactionSignatures,
+					TransactionResults:   GenMessage.Block.TransactionResults,
 					Signatures:           append([]common.Signature{GenMessage.GeneratorSignature}, sm.ObserverSignatures...),
 				}
 				if err := fr.cs.ct.ConnectBlockWithContext(b, ctx); err != nil {

@@ -63,11 +63,6 @@ func (tx *UpdateValidatorPolicy) Validate(p types.Process, loader types.LoaderWr
 
 // Execute updates the context by the transaction
 func (tx *UpdateValidatorPolicy) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
-	if tx.Seq() != ctw.Seq(tx.From())+1 {
-		return types.ErrInvalidSequence
-	}
-	ctw.AddSeq(tx.From())
-
 	acc, err := ctw.Account(tx.From())
 	if err != nil {
 		return err

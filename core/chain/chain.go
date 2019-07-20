@@ -343,9 +343,26 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 			ctw.Revert(sn)
 			return err
 		}
-		if err := tx.Execute(p, ctw, uint16(i)); err != nil {
-			ctw.Revert(sn)
-			return err
+		if at, is := tx.(AccountTransaction); is {
+			if at.Seq() != ctw.Seq(at.From())+1 {
+				ctw.Revert(sn)
+				return err
+			}
+			ctw.AddSeq(at.From())
+			Result := uint8(0)
+			if err := tx.Execute(p, ctw, uint16(i)); err != nil {
+				Result = 0
+			} else {
+				Result = 1
+			}
+			if Result != b.TransactionResults[i] {
+				return ErrInvalidResult
+			}
+		} else {
+			if err := tx.Execute(p, ctw, uint16(i)); err != nil {
+				ctw.Revert(sn)
+				return err
+			}
 		}
 		if Has, err := ctw.HasAccount(b.Header.Generator); err != nil {
 			ctw.Revert(sn)
@@ -442,7 +459,7 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block) ([][]common.Publi
 			defer wg.Done()
 			for q, tx := range txs {
 				t := b.TransactionTypes[sidx+q]
-				sigs := b.TranactionSignatures[sidx+q]
+				sigs := b.TransactionSignatures[sidx+q]
 
 				TxHash := HashTransactionByType(t, tx)
 				TxHashes[sidx+q+1] = TxHash

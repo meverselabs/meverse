@@ -44,7 +44,6 @@ func (tx *TokenIn) Validate(p types.Process, loader types.LoaderWrapper, signers
 	if tx.From() != sp.admin.AdminAddress() {
 		return admin.ErrUnauthorizedTransaction
 	}
-
 	if tx.Amount.Less(amount.COIN.DivC(10)) {
 		return types.ErrDustAmount
 	}
@@ -54,6 +53,12 @@ func (tx *TokenIn) Validate(p types.Process, loader types.LoaderWrapper, signers
 
 	if sp.HasERC20TXID(loader, tx.ERC20TXID) {
 		return ErrProcessedERC20TXID
+	}
+
+	if has, err := loader.HasAccount(tx.To); err != nil {
+		return err
+	} else if !has {
+		return types.ErrNotExistAccount
 	}
 
 	fromAcc, err := loader.Account(tx.From())
@@ -70,36 +75,8 @@ func (tx *TokenIn) Validate(p types.Process, loader types.LoaderWrapper, signers
 func (tx *TokenIn) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Gateway)
 
-	if tx.From() != sp.admin.AdminAddress() {
-		return admin.ErrUnauthorizedTransaction
-	}
-
-	if tx.Amount.Less(amount.COIN.DivC(10)) {
-		return types.ErrDustAmount
-	}
-
-	if sp.HasERC20TXID(ctw, tx.ERC20TXID) {
-		return ErrProcessedERC20TXID
-	}
-
-	if tx.Seq() != ctw.Seq(tx.From())+1 {
-		return types.ErrInvalidSequence
-	}
-	ctw.AddSeq(tx.From())
-
-	if has, err := ctw.HasAccount(tx.From()); err != nil {
-		return err
-	} else if !has {
-		return types.ErrNotExistAccount
-	}
 	if err := sp.vault.SubBalance(ctw, tx.From(), tx.Amount); err != nil {
 		return err
-	}
-
-	if has, err := ctw.HasAccount(tx.To); err != nil {
-		return err
-	} else if !has {
-		return types.ErrNotExistAccount
 	}
 	if err := sp.vault.AddBalance(ctw, tx.To, tx.Amount); err != nil {
 		return err

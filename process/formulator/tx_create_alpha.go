@@ -65,11 +65,6 @@ func (tx *CreateAlpha) Validate(p types.Process, loader types.LoaderWrapper, sig
 func (tx *CreateAlpha) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	if tx.Seq() != ctw.Seq(tx.From())+1 {
-		return types.ErrInvalidSequence
-	}
-	ctw.AddSeq(tx.From())
-
 	policy := &AlphaPolicy{}
 	if err := encoding.Unmarshal(ctw.ProcessData(tagAlphaPolicy), &policy); err != nil {
 		return err

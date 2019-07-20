@@ -72,11 +72,6 @@ func (tx *Staking) Validate(p types.Process, loader types.LoaderWrapper, signers
 func (tx *Staking) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	if tx.Seq() != ctw.Seq(tx.From())+1 {
-		return types.ErrInvalidSequence
-	}
-	ctw.AddSeq(tx.From())
-
 	acc, err := ctw.Account(tx.HyperFormulator)
 	if err != nil {
 		return err

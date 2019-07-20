@@ -63,11 +63,6 @@ func (tx *Revoke) Validate(p types.Process, loader types.LoaderWrapper, signers 
 func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	if tx.Seq() != ctw.Seq(tx.From())+1 {
-		return types.ErrInvalidSequence
-	}
-	ctw.AddSeq(tx.From())
-
 	heritorAcc, err := ctw.Account(tx.From())
 	if err != nil {
 		return err

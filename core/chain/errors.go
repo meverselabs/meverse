@@ -18,6 +18,7 @@ var (
 	ErrInvalidHashCount             = errors.New("invalid hash count")
 	ErrInvalidGenesisHash           = errors.New("invalid genesis hash")
 	ErrInvalidTxInKey               = errors.New("invalid txin key")
+	ErrInvalidResult                = errors.New("invalid result")
 	ErrChainClosed                  = errors.New("chain closed")
 	ErrStoreClosed                  = errors.New("store closed")
 	ErrNotExistKey                  = errors.New("not exist key")

@@ -58,11 +58,6 @@ func (tx *Withdraw) Validate(p types.Process, loader types.LoaderWrapper, signer
 func (tx *Withdraw) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Vault)
 
-	if tx.Seq() != ctw.Seq(tx.From())+1 {
-		return types.ErrInvalidSequence
-	}
-	ctw.AddSeq(tx.From())
-
 	outsum := amount.COIN.DivC(10)
 	for n, vout := range tx.Vout {
 		outsum = outsum.Add(vout.Amount)

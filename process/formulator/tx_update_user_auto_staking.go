@@ -65,11 +65,6 @@ func (tx *UpdateUserAutoStaking) Validate(p types.Process, loader types.LoaderWr
 func (tx *UpdateUserAutoStaking) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	if tx.Seq() != ctw.Seq(tx.From())+1 {
-		return types.ErrInvalidSequence
-	}
-	ctw.AddSeq(tx.From())
-
 	fromAcc, err := ctw.Account(tx.From())
 	if err != nil {
 		return err

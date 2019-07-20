@@ -31,9 +31,11 @@ func NewBlockCreator(cn *Chain, ctx *types.Context, Generator common.Address, Co
 				Generator:     Generator,
 				ConsensusData: ConsensusData,
 			},
-			Transactions:         []types.Transaction{},
-			TranactionSignatures: [][]common.Signature{},
-			Signatures:           []common.Signature{},
+			TransactionTypes:      []uint16{},
+			Transactions:          []types.Transaction{},
+			TransactionSignatures: [][]common.Signature{},
+			Signatures:            []common.Signature{},
+			TransactionResults:    []uint8{},
 		},
 		txFactory: encoding.Factory("transaction"),
 	}
@@ -90,14 +92,29 @@ func (bc *BlockCreator) UnsafeAddTx(Generator common.Address, t uint16, TxHsah h
 	}
 	ctw := types.NewContextWrapper(pid, bc.ctx)
 
+	Result := uint8(0)
+
 	sn := ctw.Snapshot()
 	if err := tx.Validate(p, ctw, signers); err != nil {
 		ctw.Revert(sn)
 		return err
 	}
-	if err := tx.Execute(p, ctw, uint16(len(bc.b.Transactions))); err != nil {
-		ctw.Revert(sn)
-		return err
+	if at, is := tx.(AccountTransaction); is {
+		if at.Seq() != ctw.Seq(at.From())+1 {
+			ctw.Revert(sn)
+			return err
+		}
+		ctw.AddSeq(at.From())
+		if err := tx.Execute(p, ctw, uint16(len(bc.b.Transactions))); err != nil {
+			Result = 0
+		} else {
+			Result = 1
+		}
+	} else {
+		if err := tx.Execute(p, ctw, uint16(len(bc.b.Transactions))); err != nil {
+			ctw.Revert(sn)
+			return err
+		}
 	}
 	if Has, err := ctw.HasAccount(Generator); err != nil {
 		ctw.Revert(sn)
@@ -114,7 +131,8 @@ func (bc *BlockCreator) UnsafeAddTx(Generator common.Address, t uint16, TxHsah h
 
 	bc.b.TransactionTypes = append(bc.b.TransactionTypes, t)
 	bc.b.Transactions = append(bc.b.Transactions, tx)
-	bc.b.TranactionSignatures = append(bc.b.TranactionSignatures, sigs)
+	bc.b.TransactionSignatures = append(bc.b.TransactionSignatures, sigs)
+	bc.b.TransactionResults = append(bc.b.TransactionResults, Result)
 	bc.txHashes = append(bc.txHashes, TxHsah)
 	return nil
 }

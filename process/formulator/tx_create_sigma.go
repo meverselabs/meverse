@@ -67,11 +67,6 @@ func (tx *CreateSigma) Validate(p types.Process, loader types.LoaderWrapper, sig
 func (tx *CreateSigma) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	if tx.Seq() != ctw.Seq(tx.AlphaFormulators[0])+1 {
-		return types.ErrInvalidSequence
-	}
-	ctw.AddSeq(tx.AlphaFormulators[0])
-
 	policy := &SigmaPolicy{}
 	if err := encoding.Unmarshal(ctw.ProcessData(tagSigmaPolicy), &policy); err != nil {
 		return err

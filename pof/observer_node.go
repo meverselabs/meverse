@@ -842,7 +842,8 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 				Header:               br.BlockGenMessage.Block.Header,
 				TransactionTypes:     br.BlockGenMessage.Block.TransactionTypes,
 				Transactions:         br.BlockGenMessage.Block.Transactions,
-				TranactionSignatures: br.BlockGenMessage.Block.TranactionSignatures,
+				TransactionSignatures: br.BlockGenMessage.Block.TransactionSignatures,
+				TransactionResults:   br.BlockGenMessage.Block.TransactionResults,
 				Signatures:           append([]common.Signature{br.BlockGenMessage.GeneratorSignature}, sigs...),
 			}
 			if err := ob.cs.ct.ConnectBlockWithContext(b, br.Context); err != nil {
