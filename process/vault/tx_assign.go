@@ -12,7 +12,6 @@ import (
 // Assign moves a ownership of utxos
 type Assign struct {
 	Timestamp_ uint64
-	Seq_       uint64
 	Vin        []*types.TxIn
 	Vout       []*types.TxOut
 }
@@ -20,11 +19,6 @@ type Assign struct {
 // Timestamp returns the timestamp of the transaction
 func (tx *Assign) Timestamp() uint64 {
 	return tx.Timestamp_
-}
-
-// Seq returns the sequence of the transaction
-func (tx *Assign) Seq() uint64 {
-	return tx.Seq_
 }
 
 // Validate validates signatures of the transaction
@@ -90,13 +84,6 @@ func (tx *Assign) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
 	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"seq":`)
-	if bs, err := json.Marshal(tx.Seq_); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)
