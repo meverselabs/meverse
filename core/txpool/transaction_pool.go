@@ -10,12 +10,6 @@ import (
 	"github.com/fletaio/fleta/core/types"
 )
 
-// AccountTransaction defines common functions of account model based transactions
-type AccountTransaction interface {
-	Seq() uint64
-	From() common.Address
-}
-
 // TransactionPool provides a transaction queue
 // User can push transaction regardless of UTXO model based transactions or account model based transactions
 // If the sequence of the account model based transaction is not reached to the next of the last sequence, it doens't poped
@@ -82,7 +76,7 @@ func (tp *TransactionPool) Push(t uint16, TxHash hash.Hash256, tx types.Transact
 		Signatures:  sigs,
 		Signers:     signers,
 	}
-	atx, is := tx.(AccountTransaction)
+	atx, is := tx.(chain.AccountTransaction)
 	if !is {
 		tp.utxoQ.Push(TxHash, item)
 		tp.turnQ.Push(true)
@@ -107,7 +101,7 @@ func (tp *TransactionPool) Remove(TxHash hash.Hash256, t types.Transaction) {
 	tp.Lock()
 	defer tp.Unlock()
 
-	tx, is := t.(AccountTransaction)
+	tx, is := t.(chain.AccountTransaction)
 	if !is {
 		if tp.utxoQ.Remove(TxHash) != nil {
 			tp.turnOutMap[true]++
@@ -122,7 +116,7 @@ func (tp *TransactionPool) Remove(TxHash hash.Hash256, t types.Transaction) {
 				}
 				v, _ := q.Peek()
 				item := v.(*PoolItem)
-				if tx.Seq() < item.Transaction.(AccountTransaction).Seq() {
+				if tx.Seq() < item.Transaction.(chain.AccountTransaction).Seq() {
 					break
 				}
 				q.Pop()
@@ -200,7 +194,7 @@ func (tp *TransactionPool) UnsafePop(SeqCache SeqCache) *PoolItem {
 			v, _ := q.Peek()
 			item := v.(*PoolItem)
 			lastSeq := SeqCache.Seq(addr)
-			if item.Transaction.(AccountTransaction).Seq() != lastSeq+1 {
+			if item.Transaction.(chain.AccountTransaction).Seq() != lastSeq+1 {
 				ignoreMap[addr] = true
 				tp.numberQ.Push(addr)
 				if remain > 0 {

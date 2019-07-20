@@ -314,7 +314,7 @@ func (nd *Node) addTx(t uint16, tx types.Transaction, sigs []common.Signature) e
 	if nd.txpool.IsExist(TxHash) {
 		return txpool.ErrExistTransaction
 	}
-	if atx, is := tx.(txpool.AccountTransaction); is {
+	if atx, is := tx.(chain.AccountTransaction); is {
 		seq := ctx.Seq(atx.From())
 		if atx.Seq() <= seq {
 			return txpool.ErrPastSeq
