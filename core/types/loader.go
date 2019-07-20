@@ -9,9 +9,6 @@ import (
 type Loader interface {
 	Name() string
 	Version() uint16
-	TargetHeight() uint32
-	LastHash() hash.Hash256
-	LastTimestamp() uint64
 	Seq(addr common.Address) uint64
 	Account(addr common.Address) (Account, error)
 	AddressByName(Name string) (common.Address, error)
@@ -23,6 +20,9 @@ type Loader interface {
 
 type internalLoader interface {
 	Loader
+	LastHash() hash.Hash256
+	LastTimestamp() uint64
+	TargetHeight() uint32
 	AccountData(addr common.Address, pid uint8, name []byte) []byte
 	AccountDataKeys(addr common.Address, pid uint8, Prefix []byte) ([][]byte, error)
 	ProcessData(pid uint8, name []byte) []byte

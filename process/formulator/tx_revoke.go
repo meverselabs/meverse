@@ -44,6 +44,12 @@ func (tx *Revoke) Validate(p types.Process, loader types.LoaderWrapper, signers 
 		return types.ErrInvalidSequence
 	}
 
+	if has, err := loader.HasAccount(tx.Heritor); err != nil {
+		return err
+	} else if !has {
+		return types.ErrNotExistAccount
+	}
+
 	acc, err := loader.Account(tx.From())
 	if err != nil {
 		return err
@@ -76,10 +82,7 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 	if err != nil {
 		return err
 	}
-	frAcc, is := acc.(*FormulatorAccount)
-	if !is {
-		return types.ErrInvalidAccountType
-	}
+	frAcc := acc.(*FormulatorAccount)
 	switch frAcc.FormulatorType {
 	case AlphaFormulatorType:
 		policy := &AlphaPolicy{}
@@ -164,7 +167,9 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 	default:
 		return types.ErrInvalidAccountType
 	}
-	ctw.DeleteAccount(acc)
+	if err := ctw.DeleteAccount(acc); err != nil {
+		return err
+	}
 	return nil
 }
 

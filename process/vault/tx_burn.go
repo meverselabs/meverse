@@ -62,11 +62,6 @@ func (tx *Burn) Execute(p types.Process, ctw *types.ContextWrapper, index uint16
 	}
 	ctw.AddSeq(tx.From())
 
-	if has, err := ctw.HasAccount(tx.From()); err != nil {
-		return err
-	} else if !has {
-		return types.ErrNotExistAccount
-	}
 	if err := sp.SubBalance(ctw, tx.From(), tx.Fee(ctw)); err != nil {
 		return err
 	}

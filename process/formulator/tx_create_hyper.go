@@ -65,6 +65,12 @@ func (tx *CreateHyper) Validate(p types.Process, loader types.LoaderWrapper, sig
 		return types.ErrInvalidSequence
 	}
 
+	if has, err := loader.HasAccountName(tx.Name); err != nil {
+		return err
+	} else if has {
+		return types.ErrExistAccountName
+	}
+
 	fromAcc, err := loader.Account(tx.From())
 	if err != nil {
 		return err
@@ -79,62 +85,33 @@ func (tx *CreateHyper) Validate(p types.Process, loader types.LoaderWrapper, sig
 func (tx *CreateHyper) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	if tx.From() != sp.admin.AdminAddress() {
-		return admin.ErrUnauthorizedTransaction
+	if tx.Seq() != ctw.Seq(tx.From())+1 {
+		return types.ErrInvalidSequence
 	}
-
-	if !types.IsAllowedAccountName(tx.Name) {
-		return types.ErrInvalidAccountName
-	}
-
-	if tx.Policy == nil {
-		return ErrInvalidPolicy
-	}
-	if tx.Policy.CommissionRatio1000 > 1000 {
-		return ErrInvalidPolicy
-	}
+	ctw.AddSeq(tx.From())
 
 	policy := &HyperPolicy{}
 	if err := encoding.Unmarshal(ctw.ProcessData(tagHyperPolicy), &policy); err != nil {
 		return err
 	}
 
-	if tx.Seq() != ctw.Seq(tx.From())+1 {
-		return types.ErrInvalidSequence
-	}
-	ctw.AddSeq(tx.From())
-
-	if has, err := ctw.HasAccount(tx.From()); err != nil {
-		return err
-	} else if !has {
-		return types.ErrNotExistAccount
-	}
 	if err := sp.vault.SubBalance(ctw, tx.From(), policy.HyperCreationAmount); err != nil {
 		return err
 	}
 
-	addr := common.NewAddress(ctw.TargetHeight(), index, 0)
-	if is, err := ctw.HasAccount(addr); err != nil {
+	acc := &FormulatorAccount{
+		Address_:       common.NewAddress(ctw.TargetHeight(), index, 0),
+		Name_:          tx.Name,
+		FormulatorType: HyperFormulatorType,
+		KeyHash:        tx.KeyHash,
+		GenHash:        tx.GenHash,
+		Amount:         policy.HyperCreationAmount,
+		UpdatedHeight:  ctw.TargetHeight(),
+		StakingAmount:  amount.NewCoinAmount(0, 0),
+		Policy:         tx.Policy,
+	}
+	if err := ctw.CreateAccount(acc); err != nil {
 		return err
-	} else if is {
-		return types.ErrExistAddress
-	} else if isn, err := ctw.HasAccountName(tx.Name); err != nil {
-		return err
-	} else if isn {
-		return types.ErrExistAccountName
-	} else {
-		acc := &FormulatorAccount{
-			Address_:       addr,
-			Name_:          tx.Name,
-			FormulatorType: HyperFormulatorType,
-			KeyHash:        tx.KeyHash,
-			GenHash:        tx.GenHash,
-			Amount:         policy.HyperCreationAmount,
-			UpdatedHeight:  ctw.TargetHeight(),
-			StakingAmount:  amount.NewCoinAmount(0, 0),
-			Policy:         tx.Policy,
-		}
-		ctw.CreateAccount(acc)
 	}
 	return nil
 }

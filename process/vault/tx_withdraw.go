@@ -50,6 +50,12 @@ func (tx *Withdraw) Validate(p types.Process, loader types.LoaderWrapper, signer
 	if err := fromAcc.Validate(loader, signers); err != nil {
 		return err
 	}
+
+	for _, vout := range tx.Vout {
+		if vout.Amount.Less(amount.COIN.DivC(10)) {
+			return types.ErrDustAmount
+		}
+	}
 	return nil
 }
 
@@ -62,16 +68,8 @@ func (tx *Withdraw) Execute(p types.Process, ctw *types.ContextWrapper, index ui
 	}
 	ctw.AddSeq(tx.From())
 
-	if has, err := ctw.HasAccount(tx.From()); err != nil {
-		return err
-	} else if !has {
-		return types.ErrNotExistAccount
-	}
 	outsum := tx.Fee(ctw)
 	for n, vout := range tx.Vout {
-		if vout.Amount.Less(amount.COIN.DivC(10)) {
-			return types.ErrDustAmount
-		}
 		outsum = outsum.Add(vout.Amount)
 		if err := ctw.CreateUTXO(types.MarshalID(ctw.TargetHeight(), index, uint16(n)), vout); err != nil {
 			return err

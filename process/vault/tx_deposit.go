@@ -46,6 +46,13 @@ func (tx *Deposit) Validate(p types.Process, loader types.LoaderWrapper, signers
 		return types.ErrDustAmount
 	}
 
+	if is, err := loader.HasAccount(tx.To); err != nil {
+		return err
+	} else if !is {
+		return types.ErrNotExistAccount
+	}
+
+	insum := amount.NewCoinAmount(0, 0)
 	for _, vin := range tx.Vin {
 		if utxo, err := loader.UTXO(vin.ID()); err != nil {
 			return err
@@ -53,13 +60,21 @@ func (tx *Deposit) Validate(p types.Process, loader types.LoaderWrapper, signers
 			if utxo.PublicHash != signers[0] {
 				return types.ErrInvalidUTXOSigner
 			}
+			insum = insum.Add(utxo.Amount)
 		}
 	}
 
+	outsum := tx.Fee(loader)
+	outsum = outsum.Add(tx.Amount)
 	for _, vout := range tx.Vout {
 		if vout.Amount.Less(amount.COIN.DivC(10)) {
 			return types.ErrDustAmount
 		}
+		outsum = outsum.Add(vout.Amount)
+	}
+
+	if !insum.Equal(outsum) {
+		return types.ErrInvalidOutputAmount
 	}
 	return nil
 }
@@ -68,43 +83,22 @@ func (tx *Deposit) Validate(p types.Process, loader types.LoaderWrapper, signers
 func (tx *Deposit) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Vault)
 
-	if tx.Amount.Less(amount.COIN.DivC(10)) {
-		return types.ErrDustAmount
-	}
-
-	insum := amount.NewCoinAmount(0, 0)
 	for _, vin := range tx.Vin {
 		if utxo, err := ctw.UTXO(vin.ID()); err != nil {
 			return err
 		} else {
-			insum = insum.Add(utxo.Amount)
 			if err := ctw.DeleteUTXO(utxo); err != nil {
 				return err
 			}
 		}
 	}
 
-	outsum := tx.Fee(ctw)
-	outsum = outsum.Add(tx.Amount)
 	for n, vout := range tx.Vout {
-		if vout.Amount.Less(amount.COIN.DivC(10)) {
-			return types.ErrDustAmount
-		}
-		outsum = outsum.Add(vout.Amount)
 		if err := ctw.CreateUTXO(types.MarshalID(ctw.TargetHeight(), index, uint16(n)), vout); err != nil {
 			return err
 		}
 	}
 
-	if !insum.Equal(outsum) {
-		return types.ErrInvalidOutputAmount
-	}
-
-	if is, err := ctw.HasAccount(tx.To); err != nil {
-		return err
-	} else if !is {
-		return types.ErrNotExistAccount
-	}
 	if err := sp.AddBalance(ctw, tx.To, tx.Amount); err != nil {
 		return err
 	}

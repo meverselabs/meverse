@@ -47,12 +47,23 @@ func (tx *Transfer) Validate(p types.Process, loader types.LoaderWrapper, signer
 		return types.ErrInvalidSequence
 	}
 
+	if is, err := loader.HasAccount(tx.To); err != nil {
+		return err
+	} else if !is {
+		return types.ErrNotExistAccount
+	}
+
 	fromAcc, err := loader.Account(tx.From())
 	if err != nil {
 		return err
 	}
 	if err := fromAcc.Validate(loader, signers); err != nil {
 		return err
+	}
+	if has, err := loader.HasAccount(tx.To); err != nil {
+		return err
+	} else if !has {
+		return types.ErrNotExistAccount
 	}
 	return nil
 }
@@ -61,31 +72,16 @@ func (tx *Transfer) Validate(p types.Process, loader types.LoaderWrapper, signer
 func (tx *Transfer) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Vault)
 
-	if tx.Amount.Less(amount.COIN.DivC(10)) {
-		return types.ErrDustAmount
-	}
-
 	if tx.Seq() != ctw.Seq(tx.From())+1 {
 		return types.ErrInvalidSequence
 	}
 	ctw.AddSeq(tx.From())
 
-	if has, err := ctw.HasAccount(tx.From()); err != nil {
-		return err
-	} else if !has {
-		return types.ErrNotExistAccount
-	}
 	if err := sp.SubBalance(ctw, tx.From(), tx.Fee(ctw)); err != nil {
 		return err
 	}
 	if err := sp.SubBalance(ctw, tx.From(), tx.Amount); err != nil {
 		return err
-	}
-
-	if has, err := ctw.HasAccount(tx.To); err != nil {
-		return err
-	} else if !has {
-		return types.ErrNotExistAccount
 	}
 	if err := sp.AddBalance(ctw, tx.To, tx.Amount); err != nil {
 		return err

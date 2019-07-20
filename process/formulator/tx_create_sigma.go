@@ -73,10 +73,6 @@ func (tx *CreateSigma) Validate(p types.Process, loader types.LoaderWrapper, sig
 func (tx *CreateSigma) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	if tx.From() != tx.AlphaFormulators[0] {
-		return ErrInvalidFormulatorAddress
-	}
-
 	if tx.Seq() != ctw.Seq(tx.AlphaFormulators[0])+1 {
 		return types.ErrInvalidSequence
 	}
@@ -90,35 +86,28 @@ func (tx *CreateSigma) Execute(p types.Process, ctw *types.ContextWrapper, index
 		return ErrInvalidFormulatorCount
 	}
 
+	for _, addr := range tx.AlphaFormulators[1:] {
+		if acc, err := ctw.Account(addr); err != nil {
+			return err
+		} else {
+			subAcc := acc.(*FormulatorAccount)
+			if ctw.TargetHeight() < subAcc.UpdatedHeight+policy.SigmaRequiredAlphaBlocks {
+				return ErrInsufficientFormulatorBlocks
+			}
+			if err := sp.vault.AddBalance(ctw, tx.AlphaFormulators[0], subAcc.Amount); err != nil {
+				return err
+			}
+			if err := ctw.DeleteAccount(subAcc); err != nil {
+				return err
+			}
+		}
+	}
+
 	acc, err := ctw.Account(tx.AlphaFormulators[0])
 	if err != nil {
 		return err
 	}
-	frAcc, is := acc.(*FormulatorAccount)
-	if !is {
-		return types.ErrInvalidAccountType
-	} else if frAcc.FormulatorType != AlphaFormulatorType {
-		return types.ErrInvalidAccountType
-	} else if ctw.TargetHeight() < frAcc.UpdatedHeight+policy.SigmaRequiredAlphaBlocks {
-		return ErrInsufficientFormulatorBlocks
-	}
-
-	for _, addr := range tx.AlphaFormulators[1:] {
-		if acc, err := ctw.Account(addr); err != nil {
-			return err
-		} else if subAcc, is := acc.(*FormulatorAccount); !is {
-			return types.ErrInvalidAccountType
-		} else if subAcc.FormulatorType != AlphaFormulatorType {
-			return types.ErrInvalidAccountType
-		} else if ctw.TargetHeight() < subAcc.UpdatedHeight+policy.SigmaRequiredAlphaBlocks {
-			return ErrInsufficientFormulatorBlocks
-		} else {
-			if err := sp.vault.AddBalance(ctw, tx.AlphaFormulators[0], subAcc.Amount); err != nil {
-				return err
-			}
-			ctw.DeleteAccount(subAcc)
-		}
-	}
+	frAcc := acc.(*FormulatorAccount)
 	frAcc.FormulatorType = SigmaFormulatorType
 	frAcc.UpdatedHeight = ctw.TargetHeight()
 	return nil

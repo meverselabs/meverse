@@ -41,6 +41,7 @@ func (tx *Assign) Validate(p types.Process, loader types.LoaderWrapper, signers 
 		return types.ErrInvalidSignerCount
 	}
 
+	insum := amount.NewCoinAmount(0, 0)
 	for _, vin := range tx.Vin {
 		if utxo, err := loader.UTXO(vin.ID()); err != nil {
 			return err
@@ -48,13 +49,20 @@ func (tx *Assign) Validate(p types.Process, loader types.LoaderWrapper, signers 
 			if utxo.PublicHash != signers[0] {
 				return types.ErrInvalidUTXOSigner
 			}
+			insum = insum.Add(utxo.Amount)
 		}
 	}
 
+	outsum := tx.Fee(loader)
 	for _, vout := range tx.Vout {
 		if vout.Amount.Less(amount.COIN.DivC(10)) {
 			return types.ErrDustAmount
 		}
+		outsum = outsum.Add(vout.Amount)
+	}
+
+	if !insum.Equal(outsum) {
+		return types.ErrInvalidOutputAmount
 	}
 	return nil
 }
@@ -73,19 +81,10 @@ func (tx *Assign) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 		}
 	}
 
-	outsum := tx.Fee(ctw)
 	for n, vout := range tx.Vout {
-		if vout.Amount.Less(amount.COIN.DivC(10)) {
-			return types.ErrDustAmount
-		}
-		outsum = outsum.Add(vout.Amount)
 		if err := ctw.CreateUTXO(types.MarshalID(ctw.TargetHeight(), index, uint16(n)), vout); err != nil {
 			return err
 		}
-	}
-
-	if !insum.Equal(outsum) {
-		return types.ErrInvalidOutputAmount
 	}
 	return nil
 }

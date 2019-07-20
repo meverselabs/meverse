@@ -87,13 +87,7 @@ func (tx *UpdateUserAutoStaking) Execute(p types.Process, ctw *types.ContextWrap
 	if err != nil {
 		return err
 	}
-	frAcc, is := acc.(*FormulatorAccount)
-	if !is {
-		return types.ErrInvalidAccountType
-	}
-	if frAcc.FormulatorType != HyperFormulatorType {
-		return ErrNotHyperFormulator
-	}
+	frAcc := acc.(*FormulatorAccount)
 	sp.setUserAutoStaking(ctw, frAcc.Address(), tx.From(), tx.AutoStaking)
 	return nil
 }

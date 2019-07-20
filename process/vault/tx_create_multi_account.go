@@ -41,10 +41,13 @@ func (tx *CreateMultiAccount) Fee(loader types.LoaderWrapper) *amount.Amount {
 
 // Validate validates signatures of the transaction
 func (tx *CreateMultiAccount) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
-	if len(tx.Name) < 8 || len(tx.Name) > 16 {
+	if !types.IsAllowedAccountName(tx.Name) {
 		return types.ErrInvalidAccountName
 	}
-	if len(tx.KeyHashes) <= 1 {
+	if tx.Requried < 1 {
+		return ErrInvalidRequiredKeyHashCount
+	}
+	if len(tx.KeyHashes) <= 1 || len(tx.KeyHashes) > 10 {
 		return ErrInvalidMultiKeyHashCount
 	}
 	keyHashMap := map[common.PublicHash]bool{}
@@ -53,15 +56,6 @@ func (tx *CreateMultiAccount) Validate(p types.Process, loader types.LoaderWrapp
 	}
 	if len(keyHashMap) != len(tx.KeyHashes) {
 		return ErrInvalidMultiKeyHashCount
-	}
-	if len(tx.KeyHashes) > 10 {
-		return ErrInvalidMultiKeyHashCount
-	}
-	if len(tx.Name) < 8 || len(tx.Name) > 16 {
-		return types.ErrInvalidAccountName
-	}
-	if tx.Requried < 1 {
-		return ErrInvalidRequiredKeyHashCount
 	}
 
 	if tx.Seq() <= loader.Seq(tx.From()) {
@@ -82,60 +76,23 @@ func (tx *CreateMultiAccount) Validate(p types.Process, loader types.LoaderWrapp
 func (tx *CreateMultiAccount) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Vault)
 
-	if len(tx.Name) < 8 || len(tx.Name) > 16 {
-		return types.ErrInvalidAccountName
-	}
-	if len(tx.KeyHashes) <= 1 {
-		return ErrInvalidMultiKeyHashCount
-	}
-	keyHashMap := map[common.PublicHash]bool{}
-	for _, v := range tx.KeyHashes {
-		keyHashMap[v] = true
-	}
-	if len(keyHashMap) != len(tx.KeyHashes) {
-		return ErrInvalidMultiKeyHashCount
-	}
-	if len(tx.KeyHashes) > 10 {
-		return ErrInvalidMultiKeyHashCount
-	}
-	if len(tx.Name) < 8 || len(tx.Name) > 16 {
-		return types.ErrInvalidAccountName
-	}
-	if tx.Requried < 1 {
-		return ErrInvalidRequiredKeyHashCount
-	}
-
 	if tx.Seq() != ctw.Seq(tx.From())+1 {
 		return types.ErrInvalidSequence
 	}
 	ctw.AddSeq(tx.From())
 
-	if has, err := ctw.HasAccount(tx.From()); err != nil {
-		return err
-	} else if !has {
-		return types.ErrNotExistAccount
-	}
 	if err := sp.SubBalance(ctw, tx.From(), tx.Fee(ctw)); err != nil {
 		return err
 	}
 
-	addr := common.NewAddress(ctw.TargetHeight(), index, 0)
-	if is, err := ctw.HasAccount(addr); err != nil {
+	acc := &MultiAccount{
+		Address_:  common.NewAddress(ctw.TargetHeight(), index, 0),
+		Name_:     tx.Name,
+		Required:  tx.Requried,
+		KeyHashes: tx.KeyHashes,
+	}
+	if err := ctw.CreateAccount(acc); err != nil {
 		return err
-	} else if is {
-		return types.ErrExistAddress
-	} else if isn, err := ctw.HasAccountName(tx.Name); err != nil {
-		return err
-	} else if isn {
-		return types.ErrExistAccountName
-	} else {
-		acc := &MultiAccount{
-			Address_:  addr,
-			Name_:     tx.Name,
-			Required:  tx.Requried,
-			KeyHashes: tx.KeyHashes,
-		}
-		ctw.CreateAccount(acc)
 	}
 	return nil
 }

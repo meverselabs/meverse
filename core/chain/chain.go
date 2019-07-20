@@ -347,6 +347,17 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 			ctw.Revert(sn)
 			return err
 		}
+		if Has, err := ctw.HasAccount(b.Header.Generator); err != nil {
+			ctw.Revert(sn)
+			if err == types.ErrDeletedAccount {
+				return ErrCannotDeleteGeneratorAccount
+			} else {
+				return err
+			}
+		} else if !Has {
+			ctw.Revert(sn)
+			return ErrCannotDeleteGeneratorAccount
+		}
 		ctw.Commit(sn)
 	}
 

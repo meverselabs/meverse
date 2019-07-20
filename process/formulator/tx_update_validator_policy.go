@@ -58,6 +58,9 @@ func (tx *UpdateValidatorPolicy) Validate(p types.Process, loader types.LoaderWr
 	if !is {
 		return types.ErrInvalidAccountType
 	}
+	if frAcc.FormulatorType != HyperFormulatorType {
+		return ErrNotHyperFormulator
+	}
 	if err := frAcc.Validate(loader, signers); err != nil {
 		return err
 	}
@@ -66,13 +69,6 @@ func (tx *UpdateValidatorPolicy) Validate(p types.Process, loader types.LoaderWr
 
 // Execute updates the context by the transaction
 func (tx *UpdateValidatorPolicy) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
-	if tx.Policy == nil {
-		return ErrInvalidPolicy
-	}
-	if tx.Policy.CommissionRatio1000 >= 1000 {
-		return ErrInvalidPolicy
-	}
-
 	if tx.Seq() != ctw.Seq(tx.From())+1 {
 		return types.ErrInvalidSequence
 	}
@@ -82,13 +78,7 @@ func (tx *UpdateValidatorPolicy) Execute(p types.Process, ctw *types.ContextWrap
 	if err != nil {
 		return err
 	}
-	frAcc, is := acc.(*FormulatorAccount)
-	if !is {
-		return types.ErrInvalidAccountType
-	}
-	if frAcc.FormulatorType != HyperFormulatorType {
-		return ErrNotHyperFormulator
-	}
+	frAcc := acc.(*FormulatorAccount)
 	frAcc.Policy = tx.Policy
 	return nil
 }

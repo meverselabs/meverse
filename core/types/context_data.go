@@ -185,18 +185,18 @@ func (ctd *ContextData) CreateAccount(acc Account) error {
 	if !IsAllowedAccountName(acc.Name()) {
 		return ErrInvalidAccountName
 	}
-	if _, err := ctd.Account(acc.Address()); err != nil {
+	if has, err := ctd.HasAccount(acc.Address()); err != nil {
 		if err != ErrNotExistAccount {
 			return err
 		}
-	} else {
+	} else if has {
 		return ErrExistAccount
 	}
-	if _, err := ctd.AddressByName(acc.Name()); err != nil {
+	if has, err := ctd.HasAccountName(acc.Name()); err != nil {
 		if err != ErrNotExistAccount {
 			return err
 		}
-	} else {
+	} else if has {
 		return ErrExistAccountName
 	}
 	ctd.AccountMap.Put(acc.Address(), acc)

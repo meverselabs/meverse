@@ -62,40 +62,22 @@ func (tx *CreateAccount) Validate(p types.Process, loader types.LoaderWrapper, s
 func (tx *CreateAccount) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Vault)
 
-	if !types.IsAllowedAccountName(tx.Name) {
-		return types.ErrInvalidAccountName
-	}
-
 	if tx.Seq() != ctw.Seq(tx.From())+1 {
 		return types.ErrInvalidSequence
 	}
 	ctw.AddSeq(tx.From())
 
-	if has, err := ctw.HasAccount(tx.From()); err != nil {
-		return err
-	} else if !has {
-		return types.ErrNotExistAccount
-	}
 	if err := sp.SubBalance(ctw, tx.From(), tx.Fee(ctw)); err != nil {
 		return err
 	}
 
-	addr := common.NewAddress(ctw.TargetHeight(), index, 0)
-	if is, err := ctw.HasAccount(addr); err != nil {
+	acc := &SingleAccount{
+		Address_: common.NewAddress(ctw.TargetHeight(), index, 0),
+		Name_:    tx.Name,
+		KeyHash:  tx.KeyHash,
+	}
+	if err := ctw.CreateAccount(acc); err != nil {
 		return err
-	} else if is {
-		return types.ErrExistAddress
-	} else if isn, err := ctw.HasAccountName(tx.Name); err != nil {
-		return err
-	} else if isn {
-		return types.ErrExistAccountName
-	} else {
-		acc := &SingleAccount{
-			Address_: addr,
-			Name_:    tx.Name,
-			KeyHash:  tx.KeyHash,
-		}
-		ctw.CreateAccount(acc)
 	}
 	return nil
 }

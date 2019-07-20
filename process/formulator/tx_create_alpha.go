@@ -50,6 +50,12 @@ func (tx *CreateAlpha) Validate(p types.Process, loader types.LoaderWrapper, sig
 		return types.ErrInvalidSequence
 	}
 
+	if has, err := loader.HasAccountName(tx.Name); err != nil {
+		return err
+	} else if has {
+		return types.ErrExistAccountName
+	}
+
 	fromAcc, err := loader.Account(tx.From())
 	if err != nil {
 		return err
@@ -64,10 +70,6 @@ func (tx *CreateAlpha) Validate(p types.Process, loader types.LoaderWrapper, sig
 func (tx *CreateAlpha) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	if !types.IsAllowedAccountName(tx.Name) {
-		return types.ErrInvalidAccountName
-	}
-
 	if tx.Seq() != ctw.Seq(tx.From())+1 {
 		return types.ErrInvalidSequence
 	}
@@ -81,11 +83,6 @@ func (tx *CreateAlpha) Execute(p types.Process, ctw *types.ContextWrapper, index
 		return ErrAlphaCreationLimited
 	}
 
-	if has, err := ctw.HasAccount(tx.From()); err != nil {
-		return err
-	} else if !has {
-		return types.ErrNotExistAccount
-	}
 	if err := sp.vault.SubBalance(ctw, tx.From(), tx.Fee(ctw)); err != nil {
 		return err
 	}
@@ -93,26 +90,17 @@ func (tx *CreateAlpha) Execute(p types.Process, ctw *types.ContextWrapper, index
 		return err
 	}
 
-	addr := common.NewAddress(ctw.TargetHeight(), index, 0)
-	if is, err := ctw.HasAccount(addr); err != nil {
+	acc := &FormulatorAccount{
+		Address_:       common.NewAddress(ctw.TargetHeight(), index, 0),
+		Name_:          tx.Name,
+		FormulatorType: AlphaFormulatorType,
+		KeyHash:        tx.KeyHash,
+		GenHash:        tx.GenHash,
+		Amount:         policy.AlphaCreationAmount,
+		UpdatedHeight:  ctw.TargetHeight(),
+	}
+	if err := ctw.CreateAccount(acc); err != nil {
 		return err
-	} else if is {
-		return types.ErrExistAddress
-	} else if isn, err := ctw.HasAccountName(tx.Name); err != nil {
-		return err
-	} else if isn {
-		return types.ErrExistAccountName
-	} else {
-		acc := &FormulatorAccount{
-			Address_:       addr,
-			Name_:          tx.Name,
-			FormulatorType: AlphaFormulatorType,
-			KeyHash:        tx.KeyHash,
-			GenHash:        tx.GenHash,
-			Amount:         policy.AlphaCreationAmount,
-			UpdatedHeight:  ctw.TargetHeight(),
-		}
-		ctw.CreateAccount(acc)
 	}
 	return nil
 }

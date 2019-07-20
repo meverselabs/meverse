@@ -41,12 +41,12 @@ func (tx *Unstaking) Fee(loader types.LoaderWrapper) *amount.Amount {
 
 // Validate validates signatures of the transaction
 func (tx *Unstaking) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
-	if tx.Seq() <= loader.Seq(tx.From()) {
-		return types.ErrInvalidSequence
-	}
-
 	if tx.Amount.Less(amount.COIN) {
 		return ErrInvalidStakingAmount
+	}
+
+	if tx.Seq() <= loader.Seq(tx.From()) {
+		return types.ErrInvalidSequence
 	}
 
 	acc, err := loader.Account(tx.HyperFormulator)
@@ -97,13 +97,7 @@ func (tx *Unstaking) Execute(p types.Process, ctw *types.ContextWrapper, index u
 	if err != nil {
 		return err
 	}
-	frAcc, is := acc.(*FormulatorAccount)
-	if !is {
-		return types.ErrInvalidAccountType
-	}
-	if frAcc.FormulatorType != HyperFormulatorType {
-		return types.ErrInvalidAccountType
-	}
+	frAcc := acc.(*FormulatorAccount)
 
 	fromStakingAmount := sp.GetStakingAmount(ctw, tx.HyperFormulator, tx.From())
 	if fromStakingAmount.Less(tx.Amount) {

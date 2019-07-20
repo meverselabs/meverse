@@ -46,6 +46,7 @@ func (tx *OpenAccount) Validate(p types.Process, loader types.LoaderWrapper, sig
 		return types.ErrInvalidAccountName
 	}
 
+	insum := amount.NewCoinAmount(0, 0)
 	for _, vin := range tx.Vin {
 		if utxo, err := loader.UTXO(vin.ID()); err != nil {
 			return err
@@ -53,66 +54,49 @@ func (tx *OpenAccount) Validate(p types.Process, loader types.LoaderWrapper, sig
 			if utxo.PublicHash != signers[0] {
 				return types.ErrInvalidUTXOSigner
 			}
+			insum = insum.Add(utxo.Amount)
 		}
 	}
 
+	outsum := tx.Fee(loader)
 	for _, vout := range tx.Vout {
 		if vout.Amount.Less(amount.COIN.DivC(10)) {
 			return types.ErrDustAmount
 		}
+		outsum = outsum.Add(vout.Amount)
+	}
+
+	if !insum.Equal(outsum) {
+		return types.ErrInvalidOutputAmount
 	}
 	return nil
 }
 
 // Execute updates the context by the transaction
 func (tx *OpenAccount) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
-	if !types.IsAllowedAccountName(tx.Name) {
-		return types.ErrInvalidAccountName
-	}
-
-	insum := amount.NewCoinAmount(0, 0)
 	for _, vin := range tx.Vin {
 		if utxo, err := ctw.UTXO(vin.ID()); err != nil {
 			return err
 		} else {
-			insum = insum.Add(utxo.Amount)
 			if err := ctw.DeleteUTXO(utxo); err != nil {
 				return err
 			}
 		}
 	}
 
-	outsum := tx.Fee(ctw)
 	for n, vout := range tx.Vout {
-		if vout.Amount.Less(amount.COIN.DivC(10)) {
-			return types.ErrDustAmount
-		}
-		outsum = outsum.Add(vout.Amount)
 		if err := ctw.CreateUTXO(types.MarshalID(ctw.TargetHeight(), index, uint16(n)), vout); err != nil {
 			return err
 		}
 	}
 
-	if !insum.Equal(outsum) {
-		return types.ErrInvalidOutputAmount
+	acc := &SingleAccount{
+		Address_: common.NewAddress(ctw.TargetHeight(), index, 0),
+		Name_:    tx.Name,
+		KeyHash:  tx.KeyHash,
 	}
-
-	addr := common.NewAddress(ctw.TargetHeight(), index, 0)
-	if is, err := ctw.HasAccount(addr); err != nil {
+	if err := ctw.CreateAccount(acc); err != nil {
 		return err
-	} else if is {
-		return types.ErrExistAddress
-	} else if isn, err := ctw.HasAccountName(tx.Name); err != nil {
-		return err
-	} else if isn {
-		return types.ErrExistAccountName
-	} else {
-		acc := &SingleAccount{
-			Address_: addr,
-			Name_:    tx.Name,
-			KeyHash:  tx.KeyHash,
-		}
-		ctw.CreateAccount(acc)
 	}
 	return nil
 }
