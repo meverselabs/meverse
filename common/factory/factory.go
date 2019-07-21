@@ -8,6 +8,7 @@ import (
 
 // Factory provides type's factory
 type Factory struct {
+	nameTypeMap     map[string]uint16
 	nameHashTypeMap map[hash.Hash256]uint16
 	typeNameMap     map[uint16]string
 	typeReflectMap  map[uint16]reflect.Type
@@ -16,6 +17,7 @@ type Factory struct {
 // NewFactory returns a Factory
 func NewFactory() *Factory {
 	fc := &Factory{
+		nameTypeMap:     map[string]uint16{},
 		nameHashTypeMap: map[hash.Hash256]uint16{},
 		typeNameMap:     map[uint16]string{},
 		typeReflectMap:  map[uint16]reflect.Type{},
@@ -38,6 +40,7 @@ func (fc *Factory) Register(t uint16, v interface{}) error {
 		return ErrExistTypeName
 	}
 	fc.nameHashTypeMap[h] = t
+	fc.nameTypeMap[name] = t
 	fc.typeNameMap[t] = name
 	fc.typeReflectMap[t] = rt
 	return nil
@@ -47,7 +50,6 @@ func (fc *Factory) Register(t uint16, v interface{}) error {
 func (fc *Factory) Create(t uint16) (interface{}, error) {
 	rt, has := fc.typeReflectMap[t]
 	if !has {
-		panic(ErrUnknownType)
 		return nil, ErrUnknownType
 	}
 	return reflect.New(rt).Interface(), nil
@@ -55,9 +57,13 @@ func (fc *Factory) Create(t uint16) (interface{}, error) {
 
 // TypeOf returns the type of the value
 func (fc *Factory) TypeOf(v interface{}) (uint16, error) {
-	t, has := fc.nameHashTypeMap[hash.Hash([]byte(typeNameOf(reflect.TypeOf(v))))]
+	name := typeNameOf(reflect.TypeOf(v))
+	t, has := fc.nameTypeMap[name]
 	if !has {
-		panic(ErrUnknownType)
+		return 0, ErrUnknownType
+	}
+	t, has = fc.nameHashTypeMap[hash.Hash([]byte(name))]
+	if !has {
 		return 0, ErrUnknownType
 	}
 	return t, nil
@@ -67,7 +73,6 @@ func (fc *Factory) TypeOf(v interface{}) (uint16, error) {
 func (fc *Factory) TypeName(t uint16) (string, error) {
 	name, has := fc.typeNameMap[t]
 	if !has {
-		panic(ErrUnknownType)
 		return "", ErrUnknownType
 	}
 	return name, nil
