@@ -248,6 +248,12 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 		}
 		if !RewardPowerSum.IsZero() {
 			TotalReward := policy.RewardPerBlock.MulC(int64(ctw.TargetHeight() - lastPaidHeight))
+			TotalFee := p.vault.CollectedFee(ctw)
+			if err := p.vault.SubCollectedFee(ctw, TotalFee); err != nil {
+				return err
+			}
+			TotalReward = TotalReward.Add(TotalFee)
+
 			Ratio := TotalReward.Mul(amount.COIN).Div(RewardPowerSum)
 			for RewardAddress, RewardPower := range RewardPowerMap {
 				RewardAmount := RewardPower.Mul(Ratio).Div(amount.COIN)
