@@ -91,6 +91,16 @@ func (addr Address) Height() uint32 {
 	return binary.BigEndian.Uint32(addr[:])
 }
 
+// Index returns the index of the address created
+func (addr Address) Index() uint16 {
+	return binary.BigEndian.Uint16(addr[4:])
+}
+
+// Nonce returns the nonce of the address created
+func (addr Address) Nonce() uint64 {
+	return binary.BigEndian.Uint64(addr[6:])
+}
+
 // ParseAddress parse the address from the string
 func ParseAddress(str string) (Address, error) {
 	bs, err := base58.Decode(str)
