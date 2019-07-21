@@ -85,3 +85,84 @@ func (p *Vault) LockedBalanceTotal(lw types.LoaderWrapper, addr common.Address) 
 		return amount.NewCoinAmount(0, 0)
 	}
 }
+
+// CheckFeePayable returns tx fee can be paid or not
+func (p *Vault) CheckFeePayable(lw types.LoaderWrapper, tx FeeTransaction) error {
+	lw = types.SwitchLoaderWrapper(p.pid, lw)
+
+	if has, err := lw.HasAccount(tx.From()); err != nil {
+		return err
+	} else if !has {
+		return types.ErrNotExistAccount
+	}
+
+	b := p.Balance(lw, tx.From())
+	if b.Less(tx.Fee(lw)) {
+		return ErrInsufficientFee
+	}
+	return nil
+}
+
+// WithFee processes function after withdraw fee
+func (p *Vault) WithFee(ctw *types.ContextWrapper, tx FeeTransaction, fn func() error) error {
+	ctw = types.SwitchContextWrapper(p.pid, ctw)
+
+	fee := tx.Fee(ctw)
+	if err := p.SubBalance(ctw, tx.From(), fee); err != nil {
+		return err
+	}
+	ctw.SetProcessData(tagCollectedFee, p.CollectedFee(ctw).Add(fee).Bytes())
+
+	sn := ctw.Snapshot()
+	if err := fn(); err != nil {
+		ctw.Revert(sn)
+		return err
+	}
+	ctw.Commit(sn)
+	return nil
+}
+
+// CollectedFee returns a total collected fee
+func (p *Vault) CollectedFee(lw types.LoaderWrapper) *amount.Amount {
+	lw = types.SwitchLoaderWrapper(p.pid, lw)
+
+	var total *amount.Amount
+	if bs := lw.ProcessData(tagCollectedFee); len(bs) > 0 {
+		total = amount.NewAmountFromBytes(bs)
+	} else {
+		total = amount.NewCoinAmount(0, 0)
+	}
+	return total
+}
+
+// AddCollectedFee adds collected fee to the account of the address
+func (p *Vault) AddCollectedFee(ctw *types.ContextWrapper, am *amount.Amount) error {
+	ctw = types.SwitchContextWrapper(p.pid, ctw)
+
+	zero := amount.NewCoinAmount(0, 0)
+	if am.Less(zero) {
+		return ErrMinusInput
+	}
+	//log.Println("AddCollectedFee", ctw.TargetHeight(), am.String(), p.CollectedFee(ctw).Add(am).String())
+	ctw.SetProcessData(tagCollectedFee, p.CollectedFee(ctw).Add(am).Bytes())
+	return nil
+}
+
+// SubCollectedFee subtracts collected fee
+func (p *Vault) SubCollectedFee(ctw *types.ContextWrapper, am *amount.Amount) error {
+	ctw = types.SwitchContextWrapper(p.pid, ctw)
+
+	total := p.CollectedFee(ctw)
+	if total.Less(am) {
+		return ErrMinusCollectedFee
+	}
+	//log.Println("SubCollectedFee", ctw.TargetHeight(), am.String(), p.CollectedFee(ctw).Sub(am).String())
+
+	total = total.Sub(am)
+	if total.IsZero() {
+		ctw.SetProcessData(tagCollectedFee, nil)
+	} else {
+		ctw.SetProcessData(tagCollectedFee, total.Bytes())
+	}
+	return nil
+}
