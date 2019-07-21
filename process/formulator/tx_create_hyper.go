@@ -95,6 +95,7 @@ func (tx *CreateHyper) Execute(p types.Process, ctw *types.ContextWrapper, index
 		KeyHash:        tx.KeyHash,
 		GenHash:        tx.GenHash,
 		Amount:         policy.HyperCreationAmount,
+		PreHeight:      0,
 		UpdatedHeight:  ctw.TargetHeight(),
 		StakingAmount:  amount.NewCoinAmount(0, 0),
 		Policy:         tx.Policy,

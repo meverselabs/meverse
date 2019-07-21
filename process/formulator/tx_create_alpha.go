@@ -99,6 +99,7 @@ func (tx *CreateAlpha) Execute(p types.Process, ctw *types.ContextWrapper, index
 			KeyHash:        tx.KeyHash,
 			GenHash:        tx.GenHash,
 			Amount:         policy.AlphaCreationAmount,
+			PreHeight:      0,
 			UpdatedHeight:  ctw.TargetHeight(),
 		}
 		if err := ctw.CreateAccount(acc); err != nil {

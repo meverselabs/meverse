@@ -30,6 +30,17 @@ func (cs *Consensus) updateFormulatorList(ctw *types.ContextWrapper) error {
 					return false
 				}
 			}
+		} else {
+			if acc, is := a.(*formulator.FormulatorAccount); is {
+				r := cs.rt.rankMap[acc.Address()]
+				if r.PublicHash != acc.GenHash {
+					cs.rt.removeRank(addr)
+					if err := cs.rt.addRank(NewRank(addr, acc.GenHash, phase, hash.DoubleHash(addr[:]))); err != nil {
+						inErr = err
+						return false
+					}
+				}
+			}
 		}
 		return true
 	})

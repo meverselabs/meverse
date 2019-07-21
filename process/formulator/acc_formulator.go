@@ -29,6 +29,7 @@ type FormulatorAccount struct {
 	KeyHash        common.PublicHash
 	GenHash        common.PublicHash
 	Amount         *amount.Amount
+	PreHeight      uint32
 	UpdatedHeight  uint32
 	StakingAmount  *amount.Amount
 	Policy         *ValidatorPolicy
@@ -53,6 +54,7 @@ func (acc *FormulatorAccount) Clone() types.Account {
 		KeyHash:        acc.KeyHash.Clone(),
 		GenHash:        acc.GenHash.Clone(),
 		Amount:         acc.Amount.Clone(),
+		PreHeight:      acc.PreHeight,
 		UpdatedHeight:  acc.UpdatedHeight,
 	}
 	if acc.FormulatorType == HyperFormulatorType {
@@ -114,6 +116,13 @@ func (acc *FormulatorAccount) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"amount":`)
 	if bs, err := acc.Amount.MarshalJSON(); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"pre_height":`)
+	if bs, err := json.Marshal(acc.PreHeight); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

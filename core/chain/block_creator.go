@@ -170,5 +170,6 @@ func (bc *BlockCreator) Finalize(Timestamp uint64) (*types.Block, error) {
 
 	bc.b.Header.Timestamp = Timestamp
 	bc.b.Header.ContextHash = bc.ctx.Hash()
+
 	return bc.b, nil
 }

@@ -52,6 +52,14 @@ func (tx *CreateOmega) Validate(p types.Process, loader types.LoaderWrapper, sig
 		return types.ErrInvalidSignerCount
 	}
 
+	policy := &OmegaPolicy{}
+	if err := encoding.Unmarshal(loader.ProcessData(tagOmegaPolicy), &policy); err != nil {
+		return err
+	}
+	if len(tx.SigmaFormulators) != int(policy.OmegaRequiredSigmaCount) {
+		return ErrInvalidFormulatorCount
+	}
+
 	for i, From := range tx.SigmaFormulators {
 		acc, err := loader.Account(From)
 		if err != nil {
@@ -64,17 +72,12 @@ func (tx *CreateOmega) Validate(p types.Process, loader types.LoaderWrapper, sig
 		if frAcc.FormulatorType != SigmaFormulatorType {
 			return types.ErrInvalidAccountType
 		}
+		if loader.TargetHeight()+frAcc.PreHeight < frAcc.UpdatedHeight+policy.OmegaRequiredSigmaBlocks {
+			return ErrInsufficientFormulatorBlocks
+		}
 		if err := frAcc.Validate(loader, []common.PublicHash{signers[i]}); err != nil {
 			return err
 		}
-	}
-
-	policy := &OmegaPolicy{}
-	if err := encoding.Unmarshal(loader.ProcessData(tagOmegaPolicy), &policy); err != nil {
-		return err
-	}
-	if len(tx.SigmaFormulators) != int(policy.OmegaRequiredSigmaCount) {
-		return ErrInvalidFormulatorCount
 	}
 
 	if err := sp.vault.CheckFeePayable(loader, tx); err != nil {
@@ -97,9 +100,6 @@ func (tx *CreateOmega) Execute(p types.Process, ctw *types.ContextWrapper, index
 				return err
 			} else {
 				subAcc := acc.(*FormulatorAccount)
-				if ctw.TargetHeight() < subAcc.UpdatedHeight+policy.OmegaRequiredSigmaBlocks {
-					return ErrInsufficientFormulatorBlocks
-				}
 				if err := sp.vault.AddBalance(ctw, tx.SigmaFormulators[0], subAcc.Amount); err != nil {
 					return err
 				}
@@ -115,6 +115,7 @@ func (tx *CreateOmega) Execute(p types.Process, ctw *types.ContextWrapper, index
 		}
 		frAcc := acc.(*FormulatorAccount)
 		frAcc.FormulatorType = OmegaFormulatorType
+		frAcc.PreHeight = 0
 		frAcc.UpdatedHeight = ctw.TargetHeight()
 		return nil
 	})
