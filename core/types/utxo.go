@@ -6,14 +6,6 @@ type UTXO struct {
 	*TxOut
 }
 
-// NewUTXO returns a UTXO
-func NewUTXO() *UTXO {
-	return &UTXO{
-		TxIn:  NewTxIn(0),
-		TxOut: NewTxOut(),
-	}
-}
-
 // Clone returns the clonend value of it
 func (utxo *UTXO) Clone() *UTXO {
 	return &UTXO{

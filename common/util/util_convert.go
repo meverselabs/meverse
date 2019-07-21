@@ -25,14 +25,6 @@ func Uint16ToBytes(v uint16) []byte {
 	return BNum
 }
 
-// Uint48ToBytes returns a byte array of the uint32 number and the uint16 number
-func Uint48ToBytes(a uint32, b uint16) []byte {
-	BNum := make([]byte, 6)
-	binary.LittleEndian.PutUint32(BNum, a)
-	binary.LittleEndian.PutUint16(BNum[4:], b)
-	return BNum
-}
-
 // BytesToUint16 returns a uint16 number of the byte array
 func BytesToUint16(v []byte) uint16 {
 	return binary.LittleEndian.Uint16(v)

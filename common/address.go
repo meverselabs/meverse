@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"github.com/fletaio/fleta/common/util"
-
 	"github.com/mr-tron/base58/base58"
 )
 
@@ -18,10 +16,10 @@ type Address [AddressSize]byte
 // NewAddress returns a Address by the AccountCoordinate, by the nonce
 func NewAddress(height uint32, index uint16, nonce uint64) Address {
 	var addr Address
-	copy(addr[:], util.Uint32ToBytes(height))
-	copy(addr[4:], util.Uint16ToBytes(index))
+	binary.BigEndian.PutUint32(addr[:], height)
+	binary.BigEndian.PutUint16(addr[4:], index)
 	if nonce > 0 {
-		copy(addr[6:], util.Uint64ToBytes(nonce))
+		binary.BigEndian.PutUint64(addr[6:], nonce)
 	}
 	return addr
 }
@@ -75,7 +73,7 @@ func (addr Address) Clone() Address {
 func (addr Address) WithNonce(nonce uint64) Address {
 	var cp Address
 	copy(cp[:], addr[:])
-	binary.LittleEndian.PutUint64(cp[6:], nonce)
+	binary.BigEndian.PutUint64(addr[6:], nonce)
 	return cp
 }
 
@@ -88,11 +86,9 @@ func (addr Address) Checksum() byte {
 	return cs
 }
 
-// Coordinate returns the coordinate of the address
-func (addr Address) Coordinate() *Coordinate {
-	var coord Coordinate
-	coord.SetBytes(addr[:CoordinateSize])
-	return &coord
+// Height returns the height of the address created
+func (addr Address) Height() uint32 {
+	return binary.BigEndian.Uint32(addr[:])
 }
 
 // ParseAddress parse the address from the string

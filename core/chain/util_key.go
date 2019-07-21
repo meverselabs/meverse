@@ -28,21 +28,21 @@ var (
 func toHeightBlockKey(height uint32) []byte {
 	bs := make([]byte, 6)
 	copy(bs, tagHeightBlock)
-	binary.LittleEndian.PutUint32(bs[2:], height)
+	binary.BigEndian.PutUint32(bs[2:], height)
 	return bs
 }
 
 func toHeightHeaderKey(height uint32) []byte {
 	bs := make([]byte, 6)
 	copy(bs, tagHeightHeader)
-	binary.LittleEndian.PutUint32(bs[2:], height)
+	binary.BigEndian.PutUint32(bs[2:], height)
 	return bs
 }
 
 func toHeightHashKey(height uint32) []byte {
 	bs := make([]byte, 6)
 	copy(bs, tagHeightHash)
-	binary.LittleEndian.PutUint32(bs[2:], height)
+	binary.BigEndian.PutUint32(bs[2:], height)
 	return bs
 }
 
@@ -84,12 +84,12 @@ func toAccountDataKey(key string) []byte {
 func toUTXOKey(id uint64) []byte {
 	bs := make([]byte, 10)
 	copy(bs, tagUTXO)
-	binary.LittleEndian.PutUint64(bs[2:], id)
+	binary.BigEndian.PutUint64(bs[2:], id)
 	return bs
 }
 
 func fromUTXOKey(bs []byte) uint64 {
-	return binary.LittleEndian.Uint64(bs[2:])
+	return binary.BigEndian.Uint64(bs[2:])
 }
 
 func toProcessDataKey(key string) []byte {
@@ -102,7 +102,7 @@ func toProcessDataKey(key string) []byte {
 func toEventKey(id uint64) []byte {
 	bs := make([]byte, 10)
 	copy(bs, tagEvent)
-	binary.LittleEndian.PutUint64(bs[2:], id)
+	binary.BigEndian.PutUint64(bs[2:], id)
 	return bs
 }
 
@@ -117,7 +117,7 @@ func toLockedBalanceKey(Address common.Address, UnlockHeight uint32) []byte {
 	bs := make([]byte, 6+common.AddressSize)
 	copy(bs, tagLockedBalance)
 	copy(bs[2:], Address[:])
-	binary.LittleEndian.PutUint32(bs[2+common.AddressSize:], UnlockHeight)
+	binary.BigEndian.PutUint32(bs[2+common.AddressSize:], UnlockHeight)
 	return bs
 }
 
@@ -130,14 +130,14 @@ func fromLockedBalanceKey(bs []byte) (common.Address, uint32) {
 func toLockedBalanceHeightPrefix(Height uint32) []byte {
 	bs := make([]byte, 6)
 	copy(bs, tagLockedBalance)
-	binary.LittleEndian.PutUint32(bs[2:], Height)
+	binary.BigEndian.PutUint32(bs[2:], Height)
 	return bs
 }
 
 func toLockedBalanceHeightKey(UnlockHeight uint32, Address common.Address) []byte {
 	bs := make([]byte, 6+common.AddressSize)
 	copy(bs, tagLockedBalance)
-	binary.LittleEndian.PutUint32(bs[2:], UnlockHeight)
+	binary.BigEndian.PutUint32(bs[2:], UnlockHeight)
 	copy(bs[6:], Address[:])
 	return bs
 }

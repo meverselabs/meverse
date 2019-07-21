@@ -22,7 +22,7 @@ func (cs *Consensus) updateFormulatorList(ctw *types.ContextWrapper) error {
 	var inErr error
 	phase := cs.rt.largestPhase() + 1
 	ctw.Top().AccountMap.EachAll(func(addr common.Address, a types.Account) bool {
-		if a.Address().Coordinate().Height == ctw.TargetHeight() {
+		if a.Address().Height() == ctw.TargetHeight() {
 			if acc, is := a.(*formulator.FormulatorAccount); is {
 				addr := acc.Address()
 				if err := cs.rt.addRank(NewRank(addr, acc.GenHash, phase, hash.DoubleHash(addr[:]))); err != nil {

@@ -2,8 +2,7 @@ package vault
 
 import (
 	"bytes"
-
-	"github.com/fletaio/fleta/common/util"
+	"encoding/binary"
 
 	"github.com/fletaio/fleta/common"
 )
@@ -19,7 +18,7 @@ var (
 func toLockedBalanceKey(height uint32, addr common.Address) []byte {
 	bs := make([]byte, 6+common.AddressSize)
 	copy(bs, tagLockedBalance)
-	copy(bs[2:], util.Uint32ToBytes(height))
+	binary.BigEndian.PutUint32(bs[2:], height)
 	copy(bs[6:], addr[:])
 	return bs
 }
@@ -27,7 +26,7 @@ func toLockedBalanceKey(height uint32, addr common.Address) []byte {
 func toLockedBalancePrefix(height uint32) []byte {
 	bs := make([]byte, 6)
 	copy(bs, tagLockedBalance)
-	copy(bs[2:], util.Uint32ToBytes(height))
+	binary.BigEndian.PutUint32(bs[2:], height)
 	return bs
 }
 
