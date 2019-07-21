@@ -34,8 +34,15 @@ func (tx *Unstaking) From() common.Address {
 	return tx.From_
 }
 
+// Fee returns the fee of the transaction
+func (tx *Unstaking) Fee(loader types.LoaderWrapper) *amount.Amount {
+	return amount.COIN.DivC(10)
+}
+
 // Validate validates signatures of the transaction
 func (tx *Unstaking) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
+	sp := p.(*Formulator)
+
 	if tx.Amount.Less(amount.COIN) {
 		return ErrInvalidStakingAmount
 	}
@@ -60,8 +67,11 @@ func (tx *Unstaking) Validate(p types.Process, loader types.LoaderWrapper, signe
 	if err != nil {
 		return err
 	}
-
 	if err := fromAcc.Validate(loader, signers); err != nil {
+		return err
+	}
+
+	if err := sp.vault.CheckFeePayable(loader, tx); err != nil {
 		return err
 	}
 	return nil
@@ -71,48 +81,38 @@ func (tx *Unstaking) Validate(p types.Process, loader types.LoaderWrapper, signe
 func (tx *Unstaking) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	if tx.Amount.Less(amount.COIN.DivC(10)) {
-		return ErrInvalidStakingAmount
-	}
+	return sp.vault.WithFee(ctw, tx, func() error {
+		acc, err := ctw.Account(tx.HyperFormulator)
+		if err != nil {
+			return err
+		}
+		frAcc := acc.(*FormulatorAccount)
 
-	fromAcc, err := ctw.Account(tx.From())
-	if err != nil {
-		return err
-	}
-	if err := sp.vault.SubBalance(ctw, fromAcc.Address(), amount.COIN.DivC(10)); err != nil {
-		return err
-	}
+		fromStakingAmount := sp.GetStakingAmount(ctw, tx.HyperFormulator, tx.From())
+		if fromStakingAmount.Less(tx.Amount) {
+			return ErrInsufficientStakingAmount
+		}
+		fromStakingAmount = fromStakingAmount.Sub(tx.Amount)
+		if fromStakingAmount.IsZero() {
+			sp.removeStakingAmount(ctw, tx.HyperFormulator, tx.From())
+			sp.setUserAutoStaking(ctw, tx.HyperFormulator, tx.From(), false)
+		} else {
+			sp.setStakingAmount(ctw, tx.HyperFormulator, tx.From(), fromStakingAmount)
+		}
+		if frAcc.StakingAmount.Less(tx.Amount) {
+			return ErrInsufficientStakingAmount
+		}
+		frAcc.StakingAmount = frAcc.StakingAmount.Sub(tx.Amount)
 
-	acc, err := ctw.Account(tx.HyperFormulator)
-	if err != nil {
-		return err
-	}
-	frAcc := acc.(*FormulatorAccount)
-
-	fromStakingAmount := sp.GetStakingAmount(ctw, tx.HyperFormulator, tx.From())
-	if fromStakingAmount.Less(tx.Amount) {
-		return ErrInsufficientStakingAmount
-	}
-	fromStakingAmount = fromStakingAmount.Sub(tx.Amount)
-	if fromStakingAmount.IsZero() {
-		sp.removeStakingAmount(ctw, tx.HyperFormulator, tx.From())
-		sp.setUserAutoStaking(ctw, tx.HyperFormulator, tx.From(), false)
-	} else {
-		sp.setStakingAmount(ctw, tx.HyperFormulator, tx.From(), fromStakingAmount)
-	}
-	if frAcc.StakingAmount.Less(tx.Amount) {
-		return ErrInsufficientStakingAmount
-	}
-	frAcc.StakingAmount = frAcc.StakingAmount.Sub(tx.Amount)
-
-	policy := &HyperPolicy{}
-	if err := encoding.Unmarshal(ctw.ProcessData(tagHyperPolicy), &policy); err != nil {
-		return err
-	}
-	if err := sp.vault.AddLockedBalance(ctw, fromAcc.Address(), ctw.TargetHeight()+policy.StakingUnlockRequiredBlocks, tx.Amount); err != nil {
-		return err
-	}
-	return nil
+		policy := &HyperPolicy{}
+		if err := encoding.Unmarshal(ctw.ProcessData(tagHyperPolicy), &policy); err != nil {
+			return err
+		}
+		if err := sp.vault.AddLockedBalance(ctw, tx.From(), ctw.TargetHeight()+policy.StakingUnlockRequiredBlocks, tx.Amount); err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 // MarshalJSON is a marshaler function

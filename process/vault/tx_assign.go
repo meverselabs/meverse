@@ -21,6 +21,11 @@ func (tx *Assign) Timestamp() uint64 {
 	return tx.Timestamp_
 }
 
+// Fee returns the fee of the transaction
+func (tx *Assign) Fee(loader types.LoaderWrapper) *amount.Amount {
+	return amount.COIN.DivC(2)
+}
+
 // Validate validates signatures of the transaction
 func (tx *Assign) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	if len(tx.Vin) == 0 {
@@ -42,7 +47,7 @@ func (tx *Assign) Validate(p types.Process, loader types.LoaderWrapper, signers 
 		}
 	}
 
-	outsum := amount.COIN.DivC(10)
+	outsum := tx.Fee(loader)
 	for _, vout := range tx.Vout {
 		if vout.Amount.Less(amount.COIN.DivC(10)) {
 			return types.ErrDustAmount
@@ -58,6 +63,8 @@ func (tx *Assign) Validate(p types.Process, loader types.LoaderWrapper, signers 
 
 // Execute updates the context by the transaction
 func (tx *Assign) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
+	sp := p.(*Vault)
+
 	insum := amount.NewCoinAmount(0, 0)
 	for _, vin := range tx.Vin {
 		if utxo, err := ctw.UTXO(vin.ID()); err != nil {
@@ -74,6 +81,10 @@ func (tx *Assign) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 		if err := ctw.CreateUTXO(types.MarshalID(ctw.TargetHeight(), index, uint16(n)), vout); err != nil {
 			return err
 		}
+	}
+
+	if err := sp.AddCollectedFee(ctw, tx.Fee(ctw)); err != nil {
+		return err
 	}
 	return nil
 }

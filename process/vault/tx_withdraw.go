@@ -32,8 +32,15 @@ func (tx *Withdraw) From() common.Address {
 	return tx.From_
 }
 
+// Fee returns the fee of the transaction
+func (tx *Withdraw) Fee(loader types.LoaderWrapper) *amount.Amount {
+	return amount.COIN.DivC(2)
+}
+
 // Validate validates signatures of the transaction
 func (tx *Withdraw) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
+	sp := p.(*Vault)
+
 	if tx.Seq() <= loader.Seq(tx.From()) {
 		return types.ErrInvalidSequence
 	}
@@ -51,6 +58,10 @@ func (tx *Withdraw) Validate(p types.Process, loader types.LoaderWrapper, signer
 			return types.ErrDustAmount
 		}
 	}
+
+	if err := sp.CheckFeePayable(loader, tx); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -58,17 +69,19 @@ func (tx *Withdraw) Validate(p types.Process, loader types.LoaderWrapper, signer
 func (tx *Withdraw) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Vault)
 
-	outsum := amount.COIN.DivC(10)
-	for n, vout := range tx.Vout {
-		outsum = outsum.Add(vout.Amount)
-		if err := ctw.CreateUTXO(types.MarshalID(ctw.TargetHeight(), index, uint16(n)), vout); err != nil {
+	return sp.WithFee(ctw, tx, func() error {
+		outsum := amount.NewCoinAmount(0, 0)
+		for n, vout := range tx.Vout {
+			outsum = outsum.Add(vout.Amount)
+			if err := ctw.CreateUTXO(types.MarshalID(ctw.TargetHeight(), index, uint16(n)), vout); err != nil {
+				return err
+			}
+		}
+		if err := sp.SubBalance(ctw, tx.From(), outsum); err != nil {
 			return err
 		}
-	}
-	if err := sp.SubBalance(ctw, tx.From(), outsum); err != nil {
-		return err
-	}
-	return nil
+		return nil
+	})
 }
 
 // MarshalJSON is a marshaler function

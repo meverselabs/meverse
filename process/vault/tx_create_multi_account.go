@@ -34,8 +34,15 @@ func (tx *CreateMultiAccount) From() common.Address {
 	return tx.From_
 }
 
+// Fee returns the fee of the transaction
+func (tx *CreateMultiAccount) Fee(loader types.LoaderWrapper) *amount.Amount {
+	return amount.COIN.DivC(10)
+}
+
 // Validate validates signatures of the transaction
 func (tx *CreateMultiAccount) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
+	sp := p.(*Vault)
+
 	if !types.IsAllowedAccountName(tx.Name) {
 		return types.ErrInvalidAccountName
 	}
@@ -64,6 +71,10 @@ func (tx *CreateMultiAccount) Validate(p types.Process, loader types.LoaderWrapp
 	if err := fromAcc.Validate(loader, signers); err != nil {
 		return err
 	}
+
+	if err := sp.CheckFeePayable(loader, tx); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -71,20 +82,26 @@ func (tx *CreateMultiAccount) Validate(p types.Process, loader types.LoaderWrapp
 func (tx *CreateMultiAccount) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Vault)
 
-	if err := sp.SubBalance(ctw, tx.From(), amount.COIN.MulC(10)); err != nil {
-		return err
-	}
+	return sp.WithFee(ctw, tx, func() error {
+		CreationCost := amount.COIN.MulC(10)
+		if err := sp.SubBalance(ctw, tx.From(), CreationCost); err != nil {
+			return err
+		}
+		if err := sp.AddCollectedFee(ctw, CreationCost); err != nil {
+			return err
+		}
 
-	acc := &MultiAccount{
-		Address_:  common.NewAddress(ctw.TargetHeight(), index, 0),
-		Name_:     tx.Name,
-		Required:  tx.Requried,
-		KeyHashes: tx.KeyHashes,
-	}
-	if err := ctw.CreateAccount(acc); err != nil {
-		return err
-	}
-	return nil
+		acc := &MultiAccount{
+			Address_:  common.NewAddress(ctw.TargetHeight(), index, 0),
+			Name_:     tx.Name,
+			Required:  tx.Requried,
+			KeyHashes: tx.KeyHashes,
+		}
+		if err := ctw.CreateAccount(acc); err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 // MarshalJSON is a marshaler function

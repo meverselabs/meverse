@@ -33,8 +33,15 @@ func (tx *Staking) From() common.Address {
 	return tx.From_
 }
 
+// Fee returns the fee of the transaction
+func (tx *Staking) Fee(loader types.LoaderWrapper) *amount.Amount {
+	return amount.COIN.DivC(10)
+}
+
 // Validate validates signatures of the transaction
 func (tx *Staking) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
+	sp := p.(*Formulator)
+
 	if tx.Amount.Less(amount.COIN.DivC(10)) {
 		return ErrInvalidStakingAmount
 	}
@@ -65,6 +72,10 @@ func (tx *Staking) Validate(p types.Process, loader types.LoaderWrapper, signers
 	if err := fromAcc.Validate(loader, signers); err != nil {
 		return err
 	}
+
+	if err := sp.vault.CheckFeePayable(loader, tx); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -72,26 +83,25 @@ func (tx *Staking) Validate(p types.Process, loader types.LoaderWrapper, signers
 func (tx *Staking) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	acc, err := ctw.Account(tx.HyperFormulator)
-	if err != nil {
-		return err
-	}
-	frAcc := acc.(*FormulatorAccount)
+	return sp.vault.WithFee(ctw, tx, func() error {
+		acc, err := ctw.Account(tx.HyperFormulator)
+		if err != nil {
+			return err
+		}
+		frAcc := acc.(*FormulatorAccount)
 
-	fromAcc, err := ctw.Account(tx.From())
-	if err != nil {
-		return err
-	}
-	if err := sp.vault.SubBalance(ctw, fromAcc.Address(), amount.COIN.DivC(10)); err != nil {
-		return err
-	}
-	if err := sp.vault.SubBalance(ctw, fromAcc.Address(), tx.Amount); err != nil {
-		return err
-	}
+		fromAcc, err := ctw.Account(tx.From())
+		if err != nil {
+			return err
+		}
+		if err := sp.vault.SubBalance(ctw, fromAcc.Address(), tx.Amount); err != nil {
+			return err
+		}
 
-	sp.addStakingAmount(ctw, tx.HyperFormulator, tx.From(), tx.Amount)
-	frAcc.StakingAmount = frAcc.StakingAmount.Add(tx.Amount)
-	return nil
+		sp.addStakingAmount(ctw, tx.HyperFormulator, tx.From(), tx.Amount)
+		frAcc.StakingAmount = frAcc.StakingAmount.Add(tx.Amount)
+		return nil
+	})
 }
 
 // MarshalJSON is a marshaler function

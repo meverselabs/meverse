@@ -33,8 +33,15 @@ func (tx *UpdateUserAutoStaking) From() common.Address {
 	return tx.From_
 }
 
+// Fee returns the fee of the transaction
+func (tx *UpdateUserAutoStaking) Fee(loader types.LoaderWrapper) *amount.Amount {
+	return amount.COIN.DivC(10)
+}
+
 // Validate validates signatures of the transaction
 func (tx *UpdateUserAutoStaking) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
+	sp := p.(*Formulator)
+
 	if tx.Seq() <= loader.Seq(tx.From()) {
 		return types.ErrInvalidSequence
 	}
@@ -58,6 +65,10 @@ func (tx *UpdateUserAutoStaking) Validate(p types.Process, loader types.LoaderWr
 	if err := fromAcc.Validate(loader, signers); err != nil {
 		return err
 	}
+
+	if err := sp.vault.CheckFeePayable(loader, tx); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -65,21 +76,15 @@ func (tx *UpdateUserAutoStaking) Validate(p types.Process, loader types.LoaderWr
 func (tx *UpdateUserAutoStaking) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	fromAcc, err := ctw.Account(tx.From())
-	if err != nil {
-		return err
-	}
-	if err := sp.vault.SubBalance(ctw, fromAcc.Address(), amount.COIN.DivC(10)); err != nil {
-		return err
-	}
-
-	acc, err := ctw.Account(tx.HyperFormulator)
-	if err != nil {
-		return err
-	}
-	frAcc := acc.(*FormulatorAccount)
-	sp.setUserAutoStaking(ctw, frAcc.Address(), tx.From(), tx.AutoStaking)
-	return nil
+	return sp.vault.WithFee(ctw, tx, func() error {
+		acc, err := ctw.Account(tx.HyperFormulator)
+		if err != nil {
+			return err
+		}
+		frAcc := acc.(*FormulatorAccount)
+		sp.setUserAutoStaking(ctw, frAcc.Address(), tx.From(), tx.AutoStaking)
+		return nil
+	})
 }
 
 // MarshalJSON is a marshaler function

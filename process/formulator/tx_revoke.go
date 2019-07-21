@@ -33,8 +33,15 @@ func (tx *Revoke) From() common.Address {
 	return tx.From_
 }
 
+// Fee returns the fee of the transaction
+func (tx *Revoke) Fee(loader types.LoaderWrapper) *amount.Amount {
+	return amount.COIN.DivC(10)
+}
+
 // Validate validates signatures of the transaction
 func (tx *Revoke) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
+	sp := p.(*Formulator)
+
 	if tx.Seq() <= loader.Seq(tx.From()) {
 		return types.ErrInvalidSequence
 	}
@@ -56,6 +63,10 @@ func (tx *Revoke) Validate(p types.Process, loader types.LoaderWrapper, signers 
 	if err := frAcc.Validate(loader, signers); err != nil {
 		return err
 	}
+
+	if err := sp.vault.CheckFeePayable(loader, tx); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -63,104 +74,91 @@ func (tx *Revoke) Validate(p types.Process, loader types.LoaderWrapper, signers 
 func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	heritorAcc, err := ctw.Account(tx.From())
-	if err != nil {
-		return err
-	}
-
-	acc, err := ctw.Account(tx.From())
-	if err != nil {
-		return err
-	}
-	frAcc := acc.(*FormulatorAccount)
-	switch frAcc.FormulatorType {
-	case AlphaFormulatorType:
-		policy := &AlphaPolicy{}
-		if err := encoding.Unmarshal(ctw.ProcessData(tagAlphaPolicy), &policy); err != nil {
-			return err
-		}
-		if err := sp.vault.SubBalance(ctw, frAcc.Address(), amount.COIN.DivC(10)); err != nil {
-			return err
-		}
-		if err := sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), ctw.TargetHeight()+policy.AlphaUnlockRequiredBlocks, frAcc.Amount); err != nil {
-			return err
-		}
-		if err := sp.vault.AddBalance(ctw, heritorAcc.Address(), sp.vault.Balance(ctw, frAcc.Address())); err != nil {
-			return err
-		}
-	case SigmaFormulatorType:
-		policy := &SigmaPolicy{}
-		if err := encoding.Unmarshal(ctw.ProcessData(tagSigmaPolicy), &policy); err != nil {
-			return err
-		}
-
-		if err := sp.vault.SubBalance(ctw, frAcc.Address(), amount.COIN.DivC(10)); err != nil {
-			return err
-		}
-		if err := sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), ctw.TargetHeight()+policy.SigmaUnlockRequiredBlocks, frAcc.Amount); err != nil {
-			return err
-		}
-		if err := sp.vault.AddBalance(ctw, heritorAcc.Address(), sp.vault.Balance(ctw, frAcc.Address())); err != nil {
-			return err
-		}
-	case OmegaFormulatorType:
-		policy := &OmegaPolicy{}
-		if err := encoding.Unmarshal(ctw.ProcessData(tagOmegaPolicy), &policy); err != nil {
-			return err
-		}
-
-		if err := sp.vault.SubBalance(ctw, frAcc.Address(), amount.COIN.DivC(10)); err != nil {
-			return err
-		}
-		if err := sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), ctw.TargetHeight()+policy.OmegaUnlockRequiredBlocks, frAcc.Amount); err != nil {
-			return err
-		}
-		if err := sp.vault.AddBalance(ctw, heritorAcc.Address(), sp.vault.Balance(ctw, frAcc.Address())); err != nil {
-			return err
-		}
-	case HyperFormulatorType:
-		policy := &HyperPolicy{}
-		if err := encoding.Unmarshal(ctw.ProcessData(tagHyperPolicy), &policy); err != nil {
-			return err
-		}
-
-		if err := sp.vault.SubBalance(ctw, frAcc.Address(), amount.COIN.DivC(10)); err != nil {
-			return err
-		}
-		if err := sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), ctw.TargetHeight()+policy.HyperUnlockRequiredBlocks, frAcc.Amount); err != nil {
-			return err
-		}
-		if err := sp.vault.AddBalance(ctw, heritorAcc.Address(), sp.vault.Balance(ctw, frAcc.Address())); err != nil {
-			return err
-		}
-
-		PowerMap, err := sp.GetStakingAmountMap(ctw, tx.From())
+	return sp.vault.WithFee(ctw, tx, func() error {
+		heritorAcc, err := ctw.Account(tx.From())
 		if err != nil {
 			return err
 		}
-		for addr, StakingAmount := range PowerMap {
-			if StakingAmount.IsZero() {
-				return ErrInvalidStakingAddress
-			}
-			if frAcc.StakingAmount.Less(StakingAmount) {
-				return ErrCriticalStakingAmount
-			}
-			frAcc.StakingAmount = frAcc.StakingAmount.Sub(StakingAmount)
 
-			if err := sp.vault.AddLockedBalance(ctw, addr, ctw.TargetHeight()+policy.StakingUnlockRequiredBlocks, StakingAmount); err != nil {
+		acc, err := ctw.Account(tx.From())
+		if err != nil {
+			return err
+		}
+		frAcc := acc.(*FormulatorAccount)
+		switch frAcc.FormulatorType {
+		case AlphaFormulatorType:
+			policy := &AlphaPolicy{}
+			if err := encoding.Unmarshal(ctw.ProcessData(tagAlphaPolicy), &policy); err != nil {
 				return err
 			}
+			if err := sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), ctw.TargetHeight()+policy.AlphaUnlockRequiredBlocks, frAcc.Amount); err != nil {
+				return err
+			}
+			if err := sp.vault.AddBalance(ctw, heritorAcc.Address(), sp.vault.Balance(ctw, frAcc.Address())); err != nil {
+				return err
+			}
+		case SigmaFormulatorType:
+			policy := &SigmaPolicy{}
+			if err := encoding.Unmarshal(ctw.ProcessData(tagSigmaPolicy), &policy); err != nil {
+				return err
+			}
+			if err := sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), ctw.TargetHeight()+policy.SigmaUnlockRequiredBlocks, frAcc.Amount); err != nil {
+				return err
+			}
+			if err := sp.vault.AddBalance(ctw, heritorAcc.Address(), sp.vault.Balance(ctw, frAcc.Address())); err != nil {
+				return err
+			}
+		case OmegaFormulatorType:
+			policy := &OmegaPolicy{}
+			if err := encoding.Unmarshal(ctw.ProcessData(tagOmegaPolicy), &policy); err != nil {
+				return err
+			}
+			if err := sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), ctw.TargetHeight()+policy.OmegaUnlockRequiredBlocks, frAcc.Amount); err != nil {
+				return err
+			}
+			if err := sp.vault.AddBalance(ctw, heritorAcc.Address(), sp.vault.Balance(ctw, frAcc.Address())); err != nil {
+				return err
+			}
+		case HyperFormulatorType:
+			policy := &HyperPolicy{}
+			if err := encoding.Unmarshal(ctw.ProcessData(tagHyperPolicy), &policy); err != nil {
+				return err
+			}
+			if err := sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), ctw.TargetHeight()+policy.HyperUnlockRequiredBlocks, frAcc.Amount); err != nil {
+				return err
+			}
+			if err := sp.vault.AddBalance(ctw, heritorAcc.Address(), sp.vault.Balance(ctw, frAcc.Address())); err != nil {
+				return err
+			}
+
+			PowerMap, err := sp.GetStakingAmountMap(ctw, tx.From())
+			if err != nil {
+				return err
+			}
+			for addr, StakingAmount := range PowerMap {
+				if StakingAmount.IsZero() {
+					return ErrInvalidStakingAddress
+				}
+				if frAcc.StakingAmount.Less(StakingAmount) {
+					return ErrCriticalStakingAmount
+				}
+				frAcc.StakingAmount = frAcc.StakingAmount.Sub(StakingAmount)
+
+				if err := sp.vault.AddLockedBalance(ctw, addr, ctw.TargetHeight()+policy.StakingUnlockRequiredBlocks, StakingAmount); err != nil {
+					return err
+				}
+			}
+			if !frAcc.StakingAmount.IsZero() {
+				return ErrCriticalStakingAmount
+			}
+		default:
+			return types.ErrInvalidAccountType
 		}
-		if !frAcc.StakingAmount.IsZero() {
-			return ErrCriticalStakingAmount
+		if err := ctw.DeleteAccount(acc); err != nil {
+			return err
 		}
-	default:
-		return types.ErrInvalidAccountType
-	}
-	if err := ctw.DeleteAccount(acc); err != nil {
-		return err
-	}
-	return nil
+		return nil
+	})
 }
 
 // MarshalJSON is a marshaler function

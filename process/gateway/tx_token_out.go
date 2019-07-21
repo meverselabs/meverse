@@ -33,6 +33,11 @@ func (tx *TokenOut) From() common.Address {
 	return tx.From_
 }
 
+// Fee returns the fee of the transaction
+func (tx *TokenOut) Fee(loader types.LoaderWrapper) *amount.Amount {
+	return amount.COIN.DivC(10)
+}
+
 // Validate validates signatures of the transaction
 func (tx *TokenOut) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	sp := p.(*Gateway)
@@ -57,6 +62,10 @@ func (tx *TokenOut) Validate(p types.Process, loader types.LoaderWrapper, signer
 	if err := fromAcc.Validate(loader, signers); err != nil {
 		return err
 	}
+
+	if err := sp.vault.CheckFeePayable(loader, tx); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -64,16 +73,15 @@ func (tx *TokenOut) Validate(p types.Process, loader types.LoaderWrapper, signer
 func (tx *TokenOut) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Gateway)
 
-	if err := sp.vault.SubBalance(ctw, tx.From(), amount.COIN.DivC(10)); err != nil {
-		return err
-	}
-	if err := sp.vault.SubBalance(ctw, tx.From(), tx.Amount); err != nil {
-		return err
-	}
-	if err := sp.vault.AddBalance(ctw, sp.admin.AdminAddress(), tx.Amount); err != nil {
-		return err
-	}
-	return nil
+	return sp.vault.WithFee(ctw, tx, func() error {
+		if err := sp.vault.SubBalance(ctw, tx.From(), tx.Amount); err != nil {
+			return err
+		}
+		if err := sp.vault.AddBalance(ctw, sp.admin.AdminAddress(), tx.Amount); err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 // MarshalJSON is a marshaler function

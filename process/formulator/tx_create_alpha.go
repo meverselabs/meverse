@@ -35,8 +35,15 @@ func (tx *CreateAlpha) From() common.Address {
 	return tx.From_
 }
 
+// Fee returns the fee of the transaction
+func (tx *CreateAlpha) Fee(loader types.LoaderWrapper) *amount.Amount {
+	return amount.COIN.DivC(10)
+}
+
 // Validate validates signatures of the transaction
 func (tx *CreateAlpha) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
+	sp := p.(*Formulator)
+
 	if !types.IsAllowedAccountName(tx.Name) {
 		return types.ErrInvalidAccountName
 	}
@@ -58,6 +65,10 @@ func (tx *CreateAlpha) Validate(p types.Process, loader types.LoaderWrapper, sig
 	if err := fromAcc.Validate(loader, signers); err != nil {
 		return err
 	}
+
+	if err := sp.vault.CheckFeePayable(loader, tx); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -65,34 +76,32 @@ func (tx *CreateAlpha) Validate(p types.Process, loader types.LoaderWrapper, sig
 func (tx *CreateAlpha) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	policy := &AlphaPolicy{}
-	if err := encoding.Unmarshal(ctw.ProcessData(tagAlphaPolicy), &policy); err != nil {
-		return err
-	}
-	if ctw.TargetHeight() < policy.AlphaCreationLimitHeight {
-		return ErrAlphaCreationLimited
-	}
+	return sp.vault.WithFee(ctw, tx, func() error {
+		policy := &AlphaPolicy{}
+		if err := encoding.Unmarshal(ctw.ProcessData(tagAlphaPolicy), &policy); err != nil {
+			return err
+		}
+		if ctw.TargetHeight() < policy.AlphaCreationLimitHeight {
+			return ErrAlphaCreationLimited
+		}
+		if err := sp.vault.SubBalance(ctw, tx.From(), policy.AlphaCreationAmount); err != nil {
+			return err
+		}
 
-	if err := sp.vault.SubBalance(ctw, tx.From(), amount.COIN.DivC(10)); err != nil {
-		return err
-	}
-	if err := sp.vault.SubBalance(ctw, tx.From(), policy.AlphaCreationAmount); err != nil {
-		return err
-	}
-
-	acc := &FormulatorAccount{
-		Address_:       common.NewAddress(ctw.TargetHeight(), index, 0),
-		Name_:          tx.Name,
-		FormulatorType: AlphaFormulatorType,
-		KeyHash:        tx.KeyHash,
-		GenHash:        tx.GenHash,
-		Amount:         policy.AlphaCreationAmount,
-		UpdatedHeight:  ctw.TargetHeight(),
-	}
-	if err := ctw.CreateAccount(acc); err != nil {
-		return err
-	}
-	return nil
+		acc := &FormulatorAccount{
+			Address_:       common.NewAddress(ctw.TargetHeight(), index, 0),
+			Name_:          tx.Name,
+			FormulatorType: AlphaFormulatorType,
+			KeyHash:        tx.KeyHash,
+			GenHash:        tx.GenHash,
+			Amount:         policy.AlphaCreationAmount,
+			UpdatedHeight:  ctw.TargetHeight(),
+		}
+		if err := ctw.CreateAccount(acc); err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 // MarshalJSON is a marshaler function

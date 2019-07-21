@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/amount"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
 )
@@ -32,8 +33,15 @@ func (tx *CreateSigma) From() common.Address {
 	return tx.From_
 }
 
+// Fee returns the fee of the transaction
+func (tx *CreateSigma) Fee(loader types.LoaderWrapper) *amount.Amount {
+	return amount.COIN.DivC(10)
+}
+
 // Validate validates signatures of the transaction
 func (tx *CreateSigma) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
+	sp := p.(*Formulator)
+
 	if tx.From() != tx.AlphaFormulators[0] {
 		return ErrInvalidFormulatorAddress
 	}
@@ -60,6 +68,10 @@ func (tx *CreateSigma) Validate(p types.Process, loader types.LoaderWrapper, sig
 			return err
 		}
 	}
+
+	if err := sp.vault.CheckFeePayable(loader, tx); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -67,39 +79,41 @@ func (tx *CreateSigma) Validate(p types.Process, loader types.LoaderWrapper, sig
 func (tx *CreateSigma) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	policy := &SigmaPolicy{}
-	if err := encoding.Unmarshal(ctw.ProcessData(tagSigmaPolicy), &policy); err != nil {
-		return err
-	}
-	if len(tx.AlphaFormulators) != int(policy.SigmaRequiredAlphaCount) {
-		return ErrInvalidFormulatorCount
-	}
-
-	for _, addr := range tx.AlphaFormulators[1:] {
-		if acc, err := ctw.Account(addr); err != nil {
+	return sp.vault.WithFee(ctw, tx, func() error {
+		policy := &SigmaPolicy{}
+		if err := encoding.Unmarshal(ctw.ProcessData(tagSigmaPolicy), &policy); err != nil {
 			return err
-		} else {
-			subAcc := acc.(*FormulatorAccount)
-			if ctw.TargetHeight() < subAcc.UpdatedHeight+policy.SigmaRequiredAlphaBlocks {
-				return ErrInsufficientFormulatorBlocks
-			}
-			if err := sp.vault.AddBalance(ctw, tx.AlphaFormulators[0], subAcc.Amount); err != nil {
+		}
+		if len(tx.AlphaFormulators) != int(policy.SigmaRequiredAlphaCount) {
+			return ErrInvalidFormulatorCount
+		}
+
+		for _, addr := range tx.AlphaFormulators[1:] {
+			if acc, err := ctw.Account(addr); err != nil {
 				return err
-			}
-			if err := ctw.DeleteAccount(subAcc); err != nil {
-				return err
+			} else {
+				subAcc := acc.(*FormulatorAccount)
+				if ctw.TargetHeight() < subAcc.UpdatedHeight+policy.SigmaRequiredAlphaBlocks {
+					return ErrInsufficientFormulatorBlocks
+				}
+				if err := sp.vault.AddBalance(ctw, tx.AlphaFormulators[0], subAcc.Amount); err != nil {
+					return err
+				}
+				if err := ctw.DeleteAccount(subAcc); err != nil {
+					return err
+				}
 			}
 		}
-	}
 
-	acc, err := ctw.Account(tx.AlphaFormulators[0])
-	if err != nil {
-		return err
-	}
-	frAcc := acc.(*FormulatorAccount)
-	frAcc.FormulatorType = SigmaFormulatorType
-	frAcc.UpdatedHeight = ctw.TargetHeight()
-	return nil
+		acc, err := ctw.Account(tx.AlphaFormulators[0])
+		if err != nil {
+			return err
+		}
+		frAcc := acc.(*FormulatorAccount)
+		frAcc.FormulatorType = SigmaFormulatorType
+		frAcc.UpdatedHeight = ctw.TargetHeight()
+		return nil
+	})
 }
 
 // MarshalJSON is a marshaler function

@@ -84,7 +84,6 @@ func (tx *CreateHyper) Execute(p types.Process, ctw *types.ContextWrapper, index
 	if err := encoding.Unmarshal(ctw.ProcessData(tagHyperPolicy), &policy); err != nil {
 		return err
 	}
-
 	if err := sp.vault.SubBalance(ctw, tx.From(), policy.HyperCreationAmount); err != nil {
 		return err
 	}

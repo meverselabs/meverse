@@ -23,6 +23,11 @@ func (tx *Deposit) Timestamp() uint64 {
 	return tx.Timestamp_
 }
 
+// Fee returns the fee of the transaction
+func (tx *Deposit) Fee(loader types.LoaderWrapper) *amount.Amount {
+	return amount.COIN.DivC(2)
+}
+
 // Validate validates signatures of the transaction
 func (tx *Deposit) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	if len(tx.Vin) == 0 {
@@ -53,7 +58,7 @@ func (tx *Deposit) Validate(p types.Process, loader types.LoaderWrapper, signers
 		}
 	}
 
-	outsum := amount.COIN.DivC(10)
+	outsum := tx.Fee(loader)
 	outsum = outsum.Add(tx.Amount)
 	for _, vout := range tx.Vout {
 		if vout.Amount.Less(amount.COIN.DivC(10)) {
@@ -89,6 +94,10 @@ func (tx *Deposit) Execute(p types.Process, ctw *types.ContextWrapper, index uin
 	}
 
 	if err := sp.AddBalance(ctw, tx.To, tx.Amount); err != nil {
+		return err
+	}
+
+	if err := sp.AddCollectedFee(ctw, tx.Fee(ctw)); err != nil {
 		return err
 	}
 	return nil
