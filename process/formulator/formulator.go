@@ -305,7 +305,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 								CommissionSum = CommissionSum.Add(Commission)
 								RewardAmount = RewardAmount.Sub(Commission)
 								if p.getUserAutoStaking(ctw, frAcc.Address(), StakingAddress) {
-									p.addStakingAmount(ctw, frAcc.Address(), StakingAddress, RewardAmount)
+									p.AddStakingAmount(ctw, frAcc.Address(), StakingAddress, RewardAmount)
 								} else {
 									if err := p.vault.AddBalance(ctw, StakingAddress, RewardAmount); err != nil {
 										inErr = err

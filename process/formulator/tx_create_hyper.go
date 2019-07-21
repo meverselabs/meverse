@@ -45,10 +45,6 @@ func (tx *CreateHyper) Validate(p types.Process, loader types.LoaderWrapper, sig
 		return admin.ErrUnauthorizedTransaction
 	}
 
-	if !types.IsAllowedAccountName(tx.Name) {
-		return types.ErrInvalidAccountName
-	}
-
 	if tx.Policy == nil {
 		return ErrInvalidValidatorPolicy
 	}

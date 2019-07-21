@@ -77,7 +77,10 @@ func (p *Formulator) GetStakingAmount(lw types.LoaderWrapper, HyperAddress commo
 	}
 }
 
-func (p *Formulator) addStakingAmount(ctw *types.ContextWrapper, HyperAddress common.Address, StakingAddress common.Address, StakingAmount *amount.Amount) {
+// AddStakingAmount adds staking amount of the address at the hyper formulator
+func (p *Formulator) AddStakingAmount(ctw *types.ContextWrapper, HyperAddress common.Address, StakingAddress common.Address, StakingAmount *amount.Amount) {
+	ctw = types.SwitchContextWrapper(p.pid, ctw)
+
 	am := p.GetStakingAmount(ctw, HyperAddress, StakingAddress)
 	if am.IsZero() {
 		var Count uint32

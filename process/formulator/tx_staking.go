@@ -98,7 +98,7 @@ func (tx *Staking) Execute(p types.Process, ctw *types.ContextWrapper, index uin
 			return err
 		}
 
-		sp.addStakingAmount(ctw, tx.HyperFormulator, tx.From(), tx.Amount)
+		sp.AddStakingAmount(ctw, tx.HyperFormulator, tx.From(), tx.Amount)
 		frAcc.StakingAmount = frAcc.StakingAmount.Add(tx.Amount)
 		return nil
 	})
