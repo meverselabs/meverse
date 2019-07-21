@@ -113,11 +113,6 @@ func (ctw *ContextWrapper) DeleteAccount(acc Account) error {
 	return ctw.ctx.DeleteAccount(acc)
 }
 
-// AccountDataKeys returns all data keys of the account in the context
-func (ctw *ContextWrapper) AccountDataKeys(addr common.Address, Prefix []byte) ([][]byte, error) {
-	return ctw.ctx.AccountDataKeys(addr, ctw.pid, Prefix)
-}
-
 // AccountData returns the account data from the top snapshot
 func (ctw *ContextWrapper) AccountData(addr common.Address, name []byte) []byte {
 	return ctw.ctx.AccountData(addr, ctw.pid, name)
@@ -176,11 +171,6 @@ func (ctw *ContextWrapper) Commit(sn int) {
 // StackSize returns the size of the context data stack
 func (ctw *ContextWrapper) StackSize() int {
 	return ctw.ctx.StackSize()
-}
-
-// ProcessDataKeys returns all data keys of the process in the context
-func (ctw *ContextWrapper) ProcessDataKeys(Prefix []byte) ([][]byte, error) {
-	return ctw.ctx.ProcessDataKeys(ctw.pid, Prefix)
 }
 
 // ProcessData returns the process data from the top snapshot

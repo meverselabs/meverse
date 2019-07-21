@@ -215,43 +215,6 @@ func (ctd *ContextData) DeleteAccount(acc Account) error {
 	return nil
 }
 
-// AccountDataKeys returns all data keys of the account in the context
-func (ctd *ContextData) AccountDataKeys(addr common.Address, pid uint8, Prefix []byte) ([][]byte, error) {
-	keyMap := NewStringBoolMap()
-	if ctd.Parent != nil {
-		keys, err := ctd.Parent.AccountDataKeys(addr, pid, Prefix)
-		if err != nil {
-			return nil, err
-		}
-		for _, k := range keys {
-			keyMap.Put(string(k), true)
-		}
-	} else {
-		keys, err := ctd.loader.AccountDataKeys(addr, pid, Prefix)
-		if err != nil {
-			return nil, err
-		}
-		for _, k := range keys {
-			keyMap.Put(string(k), true)
-		}
-	}
-	prefix := string(addr[:]) + string(pid)
-	ctd.AccountDataMap.EachPrefix(prefix, func(key string, value []byte) bool {
-		keyMap.Put(key[len(prefix):], true)
-		return true
-	})
-	ctd.DeletedAccountDataMap.EachPrefix(prefix, func(key string, value bool) bool {
-		keyMap.Delete(key[len(prefix):])
-		return true
-	})
-	keys := [][]byte{}
-	keyMap.EachAll(func(key string, value bool) bool {
-		keys = append(keys, []byte(key))
-		return true
-	})
-	return keys, nil
-}
-
 // AccountData returns the account data
 func (ctd *ContextData) AccountData(addr common.Address, pid uint8, name []byte) []byte {
 	key := string(addr[:]) + string(pid) + string(name)
@@ -381,43 +344,6 @@ func (ctd *ContextData) EmitEvent(e Event) error {
 	ctd.EventN++
 	ctd.Events = append(ctd.Events, e)
 	return nil
-}
-
-// ProcessDataKeys returns all data keys of the process in the context
-func (ctd *ContextData) ProcessDataKeys(pid uint8, Prefix []byte) ([][]byte, error) {
-	keyMap := NewStringBoolMap()
-	if ctd.Parent != nil {
-		keys, err := ctd.Parent.ProcessDataKeys(pid, Prefix)
-		if err != nil {
-			return nil, err
-		}
-		for _, k := range keys {
-			keyMap.Put(string(k), true)
-		}
-	} else {
-		keys, err := ctd.loader.ProcessDataKeys(pid, Prefix)
-		if err != nil {
-			return nil, err
-		}
-		for _, k := range keys {
-			keyMap.Put(string(k), true)
-		}
-	}
-	pre := string(pid) + string(Prefix)
-	ctd.ProcessDataMap.EachPrefix(pre, func(key string, value []byte) bool {
-		keyMap.Put(key[1:], true)
-		return true
-	})
-	ctd.DeletedProcessDataMap.EachPrefix(pre, func(key string, value bool) bool {
-		keyMap.Delete(key[1:])
-		return true
-	})
-	keys := [][]byte{}
-	keyMap.EachAll(func(key string, value bool) bool {
-		keys = append(keys, []byte(key))
-		return true
-	})
-	return keys, nil
 }
 
 // ProcessData returns the process data

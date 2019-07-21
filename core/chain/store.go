@@ -520,39 +520,6 @@ func (st *Store) HasAccountName(Name string) (bool, error) {
 	return Has, nil
 }
 
-// AccountDataKeys returns all data keys of the account in the store
-func (st *Store) AccountDataKeys(addr common.Address, pid uint8, Prefix []byte) ([][]byte, error) {
-	st.closeLock.RLock()
-	defer st.closeLock.RUnlock()
-	if st.isClose {
-		return nil, ErrStoreClosed
-	}
-
-	list := [][]byte{}
-	if err := st.db.View(func(txn *badger.Txn) error {
-		it := txn.NewIterator(badger.IteratorOptions{
-			PrefetchValues: false,
-		})
-		defer it.Close()
-		preTag := toAccountDataKey(string(addr[:]) + string(pid))
-		pre := preTag
-		if len(Prefix) > 0 {
-			pre = append(pre, Prefix...)
-		}
-		for it.Seek(pre); it.ValidForPrefix(pre); it.Next() {
-			item := it.Item()
-			key := item.Key()
-			bs := make([]byte, len(key)-len(preTag))
-			copy(bs, key[len(preTag):])
-			list = append(list, bs)
-		}
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return list, nil
-}
-
 // AccountData returns the account data from the store
 func (st *Store) AccountData(addr common.Address, pid uint8, name []byte) []byte {
 	st.closeLock.RLock()
@@ -678,39 +645,6 @@ func (st *Store) UTXO(id uint64) (*types.UTXO, error) {
 		return nil, err
 	}
 	return utxo, nil
-}
-
-// ProcessDataKeys returns all data keys of the process in the store
-func (st *Store) ProcessDataKeys(pid uint8, Prefix []byte) ([][]byte, error) {
-	st.closeLock.RLock()
-	defer st.closeLock.RUnlock()
-	if st.isClose {
-		return nil, ErrStoreClosed
-	}
-
-	list := [][]byte{}
-	if err := st.db.View(func(txn *badger.Txn) error {
-		it := txn.NewIterator(badger.IteratorOptions{
-			PrefetchValues: false,
-		})
-		defer it.Close()
-		preTag := toProcessDataKey(string(pid))
-		pre := preTag
-		if len(Prefix) > 0 {
-			pre = append(pre, Prefix...)
-		}
-		for it.Seek(pre); it.ValidForPrefix(pre); it.Next() {
-			item := it.Item()
-			key := item.Key()
-			bs := make([]byte, len(key)-len(preTag))
-			copy(bs, key[len(preTag):])
-			list = append(list, bs)
-		}
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return list, nil
 }
 
 // ProcessData returns the process data from the store

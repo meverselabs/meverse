@@ -3,6 +3,7 @@ package vault
 import (
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
+	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/core/types"
 )
 
@@ -59,7 +60,18 @@ func (p *Vault) AddLockedBalance(ctw *types.ContextWrapper, addr common.Address,
 	if am.Less(zero) {
 		return ErrMinusInput
 	}
-	ctw.SetProcessData(toLockedBalanceKey(UnlockedHeight, addr), p.LockedBalance(ctw, addr, UnlockedHeight).Add(am).Bytes())
+	sum := p.LockedBalance(ctw, addr, UnlockedHeight)
+	if sum.IsZero() {
+		var Count uint32
+		if bs := ctw.ProcessData(toLockedBalanceCountKey(UnlockedHeight)); len(bs) > 0 {
+			Count = util.BytesToUint32(bs)
+		}
+		ctw.SetProcessData(toLockedBalanceNumberKey(UnlockedHeight, addr), util.Uint32ToBytes(Count))
+		ctw.SetProcessData(toLockedBalanceReverseKey(UnlockedHeight, Count), addr[:])
+		Count++
+		ctw.SetProcessData(toLockedBalanceCountKey(UnlockedHeight), util.Uint32ToBytes(Count))
+	}
+	ctw.SetProcessData(toLockedBalanceKey(UnlockedHeight, addr), sum.Add(am).Bytes())
 	ctw.SetProcessData(toLockedBalanceSumKey(addr), p.LockedBalanceTotal(ctw, addr).Add(am).Bytes())
 	return nil
 }

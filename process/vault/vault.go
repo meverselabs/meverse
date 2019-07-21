@@ -2,6 +2,7 @@ package vault
 
 import (
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/service/apiserver"
 )
@@ -92,19 +93,33 @@ func (p *Vault) BeforeExecuteTransactions(ctw *types.ContextWrapper) error {
 
 // AfterExecuteTransactions called after processes transactions of the block
 func (p *Vault) AfterExecuteTransactions(b *types.Block, ctw *types.ContextWrapper) error {
-	keys, err := ctw.ProcessDataKeys(toLockedBalancePrefix(b.Header.Height))
-	if err != nil {
-		return err
-	}
-	for _, k := range keys {
-		if addr, is := fromLockedBalancePrefix(k); is {
+	if bs := ctw.ProcessData(toLockedBalanceCountKey(b.Header.Height)); len(bs) > 0 {
+		Count := util.BytesToUint32(bs)
+		for i := uint32(0); i < Count; i++ {
+			bs := ctw.ProcessData(toLockedBalanceReverseKey(b.Header.Height, i))
+			if len(bs) == 0 {
+				return ErrInvalidLockedBalanceKey
+			}
+			var addr common.Address
+			copy(addr[:], bs)
+
 			am := p.LockedBalance(ctw, addr, b.Header.Height)
 			if err := p.AddBalance(ctw, addr, am); err != nil {
 				return err
 			}
-			ctw.SetProcessData(k, nil)
-			ctw.SetProcessData(toLockedBalanceSumKey(addr), p.LockedBalanceTotal(ctw, addr).Sub(am).Bytes())
+
+			ctw.SetProcessData(toLockedBalanceKey(b.Header.Height, addr), nil)
+			ctw.SetProcessData(toLockedBalanceNumberKey(b.Header.Height, addr), nil)
+			ctw.SetProcessData(toLockedBalanceReverseKey(b.Header.Height, i), nil)
+
+			sum := p.LockedBalanceTotal(ctw, addr).Sub(am)
+			if !sum.IsZero() {
+				ctw.SetProcessData(toLockedBalanceSumKey(addr), sum.Bytes())
+			} else {
+				ctw.SetProcessData(toLockedBalanceSumKey(addr), nil)
+			}
 		}
+		ctw.SetProcessData(toLockedBalanceCountKey(b.Header.Height), nil)
 	}
 	return nil
 }

@@ -1,7 +1,6 @@
 package vault
 
 import (
-	"bytes"
 	"encoding/binary"
 
 	"github.com/fletaio/fleta/common"
@@ -9,10 +8,13 @@ import (
 
 // tags
 var (
-	tagBalance          = []byte{1, 1}
-	tagLockedBalance    = []byte{1, 2}
-	tagLockedBalanceSum = []byte{1, 3}
-	tagCollectedFee     = []byte{2, 1}
+	tagBalance              = []byte{1, 1}
+	tagLockedBalance        = []byte{2, 2}
+	tagLockedBalanceNumber  = []byte{2, 3}
+	tagLockedBalanceReverse = []byte{2, 4}
+	tagLockedBalanceCount   = []byte{2, 5}
+	tagLockedBalanceSum     = []byte{2, 6}
+	tagCollectedFee         = []byte{3, 1}
 )
 
 func toLockedBalanceKey(height uint32, addr common.Address) []byte {
@@ -23,21 +25,27 @@ func toLockedBalanceKey(height uint32, addr common.Address) []byte {
 	return bs
 }
 
-func toLockedBalancePrefix(height uint32) []byte {
-	bs := make([]byte, 6)
-	copy(bs, tagLockedBalance)
+func toLockedBalanceNumberKey(height uint32, addr common.Address) []byte {
+	bs := make([]byte, 6+common.AddressSize)
+	copy(bs, tagLockedBalanceNumber)
 	binary.BigEndian.PutUint32(bs[2:], height)
+	copy(bs[6:], addr[:])
 	return bs
 }
 
-func fromLockedBalancePrefix(bs []byte) (common.Address, bool) {
-	if bytes.HasPrefix(bs, tagLockedBalance) {
-		var addr common.Address
-		copy(addr[:], bs[6:])
-		return addr, true
-	} else {
-		return common.Address{}, false
-	}
+func toLockedBalanceReverseKey(height uint32, num uint32) []byte {
+	bs := make([]byte, 10)
+	copy(bs, tagLockedBalanceReverse)
+	binary.BigEndian.PutUint32(bs[2:], height)
+	binary.BigEndian.PutUint32(bs[6:], num)
+	return bs
+}
+
+func toLockedBalanceCountKey(height uint32) []byte {
+	bs := make([]byte, 6)
+	copy(bs, tagLockedBalanceCount)
+	binary.BigEndian.PutUint32(bs[2:], height)
+	return bs
 }
 
 func toLockedBalanceSumKey(addr common.Address) []byte {

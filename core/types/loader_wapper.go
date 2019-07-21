@@ -11,7 +11,5 @@ func SwitchLoaderWrapper(pid uint8, lw LoaderWrapper) LoaderWrapper {
 type LoaderWrapper interface {
 	Loader
 	AccountData(addr common.Address, name []byte) []byte
-	AccountDataKeys(addr common.Address, Prefix []byte) ([][]byte, error)
 	ProcessData(name []byte) []byte
-	ProcessDataKeys(Prefix []byte) ([][]byte, error)
 }

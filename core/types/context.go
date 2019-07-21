@@ -129,11 +129,6 @@ func (ctx *Context) DeleteAccount(acc Account) error {
 	return ctx.Top().DeleteAccount(acc)
 }
 
-// AccountDataKeys returns all data keys of the account in the context
-func (ctx *Context) AccountDataKeys(addr common.Address, pid uint8, Prefix []byte) ([][]byte, error) {
-	return ctx.Top().AccountDataKeys(addr, pid, Prefix)
-}
-
 // AccountData returns the account data from the top snapshot
 func (ctx *Context) AccountData(addr common.Address, pid uint8, name []byte) []byte {
 	return ctx.Top().AccountData(addr, pid, name)
@@ -171,11 +166,6 @@ func (ctx *Context) DeleteUTXO(utxo *UTXO) error {
 func (ctx *Context) EmitEvent(e Event) error {
 	ctx.isLatestHash = false
 	return ctx.Top().EmitEvent(e)
-}
-
-// ProcessDataKeys returns all data keys of the process in the context
-func (ctx *Context) ProcessDataKeys(pid uint8, Prefix []byte) ([][]byte, error) {
-	return ctx.Top().ProcessDataKeys(pid, Prefix)
 }
 
 // ProcessData returns the process data from the top snapshot

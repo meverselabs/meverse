@@ -6,29 +6,25 @@ import (
 )
 
 type contextCache struct {
-	ctx                *Context
-	SeqMap             map[common.Address]uint64
-	AccountMap         map[common.Address]Account
-	AccountNameMap     map[string]common.Address
-	AccountDataMap     map[string][]byte
-	AccountDataKeysMap map[common.Address][][]byte
-	ProcessDataMap     map[string][]byte
-	ProcessDataKeysMap map[uint8][][]byte
-	UTXOMap            map[uint64]*UTXO
+	ctx            *Context
+	SeqMap         map[common.Address]uint64
+	AccountMap     map[common.Address]Account
+	AccountNameMap map[string]common.Address
+	AccountDataMap map[string][]byte
+	ProcessDataMap map[string][]byte
+	UTXOMap        map[uint64]*UTXO
 }
 
 // NewContextCache is used for generating genesis state
 func newContextCache(ctx *Context) *contextCache {
 	return &contextCache{
-		ctx:                ctx,
-		SeqMap:             map[common.Address]uint64{},
-		AccountMap:         map[common.Address]Account{},
-		AccountNameMap:     map[string]common.Address{},
-		AccountDataMap:     map[string][]byte{},
-		AccountDataKeysMap: map[common.Address][][]byte{},
-		ProcessDataMap:     map[string][]byte{},
-		ProcessDataKeysMap: map[uint8][][]byte{},
-		UTXOMap:            map[uint64]*UTXO{},
+		ctx:            ctx,
+		SeqMap:         map[common.Address]uint64{},
+		AccountMap:     map[common.Address]Account{},
+		AccountNameMap: map[string]common.Address{},
+		AccountDataMap: map[string][]byte{},
+		ProcessDataMap: map[string][]byte{},
+		UTXOMap:        map[uint64]*UTXO{},
 	}
 }
 
@@ -114,11 +110,6 @@ func (cc *contextCache) HasAccountName(Name string) (bool, error) {
 	}
 }
 
-// AccountDataKeys returns all data keys of the account in the context
-func (cc *contextCache) AccountDataKeys(addr common.Address, pid uint8, Prefix []byte) ([][]byte, error) {
-	return cc.ctx.loader.AccountDataKeys(addr, pid, Prefix)
-}
-
 // AccountData returns the account data
 func (cc *contextCache) AccountData(addr common.Address, pid uint8, name []byte) []byte {
 	key := string(addr[:]) + string(pid) + string(name)
@@ -152,11 +143,6 @@ func (cc *contextCache) UTXO(id uint64) (*UTXO, error) {
 			return utxo, nil
 		}
 	}
-}
-
-// ProcessDataKeys returns all data keys of the process in the context
-func (cc *contextCache) ProcessDataKeys(pid uint8, Prefix []byte) ([][]byte, error) {
-	return cc.ctx.loader.ProcessDataKeys(pid, Prefix)
 }
 
 // ProcessData returns the process data

@@ -1,7 +1,7 @@
 package formulator
 
 import (
-	"bytes"
+	"encoding/binary"
 
 	"github.com/fletaio/fleta/common"
 )
@@ -9,19 +9,28 @@ import (
 // tags
 var (
 	tagStakingAmount         = []byte{1, 0}
-	tagRewardPower           = []byte{1, 2}
-	tagAutoStaking           = []byte{1, 3}
-	tagLastPaidHeight        = []byte{1, 4}
-	tagRewardPolicy          = []byte{2, 0}
-	tagAlphaPolicy           = []byte{2, 1}
-	tagSigmaPolicy           = []byte{2, 2}
-	tagOmegaPolicy           = []byte{2, 3}
-	tagHyperPolicy           = []byte{2, 4}
-	tagGenCount              = []byte{3, 0}
-	tagStakingAmountMap      = []byte{4, 0}
-	tagStakingPowerMap       = []byte{4, 1}
-	tagStackRewardMap        = []byte{4, 2}
-	tagLastStakingPaidHeight = []byte{4, 3}
+	tagStakingAmountNumber   = []byte{1, 1}
+	tagStakingAmountReverse  = []byte{1, 2}
+	tagStakingAmountCount    = []byte{1, 3}
+	tagRewardPower           = []byte{2, 0}
+	tagRewardPowerNumber     = []byte{2, 1}
+	tagRewardPowerReverse    = []byte{2, 2}
+	tagRewardPowerCount      = []byte{2, 3}
+	tagRewardPolicy          = []byte{3, 0}
+	tagAlphaPolicy           = []byte{3, 1}
+	tagSigmaPolicy           = []byte{3, 2}
+	tagOmegaPolicy           = []byte{3, 3}
+	tagHyperPolicy           = []byte{3, 4}
+	tagGenCount              = []byte{4, 0}
+	tagGenCountNumber        = []byte{4, 1}
+	tagGenCountReverse       = []byte{4, 2}
+	tagGenCountCount         = []byte{4, 3}
+	tagStakingAmountMap      = []byte{5, 0}
+	tagStakingPowerMap       = []byte{5, 1}
+	tagStackRewardMap        = []byte{5, 2}
+	tagLastStakingPaidHeight = []byte{5, 3}
+	tagAutoStaking           = []byte{5, 4}
+	tagLastPaidHeight        = []byte{5, 5}
 )
 
 func toStakingAmountKey(StakingAddrss common.Address) []byte {
@@ -31,14 +40,18 @@ func toStakingAmountKey(StakingAddrss common.Address) []byte {
 	return bs
 }
 
-func fromStakingAmountKey(bs []byte) (common.Address, bool) {
-	if bytes.HasPrefix(bs, tagStakingAmount) {
-		var addr common.Address
-		copy(addr[:], bs[2:])
-		return addr, true
-	} else {
-		return common.Address{}, false
-	}
+func toStakingAmountNumberKey(StakingAddrss common.Address) []byte {
+	bs := make([]byte, 2+common.AddressSize)
+	copy(bs, tagStakingAmountNumber)
+	copy(bs[2:], StakingAddrss[:])
+	return bs
+}
+
+func toStakingAmountReverseKey(Num uint32) []byte {
+	bs := make([]byte, 6)
+	copy(bs, tagStakingAmountReverse)
+	binary.BigEndian.PutUint32(bs[2:], Num)
+	return bs
 }
 
 func toRewardPowerKey(StakingAddrss common.Address) []byte {
@@ -48,14 +61,18 @@ func toRewardPowerKey(StakingAddrss common.Address) []byte {
 	return bs
 }
 
-func fromRewardPowerKey(bs []byte) (common.Address, bool) {
-	if bytes.HasPrefix(bs, tagRewardPower) {
-		var addr common.Address
-		copy(addr[:], bs[2:])
-		return addr, true
-	} else {
-		return common.Address{}, false
-	}
+func toRewardPowerNumberKey(StakingAddrss common.Address) []byte {
+	bs := make([]byte, 2+common.AddressSize)
+	copy(bs, tagRewardPowerNumber)
+	copy(bs[2:], StakingAddrss[:])
+	return bs
+}
+
+func toRewardPowerReverseKey(Num uint32) []byte {
+	bs := make([]byte, 6)
+	copy(bs, tagRewardPowerReverse)
+	binary.BigEndian.PutUint32(bs[2:], Num)
+	return bs
 }
 
 func toAutoStakingKey(StakingAddrss common.Address) []byte {
@@ -72,12 +89,16 @@ func toGenCountKey(GenAddrss common.Address) []byte {
 	return bs
 }
 
-func fromGenCountKey(bs []byte) (common.Address, bool) {
-	if bytes.HasPrefix(bs, tagGenCount) {
-		var addr common.Address
-		copy(addr[:], bs[2:])
-		return addr, true
-	} else {
-		return common.Address{}, false
-	}
+func toGenCountNumberKey(GenAddrss common.Address) []byte {
+	bs := make([]byte, 2+common.AddressSize)
+	copy(bs, tagGenCountNumber)
+	copy(bs[2:], GenAddrss[:])
+	return bs
+}
+
+func toGenCountReverseKey(Num uint32) []byte {
+	bs := make([]byte, 6)
+	copy(bs, tagGenCountReverse)
+	binary.BigEndian.PutUint32(bs[2:], Num)
+	return bs
 }

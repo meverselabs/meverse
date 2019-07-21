@@ -97,12 +97,11 @@ func (tx *Unstaking) Execute(p types.Process, ctw *types.ContextWrapper, index u
 		frAcc := acc.(*FormulatorAccount)
 
 		fromStakingAmount := sp.GetStakingAmount(ctw, tx.HyperFormulator, tx.From())
-		fromStakingAmount = fromStakingAmount.Sub(tx.Amount)
-		if fromStakingAmount.IsZero() {
-			sp.removeStakingAmount(ctw, tx.HyperFormulator, tx.From())
+		if fromStakingAmount.Equal(tx.Amount) {
 			sp.setUserAutoStaking(ctw, tx.HyperFormulator, tx.From(), false)
-		} else {
-			sp.setStakingAmount(ctw, tx.HyperFormulator, tx.From(), fromStakingAmount)
+		}
+		if err := sp.subStakingAmount(ctw, tx.HyperFormulator, tx.From(), tx.Amount); err != nil {
+			return err
 		}
 		frAcc.StakingAmount = frAcc.StakingAmount.Sub(tx.Amount)
 

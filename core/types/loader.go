@@ -24,9 +24,7 @@ type internalLoader interface {
 	LastHash() hash.Hash256
 	LastTimestamp() uint64
 	AccountData(addr common.Address, pid uint8, name []byte) []byte
-	AccountDataKeys(addr common.Address, pid uint8, Prefix []byte) ([][]byte, error)
 	ProcessData(pid uint8, name []byte) []byte
-	ProcessDataKeys(pid uint8, Prefix []byte) ([][]byte, error)
 }
 
 type emptyLoader struct {
@@ -87,11 +85,6 @@ func (st *emptyLoader) HasAccountName(Name string) (bool, error) {
 	return false, nil
 }
 
-// AccountDataKeys returns nil
-func (st *emptyLoader) AccountDataKeys(addr common.Address, pid uint8, Prefix []byte) ([][]byte, error) {
-	return nil, nil
-}
-
 // AccountData returns nil
 func (st *emptyLoader) AccountData(addr common.Address, pid uint8, name []byte) []byte {
 	return nil
@@ -105,11 +98,6 @@ func (st *emptyLoader) HasUTXO(id uint64) (bool, error) {
 // UTXO returns ErrNotExistUTXO
 func (st *emptyLoader) UTXO(id uint64) (*UTXO, error) {
 	return nil, ErrNotExistUTXO
-}
-
-// ProcessDataKeys returns nil
-func (st *emptyLoader) ProcessDataKeys(pid uint8, Prefix []byte) ([][]byte, error) {
-	return nil, nil
 }
 
 // ProcessData returns nil
