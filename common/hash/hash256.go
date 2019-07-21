@@ -45,6 +45,9 @@ func ParseHash(str string) (Hash256, error) {
 	if err != nil {
 		return Hash256{}, err
 	}
+	if len(bs) != Hash256Size {
+		return Hash256{}, ErrInvalidHashSize
+	}
 	var hash Hash256
 	copy(hash[:], bs)
 	return hash, nil

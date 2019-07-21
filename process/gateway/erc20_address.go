@@ -5,8 +5,8 @@ import (
 	"strings"
 )
 
-// ERC20AddressSize is 14 bytes
-const ERC20AddressSize = 14
+// ERC20AddressSize is 20 bytes
+const ERC20AddressSize = 20
 
 // ERC20Address is the [ERC20AddressSize]byte with methods
 type ERC20Address [ERC20AddressSize]byte
