@@ -75,7 +75,7 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 	sp := p.(*Formulator)
 
 	return sp.vault.WithFee(ctw, tx, func() error {
-		heritorAcc, err := ctw.Account(tx.From())
+		heritorAcc, err := ctw.Account(tx.Heritor)
 		if err != nil {
 			return err
 		}
