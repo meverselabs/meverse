@@ -363,7 +363,9 @@ func addSingleAccount(sp *vault.Vault, ctw *types.ContextWrapper, KeyHash common
 	if err := ctw.CreateAccount(acc); err != nil {
 		panic(err)
 	}
-	sp.AddBalance(ctw, acc.Address(), amount.NewCoinAmount(100000000000, 0))
+	if err := sp.AddBalance(ctw, acc.Address(), amount.NewCoinAmount(100000000000, 0)); err != nil {
+		panic(err)
+	}
 }
 
 func addAlphaFormulator(sp *vault.Vault, ctw *types.ContextWrapper, alphaPolicy *formulator.AlphaPolicy, KeyHash common.PublicHash, GenHash common.PublicHash, addr common.Address, name string) {
