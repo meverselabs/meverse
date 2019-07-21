@@ -7,11 +7,15 @@ import (
 
 // SwitchContextWrapper returns a SwitchContextWrapper of the pid
 func SwitchContextWrapper(pid uint8, ctw *ContextWrapper) *ContextWrapper {
-	cts := &ContextWrapper{
-		pid: pid,
-		ctx: ctw.ctx,
+	if ctw.pid == pid {
+		return ctw
+	} else {
+		cts := &ContextWrapper{
+			pid: pid,
+			ctx: ctw.ctx,
+		}
+		return cts
 	}
-	return cts
 }
 
 // ContextWrapper is an context for the process

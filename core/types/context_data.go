@@ -179,11 +179,11 @@ func (ctd *ContextData) HasAccountName(Name string) (bool, error) {
 
 // CreateAccount inserts the account
 func (ctd *ContextData) CreateAccount(acc Account) error {
+	if acc.Address().Height() != ctd.loader.TargetHeight() {
+		return ErrInvalidAddressHeight
+	}
 	if acc.Address() == common.NewAddress(0, 0, 0) {
 		return ErrNotAllowedZeroAddressAccount
-	}
-	if !IsAllowedAccountName(acc.Name()) {
-		return ErrInvalidAccountName
 	}
 	if has, err := ctd.HasAccount(acc.Address()); err != nil {
 		if err != ErrNotExistAccount {

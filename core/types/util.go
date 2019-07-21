@@ -45,12 +45,12 @@ func cmpUint64ASC(a interface{}, b interface{}) bool {
 
 // IsAllowedAccountName returns it is allowed account name or not
 func IsAllowedAccountName(Name string) bool {
-	if len(Name) < 8 || len(Name) > 16 {
+	if len(Name) < 8 || len(Name) > 40 {
 		return false
 	}
 	for i := 0; i < len(Name); i++ {
 		c := Name[i]
-		if (c < '0' || '9' < c) && (c < 'a' || 'z' < c) && (c < 'A' || 'Z' < c) && c != '.' && c != '-' && c != '_' {
+		if (c < '0' || '9' < c) && (c < 'a' || 'z' < c) && (c < 'A' || 'Z' < c) && c != '.' && c != '-' && c != '_' && c != '@' {
 			return false
 		}
 	}
