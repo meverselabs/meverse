@@ -71,6 +71,14 @@ func (tx *Unstaking) Validate(p types.Process, loader types.LoaderWrapper, signe
 		return err
 	}
 
+	fromStakingAmount := sp.GetStakingAmount(loader, tx.HyperFormulator, tx.From())
+	if fromStakingAmount.Less(tx.Amount) {
+		return ErrInsufficientStakingAmount
+	}
+	if frAcc.StakingAmount.Less(tx.Amount) {
+		return ErrInsufficientStakingAmount
+	}
+
 	if err := sp.vault.CheckFeePayable(loader, tx); err != nil {
 		return err
 	}
@@ -89,18 +97,12 @@ func (tx *Unstaking) Execute(p types.Process, ctw *types.ContextWrapper, index u
 		frAcc := acc.(*FormulatorAccount)
 
 		fromStakingAmount := sp.GetStakingAmount(ctw, tx.HyperFormulator, tx.From())
-		if fromStakingAmount.Less(tx.Amount) {
-			return ErrInsufficientStakingAmount
-		}
 		fromStakingAmount = fromStakingAmount.Sub(tx.Amount)
 		if fromStakingAmount.IsZero() {
 			sp.removeStakingAmount(ctw, tx.HyperFormulator, tx.From())
 			sp.setUserAutoStaking(ctw, tx.HyperFormulator, tx.From(), false)
 		} else {
 			sp.setStakingAmount(ctw, tx.HyperFormulator, tx.From(), fromStakingAmount)
-		}
-		if frAcc.StakingAmount.Less(tx.Amount) {
-			return ErrInsufficientStakingAmount
 		}
 		frAcc.StakingAmount = frAcc.StakingAmount.Sub(tx.Amount)
 

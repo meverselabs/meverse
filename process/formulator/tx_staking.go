@@ -73,7 +73,7 @@ func (tx *Staking) Validate(p types.Process, loader types.LoaderWrapper, signers
 		return err
 	}
 
-	if err := sp.vault.CheckFeePayable(loader, tx); err != nil {
+	if err := sp.vault.CheckFeePayableWith(loader, tx, tx.Amount); err != nil {
 		return err
 	}
 	return nil

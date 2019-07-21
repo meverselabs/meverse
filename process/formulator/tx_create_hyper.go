@@ -50,10 +50,10 @@ func (tx *CreateHyper) Validate(p types.Process, loader types.LoaderWrapper, sig
 	}
 
 	if tx.Policy == nil {
-		return ErrInvalidPolicy
+		return ErrInvalidValidatorPolicy
 	}
 	if tx.Policy.CommissionRatio1000 > 1000 {
-		return ErrInvalidPolicy
+		return ErrInvalidValidatorPolicy
 	}
 
 	if tx.Seq() <= loader.Seq(tx.From()) {

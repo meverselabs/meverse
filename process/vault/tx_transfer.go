@@ -49,9 +49,9 @@ func (tx *Transfer) Validate(p types.Process, loader types.LoaderWrapper, signer
 		return types.ErrInvalidSequence
 	}
 
-	if is, err := loader.HasAccount(tx.To); err != nil {
+	if has, err := loader.HasAccount(tx.To); err != nil {
 		return err
-	} else if !is {
+	} else if !has {
 		return types.ErrNotExistAccount
 	}
 
@@ -62,13 +62,8 @@ func (tx *Transfer) Validate(p types.Process, loader types.LoaderWrapper, signer
 	if err := fromAcc.Validate(loader, signers); err != nil {
 		return err
 	}
-	if has, err := loader.HasAccount(tx.To); err != nil {
-		return err
-	} else if !has {
-		return types.ErrNotExistAccount
-	}
 
-	if err := sp.CheckFeePayable(loader, tx); err != nil {
+	if err := sp.CheckFeePayableWith(loader, tx, tx.Amount); err != nil {
 		return err
 	}
 	return nil

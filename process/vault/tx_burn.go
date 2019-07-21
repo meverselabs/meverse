@@ -53,7 +53,7 @@ func (tx *Burn) Validate(p types.Process, loader types.LoaderWrapper, signers []
 		return err
 	}
 
-	if err := sp.CheckFeePayable(loader, tx); err != nil {
+	if err := sp.CheckFeePayableWith(loader, tx, tx.Amount); err != nil {
 		return err
 	}
 	return nil

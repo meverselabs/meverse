@@ -7,6 +7,7 @@ import (
 // tags
 var (
 	tagERC20TXID = []byte{1, 0}
+	tagPolicy    = []byte{2, 0}
 )
 
 func toERC20TXIDKey(h hash.Hash256) []byte {

@@ -88,6 +88,11 @@ func (p *Vault) LockedBalanceTotal(lw types.LoaderWrapper, addr common.Address) 
 
 // CheckFeePayable returns tx fee can be paid or not
 func (p *Vault) CheckFeePayable(lw types.LoaderWrapper, tx FeeTransaction) error {
+	return p.CheckFeePayableWith(lw, tx, nil)
+}
+
+// CheckFeePayableWith returns tx fee and amount can be paid or not
+func (p *Vault) CheckFeePayableWith(lw types.LoaderWrapper, tx FeeTransaction, am *amount.Amount) error {
 	lw = types.SwitchLoaderWrapper(p.pid, lw)
 
 	if has, err := lw.HasAccount(tx.From()); err != nil {
@@ -96,8 +101,15 @@ func (p *Vault) CheckFeePayable(lw types.LoaderWrapper, tx FeeTransaction) error
 		return types.ErrNotExistAccount
 	}
 
+	fee := tx.Fee(lw)
+	if am != nil {
+		am = am.Add(fee)
+	} else {
+		am = fee
+	}
+
 	b := p.Balance(lw, tx.From())
-	if b.Less(tx.Fee(lw)) {
+	if b.Less(am) {
 		return ErrInsufficientFee
 	}
 	return nil

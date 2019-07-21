@@ -20,6 +20,6 @@ var (
 	ErrInsufficientFormulatorBlocks            = errors.New("insufficient formulator blocks")
 	ErrCriticalStakingAmount                   = errors.New("critical staking amount")
 	ErrInsufficientStakingAmount               = errors.New("insufficient staking amount")
-	ErrInvalidPolicy                           = errors.New("invalid policy")
+	ErrInvalidValidatorPolicy                  = errors.New("invalid validator policy")
 	ErrNotHyperFormulator                      = errors.New("not hyper formulator")
 )

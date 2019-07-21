@@ -66,7 +66,14 @@ func (tx *CreateAlpha) Validate(p types.Process, loader types.LoaderWrapper, sig
 		return err
 	}
 
-	if err := sp.vault.CheckFeePayable(loader, tx); err != nil {
+	policy := &AlphaPolicy{}
+	if err := encoding.Unmarshal(loader.ProcessData(tagAlphaPolicy), &policy); err != nil {
+		return err
+	}
+	if loader.TargetHeight() < policy.AlphaCreationLimitHeight {
+		return ErrAlphaCreationLimited
+	}
+	if err := sp.vault.CheckFeePayableWith(loader, tx, policy.AlphaCreationAmount); err != nil {
 		return err
 	}
 	return nil
@@ -80,9 +87,6 @@ func (tx *CreateAlpha) Execute(p types.Process, ctw *types.ContextWrapper, index
 		policy := &AlphaPolicy{}
 		if err := encoding.Unmarshal(ctw.ProcessData(tagAlphaPolicy), &policy); err != nil {
 			return err
-		}
-		if ctw.TargetHeight() < policy.AlphaCreationLimitHeight {
-			return ErrAlphaCreationLimited
 		}
 		if err := sp.vault.SubBalance(ctw, tx.From(), policy.AlphaCreationAmount); err != nil {
 			return err

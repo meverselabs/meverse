@@ -7,6 +7,7 @@ import (
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
 	"github.com/fletaio/fleta/core/types"
+	"github.com/fletaio/fleta/encoding"
 )
 
 // TokenOut is a TokenOut
@@ -63,7 +64,12 @@ func (tx *TokenOut) Validate(p types.Process, loader types.LoaderWrapper, signer
 		return err
 	}
 
-	if err := sp.vault.CheckFeePayable(loader, tx); err != nil {
+	policy := &Policy{}
+	if err := encoding.Unmarshal(loader.ProcessData(tagPolicy), &policy); err != nil {
+		return err
+	}
+
+	if err := sp.vault.CheckFeePayableWith(loader, tx, tx.Amount.Add(policy.WithdrawFee)); err != nil {
 		return err
 	}
 	return nil
@@ -74,7 +80,17 @@ func (tx *TokenOut) Execute(p types.Process, ctw *types.ContextWrapper, index ui
 	sp := p.(*Gateway)
 
 	return sp.vault.WithFee(ctw, tx, func() error {
+		policy := &Policy{}
+		if err := encoding.Unmarshal(ctw.ProcessData(tagPolicy), &policy); err != nil {
+			return err
+		}
+		if err := sp.vault.SubBalance(ctw, tx.From(), policy.WithdrawFee); err != nil {
+			return err
+		}
 		if err := sp.vault.SubBalance(ctw, tx.From(), tx.Amount); err != nil {
+			return err
+		}
+		if err := sp.vault.AddBalance(ctw, tx.From(), policy.WithdrawFee); err != nil {
 			return err
 		}
 		if err := sp.vault.AddBalance(ctw, sp.admin.AdminAddress(), tx.Amount); err != nil {

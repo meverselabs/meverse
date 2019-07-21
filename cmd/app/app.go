@@ -6,6 +6,7 @@ import (
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/process/admin"
 	"github.com/fletaio/fleta/process/formulator"
+	"github.com/fletaio/fleta/process/gateway"
 	"github.com/fletaio/fleta/process/vault"
 )
 
@@ -89,6 +90,19 @@ func (app *FletaApp) InitGenesis(ctw *types.ContextWrapper) error {
 			sigmaPolicy,
 			omegaPolicy,
 			hyperPolicy,
+		); err != nil {
+			return err
+		}
+	}
+	if p, err := app.pm.ProcessByName("fleta.gateway"); err != nil {
+		return err
+	} else if fp, is := p.(*gateway.Gateway); !is {
+		return types.ErrNotExistProcess
+	} else {
+		if err := fp.InitPolicy(ctw,
+			&gateway.Policy{
+				WithdrawFee: amount.NewCoinAmount(30, 0),
+			},
 		); err != nil {
 			return err
 		}

@@ -69,6 +69,14 @@ func (tx *CreateOmega) Validate(p types.Process, loader types.LoaderWrapper, sig
 		}
 	}
 
+	policy := &OmegaPolicy{}
+	if err := encoding.Unmarshal(loader.ProcessData(tagOmegaPolicy), &policy); err != nil {
+		return err
+	}
+	if len(tx.SigmaFormulators) != int(policy.OmegaRequiredSigmaCount) {
+		return ErrInvalidFormulatorCount
+	}
+
 	if err := sp.vault.CheckFeePayable(loader, tx); err != nil {
 		return err
 	}
@@ -84,10 +92,6 @@ func (tx *CreateOmega) Execute(p types.Process, ctw *types.ContextWrapper, index
 		if err := encoding.Unmarshal(ctw.ProcessData(tagOmegaPolicy), &policy); err != nil {
 			return err
 		}
-		if len(tx.SigmaFormulators) != int(policy.OmegaRequiredSigmaCount) {
-			return ErrInvalidFormulatorCount
-		}
-
 		for _, addr := range tx.SigmaFormulators[1:] {
 			if acc, err := ctw.Account(addr); err != nil {
 				return err

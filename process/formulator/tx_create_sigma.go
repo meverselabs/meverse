@@ -69,6 +69,14 @@ func (tx *CreateSigma) Validate(p types.Process, loader types.LoaderWrapper, sig
 		}
 	}
 
+	policy := &SigmaPolicy{}
+	if err := encoding.Unmarshal(loader.ProcessData(tagSigmaPolicy), &policy); err != nil {
+		return err
+	}
+	if len(tx.AlphaFormulators) != int(policy.SigmaRequiredAlphaCount) {
+		return ErrInvalidFormulatorCount
+	}
+
 	if err := sp.vault.CheckFeePayable(loader, tx); err != nil {
 		return err
 	}
@@ -84,10 +92,6 @@ func (tx *CreateSigma) Execute(p types.Process, ctw *types.ContextWrapper, index
 		if err := encoding.Unmarshal(ctw.ProcessData(tagSigmaPolicy), &policy); err != nil {
 			return err
 		}
-		if len(tx.AlphaFormulators) != int(policy.SigmaRequiredAlphaCount) {
-			return ErrInvalidFormulatorCount
-		}
-
 		for _, addr := range tx.AlphaFormulators[1:] {
 			if acc, err := ctw.Account(addr); err != nil {
 				return err

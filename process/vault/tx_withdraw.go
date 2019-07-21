@@ -53,13 +53,15 @@ func (tx *Withdraw) Validate(p types.Process, loader types.LoaderWrapper, signer
 		return err
 	}
 
+	outsum := amount.NewCoinAmount(0, 0)
 	for _, vout := range tx.Vout {
 		if vout.Amount.Less(amount.COIN.DivC(10)) {
 			return types.ErrDustAmount
 		}
+		outsum = outsum.Add(vout.Amount)
 	}
 
-	if err := sp.CheckFeePayable(loader, tx); err != nil {
+	if err := sp.CheckFeePayableWith(loader, tx, outsum); err != nil {
 		return err
 	}
 	return nil

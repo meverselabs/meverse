@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"github.com/fletaio/fleta/core/types"
+	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/process/admin"
 	"github.com/fletaio/fleta/process/vault"
 )
@@ -61,6 +62,26 @@ func (p *Gateway) Init(reg *types.Register, pm types.ProcessManager, cn types.Pr
 
 	reg.RegisterTransaction(1, &TokenIn{})
 	reg.RegisterTransaction(2, &TokenOut{})
+	return nil
+}
+
+// InitPolicy called at OnInitGenesis of an application
+func (p *Gateway) InitPolicy(ctw *types.ContextWrapper, policy *Policy) error {
+	ctw = types.SwitchContextWrapper(p.pid, ctw)
+
+	if bs, err := encoding.Marshal(policy); err != nil {
+		return err
+	} else {
+		ctw.SetProcessData(tagPolicy, bs)
+	}
+	return nil
+}
+
+// OnLoadChain called when the chain loaded
+func (p *Gateway) OnLoadChain(loader types.LoaderWrapper) error {
+	if bs := loader.ProcessData(tagPolicy); len(bs) == 0 {
+		return ErrPolicyShouldBeSetupInApplication
+	}
 	return nil
 }
 

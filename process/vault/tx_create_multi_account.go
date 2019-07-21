@@ -72,7 +72,8 @@ func (tx *CreateMultiAccount) Validate(p types.Process, loader types.LoaderWrapp
 		return err
 	}
 
-	if err := sp.CheckFeePayable(loader, tx); err != nil {
+	CreationCost := amount.COIN.MulC(10)
+	if err := sp.CheckFeePayableWith(loader, tx, CreationCost); err != nil {
 		return err
 	}
 	return nil
