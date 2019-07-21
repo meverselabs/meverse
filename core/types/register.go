@@ -25,16 +25,22 @@ func NewRegister(pid uint8) *Register {
 }
 
 // RegisterTransaction adds the type of the transaction of the process to the encoding factory
-func (reg *Register) RegisterTransaction(t uint8, tx Transaction) {
-	reg.txFactory.Register(uint16(reg.pid)<<8|uint16(t), tx)
+func (reg *Register) RegisterTransaction(t uint8, tx Transaction) uint16 {
+	v := uint16(reg.pid)<<8 | uint16(t)
+	reg.txFactory.Register(v, tx)
+	return v
 }
 
 // RegisterAccount adds the type of the account of the process to the encoding factory
-func (reg *Register) RegisterAccount(t uint8, acc Account) {
-	reg.accFactory.Register(uint16(reg.pid)<<8|uint16(t), acc)
+func (reg *Register) RegisterAccount(t uint8, acc Account) uint16 {
+	v := uint16(reg.pid)<<8 | uint16(t)
+	reg.accFactory.Register(v, acc)
+	return v
 }
 
 // RegisterEvent adds the type of the event of the process to the encoding factory
-func (reg *Register) RegisterEvent(t uint8, acc Event) {
-	reg.evFactory.Register(uint16(reg.pid)<<8|uint16(t), acc)
+func (reg *Register) RegisterEvent(t uint8, acc Event) uint16 {
+	v := uint16(reg.pid)<<8 | uint16(t)
+	reg.evFactory.Register(v, acc)
+	return v
 }
