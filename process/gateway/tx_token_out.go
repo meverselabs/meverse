@@ -50,7 +50,8 @@ func (tx *TokenOut) Validate(p types.Process, loader types.LoaderWrapper, signer
 		return types.ErrInvalidSequence
 	}
 
-	if has, err := loader.HasAccount(sp.admin.AdminAddress()); err != nil {
+	AdminAddress := sp.admin.AdminAddress(loader, p.Name())
+	if has, err := loader.HasAccount(AdminAddress); err != nil {
 		return err
 	} else if !has {
 		return types.ErrNotExistAccount
@@ -90,10 +91,11 @@ func (tx *TokenOut) Execute(p types.Process, ctw *types.ContextWrapper, index ui
 		if err := sp.vault.SubBalance(ctw, tx.From(), tx.Amount); err != nil {
 			return err
 		}
-		if err := sp.vault.AddBalance(ctw, tx.From(), policy.WithdrawFee); err != nil {
+		AdminAddress := sp.admin.AdminAddress(ctw, p.Name())
+		if err := sp.vault.AddBalance(ctw, AdminAddress, policy.WithdrawFee); err != nil {
 			return err
 		}
-		if err := sp.vault.AddBalance(ctw, sp.admin.AdminAddress(), tx.Amount); err != nil {
+		if err := sp.vault.AddBalance(ctw, AdminAddress, tx.Amount); err != nil {
 			return err
 		}
 		return nil

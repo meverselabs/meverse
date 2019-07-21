@@ -79,6 +79,7 @@ func (p *Gateway) InitPolicy(ctw *types.ContextWrapper, policy *Policy) error {
 
 // OnLoadChain called when the chain loaded
 func (p *Gateway) OnLoadChain(loader types.LoaderWrapper) error {
+	p.admin.AdminAddress(loader, p.Name())
 	if bs := loader.ProcessData(tagPolicy); len(bs) == 0 {
 		return ErrPolicyShouldBeSetupInApplication
 	}

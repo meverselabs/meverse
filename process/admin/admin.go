@@ -8,10 +8,9 @@ import (
 // Admin manages balance of accounts of the chain
 type Admin struct {
 	*types.ProcessBase
-	pid          uint8
-	pm           types.ProcessManager
-	cn           types.Provider
-	adminAddress common.Address
+	pid uint8
+	pm  types.ProcessManager
+	cn  types.Provider
 }
 
 // NewAdmin returns a Admin
@@ -38,10 +37,12 @@ func (p *Admin) Version() string {
 }
 
 // InitAdmin called at OnInitGenesis of an application
-func (p *Admin) InitAdmin(ctw *types.ContextWrapper, AdminAddress common.Address) error {
+func (p *Admin) InitAdmin(ctw *types.ContextWrapper, addrMap map[string]common.Address) error {
 	ctw = types.SwitchContextWrapper(p.pid, ctw)
 
-	ctw.SetProcessData(tagAdminAddress, AdminAddress[:])
+	for name, adminAddr := range addrMap {
+		ctw.SetProcessData(toAdminAddressKey(name), adminAddr[:])
+	}
 	return nil
 }
 
@@ -54,13 +55,6 @@ func (p *Admin) Init(reg *types.Register, pm types.ProcessManager, cn types.Prov
 
 // OnLoadChain called when the chain loaded
 func (p *Admin) OnLoadChain(loader types.LoaderWrapper) error {
-	if bs := loader.ProcessData(tagAdminAddress); len(bs) == 0 {
-		return ErrAdminAddressShouldBeSetupInApplication
-	} else {
-		var addr common.Address
-		copy(addr[:], bs)
-		p.adminAddress = addr
-	}
 	return nil
 }
 

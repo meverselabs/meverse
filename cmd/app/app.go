@@ -13,15 +13,18 @@ import (
 // FletaApp is app
 type FletaApp struct {
 	*types.ApplicationBase
-	pm           types.ProcessManager
-	cn           types.Provider
-	adminAddress common.Address
+	pm      types.ProcessManager
+	cn      types.Provider
+	addrMap map[string]common.Address
 }
 
 // NewFletaApp returns a FletaApp
 func NewFletaApp() *FletaApp {
 	return &FletaApp{
-		adminAddress: common.MustParseAddress("4kbaAVnrij"),
+		addrMap: map[string]common.Address{
+			"fleta.gateway":    common.MustParseAddress("4kbaAVnrij"),
+			"fleta.formulator": common.MustParseAddress("4kbaAVnrij"),
+		},
 	}
 }
 
@@ -33,11 +36,6 @@ func (app *FletaApp) Name() string {
 // Version returns the version of the application
 func (app *FletaApp) Version() string {
 	return "v0.0.1"
-}
-
-// AdminAddress returns the admin address of the application
-func (app *FletaApp) AdminAddress() common.Address {
-	return app.adminAddress
 }
 
 // Init initializes the consensus
@@ -112,7 +110,7 @@ func (app *FletaApp) InitGenesis(ctw *types.ContextWrapper) error {
 	} else if ap, is := p.(*admin.Admin); !is {
 		return types.ErrNotExistProcess
 	} else {
-		if err := ap.InitAdmin(ctw, app.adminAddress); err != nil {
+		if err := ap.InitAdmin(ctw, app.addrMap); err != nil {
 			return err
 		}
 	}

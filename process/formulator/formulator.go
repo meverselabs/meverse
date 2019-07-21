@@ -109,6 +109,7 @@ func (p *Formulator) InitPolicy(ctw *types.ContextWrapper, rp *RewardPolicy, ap 
 
 // OnLoadChain called when the chain loaded
 func (p *Formulator) OnLoadChain(loader types.LoaderWrapper) error {
+	p.admin.AdminAddress(loader, p.Name())
 	if bs := loader.ProcessData(tagRewardPolicy); len(bs) == 0 {
 		return ErrRewardPolicyShouldBeSetupInApplication
 	}

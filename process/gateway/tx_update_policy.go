@@ -37,7 +37,7 @@ func (tx *UpdatePolicy) From() common.Address {
 func (tx *UpdatePolicy) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	sp := p.(*Gateway)
 
-	if tx.From() != sp.admin.AdminAddress() {
+	if tx.From() != sp.admin.AdminAddress(loader, p.Name()) {
 		return admin.ErrUnauthorizedTransaction
 	}
 	if tx.Policy == nil {
