@@ -35,7 +35,7 @@ func (app *FletaApp) Name() string {
 
 // Version returns the version of the application
 func (app *FletaApp) Version() string {
-	return "v0.0.1"
+	return "v1.0.0"
 }
 
 // Init initializes the consensus
