@@ -223,12 +223,12 @@ func (ms *FormulatorService) recvHandshake(conn *websocket.Conn) (common.Address
 	if err != nil {
 		return common.Address{}, err
 	}
-	if len(req) != 60 {
+	if len(req) != 40+common.AddressSize {
 		return common.Address{}, p2p.ErrInvalidHandshake
 	}
+	timestamp := binary.LittleEndian.Uint64(req[32:])
 	var Formulator common.Address
-	copy(Formulator[:], req[32:])
-	timestamp := binary.LittleEndian.Uint64(req[52:])
+	copy(Formulator[:], req[40:])
 	diff := time.Duration(uint64(time.Now().UnixNano()) - timestamp)
 	if diff < 0 {
 		diff = -diff

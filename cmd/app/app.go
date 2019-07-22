@@ -1157,8 +1157,10 @@ func addSingleAccount(sp *vault.Vault, ctw *types.ContextWrapper, KeyHash common
 	if err := ctw.CreateAccount(acc); err != nil {
 		panic(err)
 	}
-	if err := sp.AddBalance(ctw, acc.Address(), am); err != nil {
-		panic(err)
+	if !am.IsZero() {
+		if err := sp.AddBalance(ctw, acc.Address(), am); err != nil {
+			panic(err)
+		}
 	}
 }
 

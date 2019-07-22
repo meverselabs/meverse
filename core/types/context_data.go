@@ -2,6 +2,7 @@ package types
 
 import (
 	"bytes"
+	"encoding/hex"
 	"strconv"
 
 	"github.com/fletaio/fleta/common"
@@ -554,9 +555,11 @@ func (ctd *ContextData) Dump() string {
 	buffer.WriteString("\n")
 	buffer.WriteString("ProcessDataMap\n")
 	ctd.ProcessDataMap.EachAll(func(key string, value []byte) bool {
-		buffer.WriteString(hash.Hash([]byte(key)).String())
+		//buffer.WriteString(hash.Hash([]byte(key)).String())
+		buffer.WriteString(hex.EncodeToString([]byte(key)))
 		buffer.WriteString(": ")
-		buffer.WriteString(hash.Hash(value).String())
+		//buffer.WriteString(hash.Hash(value).String())
+		buffer.WriteString(hex.EncodeToString(value))
 		buffer.WriteString("\n")
 		return true
 	})

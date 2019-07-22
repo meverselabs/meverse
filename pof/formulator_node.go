@@ -57,12 +57,15 @@ type FormulatorNode struct {
 
 // NewFormulatorNode returns a FormulatorNode
 func NewFormulatorNode(Config *FormulatorConfig, key key.Key, ndkey key.Key, NetAddressMap map[common.PublicHash]string, SeedNodeMap map[common.PublicHash]string, cs *Consensus, peerStorePath string) *FormulatorNode {
+	if Config.MaxTransactionsPerBlock == 0 {
+		Config.MaxTransactionsPerBlock = 10000
+	}
 	fr := &FormulatorNode{
 		Config:               Config,
 		cs:                   cs,
 		key:                  key,
 		ndkey:                ndkey,
-		myPublicHash:         common.NewPublicHash(key.PublicKey()),
+		myPublicHash:         common.NewPublicHash(ndkey.PublicKey()),
 		lastGenMessages:      []*BlockGenMessage{},
 		lastObSignMessageMap: map[uint32]*BlockObSignMessage{},
 		lastContextes:        []*types.Context{},
@@ -560,12 +563,12 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 				}
 
 				b := &types.Block{
-					Header:               GenMessage.Block.Header,
-					TransactionTypes:     GenMessage.Block.TransactionTypes,
-					Transactions:         GenMessage.Block.Transactions,
+					Header:                GenMessage.Block.Header,
+					TransactionTypes:      GenMessage.Block.TransactionTypes,
+					Transactions:          GenMessage.Block.Transactions,
 					TransactionSignatures: GenMessage.Block.TransactionSignatures,
-					TransactionResults:   GenMessage.Block.TransactionResults,
-					Signatures:           append([]common.Signature{GenMessage.GeneratorSignature}, sm.ObserverSignatures...),
+					TransactionResults:    GenMessage.Block.TransactionResults,
+					Signatures:            append([]common.Signature{GenMessage.GeneratorSignature}, sm.ObserverSignatures...),
 				}
 				if err := fr.cs.ct.ConnectBlockWithContext(b, ctx); err != nil {
 					return err

@@ -101,7 +101,9 @@ func (sm *StringBytesMap) Get(key string) ([]byte, bool) {
 
 // Put adds data of the key
 func (sm *StringBytesMap) Put(key string, value []byte) {
-	sm.m.ReplaceOrInsert(&pairStringBytesMap{key: key, value: value})
+	nvalue := make([]byte, len(value))
+	copy(nvalue, value)
+	sm.m.ReplaceOrInsert(&pairStringBytesMap{key: key, value: nvalue})
 }
 
 // Delete removes data of the key

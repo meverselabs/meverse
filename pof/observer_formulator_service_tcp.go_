@@ -216,13 +216,13 @@ func (ms *FormulatorService) handleConnection(p peer.Peer) error {
 
 func (ms *FormulatorService) recvHandshake(conn net.Conn) (common.Address, error) {
 	//log.Println("recvHandshake")
-	req := make([]byte, 60)
+	req := make([]byte, 40+common.AddressSize)
 	if _, err := p2p.FillBytes(conn, req); err != nil {
 		return common.Address{}, err
 	}
+	timestamp := binary.LittleEndian.Uint64(req[32:])
 	var Formulator common.Address
-	copy(Formulator[:], req[32:])
-	timestamp := binary.LittleEndian.Uint64(req[52:])
+	copy(Formulator[:], req[40:])
 	diff := time.Duration(uint64(time.Now().UnixNano()) - timestamp)
 	if diff < 0 {
 		diff = -diff

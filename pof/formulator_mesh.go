@@ -226,12 +226,12 @@ func (ms *FormulatorNodeMesh) recvHandshake(conn *websocket.Conn) error {
 
 func (ms *FormulatorNodeMesh) sendHandshake(conn *websocket.Conn) (common.PublicHash, error) {
 	//log.Println("sendHandshake")
-	req := make([]byte, 60)
+	req := make([]byte, 40+common.AddressSize)
 	if _, err := crand.Read(req[:32]); err != nil {
 		return common.PublicHash{}, err
 	}
-	copy(req[32:], ms.fr.Config.Formulator[:])
-	binary.LittleEndian.PutUint64(req[52:], uint64(time.Now().UnixNano()))
+	binary.LittleEndian.PutUint64(req[32:], uint64(time.Now().UnixNano()))
+	copy(req[40:], ms.fr.Config.Formulator[:])
 	if err := conn.WriteMessage(websocket.BinaryMessage, req); err != nil {
 		return common.PublicHash{}, err
 	}
