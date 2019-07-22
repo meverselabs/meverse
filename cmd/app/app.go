@@ -22,8 +22,8 @@ type FletaApp struct {
 func NewFletaApp() *FletaApp {
 	return &FletaApp{
 		addrMap: map[string]common.Address{
-			"fleta.gateway":    common.MustParseAddress("4kbaAVnrij"),
-			"fleta.formulator": common.MustParseAddress("4kbaAVnrij"),
+			"fleta.gateway":    common.MustParseAddress("3CUsUpv9v"),
+			"fleta.formulator": common.MustParseAddress("5PxjxeqJq"),
 		},
 	}
 }
@@ -125,7 +125,7 @@ func (app *FletaApp) InitGenesis(ctw *types.ContextWrapper) error {
 		totalDeligated := amount.NewCoinAmount(32789834, 156124126700000000)
 		gatewaySupply := totalSupply.Sub(alphaCreated).Sub(hyperCreated).Sub(totalDeligated)
 		addSingleAccount(sp, ctw, common.MustParsePublicHash("4d5aH1brXeatoDYh6UauLemK1gYiHbEDyTqBj8FSKu6"), common.MustParseAddress("3CUsUpv9v"), "fleta.gateway", gatewaySupply)
-		addSingleAccount(sp, ctw, common.MustParsePublicHash("3VH7Bhv3Q2vnhQEcmbDoeXVvYu1VPfZUwz5SYs2iWKH"), common.MustParseAddress("5PxjxeqJq"), "fleta.hyper", amount.NewCoinAmount(0, 0))
+		addSingleAccount(sp, ctw, common.MustParsePublicHash("3VH7Bhv3Q2vnhQEcmbDoeXVvYu1VPfZUwz5SYs2iWKH"), common.MustParseAddress("5PxjxeqJq"), "fleta.formulator", amount.NewCoinAmount(0, 0))
 
 		addHyperFormulator(sp, ctw, hyperPolicy, 80, common.MustParsePublicHash("2JnwH81dtJiqsiLbXfgDRMdz1z5duSDK7QxiB4Av71w"), common.MustParsePublicHash("yspRViZLka9Sw34zJcnaChZk7YEc32QtXeQAXuKDge"), common.MustParseAddress("385ujsGNZt"), "HashTower")
 		addHyperFormulator(sp, ctw, hyperPolicy, 80, common.MustParsePublicHash("21FxFSk78sRu5xbYkUHxABCrsADifgR2Mxqzpqf5R9e"), common.MustParsePublicHash("4Y8inmnKCwXA654RzS6obxFJmFm38azENGFMuAyuBFS"), common.MustParseAddress("9nvUvJibL"), "Cosmostation")
