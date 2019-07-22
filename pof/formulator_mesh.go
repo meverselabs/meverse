@@ -143,7 +143,7 @@ func (ms *FormulatorNodeMesh) BroadcastMessage(m interface{}) error {
 }
 
 func (ms *FormulatorNodeMesh) client(Address string, TargetPubHash common.PublicHash) error {
-	conn, _, err := websocket.DefaultDialer.Dial("ws://"+Address, nil)
+	conn, _, err := websocket.DefaultDialer.Dial("wss://"+Address, nil)
 	if err != nil {
 		return err
 	}

@@ -279,7 +279,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 		for _, frAcc := range Hypers {
 			if StackReward, has := StackRewardMap.Get(frAcc.Address()); has {
 				lastStakingPaidHeight := p.getLastStakingPaidHeight(ctw, frAcc.Address())
-				if ctw.TargetHeight() >= lastStakingPaidHeight+frAcc.Policy.PayOutInterval {
+				if ctw.TargetHeight() >= lastStakingPaidHeight+policy.PayRewardEveryBlocks*frAcc.Policy.PayOutInterval {
 					StakingPowerMap := types.NewAddressAmountMap()
 					if bs := ctw.AccountData(b.Header.Generator, tagStakingPowerMap); len(bs) > 0 {
 						if err := encoding.Unmarshal(bs, &StakingPowerMap); err != nil {

@@ -7,8 +7,8 @@ StoreRoot = "./odata"
 ForceRecover = true
 
 [ObserverKeyMap]
-3e5PNobd577YEdjeb59zG6N7BBZbyRKMja2s55QQMQE = "testnet_observer1.fleta.io:35000"
-4ry8UmsCbo1BPTmUhqjMWgy9UtLDFcebEsc4Lgjo9ba = "testnet_observer2.fleta.io:35000"
-4KT4crmdp5GDihPXufUonmAujjC1YH4viej8C1udjc4 = "testnet_observer3.fleta.io:35000"
-3suqtMQWdUFUwDGMzH53KRJPFzqaP6YYRqRGMPLhhp5 = "testnet_observer4.fleta.io:35000"
-3HLUjZYeUDc7nGKqCaRyqB8yJHwj3BgFMWUYNmMSYfE = "testnet_observer5.fleta.io:35000"
+3UwhKPR25vZyycKXzvTjTTEvaQhLYNdga7Qfu96nkFS = "observer1.fletamain.net:35000"
+3LRTWd7Gsjx6nLtyPewi5z1wkMGMT4GDYwnkYWFwDjx = "observer2.fletamain.net:35000"
+6NCt1mLHxVSQYrSLJv5QmRWh236eEfw6jUMXAGURBN = "observer3.fletamain.net:35000"
+4Muu1gBArNvekXNF5CNSJhRFq31xPejb6kQ8Js1jwRA = "observer4.fletamain.net:35000"
+nnyPSWrxKXpozLZ36u9dEM9yH5mna2jk4oq6hCAZ8c = "observer5.fletamain.net:35000"

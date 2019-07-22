@@ -839,12 +839,12 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 			}
 
 			b := &types.Block{
-				Header:               br.BlockGenMessage.Block.Header,
-				TransactionTypes:     br.BlockGenMessage.Block.TransactionTypes,
-				Transactions:         br.BlockGenMessage.Block.Transactions,
+				Header:                br.BlockGenMessage.Block.Header,
+				TransactionTypes:      br.BlockGenMessage.Block.TransactionTypes,
+				Transactions:          br.BlockGenMessage.Block.Transactions,
 				TransactionSignatures: br.BlockGenMessage.Block.TransactionSignatures,
-				TransactionResults:   br.BlockGenMessage.Block.TransactionResults,
-				Signatures:           append([]common.Signature{br.BlockGenMessage.GeneratorSignature}, sigs...),
+				TransactionResults:    br.BlockGenMessage.Block.TransactionResults,
+				Signatures:            append([]common.Signature{br.BlockGenMessage.GeneratorSignature}, sigs...),
 			}
 			if err := ob.cs.ct.ConnectBlockWithContext(b, br.Context); err != nil {
 				return err
