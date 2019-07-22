@@ -431,7 +431,8 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 		fr.lastReqMessage = msg
 
 		start := time.Now().UnixNano()
-		StartBlockTime := uint64(time.Now().UnixNano())
+		Now := uint64(time.Now().UnixNano())
+		StartBlockTime := Now
 		bNoDelay := false
 
 		RemainBlocks := fr.cs.maxBlocksPerFormulator
@@ -456,7 +457,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 			}
 
 			Timestamp := StartBlockTime
-			if bNoDelay {
+			if bNoDelay || Timestamp > Now+uint64(3*time.Second) {
 				Timestamp += uint64(i) * uint64(time.Millisecond)
 			} else {
 				Timestamp += uint64(i) * uint64(500*time.Millisecond)
