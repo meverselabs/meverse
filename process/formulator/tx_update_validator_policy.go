@@ -39,6 +39,9 @@ func (tx *UpdateValidatorPolicy) Validate(p types.Process, loader types.LoaderWr
 	if tx.Policy.CommissionRatio1000 >= 1000 {
 		return ErrInvalidValidatorPolicy
 	}
+	if tx.Policy.PayOutInterval <= 0 {
+		return ErrInvalidValidatorPolicy
+	}
 
 	if tx.Seq() <= loader.Seq(tx.From()) {
 		return types.ErrInvalidSequence
