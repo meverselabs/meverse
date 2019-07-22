@@ -145,7 +145,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 
 	lastPaidHeight := p.getLastPaidHeight(ctw)
 	if ctw.TargetHeight() >= lastPaidHeight+policy.PayRewardEveryBlocks {
-		CountMap, err := p.getGenCountMap(ctw)
+		CountMap, err := p.flushGenCountMap(ctw)
 		if err != nil {
 			return err
 		}
@@ -155,8 +155,6 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 		StakingRewardPowerMap := map[common.Address]*amount.Amount{}
 		Hypers := []*FormulatorAccount{}
 		for GenAddress, GenCount := range CountMap {
-			p.removeGenCount(ctw, GenAddress)
-
 			acc, err := ctw.Account(GenAddress)
 			if err != nil {
 				return err

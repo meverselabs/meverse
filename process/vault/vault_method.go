@@ -60,8 +60,7 @@ func (p *Vault) AddLockedBalance(ctw *types.ContextWrapper, addr common.Address,
 	if am.Less(zero) {
 		return ErrMinusInput
 	}
-	sum := p.LockedBalance(ctw, addr, UnlockedHeight)
-	if sum.IsZero() {
+	if ns := ctw.ProcessData(toLockedBalanceNumberKey(UnlockedHeight, addr)); len(ns) == 0 {
 		var Count uint32
 		if bs := ctw.ProcessData(toLockedBalanceCountKey(UnlockedHeight)); len(bs) > 0 {
 			Count = util.BytesToUint32(bs)
@@ -71,7 +70,7 @@ func (p *Vault) AddLockedBalance(ctw *types.ContextWrapper, addr common.Address,
 		Count++
 		ctw.SetProcessData(toLockedBalanceCountKey(UnlockedHeight), util.Uint32ToBytes(Count))
 	}
-	ctw.SetProcessData(toLockedBalanceKey(UnlockedHeight, addr), sum.Add(am).Bytes())
+	ctw.SetProcessData(toLockedBalanceKey(UnlockedHeight, addr), p.LockedBalance(ctw, addr, UnlockedHeight).Add(am).Bytes())
 	ctw.SetProcessData(toLockedBalanceSumKey(addr), p.LockedBalanceTotal(ctw, addr).Add(am).Bytes())
 	return nil
 }
@@ -96,6 +95,24 @@ func (p *Vault) LockedBalanceTotal(lw types.LoaderWrapper, addr common.Address) 
 	} else {
 		return amount.NewCoinAmount(0, 0)
 	}
+}
+
+func (p *Vault) flushLockedBalanceMap(ctw *types.ContextWrapper, UnlockedHeight uint32) (map[common.Address]*amount.Amount, error) {
+	LockedBalanceMap := map[common.Address]*amount.Amount{}
+	if bs := ctw.ProcessData(toLockedBalanceCountKey(UnlockedHeight)); len(bs) > 0 {
+		Count := util.BytesToUint32(bs)
+		for i := uint32(0); i < Count; i++ {
+			var addr common.Address
+			copy(addr[:], ctw.ProcessData(toLockedBalanceReverseKey(UnlockedHeight, i)))
+			LockedBalanceMap[addr] = p.LockedBalance(ctw, addr, UnlockedHeight)
+
+			ctw.SetProcessData(toLockedBalanceKey(UnlockedHeight, addr), nil)
+			ctw.SetProcessData(toLockedBalanceNumberKey(UnlockedHeight, addr), nil)
+			ctw.SetProcessData(toLockedBalanceReverseKey(UnlockedHeight, i), nil)
+		}
+		ctw.SetProcessData(tagLockedBalanceCount, nil)
+	}
+	return LockedBalanceMap, nil
 }
 
 // CheckFeePayable returns tx fee can be paid or not

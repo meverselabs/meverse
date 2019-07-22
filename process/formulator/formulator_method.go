@@ -16,8 +16,7 @@ func (p *Formulator) getGenCount(lw types.LoaderWrapper, addr common.Address) ui
 }
 
 func (p *Formulator) addGenCount(ctw *types.ContextWrapper, addr common.Address) {
-	genCount := p.getGenCount(ctw, addr)
-	if genCount == 0 {
+	if ns := ctw.ProcessData(toGenCountNumberKey(addr)); len(ns) == 0 {
 		var Count uint32
 		if bs := ctw.ProcessData(tagGenCountCount); len(bs) > 0 {
 			Count = util.BytesToUint32(bs)
@@ -30,38 +29,20 @@ func (p *Formulator) addGenCount(ctw *types.ContextWrapper, addr common.Address)
 	ctw.SetProcessData(toGenCountKey(addr), util.Uint64ToBytes(p.getGenCount(ctw, addr)+1))
 }
 
-func (p *Formulator) removeGenCount(ctw *types.ContextWrapper, addr common.Address) {
-	genCount := p.getGenCount(ctw, addr)
-	if genCount != 0 {
-		var Count uint32
-		if bs := ctw.ProcessData(tagGenCountCount); len(bs) > 0 {
-			Count = util.BytesToUint32(bs)
-		}
-		Number := util.BytesToUint32(ctw.ProcessData(toGenCountNumberKey(addr)))
-		if Number != Count-1 {
-			var swapAddr common.Address
-			copy(swapAddr[:], ctw.ProcessData(toGenCountReverseKey(Count-1)))
-			ctw.SetProcessData(toGenCountNumberKey(swapAddr), util.Uint32ToBytes(Number))
-			ctw.SetProcessData(toGenCountReverseKey(Number), swapAddr[:])
-		} else {
-		}
-		ctw.SetProcessData(toGenCountNumberKey(addr), nil)
-		ctw.SetProcessData(toGenCountReverseKey(Count-1), nil)
-		Count--
-		ctw.SetProcessData(tagGenCountCount, util.Uint32ToBytes(Count))
-	}
-	ctw.SetProcessData(toGenCountKey(addr), nil)
-}
-
-func (p *Formulator) getGenCountMap(lw types.LoaderWrapper) (map[common.Address]uint64, error) {
+func (p *Formulator) flushGenCountMap(ctw *types.ContextWrapper) (map[common.Address]uint64, error) {
 	CountMap := map[common.Address]uint64{}
-	if bs := lw.ProcessData(tagGenCountCount); len(bs) > 0 {
+	if bs := ctw.ProcessData(tagGenCountCount); len(bs) > 0 {
 		Count := util.BytesToUint32(bs)
 		for i := uint32(0); i < Count; i++ {
 			var addr common.Address
-			copy(addr[:], lw.ProcessData(toGenCountReverseKey(i)))
-			CountMap[addr] = p.getGenCount(lw, addr)
+			copy(addr[:], ctw.ProcessData(toGenCountReverseKey(i)))
+			CountMap[addr] = p.getGenCount(ctw, addr)
+
+			ctw.SetProcessData(toGenCountKey(addr), nil)
+			ctw.SetProcessData(toGenCountNumberKey(addr), nil)
+			ctw.SetProcessData(toGenCountReverseKey(i), nil)
 		}
+		ctw.SetProcessData(tagGenCountCount, nil)
 	}
 	return CountMap, nil
 }
@@ -81,8 +62,7 @@ func (p *Formulator) GetStakingAmount(lw types.LoaderWrapper, HyperAddress commo
 func (p *Formulator) AddStakingAmount(ctw *types.ContextWrapper, HyperAddress common.Address, StakingAddress common.Address, StakingAmount *amount.Amount) {
 	ctw = types.SwitchContextWrapper(p.pid, ctw)
 
-	am := p.GetStakingAmount(ctw, HyperAddress, StakingAddress)
-	if am.IsZero() {
+	if ns := ctw.AccountData(HyperAddress, toStakingAmountNumberKey(StakingAddress)); len(ns) == 0 {
 		var Count uint32
 		if bs := ctw.AccountData(HyperAddress, tagStakingAmountCount); len(bs) > 0 {
 			Count = util.BytesToUint32(bs)
@@ -92,7 +72,7 @@ func (p *Formulator) AddStakingAmount(ctw *types.ContextWrapper, HyperAddress co
 		Count++
 		ctw.SetAccountData(HyperAddress, tagStakingAmountCount, util.Uint32ToBytes(Count))
 	}
-	ctw.SetAccountData(HyperAddress, toStakingAmountKey(StakingAddress), am.Add(StakingAmount).Bytes())
+	ctw.SetAccountData(HyperAddress, toStakingAmountKey(StakingAddress), p.GetStakingAmount(ctw, HyperAddress, StakingAddress).Add(StakingAmount).Bytes())
 }
 
 func (p *Formulator) subStakingAmount(ctw *types.ContextWrapper, HyperAddress common.Address, StakingAddress common.Address, am *amount.Amount) error {
@@ -104,33 +84,28 @@ func (p *Formulator) subStakingAmount(ctw *types.ContextWrapper, HyperAddress co
 
 	total = total.Sub(am)
 	if total.IsZero() {
-		p.removeStakingAmount(ctw, HyperAddress, StakingAddress)
+		if ns := ctw.AccountData(HyperAddress, toStakingAmountNumberKey(StakingAddress)); len(ns) > 0 {
+			var Count uint32
+			if bs := ctw.AccountData(HyperAddress, tagStakingAmountCount); len(bs) > 0 {
+				Count = util.BytesToUint32(bs)
+			}
+			Number := util.BytesToUint32(ns)
+			if Number != Count-1 {
+				var swapAddr common.Address
+				copy(swapAddr[:], ctw.AccountData(HyperAddress, toStakingAmountReverseKey(Count-1)))
+				ctw.SetAccountData(HyperAddress, toStakingAmountReverseKey(Number), swapAddr[:])
+				ctw.SetAccountData(HyperAddress, toStakingAmountNumberKey(swapAddr), util.Uint32ToBytes(Number))
+			}
+			ctw.SetAccountData(HyperAddress, toStakingAmountNumberKey(StakingAddress), nil)
+			ctw.SetAccountData(HyperAddress, toStakingAmountReverseKey(Count-1), nil)
+			Count--
+			ctw.SetAccountData(HyperAddress, tagStakingAmountCount, util.Uint32ToBytes(Count))
+		}
+		ctw.SetAccountData(HyperAddress, toStakingAmountKey(StakingAddress), nil)
 	} else {
 		ctw.SetAccountData(HyperAddress, toStakingAmountKey(StakingAddress), total.Bytes())
 	}
 	return nil
-}
-
-func (p *Formulator) removeStakingAmount(ctw *types.ContextWrapper, HyperAddress common.Address, StakingAddress common.Address) {
-	am := p.GetStakingAmount(ctw, HyperAddress, StakingAddress)
-	if !am.IsZero() {
-		var Count uint32
-		if bs := ctw.AccountData(HyperAddress, tagStakingAmountCount); len(bs) > 0 {
-			Count = util.BytesToUint32(bs)
-		}
-		Number := util.BytesToUint32(ctw.AccountData(HyperAddress, toStakingAmountNumberKey(StakingAddress)))
-		if Number != Count-1 {
-			var swapAddr common.Address
-			copy(swapAddr[:], ctw.AccountData(HyperAddress, toStakingAmountReverseKey(Count-1)))
-			ctw.SetAccountData(HyperAddress, toStakingAmountNumberKey(swapAddr), util.Uint32ToBytes(Number))
-			ctw.SetAccountData(HyperAddress, toStakingAmountReverseKey(Number), swapAddr[:])
-		}
-		ctw.SetAccountData(HyperAddress, toStakingAmountNumberKey(StakingAddress), nil)
-		ctw.SetAccountData(HyperAddress, toStakingAmountReverseKey(Count-1), nil)
-		Count--
-		ctw.SetAccountData(HyperAddress, tagStakingAmountCount, util.Uint32ToBytes(Count))
-	}
-	ctw.SetAccountData(HyperAddress, toStakingAmountKey(StakingAddress), nil)
 }
 
 // GetStakingAmountMap returns all staking amount of the hyper formulator
@@ -144,64 +119,6 @@ func (p *Formulator) GetStakingAmountMap(lw types.LoaderWrapper, HyperAddress co
 			var StakingAddress common.Address
 			copy(StakingAddress[:], lw.AccountData(HyperAddress, toStakingAmountReverseKey(i)))
 			PowerMap[StakingAddress] = p.GetStakingAmount(lw, HyperAddress, StakingAddress)
-		}
-	}
-	return PowerMap, nil
-}
-
-func (p *Formulator) getRewardPower(lw types.LoaderWrapper, addr common.Address) *amount.Amount {
-	if bs := lw.ProcessData(toRewardPowerKey(addr)); len(bs) > 0 {
-		return amount.NewAmountFromBytes(bs)
-	} else {
-		return amount.NewCoinAmount(0, 0)
-	}
-}
-
-func (p *Formulator) addRewardPower(ctw *types.ContextWrapper, addr common.Address, Power *amount.Amount) {
-	am := p.getRewardPower(ctw, addr)
-	if am.IsZero() {
-		var Count uint32
-		if bs := ctw.ProcessData(tagRewardPowerCount); len(bs) > 0 {
-			Count = util.BytesToUint32(bs)
-		}
-		ctw.SetProcessData(toRewardPowerNumberKey(addr), util.Uint32ToBytes(Count))
-		ctw.SetProcessData(toRewardPowerReverseKey(Count), addr[:])
-		Count++
-		ctw.SetProcessData(tagRewardPowerCount, util.Uint32ToBytes(Count))
-	}
-	ctw.SetProcessData(toRewardPowerKey(addr), p.getRewardPower(ctw, addr).Add(Power).Bytes())
-}
-
-func (p *Formulator) removeRewardPower(ctw *types.ContextWrapper, addr common.Address) {
-	am := p.getRewardPower(ctw, addr)
-	if !am.IsZero() {
-		var Count uint32
-		if bs := ctw.ProcessData(tagRewardPowerCount); len(bs) > 0 {
-			Count = util.BytesToUint32(bs)
-		}
-		Number := util.BytesToUint32(ctw.ProcessData(toRewardPowerNumberKey(addr)))
-		if Number != Count-1 {
-			var addr common.Address
-			copy(addr[:], ctw.ProcessData(toRewardPowerReverseKey(Count-1)))
-			ctw.SetProcessData(toRewardPowerNumberKey(addr), util.Uint32ToBytes(Number))
-			ctw.SetProcessData(toRewardPowerReverseKey(Number), addr[:])
-		}
-		ctw.SetProcessData(toRewardPowerNumberKey(addr), nil)
-		ctw.SetProcessData(toRewardPowerReverseKey(Count-1), nil)
-		Count--
-		ctw.SetProcessData(tagRewardPowerCount, util.Uint32ToBytes(Count))
-	}
-	ctw.SetProcessData(toRewardPowerKey(addr), nil)
-}
-
-func (p *Formulator) getRewardPowerMap(lw types.LoaderWrapper) (map[common.Address]*amount.Amount, error) {
-	PowerMap := map[common.Address]*amount.Amount{}
-	if bs := lw.ProcessData(tagRewardPowerCount); len(bs) > 0 {
-		Count := util.BytesToUint32(bs)
-		for i := uint32(0); i < Count; i++ {
-			var addr common.Address
-			copy(addr[:], lw.ProcessData(toRewardPowerReverseKey(i)))
-			PowerMap[addr] = p.getRewardPower(lw, addr)
 		}
 	}
 	return PowerMap, nil
