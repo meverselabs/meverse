@@ -923,6 +923,4 @@ func addStaking(fp *formulator.Formulator, ctw *types.ContextWrapper, HyperAddre
 		panic(types.ErrNotExistAccount)
 	}
 	fp.AddStakingAmount(ctw, HyperAddress, StakingAddress, am)
-
-	gAmount = gAmount.Add(am)
 }
