@@ -218,3 +218,12 @@ func ParseAmount(str string) (*Amount, error) {
 		return nil, ErrInvalidAmountFormat
 	}
 }
+
+// MustParseAmount parse the amount from the float string
+func MustParseAmount(str string) *Amount {
+	am, err := ParseAmount(str)
+	if err != nil {
+		panic(err)
+	}
+	return am
+}
