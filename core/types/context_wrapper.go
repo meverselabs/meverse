@@ -62,6 +62,11 @@ func (ctw *ContextWrapper) TargetHeight() uint32 {
 	return ctw.ctx.TargetHeight()
 }
 
+// LastStatus returns the recored target height, prev hash and timestamp
+func (ctw *ContextWrapper) LastStatus() (uint32, hash.Hash256, uint64) {
+	return ctw.ctx.LastStatus()
+}
+
 // LastHash returns the recorded prev hash when ContextWrapper generation
 func (ctw *ContextWrapper) LastHash() hash.Hash256 {
 	return ctw.ctx.LastHash()

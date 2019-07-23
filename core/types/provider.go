@@ -9,6 +9,7 @@ import (
 type Provider interface {
 	Version() uint16
 	Height() uint32
+	LastStatus() (uint32, hash.Hash256, uint64)
 	LastHash() hash.Hash256
 	LastTimestamp() uint64
 	Hash(height uint32) (hash.Hash256, error)

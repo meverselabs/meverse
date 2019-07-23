@@ -166,9 +166,8 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 	for !fr.isClose {
 		select {
 		case <-blockTimer.C:
-			cp := fr.cs.cn.Provider()
 			fr.Lock()
-			TargetHeight := uint64(cp.Height() + 1)
+			TargetHeight := uint64(fr.cs.cn.Provider().Height() + 1)
 			item := fr.blockQ.PopUntil(TargetHeight)
 			for item != nil {
 				b := item.(*types.Block)
@@ -298,14 +297,12 @@ func (fr *FormulatorNode) OnDisconnected(p peer.Peer) {
 
 // OnRecv called when message received
 func (fr *FormulatorNode) OnRecv(p peer.Peer, m interface{}) error {
-	cp := fr.cs.cn.Provider()
-
 	var SenderPublicHash common.PublicHash
 	copy(SenderPublicHash[:], []byte(p.ID()))
 
 	switch msg := m.(type) {
 	case *p2p.RequestMessage:
-		b, err := cp.Block(msg.Height)
+		b, err := fr.cs.cn.Provider().Block(msg.Height)
 		if err != nil {
 			return err
 		}
@@ -316,7 +313,7 @@ func (fr *FormulatorNode) OnRecv(p peer.Peer, m interface{}) error {
 			return err
 		}
 	case *p2p.StatusMessage:
-		Height := cp.Height()
+		Height := fr.cs.cn.Provider().Height()
 		if Height < msg.Height {
 			for i := Height + 1; i <= Height+100 && i <= msg.Height; i++ {
 				if !fr.requestNodeTimer.Exist(i) {
@@ -324,7 +321,7 @@ func (fr *FormulatorNode) OnRecv(p peer.Peer, m interface{}) error {
 				}
 			}
 		} else {
-			h, err := cp.Hash(msg.Height)
+			h, err := fr.cs.cn.Provider().Hash(msg.Height)
 			if err != nil {
 				return err
 			}
@@ -609,7 +606,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 		}
 		return nil
 	case *p2p.BlockMessage:
-		if msg.Block.Header.Height <= fr.cs.cn.Provider().Height() {
+		if msg.Block.Header.Height <= cp.Height() {
 			return nil
 		}
 		if err := fr.addBlock(msg.Block); err != nil {
@@ -638,7 +635,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 			}
 		}
 
-		TargetHeight := fr.cs.cn.Provider().Height() + 1
+		TargetHeight := cp.Height() + 1
 		for TargetHeight <= msg.Height {
 			if !fr.requestTimer.Exist(TargetHeight) {
 				if fr.blockQ.Find(uint64(TargetHeight)) == nil {

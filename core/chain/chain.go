@@ -401,17 +401,17 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 
 func (cn *Chain) validateHeader(bh *types.Header) error {
 	provider := cn.Provider()
+	height, lastHash, lastTimestamp := provider.LastStatus()
 	if bh.Version > provider.Version() {
 		return ErrInvalidVersion
 	}
-	if bh.Timestamp <= provider.LastTimestamp() {
+	if bh.Timestamp <= lastTimestamp {
 		return ErrInvalidTimestamp
 	}
 	if bh.Generator == common.NewAddress(0, 0, 0) {
 		return ErrInvalidGenerator
 	}
 
-	height := provider.Height()
 	if bh.Height != height+1 {
 		return ErrInvalidHeight
 	}
@@ -428,7 +428,7 @@ func (cn *Chain) validateHeader(bh *types.Header) error {
 			return ErrInvalidVersion
 		}
 	}
-	if bh.PrevHash != provider.LastHash() {
+	if bh.PrevHash != lastHash {
 		return ErrInvalidPrevHash
 	}
 	return nil

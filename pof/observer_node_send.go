@@ -16,10 +16,11 @@ func (ob *ObserverNode) sendRoundVote() error {
 	}
 
 	cp := ob.cs.cn.Provider()
+	height, lastHash, _ := cp.LastStatus()
 	nm := &RoundVoteMessage{
 		RoundVote: &RoundVote{
-			LastHash:             cp.LastHash(),
-			TargetHeight:         cp.Height() + 1,
+			LastHash:             lastHash,
+			TargetHeight:         height + 1,
 			TimeoutCount:         uint32(TimeoutCount),
 			Formulator:           Top.Address,
 			FormulatorPublicHash: Top.PublicHash,
@@ -30,14 +31,14 @@ func (ob *ObserverNode) sendRoundVote() error {
 	if gh, err := ob.fs.GuessHeight(Top.Address); err != nil {
 		ob.fs.SendTo(Top.Address, &p2p.StatusMessage{
 			Version:  cp.Version(),
-			Height:   cp.Height(),
-			LastHash: cp.LastHash(),
+			Height:   height,
+			LastHash: lastHash,
 		})
-	} else if gh < cp.Height() {
+	} else if gh < height {
 		ob.fs.SendTo(Top.Address, &p2p.StatusMessage{
 			Version:  cp.Version(),
-			Height:   cp.Height(),
-			LastHash: cp.LastHash(),
+			Height:   height,
+			LastHash: lastHash,
 		})
 	}
 	ob.round.VoteFailCount = 0
@@ -63,6 +64,7 @@ func (ob *ObserverNode) sendRoundVoteTo(TargetPubHash common.PublicHash) error {
 	}
 
 	cp := ob.cs.cn.Provider()
+	height, lastHash, _ := cp.LastStatus()
 	if ob.round.RoundState == BlockVoteState {
 		MyMsg, has := ob.round.RoundVoteMessageMap[ob.myPublicHash]
 		if !has {
@@ -79,11 +81,12 @@ func (ob *ObserverNode) sendRoundVoteTo(TargetPubHash common.PublicHash) error {
 				IsReply:              true,
 			},
 		}
-		TargetHeight := cp.Height() + 1
+
+		TargetHeight := height + 1
 		if MyMsg.RoundVote.TargetHeight != TargetHeight {
 			nm.RoundVote.TimeoutCount = 0
 			nm.RoundVote.TargetHeight = TargetHeight
-			nm.RoundVote.LastHash = cp.LastHash()
+			nm.RoundVote.LastHash = lastHash
 			nm.RoundVote.Timestamp = uint64(time.Now().UnixNano())
 		}
 
@@ -102,8 +105,8 @@ func (ob *ObserverNode) sendRoundVoteTo(TargetPubHash common.PublicHash) error {
 
 		nm := &RoundVoteMessage{
 			RoundVote: &RoundVote{
-				LastHash:             cp.LastHash(),
-				TargetHeight:         cp.Height() + 1,
+				LastHash:             lastHash,
+				TargetHeight:         height + 1,
 				TimeoutCount:         uint32(TimeoutCount),
 				Formulator:           Top.Address,
 				FormulatorPublicHash: Top.PublicHash,
@@ -175,11 +178,12 @@ func (ob *ObserverNode) sendRoundVoteAckTo(TargetPubHash common.PublicHash) erro
 			},
 		}
 		cp := ob.cs.cn.Provider()
-		TargetHeight := cp.Height() + 1
+		height, lastHash, _ := cp.LastStatus()
+		TargetHeight := height + 1
 		if MyMsg.RoundVoteAck.TargetHeight != TargetHeight {
 			nm.RoundVoteAck.TimeoutCount = 0
 			nm.RoundVoteAck.TargetHeight = TargetHeight
-			nm.RoundVoteAck.LastHash = cp.LastHash()
+			nm.RoundVoteAck.LastHash = lastHash
 			nm.RoundVoteAck.Timestamp = uint64(time.Now().UnixNano())
 		}
 
@@ -323,10 +327,11 @@ func (ob *ObserverNode) sendStatusTo(TargetPubHash common.PublicHash) error {
 	}
 
 	cp := ob.cs.cn.Provider()
+	height, lastHash, _ := cp.LastStatus()
 	nm := &p2p.StatusMessage{
 		Version:  cp.Version(),
-		Height:   cp.Height(),
-		LastHash: cp.LastHash(),
+		Height:   height,
+		LastHash: lastHash,
 	}
 	ob.ms.SendTo(TargetPubHash, nm)
 	return nil
@@ -334,10 +339,11 @@ func (ob *ObserverNode) sendStatusTo(TargetPubHash common.PublicHash) error {
 
 func (ob *ObserverNode) broadcastStatus() error {
 	cp := ob.cs.cn.Provider()
+	height, lastHash, _ := cp.LastStatus()
 	nm := &p2p.StatusMessage{
 		Version:  cp.Version(),
-		Height:   cp.Height(),
-		LastHash: cp.LastHash(),
+		Height:   height,
+		LastHash: lastHash,
 	}
 	ob.ms.BroadcastMessage(nm)
 	return nil

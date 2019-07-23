@@ -113,6 +113,27 @@ func (st *Store) NewContextWrapper(pid uint8) *types.ContextWrapper {
 	return types.NewContextWrapper(pid, types.NewContext(st))
 }
 
+// LastStatus returns the recored target height, prev hash and timestamp
+func (st *Store) LastStatus() (uint32, hash.Hash256, uint64) {
+	height := st.Height()
+	h, err := st.Hash(height)
+	if err != nil {
+		panic(err)
+	}
+	if height == 0 {
+		return 0, h, 0
+	}
+	bh, err := st.Header(height)
+	if err != nil {
+		if err != ErrStoreClosed {
+			// should have not reabh
+			panic(err)
+		}
+		return 0, hash.Hash256{}, 0
+	}
+	return bh.Height, h, bh.Timestamp
+}
+
 // LastHash returns the last hash of the chain
 func (st *Store) LastHash() hash.Hash256 {
 	h, err := st.Hash(st.Height())

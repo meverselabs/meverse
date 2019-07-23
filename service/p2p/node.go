@@ -142,9 +142,8 @@ func (nd *Node) Run(BindAddress string) {
 	for !nd.isClose {
 		select {
 		case <-blockTimer.C:
-			cp := nd.cn.Provider()
 			nd.Lock()
-			TargetHeight := uint64(cp.Height() + 1)
+			TargetHeight := uint64(nd.cn.Provider().Height() + 1)
 			item := nd.blockQ.PopUntil(TargetHeight)
 			for item != nil {
 				b := item.(*types.Block)
@@ -153,7 +152,7 @@ func (nd *Node) Run(BindAddress string) {
 					panic(err)
 					break
 				}
-				log.Println("Node", nd.myPublicHash.String(), cp.Height(), "BlockConnected", b.Header.Generator.String(), b.Header.Height)
+				log.Println("Node", nd.myPublicHash.String(), nd.cn.Provider().Height(), "BlockConnected", b.Header.Generator.String(), b.Header.Height)
 				nd.broadcastStatus()
 				TargetHeight++
 				item = nd.blockQ.PopUntil(TargetHeight)
@@ -193,14 +192,12 @@ func (nd *Node) OnDisconnected(p peer.Peer) {
 
 // OnRecv called when message received
 func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
-	cp := nd.cn.Provider()
-
 	var SenderPublicHash common.PublicHash
 	copy(SenderPublicHash[:], []byte(p.ID()))
 
 	switch msg := m.(type) {
 	case *RequestMessage:
-		b, err := cp.Block(msg.Height)
+		b, err := nd.cn.Provider().Block(msg.Height)
 		if err != nil {
 			return err
 		}
@@ -212,7 +209,7 @@ func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
 		}
 		return nil
 	case *StatusMessage:
-		Height := cp.Height()
+		Height := nd.cn.Provider().Height()
 		if Height < msg.Height {
 			for i := Height + 1; i <= Height+100 && i <= msg.Height; i++ {
 				if !nd.requestTimer.Exist(i) {
@@ -220,7 +217,7 @@ func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
 				}
 			}
 		} else {
-			h, err := cp.Hash(msg.Height)
+			h, err := nd.cn.Provider().Hash(msg.Height)
 			if err != nil {
 				return err
 			}

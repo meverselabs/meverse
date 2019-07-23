@@ -9,10 +9,11 @@ import (
 
 func (fr *FormulatorNode) broadcastStatus() error {
 	cp := fr.cs.cn.Provider()
+	height, lastHash, _ := cp.LastStatus()
 	nm := &p2p.StatusMessage{
 		Version:  cp.Version(),
-		Height:   cp.Height(),
-		LastHash: cp.LastHash(),
+		Height:   height,
+		LastHash: lastHash,
 	}
 	fr.ms.BroadcastMessage(nm)
 	fr.nm.BroadcastMessage(nm)

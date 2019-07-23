@@ -200,10 +200,11 @@ func (ms *FormulatorService) handleConnection(p peer.Peer) error {
 	}
 
 	cp := ms.ob.cs.cn.Provider()
+	height, lastHash, _ := cp.LastStatus()
 	p.Send(&p2p.StatusMessage{
 		Version:  cp.Version(),
-		Height:   cp.Height(),
-		LastHash: cp.LastHash(),
+		Height:   height,
+		LastHash: lastHash,
 	})
 
 	for {

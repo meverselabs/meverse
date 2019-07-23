@@ -12,10 +12,11 @@ func (nd *Node) sendStatusTo(TargetPubHash common.PublicHash) error {
 	}
 
 	cp := nd.cn.Provider()
+	height, lastHash, _ := cp.LastStatus()
 	nm := &StatusMessage{
 		Version:  cp.Version(),
-		Height:   cp.Height(),
-		LastHash: cp.LastHash(),
+		Height:   height,
+		LastHash: lastHash,
 	}
 	nd.ms.SendTo(TargetPubHash, nm)
 	return nil
@@ -23,10 +24,11 @@ func (nd *Node) sendStatusTo(TargetPubHash common.PublicHash) error {
 
 func (nd *Node) broadcastStatus() error {
 	cp := nd.cn.Provider()
+	height, lastHash, _ := cp.LastStatus()
 	nm := &StatusMessage{
 		Version:  cp.Version(),
-		Height:   cp.Height(),
-		LastHash: cp.LastHash(),
+		Height:   height,
+		LastHash: lastHash,
 	}
 	nd.ms.BroadcastMessage(nm)
 	return nil

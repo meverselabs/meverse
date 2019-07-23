@@ -226,8 +226,7 @@ func (ob *ObserverNode) OnTimerExpired(height uint32, value string) {
 }
 
 func (ob *ObserverNode) syncVoteRound() {
-	cp := ob.cs.cn.Provider()
-	TargetHeight := cp.Height() + 1
+	TargetHeight := ob.cs.cn.Provider().Height() + 1
 	if ob.round.TargetHeight < TargetHeight {
 		IsContinue := false
 		Top, err := ob.cs.rt.TopRank(0)
@@ -249,7 +248,7 @@ func (ob *ObserverNode) syncVoteRound() {
 		}
 		if !IsContinue {
 			if debug.DEBUG {
-				log.Println("Observer", ob.myPublicHash.String(), cp.Height(), "Turn Over", ob.round.RoundState, len(ob.adjustFormulatorMap()), ob.fs.PeerCount(), (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
+				log.Println("Observer", ob.myPublicHash.String(), ob.cs.cn.Provider().Height(), "Turn Over", ob.round.RoundState, len(ob.adjustFormulatorMap()), ob.fs.PeerCount(), (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
 			}
 			ob.resetVoteRound(false)
 		}
@@ -707,7 +706,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 		//[if valid block]
 		Now := uint64(time.Now().UnixNano())
 		if msg.Block.Header.Timestamp > Now+uint64(10*time.Second) {
-			log.Println(msg.Block.Header.Generator.String(), "if msg.Block.Header.Timestamp > Now+uint64(10*time.Second) {")
+			//log.Println(msg.Block.Header.Generator.String(), "if msg.Block.Header.Timestamp > Now+uint64(10*time.Second) {")
 			return ErrInvalidVote
 		}
 		if msg.Block.Header.Timestamp < cp.LastTimestamp() {

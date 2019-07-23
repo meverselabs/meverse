@@ -43,6 +43,11 @@ func (cc *contextCache) TargetHeight() uint32 {
 	return cc.ctx.TargetHeight()
 }
 
+// LastStatus returns the recored target height, prev hash and timestamp
+func (cc *contextCache) LastStatus() (uint32, hash.Hash256, uint64) {
+	return cc.ctx.LastStatus()
+}
+
 // LastHash returns the recorded prev hash when context generation
 func (cc *contextCache) LastHash() hash.Hash256 {
 	return cc.ctx.LastHash()

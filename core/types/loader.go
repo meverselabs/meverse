@@ -50,6 +50,11 @@ func (st *emptyLoader) TargetHeight() uint32 {
 	return 0
 }
 
+// LastStatus returns 0, hash.Hash256{}, 0
+func (st *emptyLoader) LastStatus() (uint32, hash.Hash256, uint64) {
+	return 0, hash.Hash256{}, 0
+}
+
 // LastHash returns hash.Hash256{}
 func (st *emptyLoader) LastHash() hash.Hash256 {
 	return hash.Hash256{}

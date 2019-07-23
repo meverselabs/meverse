@@ -70,6 +70,11 @@ func (ctx *Context) TargetHeight() uint32 {
 	return ctx.genTargetHeight
 }
 
+// LastStatus returns the recored target height, prev hash and timestamp
+func (ctx *Context) LastStatus() (uint32, hash.Hash256, uint64) {
+	return ctx.genTargetHeight, ctx.genLastHash, ctx.genTimestamp
+}
+
 // LastHash returns the recorded prev hash when context generation
 func (ctx *Context) LastHash() hash.Hash256 {
 	return ctx.genLastHash
