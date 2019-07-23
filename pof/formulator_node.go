@@ -41,6 +41,7 @@ type FormulatorNode struct {
 	lastContextes        []*types.Context
 	lastReqMessage       *BlockReqMessage
 	lastGenHeight        uint32
+	lastGenTime          int64
 	txMsgChans           []*chan *p2p.TxMsgItem
 	txMsgIdx             uint64
 	statusMap            map[string]*p2p.Status
@@ -381,7 +382,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 		defer fr.Unlock()
 
 		Height := cp.Height()
-		if msg.TargetHeight <= fr.lastGenHeight {
+		if msg.TargetHeight <= fr.lastGenHeight && fr.lastGenTime+int64(30*time.Second) < time.Now().UnixNano() {
 			return nil
 		}
 		if msg.TargetHeight <= Height {
@@ -527,6 +528,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 			fr.lastGenMessages = append(fr.lastGenMessages, nm)
 			fr.lastContextes = append(fr.lastContextes, ctx)
 			fr.lastGenHeight = ctx.TargetHeight()
+			fr.lastGenTime = time.Now().UnixNano()
 
 			ExpectedTime := time.Duration(i+1) * 200 * time.Millisecond
 			PastTime := time.Duration(time.Now().UnixNano() - start)
