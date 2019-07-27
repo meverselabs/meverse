@@ -5,8 +5,6 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/fletaio/fleta/common/util"
-
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/core/types"
@@ -87,7 +85,7 @@ func (cn *Chain) Init() error {
 	}
 	top := genesisContext.Top()
 
-	GenesisHash := hash.Hashes(hash.Hash([]byte(cn.store.Name())), hash.Hash(util.Uint16ToBytes(cn.store.Version())), genesisContext.Hash())
+	GenesisHash := hash.Hashes(hash.Hash([]byte(cn.store.Name())), hash.Hash([]byte{cn.store.ChainID()}), genesisContext.Hash())
 	if h, err := cn.Provider().Hash(0); err != nil {
 		if err != ErrNotExistKey {
 			return err
@@ -296,9 +294,7 @@ func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context) err
 		return err
 	}
 	for _, s := range cn.services {
-		if err := s.OnBlockConnected(b, top.Events, ctx); err != nil {
-			return err
-		}
+		s.OnBlockConnected(b, top.Events, ctx)
 	}
 	return nil
 }
@@ -395,15 +391,20 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 	} else if ctx.StackSize() > 1 {
 		return ErrDirtyContext
 	}
-
 	return nil
 }
 
 func (cn *Chain) validateHeader(bh *types.Header) error {
 	provider := cn.Provider()
 	height, lastHash, lastTimestamp := provider.LastStatus()
+	if bh.ChainID != provider.ChainID() {
+		return ErrInvalidChainID
+	}
 	if bh.Version > provider.Version() {
 		return ErrInvalidVersion
+	}
+	if bh.PrevHash != lastHash {
+		return ErrInvalidPrevHash
 	}
 	if bh.Timestamp <= lastTimestamp {
 		return ErrInvalidTimestamp
@@ -427,9 +428,9 @@ func (cn *Chain) validateHeader(bh *types.Header) error {
 		if bh.Version < TargetHeader.Version {
 			return ErrInvalidVersion
 		}
-	}
-	if bh.PrevHash != lastHash {
-		return ErrInvalidPrevHash
+		if bh.ChainID != TargetHeader.ChainID {
+			return ErrInvalidChainID
+		}
 	}
 	return nil
 }
@@ -461,7 +462,7 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block) ([][]common.Publi
 				t := b.TransactionTypes[sidx+q]
 				sigs := b.TransactionSignatures[sidx+q]
 
-				TxHash := HashTransactionByType(t, tx)
+				TxHash := HashTransactionByType(cn.store.chainID, t, tx)
 				TxHashes[sidx+q+1] = TxHash
 				signers := make([]common.PublicHash, 0, len(sigs))
 				for _, sig := range sigs {

@@ -19,6 +19,7 @@ func (ob *ObserverNode) sendRoundVote() error {
 	height, lastHash, _ := cp.LastStatus()
 	nm := &RoundVoteMessage{
 		RoundVote: &RoundVote{
+			ChainID:              cp.ChainID(),
 			LastHash:             lastHash,
 			TargetHeight:         height + 1,
 			TimeoutCount:         uint32(TimeoutCount),
@@ -72,6 +73,7 @@ func (ob *ObserverNode) sendRoundVoteTo(TargetPubHash common.PublicHash) error {
 		}
 		nm := &RoundVoteMessage{
 			RoundVote: &RoundVote{
+				ChainID:              MyMsg.RoundVote.ChainID,
 				LastHash:             MyMsg.RoundVote.LastHash,
 				TargetHeight:         MyMsg.RoundVote.TargetHeight,
 				TimeoutCount:         MyMsg.RoundVote.TimeoutCount,
@@ -105,6 +107,7 @@ func (ob *ObserverNode) sendRoundVoteTo(TargetPubHash common.PublicHash) error {
 
 		nm := &RoundVoteMessage{
 			RoundVote: &RoundVote{
+				ChainID:              cp.ChainID(),
 				LastHash:             lastHash,
 				TargetHeight:         height + 1,
 				TimeoutCount:         uint32(TimeoutCount),
@@ -130,6 +133,7 @@ func (ob *ObserverNode) sendRoundVoteAck() error {
 	MinRoundVote := ob.round.RoundVoteMessageMap[ob.round.MinVotePublicHash].RoundVote
 	nm := &RoundVoteAckMessage{
 		RoundVoteAck: &RoundVoteAck{
+			ChainID:              MinRoundVote.ChainID,
 			LastHash:             MinRoundVote.LastHash,
 			TargetHeight:         MinRoundVote.TargetHeight,
 			TimeoutCount:         MinRoundVote.TimeoutCount,
@@ -167,6 +171,7 @@ func (ob *ObserverNode) sendRoundVoteAckTo(TargetPubHash common.PublicHash) erro
 		}
 		nm := &RoundVoteAckMessage{
 			RoundVoteAck: &RoundVoteAck{
+				ChainID:              MyMsg.RoundVoteAck.ChainID,
 				LastHash:             MyMsg.RoundVoteAck.LastHash,
 				TargetHeight:         MyMsg.RoundVoteAck.TargetHeight,
 				TimeoutCount:         MyMsg.RoundVoteAck.TimeoutCount,
@@ -201,6 +206,7 @@ func (ob *ObserverNode) sendRoundVoteAckTo(TargetPubHash common.PublicHash) erro
 		}
 		nm := &RoundVoteAckMessage{
 			RoundVoteAck: &RoundVoteAck{
+				ChainID:              MyMsg.RoundVoteAck.ChainID,
 				LastHash:             MyMsg.RoundVoteAck.LastHash,
 				TargetHeight:         MyMsg.RoundVoteAck.TargetHeight,
 				TimeoutCount:         MyMsg.RoundVoteAck.TimeoutCount,
@@ -226,6 +232,7 @@ func (ob *ObserverNode) sendRoundVoteAckTo(TargetPubHash common.PublicHash) erro
 func (ob *ObserverNode) sendRoundSetup() error {
 	nm := &RoundSetupMessage{
 		MinRoundVoteAck: &RoundVoteAck{
+			ChainID:              ob.round.MinRoundVoteAck.ChainID,
 			LastHash:             ob.round.MinRoundVoteAck.LastHash,
 			TargetHeight:         ob.round.MinRoundVoteAck.TargetHeight,
 			TimeoutCount:         ob.round.MinRoundVoteAck.TimeoutCount,

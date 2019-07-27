@@ -78,7 +78,7 @@ func NewFormulatorNode(Config *FormulatorConfig, key key.Key, ndkey key.Key, Net
 		txQ:                  queue.NewExpireQueue(),
 	}
 	fr.ms = NewFormulatorNodeMesh(key, NetAddressMap, fr)
-	fr.nm = p2p.NewNodeMesh(ndkey, SeedNodeMap, fr, peerStorePath)
+	fr.nm = p2p.NewNodeMesh(fr.cs.cn.Provider().ChainID(), ndkey, SeedNodeMap, fr, peerStorePath)
 	fr.txQ.AddGroup(60 * time.Second)
 	fr.txQ.AddGroup(600 * time.Second)
 	fr.txQ.AddGroup(3600 * time.Second)
@@ -212,7 +212,7 @@ func (fr *FormulatorNode) addTx(t uint16, tx types.Transaction, sigs []common.Si
 		return txpool.ErrTransactionPoolOverflowed
 	}
 
-	TxHash := chain.HashTransactionByType(t, tx)
+	TxHash := chain.HashTransactionByType(fr.cs.cn.Provider().ChainID(), t, tx)
 
 	ctx := fr.cs.ct.NewContext()
 	if fr.txpool.IsExist(TxHash) {
@@ -243,7 +243,7 @@ func (fr *FormulatorNode) addTx(t uint16, tx types.Transaction, sigs []common.Si
 	if err := tx.Validate(p, ctw, signers); err != nil {
 		return err
 	}
-	if err := fr.txpool.Push(t, TxHash, tx, sigs, signers); err != nil {
+	if err := fr.txpool.Push(fr.cs.cn.Provider().ChainID(), t, TxHash, tx, sigs, signers); err != nil {
 		return err
 	}
 	fr.txQ.Push(string(TxHash[:]), &p2p.TransactionMessage{
@@ -379,7 +379,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 		defer fr.Unlock()
 
 		Height := cp.Height()
-		if msg.TargetHeight <= fr.lastGenHeight && fr.lastGenTime+int64(30*time.Second) < time.Now().UnixNano() {
+		if msg.TargetHeight <= fr.lastGenHeight && fr.lastGenTime+int64(30*time.Second) > time.Now().UnixNano() {
 			return nil
 		}
 		if msg.TargetHeight <= Height {
@@ -722,7 +722,7 @@ func (fr *FormulatorNode) tryRequestNext() {
 func (fr *FormulatorNode) cleanPool(b *types.Block) {
 	for i, tx := range b.Transactions {
 		t := b.TransactionTypes[i]
-		TxHash := chain.HashTransactionByType(t, tx)
+		TxHash := chain.HashTransactionByType(fr.cs.cn.Provider().ChainID(), t, tx)
 		fr.txpool.Remove(TxHash, tx)
 		fr.txQ.Remove(string(TxHash[:]))
 	}

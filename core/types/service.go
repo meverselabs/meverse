@@ -5,7 +5,7 @@ type Service interface {
 	Name() string
 	Init(pm ProcessManager, cn Provider) error
 	OnLoadChain(loader Loader) error
-	OnBlockConnected(b *Block, events []Event, loader Loader) error
+	OnBlockConnected(b *Block, events []Event, loader Loader)
 }
 
 // ServiceBase is a base handler of the chain service
@@ -17,6 +17,5 @@ func (s *ServiceBase) OnLoadChain(loader Loader) error {
 }
 
 // OnBlockConnected called when a block is connected to the chain
-func (s *ServiceBase) OnBlockConnected(b *Block, events []Event, loader Loader) error {
-	return nil
+func (s *ServiceBase) OnBlockConnected(b *Block, events []Event, loader Loader) {
 }

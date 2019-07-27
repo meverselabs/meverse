@@ -21,6 +21,7 @@ import (
 type Store struct {
 	sync.Mutex
 	db         *badger.DB
+	chainID    uint8
 	name       string
 	version    uint16
 	SeqMapLock sync.Mutex
@@ -39,7 +40,7 @@ type storecache struct {
 }
 
 // NewStore returns a Store
-func NewStore(path string, name string, version uint16, bRecover bool) (*Store, error) {
+func NewStore(path string, ChainID uint8, name string, version uint16, bRecover bool) (*Store, error) {
 	opts := badger.DefaultOptions(path)
 	opts.Truncate = bRecover
 	opts.SyncWrites = true
@@ -75,6 +76,7 @@ func NewStore(path string, name string, version uint16, bRecover bool) (*Store, 
 	return &Store{
 		db:      db,
 		ticker:  ticker,
+		chainID: ChainID,
 		name:    name,
 		version: version,
 		SeqMap:  map[common.Address]uint64{},
@@ -91,6 +93,11 @@ func (st *Store) Close() {
 	st.ticker.Stop()
 	st.db = nil
 	st.ticker = nil
+}
+
+// ChainID returns the chain id of the target chain
+func (st *Store) ChainID() uint8 {
+	return st.chainID
 }
 
 // Name returns the name of the target chain

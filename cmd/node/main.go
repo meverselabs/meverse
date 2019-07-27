@@ -4,11 +4,15 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
+
+	"github.com/fletaio/fleta/encoding"
 
 	"github.com/dgraph-io/badger"
 	"github.com/fletaio/fleta/cmd/app"
@@ -17,6 +21,7 @@ import (
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/core/chain"
+	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/pof"
 	"github.com/fletaio/fleta/process/admin"
 	"github.com/fletaio/fleta/process/formulator"
@@ -96,6 +101,7 @@ func main() {
 	}
 
 	MaxBlocksPerFormulator := uint32(10)
+	ChainID := uint8(0x01)
 	Name := "FLEAT Mainnet"
 	Version := uint16(0x0001)
 
@@ -112,7 +118,7 @@ func main() {
 	}()
 	defer cm.CloseAll()
 
-	st, err := chain.NewStore(cfg.StoreRoot, Name, Version, cfg.ForceRecover)
+	st, err := chain.NewStore(cfg.StoreRoot, ChainID, Name, Version, cfg.ForceRecover)
 	if err != nil {
 		if cfg.ForceRecover || err != badger.ErrTruncateNeeded {
 			panic(err)
@@ -122,7 +128,7 @@ func main() {
 			var answer string
 			fmt.Scanf("%s", &answer)
 			if strings.ToLower(answer) == "y" {
-				if s, err := chain.NewStore(cfg.StoreRoot, Name, Version, true); err != nil {
+				if s, err := chain.NewStore(cfg.StoreRoot, ChainID, Name, Version, true); err != nil {
 					panic(err)
 				} else {
 					st = s
@@ -143,6 +149,7 @@ func main() {
 	cn.MustAddProcess(gateway.NewGateway(4))
 	as := apiserver.NewAPIServer()
 	cn.MustAddService(as)
+	cn.MustAddService(NewStatisticService())
 	if err := cn.Init(); err != nil {
 		panic(err)
 	}
@@ -160,4 +167,68 @@ func main() {
 	go as.Run(":" + strconv.Itoa(cfg.APIPort))
 
 	cm.Wait()
+}
+
+// StatisticService aggregates the chain and block data
+type StatisticService struct {
+	*types.ServiceBase
+	pm                     types.ProcessManager
+	cn                     types.Provider
+	RangeBlockTimestampMap map[uint32]uint64
+	RangeBlockCountMap     map[uint32]int
+	RangeBlockSizeMap      map[uint32]int
+}
+
+// NewStatisticService returns a StatisticService
+func NewStatisticService() *StatisticService {
+	return &StatisticService{
+		RangeBlockTimestampMap: map[uint32]uint64{},
+		RangeBlockCountMap:     map[uint32]int{},
+		RangeBlockSizeMap:      map[uint32]int{},
+	}
+}
+
+// Name returns the name of the service
+func (s *StatisticService) Name() string {
+	return "fleta.statistics"
+}
+
+// Init initializes the service
+func (s *StatisticService) Init(pm types.ProcessManager, cn types.Provider) error {
+	s.pm = pm
+	s.cn = cn
+	return nil
+}
+
+// OnLoadChain called when the chain loaded
+func (s *StatisticService) OnLoadChain(loader types.Loader) error {
+	return nil
+}
+
+// OnBlockConnected called when a block is connected to the chain
+func (s *StatisticService) OnBlockConnected(b *types.Block, events []types.Event, loader types.Loader) {
+	idx := b.Header.Height / 86400
+	s.RangeBlockCountMap[idx]++
+
+	if b.Header.Height > 1 {
+		bh, err := s.cn.Header(b.Header.Height - 1)
+		if err != nil {
+			panic(err)
+		}
+		s.RangeBlockTimestampMap[idx] += b.Header.Timestamp - bh.Timestamp
+	} else {
+		s.RangeBlockTimestampMap[idx] = 0
+	}
+
+	bs, err := encoding.Marshal(b)
+	if err != nil {
+		panic(err)
+	}
+	s.RangeBlockSizeMap[idx] += len(bs)
+
+	for day, cnt := range s.RangeBlockCountMap {
+		tsum := s.RangeBlockTimestampMap[day]
+		ssum := s.RangeBlockSizeMap[day]
+		log.Println(day, cnt, time.Duration(tsum/uint64(cnt)), ssum/cnt, 141338)
+	}
 }

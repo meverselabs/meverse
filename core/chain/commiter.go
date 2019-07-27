@@ -4,6 +4,7 @@ import "github.com/fletaio/fleta/core/types"
 
 // Committer enables to commit block with pre-executed context
 type Committer interface {
+	ValidateHeader(bh *types.Header) error
 	ExecuteBlockOnContext(b *types.Block, ctx *types.Context) error
 	ConnectBlockWithContext(b *types.Block, ctx *types.Context) error
 	NewContext() *types.Context

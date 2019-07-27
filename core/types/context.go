@@ -35,6 +35,11 @@ func NewEmptyContext() *Context {
 	return NewContext(newEmptyLoader())
 }
 
+// ChainID returns the id of the chain
+func (ctx *Context) ChainID() uint8 {
+	return ctx.loader.ChainID()
+}
+
 // Name returns the name of the chain
 func (ctx *Context) Name() string {
 	return ctx.loader.Name()

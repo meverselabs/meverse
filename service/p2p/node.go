@@ -47,7 +47,7 @@ func NewNode(key key.Key, SeedNodeMap map[common.PublicHash]string, cn *chain.Ch
 		txpool:       txpool.NewTransactionPool(),
 		txQ:          queue.NewExpireQueue(),
 	}
-	nd.ms = NewNodeMesh(key, SeedNodeMap, nd, peerStorePath)
+	nd.ms = NewNodeMesh(cn.Provider().ChainID(), key, SeedNodeMap, nd, peerStorePath)
 	nd.requestTimer = NewRequestTimer(nd)
 	nd.txQ.AddGroup(60 * time.Second)
 	nd.txQ.AddGroup(600 * time.Second)
@@ -305,7 +305,7 @@ func (nd *Node) addTx(t uint16, tx types.Transaction, sigs []common.Signature) e
 		return txpool.ErrTransactionPoolOverflowed
 	}
 
-	TxHash := chain.HashTransactionByType(t, tx)
+	TxHash := chain.HashTransactionByType(nd.cn.Provider().ChainID(), t, tx)
 
 	ctx := nd.cn.NewContext()
 	if nd.txpool.IsExist(TxHash) {
@@ -336,7 +336,7 @@ func (nd *Node) addTx(t uint16, tx types.Transaction, sigs []common.Signature) e
 	if err := tx.Validate(p, ctw, signers); err != nil {
 		return err
 	}
-	if err := nd.txpool.Push(t, TxHash, tx, sigs, signers); err != nil {
+	if err := nd.txpool.Push(nd.cn.Provider().ChainID(), t, TxHash, tx, sigs, signers); err != nil {
 		return err
 	}
 	nd.txQ.Push(string(TxHash[:]), &TransactionMessage{
@@ -350,7 +350,7 @@ func (nd *Node) addTx(t uint16, tx types.Transaction, sigs []common.Signature) e
 func (nd *Node) cleanPool(b *types.Block) {
 	for i, tx := range b.Transactions {
 		t := b.TransactionTypes[i]
-		TxHash := chain.HashTransactionByType(t, tx)
+		TxHash := chain.HashTransactionByType(nd.cn.Provider().ChainID(), t, tx)
 		nd.txpool.Remove(TxHash, tx)
 		nd.txQ.Remove(string(TxHash[:]))
 	}

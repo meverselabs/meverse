@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/service/p2p/nodepoolmanage"
 
 	"github.com/fletaio/fleta/common"
@@ -16,18 +17,18 @@ import (
 	"github.com/fletaio/fleta/service/p2p/peer"
 )
 
+// Handler is a interface for connection events
 type Handler interface {
 	OnConnected(p peer.Peer)
 	OnDisconnected(p peer.Peer)
 	OnRecv(p peer.Peer, m interface{}) error
 }
 
-type NodeConfig struct {
-}
-
+// NodeMesh is a mesh for networking between nodes
 type NodeMesh struct {
 	sync.Mutex
 	BindAddress     string
+	chainID         uint8
 	key             key.Key
 	handler         Handler
 	nodeSet         map[common.PublicHash]string
@@ -36,8 +37,10 @@ type NodeMesh struct {
 	nodePoolManager nodepoolmanage.Manager
 }
 
-func NewNodeMesh(key key.Key, SeedNodeMap map[common.PublicHash]string, handler Handler, peerStorePath string) *NodeMesh {
+// NewNodeMesh returns a NodeMesh
+func NewNodeMesh(ChainID uint8, key key.Key, SeedNodeMap map[common.PublicHash]string, handler Handler, peerStorePath string) *NodeMesh {
 	ms := &NodeMesh{
+		chainID:       ChainID,
 		key:           key,
 		handler:       handler,
 		nodeSet:       map[common.PublicHash]string{},
@@ -402,6 +405,10 @@ func (ms *NodeMesh) recvHandshake(conn net.Conn) error {
 	if _, err := FillBytes(conn, req); err != nil {
 		return err
 	}
+	ChainID := req[0]
+	if ChainID != ms.chainID {
+		return chain.ErrInvalidChainID
+	}
 	timestamp := binary.LittleEndian.Uint64(req[32:])
 	diff := time.Duration(uint64(time.Now().UnixNano()) - timestamp)
 	if diff < 0 {
@@ -435,6 +442,7 @@ func (ms *NodeMesh) sendHandshake(conn net.Conn) (common.PublicHash, string, err
 	if _, err := crand.Read(req[:32]); err != nil {
 		return common.PublicHash{}, "", err
 	}
+	req[0] = ms.chainID
 	binary.LittleEndian.PutUint64(req[32:], uint64(time.Now().UnixNano()))
 	if _, err := conn.Write(req); err != nil {
 		return common.PublicHash{}, "", err

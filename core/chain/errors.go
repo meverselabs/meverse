@@ -7,6 +7,7 @@ var (
 	ErrExistServiceName             = errors.New("exist service name")
 	ErrExistServiceID               = errors.New("exist service id")
 	ErrNotExistService              = errors.New("not exist service")
+	ErrInvalidChainID               = errors.New("invalid chain id")
 	ErrInvalidVersion               = errors.New("invalid version")
 	ErrInvalidHeight                = errors.New("invalid height")
 	ErrInvalidPrevHash              = errors.New("invalid prev hash")

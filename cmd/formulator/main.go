@@ -121,10 +121,11 @@ func main() {
 	defer cm.CloseAll()
 
 	MaxBlocksPerFormulator := uint32(10)
+	ChainID := uint8(0x01)
 	Name := "FLEAT Mainnet"
 	Version := uint16(0x0001)
 
-	st, err := chain.NewStore(cfg.StoreRoot, Name, Version, cfg.ForceRecover)
+	st, err := chain.NewStore(cfg.StoreRoot, ChainID, Name, Version, cfg.ForceRecover)
 	if err != nil {
 		if cfg.ForceRecover || err != badger.ErrTruncateNeeded {
 			panic(err)
@@ -134,7 +135,7 @@ func main() {
 			var answer string
 			fmt.Scanf("%s", &answer)
 			if strings.ToLower(answer) == "y" {
-				if s, err := chain.NewStore(cfg.StoreRoot, Name, Version, true); err != nil {
+				if s, err := chain.NewStore(cfg.StoreRoot, ChainID, Name, Version, true); err != nil {
 					panic(err)
 				} else {
 					st = s

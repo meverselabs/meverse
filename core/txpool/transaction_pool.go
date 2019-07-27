@@ -61,7 +61,7 @@ func (tp *TransactionPool) Size() int {
 // Push inserts the transaction and signatures of it by base model and sequence
 // An UTXO model based transaction will be handled by FIFO
 // An account model based transaction will be sorted by the sequence value
-func (tp *TransactionPool) Push(t uint16, TxHash hash.Hash256, tx types.Transaction, sigs []common.Signature, signers []common.PublicHash) error {
+func (tp *TransactionPool) Push(ChainID uint8, t uint16, TxHash hash.Hash256, tx types.Transaction, sigs []common.Signature, signers []common.PublicHash) error {
 	tp.Lock()
 	defer tp.Unlock()
 
@@ -70,6 +70,7 @@ func (tp *TransactionPool) Push(t uint16, TxHash hash.Hash256, tx types.Transact
 	}
 
 	item := &PoolItem{
+		ChainID:     ChainID,
 		TxType:      t,
 		TxHash:      TxHash,
 		Transaction: tx,
@@ -120,7 +121,7 @@ func (tp *TransactionPool) Remove(TxHash hash.Hash256, t types.Transaction) {
 					break
 				}
 				q.Pop()
-				delete(tp.txidMap, chain.HashTransaction(item.Transaction))
+				delete(tp.txidMap, chain.HashTransaction(item.ChainID, item.Transaction))
 				tp.turnOutMap[false]++
 				tp.numberOutMap[addr]++
 			}
@@ -157,7 +158,7 @@ func (tp *TransactionPool) UnsafePop(SeqCache SeqCache) *PoolItem {
 	}
 	if bTurn {
 		item := tp.utxoQ.Pop().(*PoolItem)
-		delete(tp.txidMap, chain.HashTransaction(item.Transaction))
+		delete(tp.txidMap, chain.HashTransaction(item.ChainID, item.Transaction))
 		return item
 	} else {
 		remain := tp.numberQ.Size()
@@ -204,7 +205,7 @@ func (tp *TransactionPool) UnsafePop(SeqCache SeqCache) *PoolItem {
 				}
 			}
 			q.Pop()
-			delete(tp.txidMap, chain.HashTransaction(item.Transaction))
+			delete(tp.txidMap, chain.HashTransaction(item.ChainID, item.Transaction))
 			if q.Size() == 0 {
 				delete(tp.bucketMap, addr)
 			}
@@ -215,6 +216,7 @@ func (tp *TransactionPool) UnsafePop(SeqCache SeqCache) *PoolItem {
 
 // PoolItem represents the item of the queue
 type PoolItem struct {
+	ChainID     uint8
 	TxType      uint16
 	TxHash      hash.Hash256
 	Transaction types.Transaction

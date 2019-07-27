@@ -7,6 +7,7 @@ import (
 
 // Header is validation informations
 type Header struct {
+	ChainID       uint8
 	Version       uint16
 	Height        uint32
 	PrevHash      hash.Hash256

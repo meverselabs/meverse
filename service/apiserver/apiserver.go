@@ -40,6 +40,5 @@ func (s *APIServer) OnLoadChain(loader types.Loader) error {
 }
 
 // OnBlockConnected called when a block is connected to the chain
-func (s *APIServer) OnBlockConnected(b *types.Block, events []types.Event, loader types.Loader) error {
-	return nil
+func (s *APIServer) OnBlockConnected(b *types.Block, events []types.Event, loader types.Loader) {
 }

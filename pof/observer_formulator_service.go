@@ -14,6 +14,7 @@ import (
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/common/util"
+	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/service/p2p"
 	"github.com/fletaio/fleta/service/p2p/peer"
@@ -227,6 +228,10 @@ func (ms *FormulatorService) recvHandshake(conn *websocket.Conn) (common.Address
 	if len(req) != 40+common.AddressSize {
 		return common.Address{}, p2p.ErrInvalidHandshake
 	}
+	ChainID := req[0]
+	if ChainID != ms.ob.cs.cn.Provider().ChainID() {
+		return common.Address{}, chain.ErrInvalidChainID
+	}
 	timestamp := binary.LittleEndian.Uint64(req[32:])
 	var Formulator common.Address
 	copy(Formulator[:], req[40:])
@@ -252,6 +257,7 @@ func (ms *FormulatorService) sendHandshake(conn *websocket.Conn) (common.PublicH
 	if _, err := crand.Read(req[:32]); err != nil {
 		return common.PublicHash{}, err
 	}
+	req[0] = ms.ob.cs.cn.Provider().ChainID()
 	binary.LittleEndian.PutUint64(req[32:], uint64(time.Now().UnixNano()))
 	if err := conn.WriteMessage(websocket.BinaryMessage, req); err != nil {
 		return common.PublicHash{}, err

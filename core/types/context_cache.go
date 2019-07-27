@@ -28,6 +28,11 @@ func newContextCache(ctx *Context) *contextCache {
 	}
 }
 
+// ChainID returns the id of the chain
+func (cc *contextCache) ChainID() uint8 {
+	return cc.ctx.ChainID()
+}
+
 // Name returns the name of the chain
 func (cc *contextCache) Name() string {
 	return cc.ctx.Name()

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fletaio/fleta/common/debug"
+	"github.com/fletaio/fleta/core/chain"
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
@@ -143,7 +144,8 @@ func (ms *FormulatorNodeMesh) BroadcastMessage(m interface{}) error {
 }
 
 func (ms *FormulatorNodeMesh) client(Address string, TargetPubHash common.PublicHash) error {
-	conn, _, err := websocket.DefaultDialer.Dial("wss://"+Address, nil)
+	//conn, _, err := websocket.DefaultDialer.Dial("wss://"+Address, nil)
+	conn, _, err := websocket.DefaultDialer.Dial(Address, nil)
 	if err != nil {
 		return err
 	}
@@ -207,6 +209,10 @@ func (ms *FormulatorNodeMesh) recvHandshake(conn *websocket.Conn) error {
 	if len(req) != 40 {
 		return p2p.ErrInvalidHandshake
 	}
+	ChainID := req[0]
+	if ChainID != ms.fr.cs.cn.Provider().ChainID() {
+		return chain.ErrInvalidChainID
+	}
 	timestamp := binary.LittleEndian.Uint64(req[32:])
 	diff := time.Duration(uint64(time.Now().UnixNano()) - timestamp)
 	if diff < 0 {
@@ -230,6 +236,7 @@ func (ms *FormulatorNodeMesh) sendHandshake(conn *websocket.Conn) (common.Public
 	if _, err := crand.Read(req[:32]); err != nil {
 		return common.PublicHash{}, err
 	}
+	req[0] = ms.fr.cs.cn.Provider().ChainID()
 	binary.LittleEndian.PutUint64(req[32:], uint64(time.Now().UnixNano()))
 	copy(req[40:], ms.fr.Config.Formulator[:])
 	if err := conn.WriteMessage(websocket.BinaryMessage, req); err != nil {

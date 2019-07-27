@@ -8,6 +8,7 @@ import (
 
 // RoundVote is a message for a round vote
 type RoundVote struct {
+	ChainID              uint8
 	LastHash             hash.Hash256
 	TargetHeight         uint32
 	TimeoutCount         uint32
@@ -25,6 +26,7 @@ type RoundVoteMessage struct {
 
 // RoundVoteAck is a message for a round vote ack
 type RoundVoteAck struct {
+	ChainID              uint8
 	LastHash             hash.Hash256
 	TargetHeight         uint32
 	TimeoutCount         uint32

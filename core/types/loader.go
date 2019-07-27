@@ -7,6 +7,7 @@ import (
 
 // Loader defines functions that loads state data from the target chain
 type Loader interface {
+	ChainID() uint8
 	Name() string
 	Version() uint16
 	TargetHeight() uint32
@@ -33,6 +34,11 @@ type emptyLoader struct {
 // newEmptyLoader is used for generating genesis state
 func newEmptyLoader() internalLoader {
 	return &emptyLoader{}
+}
+
+// ChainID returns 0
+func (st *emptyLoader) ChainID() uint8 {
+	return 0
 }
 
 // Name returns ""

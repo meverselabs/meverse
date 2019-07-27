@@ -376,6 +376,10 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 			}
 			return ErrInvalidVote
 		}
+		if msg.RoundVote.ChainID != cp.ChainID() {
+			//log.Println("if msg.RoundVote.ChainID != cp.ChainID() {")
+			return ErrInvalidVote
+		}
 		if msg.RoundVote.LastHash != cp.LastHash() {
 			//log.Println("if msg.RoundVote.LastHash != cp.LastHash() {")
 			return ErrInvalidVote
@@ -467,6 +471,10 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 					ob.sendStatusTo(SenderPublicHash)
 				}
 			}
+			return ErrInvalidVote
+		}
+		if msg.RoundVoteAck.ChainID != cp.ChainID() {
+			//log.Println("if msg.RoundVoteAck.ChainID != cp.ChainID() {")
 			return ErrInvalidVote
 		}
 		if msg.RoundVoteAck.LastHash != cp.LastHash() {
@@ -603,6 +611,10 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 			}
 			return ErrInvalidVote
 		}
+		if msg.MinRoundVoteAck.ChainID != cp.ChainID() {
+			//log.Println("if msg.MinRoundVoteAck.ChainID != cp.ChainID() {")
+			return ErrInvalidVote
+		}
 		if msg.MinRoundVoteAck.LastHash != cp.LastHash() {
 			//log.Println("if msg.MinRoundVoteAck.LastHash != cp.LastHash() {")
 			return ErrInvalidVote
@@ -698,19 +710,15 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 			//log.Println(msg.Block.Header.Generator.String(), "if Signer != ob.round.MinRoundVoteAck.FormulatorPublicHash {")
 			return ErrInvalidVote
 		}
-		if msg.Block.Header.PrevHash != cp.LastHash() {
-			//log.Println(msg.Block.Header.Generator.String(), "if msg.Block.Header.PrevHash != cp.LastHash() {")
-			return ErrInvalidVote
+		if err := ob.cs.ct.ValidateHeader(&msg.Block.Header); err != nil {
+			//log.Println(msg.Block.Header.Generator.String(), "if err := ob.cs.ct.ValidateHeader(&msg.Block.Header); err != nil {")
+			return err
 		}
 
 		//[if valid block]
 		Now := uint64(time.Now().UnixNano())
 		if msg.Block.Header.Timestamp > Now+uint64(10*time.Second) {
 			//log.Println(msg.Block.Header.Generator.String(), "if msg.Block.Header.Timestamp > Now+uint64(10*time.Second) {")
-			return ErrInvalidVote
-		}
-		if msg.Block.Header.Timestamp < cp.LastTimestamp() {
-			//log.Println(msg.Block.Header.Generator.String(), "if msg.Block.Header.Timestamp < cp.LastTimestamp() {")
 			return ErrInvalidVote
 		}
 
@@ -805,6 +813,14 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 		if msg.BlockVote.Header.PrevHash != cp.LastHash() {
 			//log.Println(encoding.Hash(msg.BlockVote.Header), "if msg.BlockVote.Header.PrevHash != cp.LastHash() {")
 			return ErrInvalidVote
+		}
+		if bh != encoding.Hash(br.BlockGenMessage.Block.Header) {
+			//log.Println(encoding.Hash(msg.BlockVote.Header), "if bh != encoding.Hash(br.BlockGenMessage.Block.Header) {")
+			return ErrInvalidVote
+		}
+		if err := ob.cs.ct.ValidateHeader(msg.BlockVote.Header); err != nil {
+			//log.Println(msg.BlockVote.Header.Generator.String(), "if err := ob.cs.ct.ValidateHeader(msg.BlockVote.Header); err != nil {")
+			return err
 		}
 
 		s := &types.BlockSign{

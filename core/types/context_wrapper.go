@@ -42,6 +42,11 @@ func (ctw *ContextWrapper) Switch(pid uint8) *ContextWrapper {
 	}
 }
 
+// ChainID returns the id of the chain
+func (ctw *ContextWrapper) ChainID() uint8 {
+	return ctw.ctx.ChainID()
+}
+
 // Name returns the name of the chain
 func (ctw *ContextWrapper) Name() string {
 	return ctw.ctx.Name()

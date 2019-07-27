@@ -7,6 +7,8 @@ import (
 
 // Provider defines functions that loads chain data from the chain
 type Provider interface {
+	ChainID() uint8
+	Name() string
 	Version() uint16
 	Height() uint32
 	LastStatus() (uint32, hash.Hash256, uint64)

@@ -14,6 +14,7 @@ import (
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/common/util"
+	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/service/p2p"
 	"github.com/fletaio/fleta/service/p2p/peer"
@@ -295,6 +296,10 @@ func (ms *ObserverNodeMesh) recvHandshake(conn net.Conn) error {
 	if _, err := p2p.FillBytes(conn, req); err != nil {
 		return err
 	}
+	ChainID := req[0]
+	if ChainID != ms.ob.cs.cn.Provider().ChainID() {
+		return chain.ErrInvalidChainID
+	}
 	timestamp := binary.LittleEndian.Uint64(req[32:])
 	diff := time.Duration(uint64(time.Now().UnixNano()) - timestamp)
 	if diff < 0 {
@@ -318,6 +323,7 @@ func (ms *ObserverNodeMesh) sendHandshake(conn net.Conn) (common.PublicHash, err
 	if _, err := crand.Read(req[:32]); err != nil {
 		return common.PublicHash{}, err
 	}
+	req[0] = ms.ob.cs.cn.Provider().ChainID()
 	binary.LittleEndian.PutUint64(req[32:], uint64(time.Now().UnixNano()))
 	if _, err := conn.Write(req); err != nil {
 		return common.PublicHash{}, err

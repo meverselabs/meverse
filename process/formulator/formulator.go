@@ -298,10 +298,12 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 						Ratio := StackReward.Mul(amount.COIN).Div(StakingPowerSum)
 						StakingPowerMap.EachAll(func(StakingAddress common.Address, StakingPower *amount.Amount) bool {
 							RewardAmount := StakingPower.Mul(Ratio).Div(amount.COIN)
-							if !RewardAmount.IsZero() {
+							if frAcc.Policy.CommissionRatio1000 > 0 {
 								Commission := RewardAmount.MulC(int64(frAcc.Policy.CommissionRatio1000)).DivC(1000)
 								CommissionSum = CommissionSum.Add(Commission)
 								RewardAmount = RewardAmount.Sub(Commission)
+							}
+							if !RewardAmount.IsZero() {
 								if p.getUserAutoStaking(ctw, frAcc.Address(), StakingAddress) {
 									p.AddStakingAmount(ctw, frAcc.Address(), StakingAddress, RewardAmount)
 								} else {
@@ -317,8 +319,10 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 							return inErr
 						}
 
-						if err := p.vault.AddBalance(ctw, frAcc.Address(), CommissionSum); err != nil {
-							return err
+						if !CommissionSum.IsZero() {
+							if err := p.vault.AddBalance(ctw, frAcc.Address(), CommissionSum); err != nil {
+								return err
+							}
 						}
 					}
 					ctw.SetAccountData(b.Header.Generator, tagStakingPowerMap, nil)

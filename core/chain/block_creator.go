@@ -25,6 +25,7 @@ func NewBlockCreator(cn *Chain, ctx *types.Context, Generator common.Address, Co
 		txHashes: []hash.Hash256{ctx.LastHash()},
 		b: &types.Block{
 			Header: types.Header{
+				ChainID:       ctx.ChainID(),
 				Version:       ctx.Version(),
 				Height:        ctx.TargetHeight(),
 				PrevHash:      ctx.LastHash(),
@@ -71,7 +72,7 @@ func (bc *BlockCreator) AddTx(Generator common.Address, tx types.Transaction, si
 	if err != nil {
 		return err
 	}
-	TxHash := HashTransactionByType(t, tx)
+	TxHash := HashTransactionByType(bc.cn.Provider().ChainID(), t, tx)
 	signers := []common.PublicHash{}
 	for _, sig := range sigs {
 		if pubkey, err := common.RecoverPubkey(TxHash, sig); err != nil {

@@ -401,6 +401,8 @@ func (ctd *ContextData) SetProcessData(pid uint8, name []byte, value []byte) {
 // Hash returns the hash value of it
 func (ctd *ContextData) Hash() hash.Hash256 {
 	var buffer bytes.Buffer
+	buffer.WriteString("ChainID")
+	buffer.Write([]byte{ctd.loader.ChainID()})
 	buffer.WriteString("ChainName")
 	buffer.WriteString(ctd.loader.Name())
 	buffer.WriteString("ChainVersion")
@@ -457,6 +459,9 @@ func (ctd *ContextData) Hash() hash.Hash256 {
 // Dump prints the context data
 func (ctd *ContextData) Dump() string {
 	var buffer bytes.Buffer
+	buffer.WriteString("ChainID\n")
+	buffer.WriteString(strconv.FormatUint(uint64(ctd.loader.ChainID()), 10))
+	buffer.WriteString("\n")
 	buffer.WriteString("ChainName\n")
 	buffer.WriteString(ctd.loader.Name())
 	buffer.WriteString("\n")
