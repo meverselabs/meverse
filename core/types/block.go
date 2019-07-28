@@ -12,6 +12,9 @@ func init() {
 	encoding.Register(Block{}, func(enc *encoding.Encoder, rv reflect.Value) error {
 		item := rv.Interface().(Block)
 
+		if len(item.TransactionTypes) >= 65535 {
+			return ErrInvalidTransactionCount
+		}
 		if len(item.TransactionTypes) != len(item.Transactions) {
 			return ErrInvalidTransactionCount
 		}
@@ -66,6 +69,9 @@ func init() {
 		TxLen, err := dec.DecodeArrayLen()
 		if err != nil {
 			return err
+		}
+		if TxLen >= 65535 {
+			return ErrInvalidTransactionCount
 		}
 		item.TransactionTypes = make([]uint16, 0, TxLen)
 		item.Transactions = make([]Transaction, 0, TxLen)
@@ -126,10 +132,10 @@ func init() {
 
 // Block includes a block header and a block body
 type Block struct {
-	Header               Header
-	TransactionTypes     []uint16             //MAXLEN : 65535
-	Transactions         []Transaction        //MAXLEN : 65535
-	TransactionSignatures [][]common.Signature //MAXLEN : 65536
-	TransactionResults   []uint8              //MAXLEN : 65535
-	Signatures           []common.Signature   //MAXLEN : 255
+	Header                Header
+	TransactionTypes      []uint16             //MAXLEN : 65535
+	Transactions          []Transaction        //MAXLEN : 65535
+	TransactionSignatures [][]common.Signature //MAXLEN : 65535
+	TransactionResults    []uint8              //MAXLEN : 65535
+	Signatures            []common.Signature   //MAXLEN : 255
 }

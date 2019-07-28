@@ -99,10 +99,10 @@ func toProcessDataKey(key string) []byte {
 	return bs
 }
 
-func toEventKey(id uint64) []byte {
-	bs := make([]byte, 10)
+func toEventKey(id uint32) []byte {
+	bs := make([]byte, 6)
 	copy(bs, tagEvent)
-	binary.BigEndian.PutUint64(bs[2:], id)
+	binary.BigEndian.PutUint32(bs[2:], id)
 	return bs
 }
 

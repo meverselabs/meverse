@@ -50,6 +50,10 @@ func (tx *Staking) Validate(p types.Process, loader types.LoaderWrapper, signers
 		return types.ErrInvalidSequence
 	}
 
+	if tx.From() == tx.HyperFormulator {
+		return ErrInvalidStakingAddress
+	}
+
 	acc, err := loader.Account(tx.HyperFormulator)
 	if err != nil {
 		return err

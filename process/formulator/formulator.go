@@ -73,6 +73,7 @@ func (p *Formulator) Init(reg *types.Register, pm types.ProcessManager, cn types
 	reg.RegisterTransaction(8, &UpdateValidatorPolicy{})
 	reg.RegisterTransaction(9, &UpdateUserAutoStaking{})
 	reg.RegisterTransaction(10, &ChangeOwner{})
+	reg.RegisterEvent(1, &RewardEvent{})
 	return nil
 }
 
@@ -148,6 +149,15 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 		CountMap, err := p.flushGenCountMap(ctw)
 		if err != nil {
 			return err
+		}
+
+		ev := &RewardEvent{
+			Height_:       ctw.TargetHeight(),
+			Index_:        65535,
+			RewardMap:     types.NewAddressAmountMap(),
+			StakedMap:     types.NewAddressAmountMap(),
+			CommissionMap: types.NewAddressAmountMap(),
+			StackedMap:    types.NewAddressAmountMap(),
 		}
 
 		StackRewardMap := types.NewAddressAmountMap()
@@ -285,6 +295,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 					if err := p.vault.AddBalance(ctw, RewardAddress, RewardAmount); err != nil {
 						return err
 					}
+					ev.AddReward(RewardAddress, RewardAmount)
 				}
 			}
 			for GenAddress, StakingRewardPower := range StakingRewardPowerMap {
@@ -297,6 +308,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 					} else {
 						StackRewardMap.Put(GenAddress, RewardAmount)
 					}
+					ev.AddStacked(GenAddress, RewardAmount)
 				}
 			}
 		}
@@ -330,11 +342,13 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 							if !RewardAmount.IsZero() {
 								if p.getUserAutoStaking(ctw, frAcc.Address(), StakingAddress) {
 									p.AddStakingAmount(ctw, frAcc.Address(), StakingAddress, RewardAmount)
+									ev.AddStaked(StakingAddress, RewardAmount)
 								} else {
 									if err := p.vault.AddBalance(ctw, StakingAddress, RewardAmount); err != nil {
 										inErr = err
 										return false
 									}
+									ev.AddReward(StakingAddress, RewardAmount)
 								}
 							}
 							return true
@@ -347,6 +361,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 							if err := p.vault.AddBalance(ctw, frAcc.Address(), CommissionSum); err != nil {
 								return err
 							}
+							ev.AddCommission(frAcc.Address(), CommissionSum)
 						}
 					}
 					ctw.SetAccountData(frAcc.Address(), tagStakingPowerMap, nil)
@@ -362,8 +377,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 			ctw.SetProcessData(tagStackRewardMap, bs)
 		}
 
-		//ctw.EmitEvent()
-		//Addr, Earn, Commision, Staked, Adds
+		ctw.EmitEvent(ev)
 
 		//log.Println("Paid at", ctw.TargetHeight())
 		p.setLastPaidHeight(ctw, ctw.TargetHeight())

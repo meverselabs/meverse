@@ -711,27 +711,42 @@ func (st *Store) Events(From uint32, To uint32) ([]types.Event, error) {
 	}
 
 	fc := encoding.Factory("event")
-
 	list := []types.Event{}
 	if err := st.db.View(func(txn *badger.Txn) error {
-		it := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer it.Close()
-		tagBegin := toEventKey(types.MarshalID(From, 0, 0))
-		tagEnd := toEventKey(types.MarshalID(To, 65535, 65535))
-		for it.Seek(tagBegin); it.ValidForPrefix(tagEnd); it.Next() {
-			item := it.Item()
+
+		for i := From; i <= To; i++ {
+			item, err := txn.Get(toEventKey(i))
+			if err != nil {
+				if err == badger.ErrKeyNotFound {
+					break
+				} else {
+					return err
+				}
+			}
 			value, err := item.ValueCopy(nil)
 			if err != nil {
 				return err
 			}
-			ev, err := fc.Create(util.BytesToUint16(value))
+			dec := encoding.NewDecoder(bytes.NewReader(value))
+			EvLen, err := dec.DecodeArrayLen()
 			if err != nil {
 				return err
 			}
-			if err := encoding.Unmarshal(value[2:], &ev); err != nil {
-				return err
+			for i := 0; i < EvLen; i++ {
+				t, err := dec.DecodeUint16()
+				if err != nil {
+					return err
+				}
+
+				ev, err := fc.Create(t)
+				if err != nil {
+					return err
+				}
+				if err := dec.Decode(&ev); err != nil {
+					return err
+				}
+				list = append(list, ev.(types.Event))
 			}
-			list = append(list, ev.(types.Event))
 		}
 		return nil
 	}); err != nil {
@@ -965,20 +980,27 @@ func applyContextData(txn *badger.Txn, ctd *types.ContextData) error {
 		return inErr
 	}
 
-	efc := encoding.Factory("event")
-	for _, ev := range ctd.Events {
-		t, err := efc.TypeOf(ev)
-		if err != nil {
-			return err
-		}
+	if len(ctd.Events) > 0 {
+		efc := encoding.Factory("event")
+
 		var buffer bytes.Buffer
-		buffer.Write(util.Uint16ToBytes(t))
-		data, err := encoding.Marshal(ev)
-		if err != nil {
+		enc := encoding.NewEncoder(&buffer)
+		if err := enc.EncodeArrayLen(len(ctd.Events)); err != nil {
 			return err
 		}
-		buffer.Write(data)
-		if err := txn.Set(toEventKey(types.MarshalID(ev.Height(), ev.Index(), ev.N())), buffer.Bytes()); err != nil {
+		for _, ev := range ctd.Events {
+			t, err := efc.TypeOf(ev)
+			if err != nil {
+				return err
+			}
+			if err := enc.EncodeUint16(t); err != nil {
+				return err
+			}
+			if err := enc.Encode(ev); err != nil {
+				return err
+			}
+		}
+		if err := txn.Set(toEventKey(ctd.Events[0].Height()), buffer.Bytes()); err != nil {
 			return err
 		}
 	}
