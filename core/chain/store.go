@@ -710,15 +710,19 @@ func (st *Store) Events(From uint32, To uint32) ([]types.Event, error) {
 		return nil, ErrStoreClosed
 	}
 
+	Height := st.Height()
+	if To > Height {
+		To = Height
+	}
+
 	fc := encoding.Factory("event")
 	list := []types.Event{}
 	if err := st.db.View(func(txn *badger.Txn) error {
-
 		for i := From; i <= To; i++ {
 			item, err := txn.Get(toEventKey(i))
 			if err != nil {
 				if err == badger.ErrKeyNotFound {
-					break
+					continue
 				} else {
 					return err
 				}
@@ -737,7 +741,6 @@ func (st *Store) Events(From uint32, To uint32) ([]types.Event, error) {
 				if err != nil {
 					return err
 				}
-
 				ev, err := fc.Create(t)
 				if err != nil {
 					return err
