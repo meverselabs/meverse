@@ -9,11 +9,11 @@ import (
 // tags
 var (
 	tagBalance              = []byte{1, 1}
-	tagLockedBalance        = []byte{2, 2}
-	tagLockedBalanceNumber  = []byte{2, 3}
-	tagLockedBalanceReverse = []byte{2, 4}
-	tagLockedBalanceCount   = []byte{2, 5}
-	tagLockedBalanceSum     = []byte{2, 6}
+	tagLockedBalance        = []byte{2, 1}
+	tagLockedBalanceNumber  = []byte{2, 2}
+	tagLockedBalanceReverse = []byte{2, 3}
+	tagLockedBalanceCount   = []byte{2, 4}
+	tagLockedBalanceSum     = []byte{2, 5}
 	tagCollectedFee         = []byte{3, 1}
 )
 
@@ -45,12 +45,5 @@ func toLockedBalanceCountKey(height uint32) []byte {
 	bs := make([]byte, 6)
 	copy(bs, tagLockedBalanceCount)
 	binary.BigEndian.PutUint32(bs[2:], height)
-	return bs
-}
-
-func toLockedBalanceSumKey(addr common.Address) []byte {
-	bs := make([]byte, 2+common.AddressSize)
-	copy(bs, tagLockedBalanceSum)
-	copy(bs[2:], addr[:])
 	return bs
 }

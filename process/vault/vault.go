@@ -101,11 +101,11 @@ func (p *Vault) AfterExecuteTransactions(b *types.Block, ctw *types.ContextWrapp
 		if err := p.AddBalance(ctw, addr, am); err != nil {
 			return err
 		}
-		sum := p.LockedBalanceTotal(ctw, addr).Sub(am)
+		sum := p.TotalLockedBalanceByAddress(ctw, addr).Sub(am)
 		if !sum.IsZero() {
-			ctw.SetProcessData(toLockedBalanceSumKey(addr), sum.Bytes())
+			ctw.SetAccountData(addr, tagLockedBalanceSum, sum.Bytes())
 		} else {
-			ctw.SetProcessData(toLockedBalanceSumKey(addr), nil)
+			ctw.SetAccountData(addr, tagLockedBalanceSum, nil)
 		}
 	}
 	return nil
