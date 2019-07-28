@@ -1,6 +1,8 @@
 package types
 
 import (
+	"bytes"
+	"encoding/json"
 	"reflect"
 
 	"github.com/fletaio/fleta/encoding"
@@ -113,4 +115,32 @@ func (sm *Uint64TxOutMap) EachAll(fn func(uint64, *TxOut) bool) {
 	sm.m.AscendRange(ninf, pinf, func(item llrb.Item) bool {
 		return fn(item.(*pairUint64TxOutMap).key, item.(*pairUint64TxOutMap).value)
 	})
+}
+
+// MarshalJSON is a marshaler function
+func (sm *Uint64TxOutMap) MarshalJSON() ([]byte, error) {
+	var buffer bytes.Buffer
+	buffer.WriteString(`{`)
+	isFirst := true
+	sm.m.AscendRange(ninf, pinf, func(item llrb.Item) bool {
+		if isFirst {
+			isFirst = false
+		} else {
+			buffer.WriteString(`,`)
+		}
+		if bs, err := json.Marshal(item.(*pairUint64TxOutMap).key); err != nil {
+			return false
+		} else {
+			buffer.Write(bs)
+		}
+		buffer.WriteString(`:`)
+		if bs, err := item.(*pairUint64TxOutMap).value.MarshalJSON(); err != nil {
+			return false
+		} else {
+			buffer.Write(bs)
+		}
+		return true
+	})
+	buffer.WriteString(`}`)
+	return buffer.Bytes(), nil
 }

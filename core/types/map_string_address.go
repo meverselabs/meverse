@@ -1,6 +1,8 @@
 package types
 
 import (
+	"bytes"
+	"encoding/json"
 	"reflect"
 	"strings"
 
@@ -122,4 +124,32 @@ func (sm *StringAddressMap) EachPrefix(prefix string, fn func(string, common.Add
 	sm.m.AscendRange(&pairStringAddressMap{key: prefix}, &pairStringAddressMap{key: prefix + string([]byte{255})}, func(item llrb.Item) bool {
 		return fn(item.(*pairStringAddressMap).key, item.(*pairStringAddressMap).value)
 	})
+}
+
+// MarshalJSON is a marshaler function
+func (sm *StringAddressMap) MarshalJSON() ([]byte, error) {
+	var buffer bytes.Buffer
+	buffer.WriteString(`{`)
+	isFirst := true
+	sm.m.AscendRange(ninf, pinf, func(item llrb.Item) bool {
+		if isFirst {
+			isFirst = false
+		} else {
+			buffer.WriteString(`,`)
+		}
+		if bs, err := json.Marshal(item.(*pairStringAddressMap).key); err != nil {
+			return false
+		} else {
+			buffer.Write(bs)
+		}
+		buffer.WriteString(`:`)
+		if bs, err := item.(*pairStringAddressMap).value.MarshalJSON(); err != nil {
+			return false
+		} else {
+			buffer.Write(bs)
+		}
+		return true
+	})
+	buffer.WriteString(`}`)
+	return buffer.Bytes(), nil
 }

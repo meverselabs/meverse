@@ -131,3 +131,31 @@ func (sm *AddressAccountMap) EachAll(fn func(common.Address, Account) bool) {
 		return fn(item.(*pairAddressAccountMap).key, item.(*pairAddressAccountMap).value)
 	})
 }
+
+// MarshalJSON is a marshaler function
+func (sm *AddressAccountMap) MarshalJSON() ([]byte, error) {
+	var buffer bytes.Buffer
+	buffer.WriteString(`{`)
+	isFirst := true
+	sm.m.AscendRange(ninf, pinf, func(item llrb.Item) bool {
+		if isFirst {
+			isFirst = false
+		} else {
+			buffer.WriteString(`,`)
+		}
+		if bs, err := item.(*pairAddressAccountMap).key.MarshalJSON(); err != nil {
+			return false
+		} else {
+			buffer.Write(bs)
+		}
+		buffer.WriteString(`:`)
+		if bs, err := item.(*pairAddressAccountMap).value.MarshalJSON(); err != nil {
+			return false
+		} else {
+			buffer.Write(bs)
+		}
+		return true
+	})
+	buffer.WriteString(`}`)
+	return buffer.Bytes(), nil
+}

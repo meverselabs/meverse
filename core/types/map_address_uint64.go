@@ -2,6 +2,7 @@ package types
 
 import (
 	"bytes"
+	"encoding/json"
 	"reflect"
 
 	"github.com/fletaio/fleta/common"
@@ -115,4 +116,32 @@ func (sm *AddressUint64Map) EachAll(fn func(common.Address, uint64) bool) {
 	sm.m.AscendRange(ninf, pinf, func(item llrb.Item) bool {
 		return fn(item.(*pairAddressUint64Map).key, item.(*pairAddressUint64Map).value)
 	})
+}
+
+// MarshalJSON is a marshaler function
+func (sm *AddressUint64Map) MarshalJSON() ([]byte, error) {
+	var buffer bytes.Buffer
+	buffer.WriteString(`{`)
+	isFirst := true
+	sm.m.AscendRange(ninf, pinf, func(item llrb.Item) bool {
+		if isFirst {
+			isFirst = false
+		} else {
+			buffer.WriteString(`,`)
+		}
+		if bs, err := item.(*pairAddressUint64Map).key.MarshalJSON(); err != nil {
+			return false
+		} else {
+			buffer.Write(bs)
+		}
+		buffer.WriteString(`:`)
+		if bs, err := json.Marshal(item.(*pairAddressUint64Map).value); err != nil {
+			return false
+		} else {
+			buffer.Write(bs)
+		}
+		return true
+	})
+	buffer.WriteString(`}`)
+	return buffer.Bytes(), nil
 }

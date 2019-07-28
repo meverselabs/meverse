@@ -1,6 +1,8 @@
 package types
 
 import (
+	"bytes"
+	"encoding/json"
 	"reflect"
 	"strings"
 
@@ -121,4 +123,32 @@ func (sm *StringBoolMap) EachPrefix(prefix string, fn func(string, bool) bool) {
 	sm.m.AscendRange(&pairStringBoolMap{key: prefix}, &pairStringBoolMap{key: prefix + string([]byte{255})}, func(item llrb.Item) bool {
 		return fn(item.(*pairStringBoolMap).key, item.(*pairStringBoolMap).value)
 	})
+}
+
+// MarshalJSON is a marshaler function
+func (sm *StringBoolMap) MarshalJSON() ([]byte, error) {
+	var buffer bytes.Buffer
+	buffer.WriteString(`{`)
+	isFirst := true
+	sm.m.AscendRange(ninf, pinf, func(item llrb.Item) bool {
+		if isFirst {
+			isFirst = false
+		} else {
+			buffer.WriteString(`,`)
+		}
+		if bs, err := json.Marshal(item.(*pairStringBoolMap).key); err != nil {
+			return false
+		} else {
+			buffer.Write(bs)
+		}
+		buffer.WriteString(`:`)
+		if bs, err := json.Marshal(item.(*pairStringBoolMap).value); err != nil {
+			return false
+		} else {
+			buffer.Write(bs)
+		}
+		return true
+	})
+	buffer.WriteString(`}`)
+	return buffer.Bytes(), nil
 }
