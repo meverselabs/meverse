@@ -27,9 +27,11 @@ type Node struct {
 	cn           *chain.Chain
 	myPublicHash common.PublicHash
 	requestTimer *RequestTimer
+	requestLock  sync.RWMutex
 	blockQ       *queue.SortedQueue
 	txMsgChans   []*chan *TxMsgItem
 	txMsgIdx     uint64
+	statusMap    map[string]*Status
 	txpool       *txpool.TransactionPool
 	txQ          *queue.ExpireQueue
 	isRunning    bool
@@ -44,6 +46,7 @@ func NewNode(key key.Key, SeedNodeMap map[common.PublicHash]string, cn *chain.Ch
 		cn:           cn,
 		myPublicHash: common.NewPublicHash(key.PublicKey()),
 		blockQ:       queue.NewSortedQueue(),
+		statusMap:    map[string]*Status{},
 		txpool:       txpool.NewTransactionPool(),
 		txQ:          queue.NewExpireQueue(),
 	}
@@ -139,10 +142,12 @@ func (nd *Node) Run(BindAddress string) {
 	}
 
 	blockTimer := time.NewTimer(time.Millisecond)
+	blockRequestTimer := time.NewTimer(time.Millisecond)
 	for !nd.isClose {
 		select {
 		case <-blockTimer.C:
 			nd.Lock()
+			hasItem := false
 			TargetHeight := uint64(nd.cn.Provider().Height() + 1)
 			item := nd.blockQ.PopUntil(TargetHeight)
 			for item != nil {
@@ -156,38 +161,45 @@ func (nd *Node) Run(BindAddress string) {
 				nd.broadcastStatus()
 				TargetHeight++
 				item = nd.blockQ.PopUntil(TargetHeight)
+				hasItem = true
 			}
 			nd.Unlock()
+
+			if hasItem {
+				nd.tryRequestBlocks()
+			}
+
 			blockTimer.Reset(50 * time.Millisecond)
+		case <-blockRequestTimer.C:
+			nd.tryRequestBlocks()
+			blockRequestTimer.Reset(500 * time.Millisecond)
 		}
 	}
 }
 
 // OnTimerExpired called when rquest expired
 func (nd *Node) OnTimerExpired(height uint32, value string) {
-	if height > nd.cn.Provider().Height() {
-		var TargetPublicHash common.PublicHash
-		copy(TargetPublicHash[:], []byte(value))
-		list := nd.ms.Peers()
-		for _, p := range list {
-			var pubhash common.PublicHash
-			copy(pubhash[:], []byte(p.ID()))
-			if pubhash != nd.myPublicHash && pubhash != TargetPublicHash {
-				nd.sendRequestBlockTo(pubhash, height, 1)
-				break
-			}
-		}
-	}
+	nd.tryRequestBlocks()
 }
 
 // OnConnected called when peer connected
 func (nd *Node) OnConnected(p peer.Peer) {
+	nd.Lock()
+	nd.statusMap[p.ID()] = &Status{}
+	nd.Unlock()
 
+	var SenderPublicHash common.PublicHash
+	copy(SenderPublicHash[:], []byte(p.ID()))
+	nd.sendStatusTo(SenderPublicHash)
 }
 
 // OnDisconnected called when peer disconnected
 func (nd *Node) OnDisconnected(p peer.Peer) {
+	nd.Lock()
+	delete(nd.statusMap, p.ID())
+	nd.Unlock()
 	nd.requestTimer.RemovesByValue(p.ID())
+	go nd.tryRequestBlocks()
 }
 
 // OnRecv called when message received
@@ -226,6 +238,16 @@ func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
 		}
 		return nil
 	case *StatusMessage:
+		nd.Lock()
+		if status, has := nd.statusMap[p.ID()]; has {
+			if status.Height < msg.Height {
+				status.Version = msg.Version
+				status.Height = msg.Height
+				status.LastHash = msg.LastHash
+			}
+		}
+		nd.Unlock()
+
 		Height := nd.cn.Provider().Height()
 		if Height < msg.Height {
 			for q := uint32(0); q < 10; q++ {
@@ -233,15 +255,15 @@ func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
 				if BaseHeight > msg.Height {
 					break
 				}
-				canAll := true
+				enableCount := 0
 				for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
 					if !nd.requestTimer.Exist(i) {
-						canAll = false
+						enableCount++
 					}
 				}
-				if canAll {
+				if enableCount == 10 {
 					nd.sendRequestBlockTo(SenderPublicHash, BaseHeight+1, 10)
-				} else {
+				} else if enableCount > 0 {
 					for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
 						if !nd.requestTimer.Exist(i) {
 							nd.sendRequestBlockTo(SenderPublicHash, i, 1)
@@ -266,6 +288,17 @@ func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
 			if err := nd.addBlock(b); err != nil {
 				return err
 			}
+		}
+
+		if len(msg.Blocks) > 0 {
+			nd.Lock()
+			if status, has := nd.statusMap[p.ID()]; has {
+				lastHeight := msg.Blocks[len(msg.Blocks)-1].Header.Height
+				if status.Height < lastHeight {
+					status.Height = lastHeight
+				}
+			}
+			nd.Unlock()
 		}
 		return nil
 	case *TransactionMessage:
@@ -380,6 +413,48 @@ func (nd *Node) addTx(t uint16, tx types.Transaction, sigs []common.Signature) e
 		Sigs:   sigs,
 	})
 	return nil
+}
+
+func (nd *Node) tryRequestBlocks() {
+	nd.requestLock.Lock()
+	defer nd.requestLock.Unlock()
+
+	Height := nd.cn.Provider().Height()
+	for q := uint32(0); q < 10; q++ {
+		BaseHeight := Height + q*10
+
+		var selectedPubHash string
+		nd.Lock()
+		for pubhash, status := range nd.statusMap {
+			if BaseHeight <= status.Height {
+				selectedPubHash = pubhash
+				break
+			}
+		}
+		nd.Unlock()
+
+		if len(selectedPubHash) == 0 {
+			break
+		}
+		enableCount := 0
+		for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
+			if !nd.requestTimer.Exist(i) {
+				enableCount++
+			}
+		}
+
+		var TargetPublicHash common.PublicHash
+		copy(TargetPublicHash[:], []byte(selectedPubHash))
+		if enableCount == 10 {
+			nd.sendRequestBlockTo(TargetPublicHash, BaseHeight+1, 10)
+		} else if enableCount > 0 {
+			for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
+				if !nd.requestTimer.Exist(i) {
+					nd.sendRequestBlockTo(TargetPublicHash, i, 1)
+				}
+			}
+		}
+	}
 }
 
 func (nd *Node) cleanPool(b *types.Block) {

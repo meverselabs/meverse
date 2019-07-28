@@ -45,6 +45,7 @@ type FormulatorNode struct {
 	txMsgChans           []*chan *p2p.TxMsgItem
 	txMsgIdx             uint64
 	statusMap            map[string]*p2p.Status
+	obStatusMap          map[string]*p2p.Status
 	requestTimer         *p2p.RequestTimer
 	requestNodeTimer     *p2p.RequestTimer
 	requestLock          sync.RWMutex
@@ -71,6 +72,7 @@ func NewFormulatorNode(Config *FormulatorConfig, key key.Key, ndkey key.Key, Net
 		lastObSignMessageMap: map[uint32]*BlockObSignMessage{},
 		lastContextes:        []*types.Context{},
 		statusMap:            map[string]*p2p.Status{},
+		obStatusMap:          map[string]*p2p.Status{},
 		requestTimer:         p2p.NewRequestTimer(nil),
 		requestNodeTimer:     p2p.NewRequestTimer(nil),
 		blockQ:               queue.NewSortedQueue(),
@@ -163,10 +165,12 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 	}
 
 	blockTimer := time.NewTimer(time.Millisecond)
+	blockRequestTimer := time.NewTimer(time.Millisecond)
 	for !fr.isClose {
 		select {
 		case <-blockTimer.C:
 			fr.Lock()
+			hasItem := false
 			TargetHeight := uint64(fr.cs.cn.Provider().Height() + 1)
 			item := fr.blockQ.PopUntil(TargetHeight)
 			for item != nil {
@@ -179,9 +183,18 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 				fr.cleanPool(b)
 				TargetHeight++
 				item = fr.blockQ.PopUntil(TargetHeight)
+				hasItem = true
 			}
 			fr.Unlock()
+
+			if hasItem {
+				fr.tryRequestBlocks()
+			}
+
 			blockTimer.Reset(50 * time.Millisecond)
+		case <-blockRequestTimer.C:
+			fr.tryRequestBlocks()
+			blockRequestTimer.Reset(500 * time.Millisecond)
 		}
 	}
 	for i := 0; i < WorkerCount; i++ {
@@ -256,7 +269,7 @@ func (fr *FormulatorNode) addTx(t uint16, tx types.Transaction, sigs []common.Si
 
 // OnTimerExpired called when rquest expired
 func (fr *FormulatorNode) OnTimerExpired(height uint32, value string) {
-	go fr.tryRequestNext()
+	go fr.tryRequestBlocks()
 }
 
 // OnItemExpired is called when the item is expired
@@ -273,14 +286,14 @@ func (fr *FormulatorNode) OnItemExpired(Interval time.Duration, Key string, Item
 // OnObserverConnected is called after a new observer peer is connected
 func (fr *FormulatorNode) OnObserverConnected(p peer.Peer) {
 	fr.Lock()
-	fr.statusMap[p.ID()] = &p2p.Status{}
+	fr.obStatusMap[p.ID()] = &p2p.Status{}
 	fr.Unlock()
 }
 
 // OnObserverDisconnected is called when the observer peer is disconnected
 func (fr *FormulatorNode) OnObserverDisconnected(p peer.Peer) {
 	fr.Lock()
-	delete(fr.statusMap, p.ID())
+	delete(fr.obStatusMap, p.ID())
 	fr.Unlock()
 	fr.requestTimer.RemovesByValue(p.ID())
 	go fr.tryRequestNext()
@@ -288,11 +301,18 @@ func (fr *FormulatorNode) OnObserverDisconnected(p peer.Peer) {
 
 // OnConnected is called after a new  peer is connected
 func (fr *FormulatorNode) OnConnected(p peer.Peer) {
+	fr.Lock()
+	fr.statusMap[p.ID()] = &p2p.Status{}
+	fr.Unlock()
 }
 
 // OnDisconnected is called when the  peer is disconnected
 func (fr *FormulatorNode) OnDisconnected(p peer.Peer) {
+	fr.Lock()
+	delete(fr.statusMap, p.ID())
+	fr.Unlock()
 	fr.requestNodeTimer.RemovesByValue(p.ID())
+	go fr.tryRequestBlocks()
 }
 
 // OnRecv called when message received
@@ -331,19 +351,29 @@ func (fr *FormulatorNode) OnRecv(p peer.Peer, m interface{}) error {
 			return err
 		}
 	case *p2p.StatusMessage:
+		fr.Lock()
+		if status, has := fr.statusMap[p.ID()]; has {
+			if status.Height < msg.Height {
+				status.Version = msg.Version
+				status.Height = msg.Height
+				status.LastHash = msg.LastHash
+			}
+		}
+		fr.Unlock()
+
 		Height := fr.cs.cn.Provider().Height()
 		if Height < msg.Height {
 			for q := uint32(0); q < 10; q++ {
 				BaseHeight := Height + q*10
-				canAll := true
+				enableCount := 0
 				for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
 					if !fr.requestTimer.Exist(i) {
-						canAll = false
+						enableCount++
 					}
 				}
-				if canAll {
+				if enableCount == 10 {
 					fr.sendRequestBlockToNode(SenderPublicHash, BaseHeight+1, 10)
-				} else {
+				} else if enableCount > 0 {
 					for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
 						if !fr.requestTimer.Exist(i) {
 							fr.sendRequestBlockToNode(SenderPublicHash, i, 1)
@@ -367,6 +397,17 @@ func (fr *FormulatorNode) OnRecv(p peer.Peer, m interface{}) error {
 			if err := fr.addBlock(b); err != nil {
 				return err
 			}
+		}
+
+		if len(msg.Blocks) > 0 {
+			fr.Lock()
+			if status, has := fr.statusMap[p.ID()]; has {
+				lastHeight := msg.Blocks[len(msg.Blocks)-1].Header.Height
+				if status.Height < lastHeight {
+					status.Height = lastHeight
+				}
+			}
+			fr.Unlock()
 		}
 	case *p2p.TransactionMessage:
 		errCh := make(chan error)
@@ -392,6 +433,48 @@ func (fr *FormulatorNode) OnRecv(p peer.Peer, m interface{}) error {
 		return p2p.ErrUnknownMessage
 	}
 	return nil
+}
+
+func (fr *FormulatorNode) tryRequestBlocks() {
+	fr.requestLock.Lock()
+	defer fr.requestLock.Unlock()
+
+	Height := fr.cs.cn.Provider().Height()
+	for q := uint32(0); q < 10; q++ {
+		BaseHeight := Height + q*10
+
+		var selectedPubHash string
+		fr.Lock()
+		for pubhash, status := range fr.statusMap {
+			if BaseHeight <= status.Height {
+				selectedPubHash = pubhash
+				break
+			}
+		}
+		fr.Unlock()
+
+		if len(selectedPubHash) == 0 {
+			break
+		}
+		enableCount := 0
+		for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
+			if !fr.requestTimer.Exist(i) {
+				enableCount++
+			}
+		}
+
+		var TargetPublicHash common.PublicHash
+		copy(TargetPublicHash[:], []byte(selectedPubHash))
+		if enableCount == 10 {
+			fr.sendRequestBlockToNode(TargetPublicHash, BaseHeight+1, 10)
+		} else if enableCount > 0 {
+			for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
+				if !fr.requestTimer.Exist(i) {
+					fr.sendRequestBlockToNode(TargetPublicHash, i, 1)
+				}
+			}
+		}
+	}
 }
 
 func (fr *FormulatorNode) onRecv(p peer.Peer, m interface{}) error {
@@ -420,7 +503,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 			return nil
 		}
 		if msg.TargetHeight > Height+1 {
-			if RetryCount >= 40 {
+			if RetryCount >= 5 {
 				return nil
 			}
 
@@ -619,7 +702,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 				fr.cleanPool(b)
 				log.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Transactions))
 
-				if status, has := fr.statusMap[p.ID()]; has {
+				if status, has := fr.obStatusMap[p.ID()]; has {
 					if status.Height < GenMessage.Block.Header.Height {
 						status.Height = GenMessage.Block.Header.Height
 					}
@@ -673,7 +756,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 
 		if len(msg.Blocks) > 0 {
 			fr.Lock()
-			if status, has := fr.statusMap[p.ID()]; has {
+			if status, has := fr.obStatusMap[p.ID()]; has {
 				lastHeight := msg.Blocks[len(msg.Blocks)-1].Header.Height
 				if status.Height < lastHeight {
 					status.Height = lastHeight
@@ -681,12 +764,10 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 			}
 			fr.Unlock()
 		}
-
-		fr.tryRequestNext()
 		return nil
 	case *p2p.StatusMessage:
 		fr.Lock()
-		if status, has := fr.statusMap[p.ID()]; has {
+		if status, has := fr.obStatusMap[p.ID()]; has {
 			if status.Height < msg.Height {
 				status.Version = msg.Version
 				status.Height = msg.Height
@@ -699,15 +780,15 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 		if Height < msg.Height {
 			for q := uint32(0); q < 10; q++ {
 				BaseHeight := Height + q*10
-				canAll := true
+				enableCount := 0
 				for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
 					if !fr.requestTimer.Exist(i) {
-						canAll = false
+						enableCount++
 					}
 				}
-				if canAll {
+				if enableCount == 10 {
 					fr.sendRequestBlockTo(p.ID(), BaseHeight+1, 10)
-				} else {
+				} else if enableCount > 0 {
 					for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
 						if !fr.requestTimer.Exist(i) {
 							fr.sendRequestBlockTo(p.ID(), i, 1)
@@ -768,7 +849,7 @@ func (fr *FormulatorNode) tryRequestNext() {
 		if fr.blockQ.Find(uint64(TargetHeight)) == nil {
 			fr.Lock()
 			var TargetPubHash string
-			for pubhash, status := range fr.statusMap {
+			for pubhash, status := range fr.obStatusMap {
 				if TargetHeight <= status.Height {
 					TargetPubHash = pubhash
 					break
