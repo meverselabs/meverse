@@ -150,6 +150,13 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 			return err
 		}
 
+		StackRewardMap := types.NewAddressAmountMap()
+		if bs := ctw.ProcessData(tagStackRewardMap); len(bs) > 0 {
+			if err := encoding.Unmarshal(bs, &StackRewardMap); err != nil {
+				return err
+			}
+		}
+
 		RewardPowerSum := amount.NewCoinAmount(0, 0)
 		RewardPowerMap := map[common.Address]*amount.Amount{}
 		StakingRewardPowerMap := map[common.Address]*amount.Amount{}
@@ -184,12 +191,12 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 				RewardPowerMap[GenAddress] = am
 
 				PrevAmountMap := types.NewAddressAmountMap()
-				if bs := ctw.AccountData(b.Header.Generator, tagStakingAmountMap); len(bs) > 0 {
+				if bs := ctw.AccountData(frAcc.Address(), tagStakingAmountMap); len(bs) > 0 {
 					if err := encoding.Unmarshal(bs, &PrevAmountMap); err != nil {
 						return err
 					}
 				}
-				AmountMap, err := p.GetStakingAmountMap(ctw, b.Header.Generator)
+				AmountMap, err := p.GetStakingAmountMap(ctw, frAcc.Address())
 				if err != nil {
 					return err
 				}
@@ -210,12 +217,12 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 				if bs, err := encoding.Marshal(CurrentAmountMap); err != nil {
 					return err
 				} else {
-					ctw.SetAccountData(b.Header.Generator, tagStakingAmountMap, bs)
+					ctw.SetAccountData(frAcc.Address(), tagStakingAmountMap, bs)
 				}
 
 				StakingRewardPower := amount.NewCoinAmount(0, 0)
 				StakingPowerMap := types.NewAddressAmountMap()
-				if bs := ctw.AccountData(b.Header.Generator, tagStakingPowerMap); len(bs) > 0 {
+				if bs := ctw.AccountData(frAcc.Address(), tagStakingPowerMap); len(bs) > 0 {
 					if err := encoding.Unmarshal(bs, &StakingPowerMap); err != nil {
 						return err
 					}
@@ -228,10 +235,33 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 					}
 					StakingRewardPower = StakingRewardPower.Add(StakingAmount.MulC(int64(GenCount)).MulC(int64(policy.StakingEfficiency1000)).DivC(1000))
 				}
+
+				StackReward, has := StackRewardMap.Get(frAcc.Address())
+				if has {
+					StakingPowerSum := amount.NewCoinAmount(0, 0)
+					StakingPowerMap.EachAll(func(StakingAddress common.Address, StakingPower *amount.Amount) bool {
+						StakingPowerSum = StakingPowerSum.Add(StakingPower)
+						return true
+					})
+					if !StakingPowerSum.IsZero() {
+						var inErr error
+						Ratio := StackReward.Mul(amount.COIN).Div(StakingPowerSum)
+						StakingPowerMap.EachAll(func(StakingAddress common.Address, StakingPower *amount.Amount) bool {
+							StackStakingAmount := StakingPower.Mul(Ratio).Div(amount.COIN)
+							StakingPowerMap.Put(StakingAddress, StakingPower.Add(StackStakingAmount))
+							StakingRewardPower = StakingRewardPower.Add(StackStakingAmount.MulC(int64(GenCount)).MulC(int64(policy.StakingEfficiency1000)).DivC(1000))
+							return true
+						})
+						if inErr != nil {
+							return inErr
+						}
+					}
+				}
+
 				if bs, err := encoding.Marshal(StakingPowerMap); err != nil {
 					return err
 				} else {
-					ctw.SetAccountData(b.Header.Generator, tagStakingPowerMap, bs)
+					ctw.SetAccountData(frAcc.Address(), tagStakingPowerMap, bs)
 				}
 				StakingRewardPowerMap[GenAddress] = StakingRewardPower
 				RewardPowerSum = RewardPowerSum.Add(StakingRewardPower)
@@ -240,12 +270,6 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 			}
 		}
 
-		StackRewardMap := types.NewAddressAmountMap()
-		if bs := ctw.AccountData(b.Header.Generator, tagStackRewardMap); len(bs) > 0 {
-			if err := encoding.Unmarshal(bs, &StackRewardMap); err != nil {
-				return err
-			}
-		}
 		if !RewardPowerSum.IsZero() {
 			TotalReward := policy.RewardPerBlock.MulC(int64(ctw.TargetHeight() - lastPaidHeight))
 			TotalFee := p.vault.CollectedFee(ctw)
@@ -281,7 +305,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 				lastStakingPaidHeight := p.getLastStakingPaidHeight(ctw, frAcc.Address())
 				if ctw.TargetHeight() >= lastStakingPaidHeight+policy.PayRewardEveryBlocks*frAcc.Policy.PayOutInterval {
 					StakingPowerMap := types.NewAddressAmountMap()
-					if bs := ctw.AccountData(b.Header.Generator, tagStakingPowerMap); len(bs) > 0 {
+					if bs := ctw.AccountData(frAcc.Address(), tagStakingPowerMap); len(bs) > 0 {
 						if err := encoding.Unmarshal(bs, &StakingPowerMap); err != nil {
 							return err
 						}
@@ -325,7 +349,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 							}
 						}
 					}
-					ctw.SetAccountData(b.Header.Generator, tagStakingPowerMap, nil)
+					ctw.SetAccountData(frAcc.Address(), tagStakingPowerMap, nil)
 
 					StackRewardMap.Delete(frAcc.Address())
 					p.setLastStakingPaidHeight(ctw, frAcc.Address(), ctw.TargetHeight())
@@ -335,8 +359,11 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 		if bs, err := encoding.Marshal(StackRewardMap); err != nil {
 			return err
 		} else {
-			ctw.SetAccountData(b.Header.Generator, tagStackRewardMap, bs)
+			ctw.SetProcessData(tagStackRewardMap, bs)
 		}
+
+		//ctw.EmitEvent()
+		//Addr, Earn, Commision, Staked, Adds
 
 		//log.Println("Paid at", ctw.TargetHeight())
 		p.setLastPaidHeight(ctw, ctw.TargetHeight())
