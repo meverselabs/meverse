@@ -238,17 +238,19 @@ func addHyperFormulator(sp *vault.Vault, ctw *types.ContextWrapper, hyperPolicy 
 }
 
 func addStaking(fp *formulator.Formulator, ctw *types.ContextWrapper, HyperAddress common.Address, StakingAddress common.Address, am *amount.Amount) {
+	if has, err := ctw.HasAccount(StakingAddress); err != nil {
+		panic(err)
+	} else if !has {
+		panic(types.ErrNotExistAccount)
+	}
 	if acc, err := ctw.Account(HyperAddress); err != nil {
 		panic(err)
 	} else if frAcc, is := acc.(*formulator.FormulatorAccount); !is {
 		panic(formulator.ErrInvalidFormulatorAddress)
 	} else if frAcc.FormulatorType != formulator.HyperFormulatorType {
 		panic(formulator.ErrNotHyperFormulator)
-	}
-	if has, err := ctw.HasAccount(StakingAddress); err != nil {
-		panic(err)
-	} else if !has {
-		panic(types.ErrNotExistAccount)
+	} else {
+		frAcc.StakingAmount = frAcc.StakingAmount.Add(am)
 	}
 	fp.AddStakingAmount(ctw, HyperAddress, StakingAddress, am)
 }
