@@ -20,24 +20,30 @@ func (fr *FormulatorNode) broadcastStatus() error {
 	return nil
 }
 
-func (fr *FormulatorNode) sendRequestBlockTo(TargetID string, Height uint32) error {
+func (fr *FormulatorNode) sendRequestBlockTo(TargetID string, Height uint32, Count uint8) error {
 	nm := &p2p.RequestMessage{
 		Height: Height,
+		Count:  Count,
 	}
 	fr.ms.SendTo(TargetID, nm)
-	fr.requestTimer.Add(Height, 10*time.Second, TargetID)
+	for i := uint32(0); i < uint32(Count); i++ {
+		fr.requestTimer.Add(Height+i, 10*time.Second, TargetID)
+	}
 	return nil
 }
 
-func (fr *FormulatorNode) sendRequestBlockToNode(TargetPubHash common.PublicHash, Height uint32) error {
+func (fr *FormulatorNode) sendRequestBlockToNode(TargetPubHash common.PublicHash, Height uint32, Count uint8) error {
 	if TargetPubHash == fr.myPublicHash {
 		return nil
 	}
 
 	nm := &p2p.RequestMessage{
 		Height: Height,
+		Count:  Count,
 	}
 	fr.nm.SendTo(TargetPubHash, nm)
-	fr.requestNodeTimer.Add(Height, 10*time.Second, string(TargetPubHash[:]))
+	for i := uint32(0); i < uint32(Count); i++ {
+		fr.requestNodeTimer.Add(Height+i, 10*time.Second, string(TargetPubHash[:]))
+	}
 	return nil
 }

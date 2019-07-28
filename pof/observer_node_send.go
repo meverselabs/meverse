@@ -356,15 +356,18 @@ func (ob *ObserverNode) broadcastStatus() error {
 	return nil
 }
 
-func (ob *ObserverNode) sendRequestBlockTo(TargetPubHash common.PublicHash, Height uint32) error {
+func (ob *ObserverNode) sendRequestBlockTo(TargetPubHash common.PublicHash, Height uint32, Count uint8) error {
 	if TargetPubHash == ob.myPublicHash {
 		return nil
 	}
 
 	nm := &p2p.RequestMessage{
 		Height: Height,
+		Count:  Count,
 	}
 	ob.ms.SendTo(TargetPubHash, nm)
-	ob.requestTimer.Add(Height, 2*time.Second, string(TargetPubHash[:]))
+	for i := uint32(0); i < uint32(Count); i++ {
+		ob.requestTimer.Add(Height+i, 2*time.Second, string(TargetPubHash[:]))
+	}
 	return nil
 }

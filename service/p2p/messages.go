@@ -72,6 +72,7 @@ type PingMessage struct {
 // RequestMessage used to request a chain data to a peer
 type RequestMessage struct {
 	Height uint32
+	Count  uint8
 }
 
 // StatusMessage used to provide the chain information to a peer
@@ -83,7 +84,7 @@ type StatusMessage struct {
 
 // BlockMessage used to send a chain block to a peer
 type BlockMessage struct {
-	Block *types.Block
+	Blocks []*types.Block
 }
 
 // TransactionMessage is a message for a transaction

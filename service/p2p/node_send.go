@@ -34,15 +34,18 @@ func (nd *Node) broadcastStatus() error {
 	return nil
 }
 
-func (nd *Node) sendRequestBlockTo(TargetPubHash common.PublicHash, Height uint32) error {
+func (nd *Node) sendRequestBlockTo(TargetPubHash common.PublicHash, Height uint32, Count uint8) error {
 	if TargetPubHash == nd.myPublicHash {
 		return nil
 	}
 
 	nm := &RequestMessage{
 		Height: Height,
+		Count:  Count,
 	}
 	nd.ms.SendTo(TargetPubHash, nm)
-	nd.requestTimer.Add(Height, 10*time.Second, string(TargetPubHash[:]))
+	for i := uint32(0); i < uint32(Count); i++ {
+		nd.requestTimer.Add(Height+i, 10*time.Second, string(TargetPubHash[:]))
+	}
 	return nil
 }

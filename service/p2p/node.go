@@ -173,7 +173,7 @@ func (nd *Node) OnTimerExpired(height uint32, value string) {
 			var pubhash common.PublicHash
 			copy(pubhash[:], []byte(p.ID()))
 			if pubhash != nd.myPublicHash && pubhash != TargetPublicHash {
-				nd.sendRequestBlockTo(pubhash, height)
+				nd.sendRequestBlockTo(pubhash, height, 1)
 				break
 			}
 		}
@@ -197,12 +197,29 @@ func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
 
 	switch msg := m.(type) {
 	case *RequestMessage:
-		b, err := nd.cn.Provider().Block(msg.Height)
-		if err != nil {
-			return err
+		if msg.Count == 0 {
+			msg.Count = 1
+		}
+		if msg.Count > 10 {
+			msg.Count = 10
+		}
+		Height := nd.cn.Provider().Height()
+		if msg.Height > Height {
+			return nil
+		}
+		list := make([]*types.Block, 0, 10)
+		for i := uint32(0); i < uint32(msg.Count); i++ {
+			if msg.Height+i > Height {
+				break
+			}
+			b, err := nd.cn.Provider().Block(msg.Height + i)
+			if err != nil {
+				return err
+			}
+			list = append(list, b)
 		}
 		sm := &BlockMessage{
-			Block: b,
+			Blocks: list,
 		}
 		if err := nd.ms.SendTo(SenderPublicHash, sm); err != nil {
 			return err
@@ -211,9 +228,25 @@ func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
 	case *StatusMessage:
 		Height := nd.cn.Provider().Height()
 		if Height < msg.Height {
-			for i := Height + 1; i <= Height+100 && i <= msg.Height; i++ {
-				if !nd.requestTimer.Exist(i) {
-					nd.sendRequestBlockTo(SenderPublicHash, i)
+			for q := uint32(0); q < 10; q++ {
+				BaseHeight := Height + q*10
+				if BaseHeight > msg.Height {
+					break
+				}
+				canAll := true
+				for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
+					if !nd.requestTimer.Exist(i) {
+						canAll = false
+					}
+				}
+				if canAll {
+					nd.sendRequestBlockTo(SenderPublicHash, BaseHeight+1, 10)
+				} else {
+					for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
+						if !nd.requestTimer.Exist(i) {
+							nd.sendRequestBlockTo(SenderPublicHash, i, 1)
+						}
+					}
 				}
 			}
 		} else {
@@ -229,8 +262,10 @@ func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
 		}
 		return nil
 	case *BlockMessage:
-		if err := nd.addBlock(msg.Block); err != nil {
-			return err
+		for _, b := range msg.Blocks {
+			if err := nd.addBlock(b); err != nil {
+				return err
+			}
 		}
 		return nil
 	case *TransactionMessage:
