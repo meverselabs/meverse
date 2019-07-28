@@ -146,6 +146,18 @@ func (app *FletaApp) InitGenesis(ctw *types.ContextWrapper) error {
 		return types.ErrNotExistProcess
 	} else {
 		setupStaking(fp, ctw)
+
+		HyperAddresses := []common.Address{
+			common.MustParseAddress("385ujsGNZt"),
+			common.MustParseAddress("9nvUvJibL"),
+			common.MustParseAddress("7bScSUoST"),
+			common.MustParseAddress("GPN6MnU3y"),
+			common.MustParseAddress("3EgMMJk82X"),
+			common.MustParseAddress("3AHPcM6Him"),
+		}
+		if err := fp.InitStakingMap(ctw, HyperAddresses); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -109,6 +109,28 @@ func (p *Formulator) InitPolicy(ctw *types.ContextWrapper, rp *RewardPolicy, ap 
 	return nil
 }
 
+// InitStakingMap called at OnInitGenesis of an application
+func (p *Formulator) InitStakingMap(ctw *types.ContextWrapper, HyperAddresses []common.Address) error {
+	ctw = types.SwitchContextWrapper(p.pid, ctw)
+
+	for _, addr := range HyperAddresses {
+		AmountMap, err := p.GetStakingAmountMap(ctw, addr)
+		if err != nil {
+			return err
+		}
+		CurrentAmountMap := types.NewAddressAmountMap()
+		for StakingAddress, StakingAmount := range AmountMap {
+			CurrentAmountMap.Put(StakingAddress, StakingAmount)
+		}
+		if bs, err := encoding.Marshal(CurrentAmountMap); err != nil {
+			return err
+		} else {
+			ctw.SetAccountData(addr, tagStakingAmountMap, bs)
+		}
+	}
+	return nil
+}
+
 // OnLoadChain called when the chain loaded
 func (p *Formulator) OnLoadChain(loader types.LoaderWrapper) error {
 	p.admin.AdminAddress(loader, p.Name())
@@ -152,12 +174,13 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 		}
 
 		ev := &RewardEvent{
-			Height_:       ctw.TargetHeight(),
-			Index_:        65535,
-			RewardMap:     types.NewAddressAmountMap(),
-			StakedMap:     types.NewAddressAmountMap(),
-			CommissionMap: types.NewAddressAmountMap(),
-			StackedMap:    types.NewAddressAmountMap(),
+			Height_:        ctw.TargetHeight(),
+			Index_:         65535,
+			RewardMap:      types.NewAddressAmountMap(),
+			CommissionMap:  types.NewAddressAmountMap(),
+			StackedMap:     types.NewAddressAmountMap(),
+			StakedMap:      types.NewAddressAddressAmountMap(),
+			StakeRewardMap: types.NewAddressAddressAmountMap(),
 		}
 
 		StackRewardMap := types.NewAddressAmountMap()
@@ -314,6 +337,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 		}
 		for _, frAcc := range Hypers {
 			if StackReward, has := StackRewardMap.Get(frAcc.Address()); has {
+				ev.RemoveStacked(frAcc.Address())
 				lastStakingPaidHeight := p.getLastStakingPaidHeight(ctw, frAcc.Address())
 				if ctw.TargetHeight() >= lastStakingPaidHeight+policy.PayRewardEveryBlocks*frAcc.Policy.PayOutInterval {
 					StakingPowerMap := types.NewAddressAmountMap()
@@ -342,13 +366,13 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 							if !RewardAmount.IsZero() {
 								if p.getUserAutoStaking(ctw, frAcc.Address(), StakingAddress) {
 									p.AddStakingAmount(ctw, frAcc.Address(), StakingAddress, RewardAmount)
-									ev.AddStaked(StakingAddress, RewardAmount)
+									ev.AddStaked(frAcc.Address(), StakingAddress, RewardAmount)
 								} else {
 									if err := p.vault.AddBalance(ctw, StakingAddress, RewardAmount); err != nil {
 										inErr = err
 										return false
 									}
-									ev.AddReward(StakingAddress, RewardAmount)
+									ev.AddStakeReward(frAcc.Address(), StakingAddress, RewardAmount)
 								}
 							}
 							return true
