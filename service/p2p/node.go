@@ -278,14 +278,18 @@ func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
 			}
 			if h != msg.LastHash {
 				//TODO : critical error signal
-				log.Println(p.Name(), h.String(), msg.LastHash.String(), msg.Height)
-				panic(chain.ErrFoundForkedBlock)
+				log.Println(chain.ErrFoundForkedBlock, p.Name(), h.String(), msg.LastHash.String(), msg.Height)
+				nd.ms.RemovePeer(p.ID())
 			}
 		}
 		return nil
 	case *BlockMessage:
 		for _, b := range msg.Blocks {
 			if err := nd.addBlock(b); err != nil {
+				if err == chain.ErrFoundForkedBlock {
+					//TODO : critical error signal
+					nd.ms.RemovePeer(p.ID())
+				}
 				return err
 			}
 		}
@@ -336,14 +340,14 @@ func (nd *Node) addBlock(b *types.Block) error {
 		}
 		if h != encoding.Hash(b.Header) {
 			//TODO : critical error signal
-			panic(chain.ErrFoundForkedBlock)
+			return chain.ErrFoundForkedBlock
 		}
 	} else {
 		if item := nd.blockQ.FindOrInsert(b, uint64(b.Header.Height)); item != nil {
 			old := item.(*types.Block)
 			if encoding.Hash(old.Header) != encoding.Hash(b.Header) {
 				//TODO : critical error signal
-				panic(chain.ErrFoundForkedBlock)
+				return chain.ErrFoundForkedBlock
 			}
 		}
 	}

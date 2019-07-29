@@ -393,12 +393,15 @@ func (fr *FormulatorNode) OnRecv(p peer.Peer, m interface{}) error {
 			if h != msg.LastHash {
 				//TODO : critical error signal
 				log.Println(p.Name(), h.String(), msg.LastHash.String(), msg.Height)
-				panic(chain.ErrFoundForkedBlock)
+				fr.nm.RemovePeer(p.ID())
 			}
 		}
 	case *p2p.BlockMessage:
 		for _, b := range msg.Blocks {
 			if err := fr.addBlock(b); err != nil {
+				if err == chain.ErrFoundForkedBlock {
+					fr.nm.RemovePeer(p.ID())
+				}
 				return err
 			}
 		}
@@ -754,6 +757,9 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 	case *p2p.BlockMessage:
 		for _, b := range msg.Blocks {
 			if err := fr.addBlock(b); err != nil {
+				if err == chain.ErrFoundForkedBlock {
+					panic(err)
+				}
 				return err
 			}
 		}
@@ -826,14 +832,14 @@ func (fr *FormulatorNode) addBlock(b *types.Block) error {
 		}
 		if h != encoding.Hash(b.Header) {
 			//TODO : critical error signal
-			panic(chain.ErrFoundForkedBlock)
+			return chain.ErrFoundForkedBlock
 		}
 	} else {
 		if item := fr.blockQ.FindOrInsert(b, uint64(b.Header.Height)); item != nil {
 			old := item.(*types.Block)
 			if encoding.Hash(old.Header) != encoding.Hash(b.Header) {
 				//TODO : critical error signal
-				panic(chain.ErrFoundForkedBlock)
+				return chain.ErrFoundForkedBlock
 			}
 		}
 	}

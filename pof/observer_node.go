@@ -358,7 +358,8 @@ func (ob *ObserverNode) onFormulatorRecv(p peer.Peer, m interface{}, raw []byte)
 			}
 			if h != msg.LastHash {
 				//TODO : critical error signal
-				panic(chain.ErrFoundForkedBlock)
+				log.Println(chain.ErrFoundForkedBlock, p.Name(), h.String(), msg.LastHash.String(), msg.Height)
+				ob.fs.RemovePeer(p.ID())
 			}
 		}
 	default:
@@ -1027,12 +1028,15 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 			if h != msg.LastHash {
 				//TODO : critical error signal
 				log.Println(SenderPublicHash.String(), h.String(), msg.LastHash.String(), msg.Height)
-				panic(chain.ErrFoundForkedBlock) //TEMP
+				panic(chain.ErrFoundForkedBlock)
 			}
 		}
 	case *p2p.BlockMessage:
 		for _, b := range msg.Blocks {
 			if err := ob.addBlock(b); err != nil {
+				if err != nil {
+					panic(chain.ErrFoundForkedBlock)
+				}
 				return err
 			}
 		}
@@ -1051,14 +1055,14 @@ func (ob *ObserverNode) addBlock(b *types.Block) error {
 		}
 		if h != encoding.Hash(b.Header) {
 			//TODO : critical error signal
-			panic(chain.ErrFoundForkedBlock)
+			return chain.ErrFoundForkedBlock
 		}
 	} else {
 		if item := ob.blockQ.FindOrInsert(b, uint64(b.Header.Height)); item != nil {
 			old := item.(*types.Block)
 			if encoding.Hash(old.Header) != encoding.Hash(b.Header) {
 				//TODO : critical error signal
-				panic(chain.ErrFoundForkedBlock)
+				return chain.ErrFoundForkedBlock
 			}
 		}
 	}
