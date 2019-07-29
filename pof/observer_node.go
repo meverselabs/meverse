@@ -15,6 +15,7 @@ import (
 	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
+	"github.com/fletaio/fleta/service/apiserver"
 	"github.com/fletaio/fleta/service/p2p"
 	"github.com/fletaio/fleta/service/p2p/peer"
 )
@@ -78,6 +79,33 @@ func (ob *ObserverNode) Init() error {
 	fc.Register(types.DefineHashedType("p2p.StatusMessage"), &p2p.StatusMessage{})
 	fc.Register(types.DefineHashedType("p2p.BlockMessage"), &p2p.BlockMessage{})
 	fc.Register(types.DefineHashedType("p2p.RequestMessage"), &p2p.RequestMessage{})
+
+	if s, err := ob.cs.cn.ServiceByName("fleta.apiserver"); err != nil {
+		return err
+	} else if as, is := s.(*apiserver.APIServer); !is {
+		return types.ErrNotExistProcess
+	} else {
+		js, err := as.JRPC("observer")
+		if err != nil {
+			return err
+		}
+		js.Set("formulatorMap", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+			m := ob.fs.FormulatorMap()
+			nm := map[string]bool{}
+			for k, v := range m {
+				nm[k.String()] = v
+			}
+			return nm, nil
+		})
+		js.Set("adjustFormulatorMap", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+			m := ob.adjustFormulatorMap()
+			nm := map[string]bool{}
+			for k, v := range m {
+				nm[k.String()] = v
+			}
+			return nm, nil
+		})
+	}
 	return nil
 }
 
