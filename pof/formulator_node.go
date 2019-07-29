@@ -366,6 +366,9 @@ func (fr *FormulatorNode) OnRecv(p peer.Peer, m interface{}) error {
 		if Height < msg.Height {
 			for q := uint32(0); q < 10; q++ {
 				BaseHeight := Height + q*10
+				if BaseHeight > msg.Height {
+					break
+				}
 				enableCount := 0
 				for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
 					if !fr.requestTimer.Exist(i) {

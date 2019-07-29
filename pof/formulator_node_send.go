@@ -27,7 +27,7 @@ func (fr *FormulatorNode) sendRequestBlockTo(TargetID string, Height uint32, Cou
 	}
 	fr.ms.SendTo(TargetID, nm)
 	for i := uint32(0); i < uint32(Count); i++ {
-		fr.requestTimer.Add(Height+i, 10*time.Second, TargetID)
+		fr.requestTimer.Add(Height+i, 2*time.Second, TargetID)
 	}
 	return nil
 }
