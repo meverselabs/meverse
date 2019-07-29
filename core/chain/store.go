@@ -57,10 +57,15 @@ func NewStore(path string, ChainID uint8, name string, version uint16, bRecover 
 	ticker := time.NewTicker(5 * time.Minute)
 	go func() {
 		for range ticker.C {
+			MaxCount := 10
+			Count := 0
 		again:
 			if err := db.RunValueLogGC(0.5); err != nil {
 			} else {
-				goto again
+				Count++
+				if Count < MaxCount {
+					goto again
+				}
 			}
 		}
 	}()
@@ -81,10 +86,13 @@ func (st *Store) Close() {
 	defer st.closeLock.Unlock()
 
 	st.isClose = true
-	{
-	again:
-		if err := st.db.RunValueLogGC(1); err != nil {
-		} else {
+	MaxCount := 10
+	Count := 0
+again:
+	if err := st.db.RunValueLogGC(1); err != nil {
+	} else {
+		Count++
+		if Count < MaxCount {
 			goto again
 		}
 	}
