@@ -194,6 +194,7 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 			blockTimer.Reset(50 * time.Millisecond)
 		case <-blockRequestTimer.C:
 			fr.tryRequestBlocks()
+			fr.tryRequestNext()
 			blockRequestTimer.Reset(500 * time.Millisecond)
 		}
 	}
