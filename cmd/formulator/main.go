@@ -104,7 +104,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		SeedNodeMap[pubhash] = netAddr
+		SeedNodeMap[pubhash] = "wss://" + netAddr
 	}
 
 	cm := closer.NewManager()
