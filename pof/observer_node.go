@@ -81,9 +81,7 @@ func (ob *ObserverNode) Init() error {
 	fc.Register(types.DefineHashedType("p2p.RequestMessage"), &p2p.RequestMessage{})
 
 	if s, err := ob.cs.cn.ServiceByName("fleta.apiserver"); err != nil {
-		return err
 	} else if as, is := s.(*apiserver.APIServer); !is {
-		return types.ErrNotExistProcess
 	} else {
 		js, err := as.JRPC("observer")
 		if err != nil {
