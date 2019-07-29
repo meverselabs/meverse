@@ -54,14 +54,6 @@ func NewStore(path string, ChainID uint8, name string, version uint16, bRecover 
 		return nil, err
 	}
 
-	{
-	again:
-		if err := db.RunValueLogGC(0.5); err != nil {
-		} else {
-			goto again
-		}
-	}
-
 	ticker := time.NewTicker(5 * time.Minute)
 	go func() {
 		for range ticker.C {
@@ -89,7 +81,13 @@ func (st *Store) Close() {
 	defer st.closeLock.Unlock()
 
 	st.isClose = true
-	st.db.RunValueLogGC(0.5)
+	{
+	again:
+		if err := st.db.RunValueLogGC(1); err != nil {
+		} else {
+			goto again
+		}
+	}
 	st.db.Close()
 	st.ticker.Stop()
 	st.db = nil

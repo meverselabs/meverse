@@ -2,7 +2,10 @@ package types
 
 import (
 	"bytes"
+	"encoding/hex"
 	"strings"
+
+	"github.com/fletaio/fleta/common/util"
 
 	"github.com/fletaio/fleta/common"
 	"github.com/petar/GoLLRB/llrb"
@@ -55,4 +58,12 @@ func IsAllowedAccountName(Name string) bool {
 		}
 	}
 	return true
+}
+
+// TransactionID returns the id of the transaction
+func TransactionID(Height uint32, Index uint16) string {
+	bs := make([]byte, 6)
+	copy(bs, util.Uint32ToBytes(Height))
+	copy(bs[4:], util.Uint16ToBytes(Index))
+	return hex.EncodeToString(bs)
 }
