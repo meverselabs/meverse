@@ -764,6 +764,8 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 				}
 			}
 			fr.Unlock()
+
+			fr.tryRequestNext()
 		}
 		return nil
 	case *p2p.StatusMessage:
@@ -777,26 +779,20 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 		}
 		fr.Unlock()
 
-		Height := cp.Height()
-		if Height < msg.Height {
-			for q := uint32(0); q < 10; q++ {
-				BaseHeight := Height + q*10
-				enableCount := 0
-				for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
-					if !fr.requestTimer.Exist(i) {
-						enableCount++
+		TargetHeight := cp.Height() + 1
+		for TargetHeight <= msg.Height {
+			if !fr.requestTimer.Exist(TargetHeight) {
+				if fr.blockQ.Find(uint64(TargetHeight)) == nil {
+					sm := &p2p.RequestMessage{
+						Height: TargetHeight,
 					}
-				}
-				if enableCount == 10 {
-					fr.sendRequestBlockTo(p.ID(), BaseHeight+1, 10)
-				} else if enableCount > 0 {
-					for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
-						if !fr.requestTimer.Exist(i) {
-							fr.sendRequestBlockTo(p.ID(), i, 1)
-						}
+					if err := p.Send(sm); err != nil {
+						return err
 					}
+					fr.requestTimer.Add(TargetHeight, 2*time.Second, p.ID())
 				}
 			}
+			TargetHeight++
 		}
 		return nil
 	case *p2p.TransactionMessage:
