@@ -95,7 +95,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		NetAddressMap[pubhash] = netAddr
+		NetAddressMap[pubhash] = "wss://" + netAddr
 		ObserverKeys = append(ObserverKeys, pubhash)
 	}
 	SeedNodeMap := map[common.PublicHash]string{}
@@ -104,7 +104,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		SeedNodeMap[pubhash] = "wss://" + netAddr
+		SeedNodeMap[pubhash] = netAddr
 	}
 
 	cm := closer.NewManager()
