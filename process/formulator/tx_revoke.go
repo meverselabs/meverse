@@ -131,11 +131,11 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 				return err
 			}
 
-			PowerMap, err := sp.GetStakingAmountMap(ctw, tx.From())
+			StakingAmountMap, err := sp.GetStakingAmountMap(ctw, tx.From())
 			if err != nil {
 				return err
 			}
-			for addr, StakingAmount := range PowerMap {
+			for addr, StakingAmount := range StakingAmountMap {
 				if StakingAmount.IsZero() {
 					return ErrInvalidStakingAddress
 				}
