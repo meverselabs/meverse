@@ -197,7 +197,9 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 		for GenAddress, GenCount := range CountMap {
 			if has, err := ctw.HasAccount(GenAddress); err != nil {
 				return err
-			} else if has {
+			} else if !has {
+				StackRewardMap.Delete(GenAddress)
+			} else {
 				acc, err := ctw.Account(GenAddress)
 				if err != nil {
 					return err
@@ -241,7 +243,9 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 					for StakingAddress, StakingAmount := range AmountMap {
 						if has, err := ctw.HasAccount(StakingAddress); err != nil {
 							return err
-						} else if has {
+						} else if !has {
+							p.subStakingAmount(ctw, frAcc.Address(), StakingAddress, StakingAmount)
+						} else {
 							CurrentAmountMap.Put(StakingAddress, StakingAmount)
 							if PrevStakingAmount, has := PrevAmountMap.Get(StakingAddress); has {
 								if !PrevStakingAmount.IsZero() && !StakingAmount.IsZero() {
@@ -252,9 +256,6 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 									}
 								}
 							}
-						} else {
-							p.subStakingAmount(ctw, frAcc.Address(), StakingAddress, StakingAmount)
-							delete(AmountMap, StakingAddress)
 						}
 					}
 					if bs, err := encoding.Marshal(CurrentAmountMap); err != nil {
@@ -282,10 +283,25 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 					StackReward, has := StackRewardMap.Get(frAcc.Address())
 					if has {
 						StakingPowerSum := amount.NewCoinAmount(0, 0)
+						Deleteds := []common.Address{}
+						var inErr error
 						StakingPowerMap.EachAll(func(StakingAddress common.Address, StakingPower *amount.Amount) bool {
-							StakingPowerSum = StakingPowerSum.Add(StakingPower)
+							if has, err := ctw.HasAccount(StakingAddress); err != nil {
+								inErr = err
+								return false
+							} else if !has {
+								Deleteds = append(Deleteds, StakingAddress)
+							} else {
+								StakingPowerSum = StakingPowerSum.Add(StakingPower)
+							}
 							return true
 						})
+						if inErr != nil {
+							return inErr
+						}
+						for _, StakingAddress := range Deleteds {
+							StakingPowerMap.Delete(StakingAddress)
+						}
 						if !StakingPowerSum.IsZero() {
 							var inErr error
 							Ratio := StackReward.Mul(amount.COIN).Div(StakingPowerSum)
@@ -311,8 +327,6 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 				default:
 					return types.ErrInvalidAccountType
 				}
-			} else {
-				ev.RemoveStacked(GenAddress)
 			}
 		}
 
@@ -362,17 +376,21 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 
 					StakingPowerSum := amount.NewCoinAmount(0, 0)
 					var inErr error
+					Deleteds := []common.Address{}
 					StakingPowerMap.EachAll(func(StakingAddress common.Address, StakingPower *amount.Amount) bool {
 						if has, err := ctw.HasAccount(StakingAddress); err != nil {
 							inErr = err
 							return false
-						} else if has {
-							StakingPowerSum = StakingPowerSum.Add(StakingPower)
+						} else if !has {
+							Deleteds = append(Deleteds, StakingAddress)
 						} else {
-							StakingPowerMap.Delete(StakingAddress)
+							StakingPowerSum = StakingPowerSum.Add(StakingPower)
 						}
 						return true
 					})
+					for _, StakingAddress := range Deleteds {
+						StakingPowerMap.Delete(StakingAddress)
+					}
 					if inErr != nil {
 						return inErr
 					}
