@@ -239,15 +239,22 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 					CurrentAmountMap := types.NewAddressAmountMap()
 					CrossAmountMap := map[common.Address]*amount.Amount{}
 					for StakingAddress, StakingAmount := range AmountMap {
-						CurrentAmountMap.Put(StakingAddress, StakingAmount)
-						if PrevStakingAmount, has := PrevAmountMap.Get(StakingAddress); has {
-							if !PrevStakingAmount.IsZero() && !StakingAmount.IsZero() {
-								if StakingAmount.Less(PrevStakingAmount) {
-									CrossAmountMap[StakingAddress] = StakingAmount
-								} else {
-									CrossAmountMap[StakingAddress] = PrevStakingAmount
+						if has, err := ctw.HasAccount(StakingAddress); err != nil {
+							return err
+						} else if has {
+							CurrentAmountMap.Put(StakingAddress, StakingAmount)
+							if PrevStakingAmount, has := PrevAmountMap.Get(StakingAddress); has {
+								if !PrevStakingAmount.IsZero() && !StakingAmount.IsZero() {
+									if StakingAmount.Less(PrevStakingAmount) {
+										CrossAmountMap[StakingAddress] = StakingAmount
+									} else {
+										CrossAmountMap[StakingAddress] = PrevStakingAmount
+									}
 								}
 							}
+						} else {
+							p.subStakingAmount(ctw, frAcc.Address(), StakingAddress, StakingAmount)
+							delete(AmountMap, StakingAddress)
 						}
 					}
 					if bs, err := encoding.Marshal(CurrentAmountMap); err != nil {
@@ -361,6 +368,8 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 							return false
 						} else if has {
 							StakingPowerSum = StakingPowerSum.Add(StakingPower)
+						} else {
+							StakingPowerMap.Delete(StakingAddress)
 						}
 						return true
 					})
@@ -372,27 +381,22 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 						var inErr error
 						Ratio := StackReward.Mul(amount.COIN).Div(StakingPowerSum)
 						StakingPowerMap.EachAll(func(StakingAddress common.Address, StakingPower *amount.Amount) bool {
-							if has, err := ctw.HasAccount(StakingAddress); err != nil {
-								inErr = err
-								return false
-							} else if has {
-								RewardAmount := StakingPower.Mul(Ratio).Div(amount.COIN)
-								if frAcc.Policy.CommissionRatio1000 > 0 {
-									Commission := RewardAmount.MulC(int64(frAcc.Policy.CommissionRatio1000)).DivC(1000)
-									CommissionSum = CommissionSum.Add(Commission)
-									RewardAmount = RewardAmount.Sub(Commission)
-								}
-								if !RewardAmount.IsZero() {
-									if p.getUserAutoStaking(ctw, frAcc.Address(), StakingAddress) {
-										p.AddStakingAmount(ctw, frAcc.Address(), StakingAddress, RewardAmount)
-										ev.AddStaked(frAcc.Address(), StakingAddress, RewardAmount)
-									} else {
-										if err := p.vault.AddBalance(ctw, StakingAddress, RewardAmount); err != nil {
-											inErr = err
-											return false
-										}
-										ev.AddStakeReward(frAcc.Address(), StakingAddress, RewardAmount)
+							RewardAmount := StakingPower.Mul(Ratio).Div(amount.COIN)
+							if frAcc.Policy.CommissionRatio1000 > 0 {
+								Commission := RewardAmount.MulC(int64(frAcc.Policy.CommissionRatio1000)).DivC(1000)
+								CommissionSum = CommissionSum.Add(Commission)
+								RewardAmount = RewardAmount.Sub(Commission)
+							}
+							if !RewardAmount.IsZero() {
+								if p.getUserAutoStaking(ctw, frAcc.Address(), StakingAddress) {
+									p.AddStakingAmount(ctw, frAcc.Address(), StakingAddress, RewardAmount)
+									ev.AddStaked(frAcc.Address(), StakingAddress, RewardAmount)
+								} else {
+									if err := p.vault.AddBalance(ctw, StakingAddress, RewardAmount); err != nil {
+										inErr = err
+										return false
 									}
+									ev.AddStakeReward(frAcc.Address(), StakingAddress, RewardAmount)
 								}
 							}
 							return true
