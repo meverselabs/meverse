@@ -8,8 +8,6 @@ import (
 )
 
 func (p *Payment) getRequestPayment(lw types.LoaderWrapper, TXID string) (*RequestPayment, error) {
-	lw = types.SwitchLoaderWrapper(p.pid, lw)
-
 	if bs := lw.ProcessData(toRequestPaymentKey(TXID)); len(bs) > 0 {
 		tx := &RequestPayment{}
 		if err := encoding.Unmarshal(bs, &tx); err != nil {
@@ -54,8 +52,6 @@ func (p *Payment) removeTopic(ctw *types.ContextWrapper, topic uint64) {
 }
 
 func (p *Payment) getSubscribe(lw types.LoaderWrapper, topic uint64, addr common.Address) (*amount.Amount, error) {
-	lw = types.SwitchLoaderWrapper(p.pid, lw)
-
 	if bs := lw.AccountData(addr, toTopicKey(topic)); len(bs) > 0 {
 		am := amount.NewAmountFromBytes(bs)
 		return am, nil
