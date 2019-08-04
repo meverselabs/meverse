@@ -22,22 +22,32 @@ func (cs *Consensus) updateFormulatorList(ctw *types.ContextWrapper) error {
 	var inErr error
 	phase := cs.rt.largestPhase() + 1
 	ctw.Top().AccountMap.EachAll(func(addr common.Address, a types.Account) bool {
-		if a.Address().Height() == ctw.TargetHeight() {
-			if acc, is := a.(*formulator.FormulatorAccount); is {
-				addr := acc.Address()
+		if acc, is := a.(*formulator.FormulatorAccount); is {
+			if a.Address().Height() == ctw.TargetHeight() {
 				if err := cs.rt.addRank(NewRank(addr, acc.GenHash, phase, hash.DoubleHash(addr[:]))); err != nil {
 					inErr = err
 					return false
 				}
-			}
-		} else {
-			if acc, is := a.(*formulator.FormulatorAccount); is {
-				r := cs.rt.rankMap[acc.Address()]
-				if r.PublicHash != acc.GenHash {
-					cs.rt.removeRank(addr)
-					if err := cs.rt.addRank(NewRank(addr, acc.GenHash, phase, hash.DoubleHash(addr[:]))); err != nil {
-						inErr = err
-						return false
+			} else {
+				r, has := cs.rt.rankMap[addr]
+				if has {
+					if acc.IsRevoked {
+						cs.rt.removeRank(addr)
+					} else {
+						if r.PublicHash != acc.GenHash {
+							cs.rt.removeRank(addr)
+							if err := cs.rt.addRank(NewRank(addr, acc.GenHash, phase, hash.DoubleHash(addr[:]))); err != nil {
+								inErr = err
+								return false
+							}
+						}
+					}
+				} else {
+					if !acc.IsRevoked {
+						if err := cs.rt.addRank(NewRank(addr, acc.GenHash, phase, hash.DoubleHash(addr[:]))); err != nil {
+							inErr = err
+							return false
+						}
 					}
 				}
 			}

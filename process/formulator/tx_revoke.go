@@ -42,6 +42,9 @@ func (tx *Revoke) Fee(loader types.LoaderWrapper) *amount.Amount {
 func (tx *Revoke) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	sp := p.(*Formulator)
 
+	if tx.From() == tx.Heritor {
+		return ErrInvalidHeritor
+	}
 	if tx.Seq() <= loader.Seq(tx.From()) {
 		return types.ErrInvalidSequence
 	}
@@ -60,6 +63,9 @@ func (tx *Revoke) Validate(p types.Process, loader types.LoaderWrapper, signers 
 	if !is {
 		return types.ErrInvalidAccountType
 	}
+	if frAcc.IsRevoked {
+		return ErrAlreadyRovoked
+	}
 	if err := frAcc.Validate(loader, signers); err != nil {
 		return err
 	}
@@ -75,26 +81,20 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 	sp := p.(*Formulator)
 
 	return sp.vault.WithFee(ctw, tx, func() error {
-		heritorAcc, err := ctw.Account(tx.Heritor)
-		if err != nil {
-			return err
-		}
-
 		acc, err := ctw.Account(tx.From())
 		if err != nil {
 			return err
 		}
 		frAcc := acc.(*FormulatorAccount)
+		frAcc.IsRevoked = true
+
 		switch frAcc.FormulatorType {
 		case AlphaFormulatorType:
 			policy := &AlphaPolicy{}
 			if err := encoding.Unmarshal(ctw.ProcessData(tagAlphaPolicy), &policy); err != nil {
 				return err
 			}
-			if err := sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), ctw.TargetHeight()+policy.AlphaUnlockRequiredBlocks, frAcc.Amount); err != nil {
-				return err
-			}
-			if err := sp.vault.AddBalance(ctw, heritorAcc.Address(), sp.vault.Balance(ctw, frAcc.Address())); err != nil {
+			if err := sp.addRevokedFormulator(ctw, acc.Address(), ctw.TargetHeight()+policy.AlphaUnlockRequiredBlocks, tx.Heritor); err != nil {
 				return err
 			}
 		case SigmaFormulatorType:
@@ -102,10 +102,7 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 			if err := encoding.Unmarshal(ctw.ProcessData(tagSigmaPolicy), &policy); err != nil {
 				return err
 			}
-			if err := sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), ctw.TargetHeight()+policy.SigmaUnlockRequiredBlocks, frAcc.Amount); err != nil {
-				return err
-			}
-			if err := sp.vault.AddBalance(ctw, heritorAcc.Address(), sp.vault.Balance(ctw, frAcc.Address())); err != nil {
+			if err := sp.addRevokedFormulator(ctw, acc.Address(), ctw.TargetHeight()+policy.SigmaUnlockRequiredBlocks, tx.Heritor); err != nil {
 				return err
 			}
 		case OmegaFormulatorType:
@@ -113,10 +110,7 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 			if err := encoding.Unmarshal(ctw.ProcessData(tagOmegaPolicy), &policy); err != nil {
 				return err
 			}
-			if err := sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), ctw.TargetHeight()+policy.OmegaUnlockRequiredBlocks, frAcc.Amount); err != nil {
-				return err
-			}
-			if err := sp.vault.AddBalance(ctw, heritorAcc.Address(), sp.vault.Balance(ctw, frAcc.Address())); err != nil {
+			if err := sp.addRevokedFormulator(ctw, acc.Address(), ctw.TargetHeight()+policy.OmegaUnlockRequiredBlocks, tx.Heritor); err != nil {
 				return err
 			}
 		case HyperFormulatorType:
@@ -124,38 +118,11 @@ func (tx *Revoke) Execute(p types.Process, ctw *types.ContextWrapper, index uint
 			if err := encoding.Unmarshal(ctw.ProcessData(tagHyperPolicy), &policy); err != nil {
 				return err
 			}
-			if err := sp.vault.AddLockedBalance(ctw, heritorAcc.Address(), ctw.TargetHeight()+policy.HyperUnlockRequiredBlocks, frAcc.Amount); err != nil {
+			if err := sp.addRevokedFormulator(ctw, acc.Address(), ctw.TargetHeight()+policy.HyperUnlockRequiredBlocks, tx.Heritor); err != nil {
 				return err
-			}
-			if err := sp.vault.AddBalance(ctw, heritorAcc.Address(), sp.vault.Balance(ctw, frAcc.Address())); err != nil {
-				return err
-			}
-
-			StakingAmountMap, err := sp.GetStakingAmountMap(ctw, tx.From())
-			if err != nil {
-				return err
-			}
-			for addr, StakingAmount := range StakingAmountMap {
-				if StakingAmount.IsZero() {
-					return ErrInvalidStakingAddress
-				}
-				if frAcc.StakingAmount.Less(StakingAmount) {
-					return ErrCriticalStakingAmount
-				}
-				frAcc.StakingAmount = frAcc.StakingAmount.Sub(StakingAmount)
-
-				if err := sp.vault.AddLockedBalance(ctw, addr, ctw.TargetHeight()+policy.StakingUnlockRequiredBlocks, StakingAmount); err != nil {
-					return err
-				}
-			}
-			if !frAcc.StakingAmount.IsZero() {
-				return ErrCriticalStakingAmount
 			}
 		default:
 			return types.ErrInvalidAccountType
-		}
-		if err := ctw.DeleteAccount(acc); err != nil {
-			return err
 		}
 		return nil
 	})

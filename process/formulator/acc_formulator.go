@@ -29,6 +29,7 @@ type FormulatorAccount struct {
 	KeyHash        common.PublicHash
 	GenHash        common.PublicHash
 	Amount         *amount.Amount
+	IsRevoked      bool
 	PreHeight      uint32
 	UpdatedHeight  uint32
 	StakingAmount  *amount.Amount
@@ -54,6 +55,7 @@ func (acc *FormulatorAccount) Clone() types.Account {
 		KeyHash:        acc.KeyHash.Clone(),
 		GenHash:        acc.GenHash.Clone(),
 		Amount:         acc.Amount.Clone(),
+		IsRevoked:      acc.IsRevoked,
 		PreHeight:      acc.PreHeight,
 		UpdatedHeight:  acc.UpdatedHeight,
 	}
@@ -116,6 +118,13 @@ func (acc *FormulatorAccount) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"amount":`)
 	if bs, err := acc.Amount.MarshalJSON(); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"is_revoked":`)
+	if bs, err := json.Marshal(acc.IsRevoked); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

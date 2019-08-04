@@ -39,7 +39,7 @@ func (ev *RewardEvent) N() uint16 {
 
 // SetN updates the n of the event
 func (ev *RewardEvent) SetN(n uint16) {
-
+	ev.N_ = n
 }
 
 // AddReward adds the reward information to the event

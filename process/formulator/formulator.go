@@ -74,6 +74,7 @@ func (p *Formulator) Init(reg *types.Register, pm types.ProcessManager, cn types
 	reg.RegisterTransaction(9, &UpdateUserAutoStaking{})
 	reg.RegisterTransaction(10, &ChangeOwner{})
 	reg.RegisterEvent(1, &RewardEvent{})
+	reg.RegisterEvent(2, &RevokedEvent{})
 	return nil
 }
 
@@ -446,10 +447,106 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 			ctw.SetProcessData(tagStackRewardMap, bs)
 		}
 
-		ctw.EmitEvent(ev)
+		if err := ctw.EmitEvent(ev); err != nil {
+			return err
+		}
 
 		//log.Println("Paid at", ctw.TargetHeight())
 		p.setLastPaidHeight(ctw, ctw.TargetHeight())
+	}
+
+	RevokedMap, err := p.flushRevokedFormulatorMap(ctw, ctw.TargetHeight())
+	if err != nil {
+		return err
+	}
+	for FormulatorAddr, Heritor := range RevokedMap {
+		acc, err := ctw.Account(FormulatorAddr)
+		if err != nil {
+			return err
+		}
+		frAcc, is := acc.(*FormulatorAccount)
+		if !is {
+			return types.ErrInvalidAccountType
+		}
+		if has, err := ctw.HasAccount(Heritor); err != nil {
+			return err
+		} else if !has {
+		} else {
+			if err := p.vault.AddBalance(ctw, Heritor, frAcc.Amount); err != nil {
+				return err
+			}
+			if err := p.vault.AddBalance(ctw, Heritor, p.vault.Balance(ctw, FormulatorAddr)); err != nil {
+				return err
+			}
+			if err := p.vault.RemoveBalance(ctw, FormulatorAddr); err != nil {
+				return err
+			}
+		}
+		if frAcc.FormulatorType == HyperFormulatorType {
+			StakingAmountMap, err := p.GetStakingAmountMap(ctw, FormulatorAddr)
+			if err != nil {
+				return err
+			}
+			for addr, StakingAmount := range StakingAmountMap {
+				if StakingAmount.IsZero() {
+					return ErrInvalidStakingAddress
+				}
+				if frAcc.StakingAmount.Less(StakingAmount) {
+					return ErrCriticalStakingAmount
+				}
+				frAcc.StakingAmount = frAcc.StakingAmount.Sub(StakingAmount)
+
+				if err := p.vault.AddBalance(ctw, addr, StakingAmount); err != nil {
+					return err
+				}
+			}
+			if !frAcc.StakingAmount.IsZero() {
+				return ErrCriticalStakingAmount
+			}
+		}
+		if err := ctw.DeleteAccount(frAcc); err != nil {
+			return err
+		}
+		ev := &RevokedEvent{
+			Height_:    ctw.TargetHeight(),
+			Index_:     65535,
+			Formulator: FormulatorAddr,
+		}
+		if err := ctw.EmitEvent(ev); err != nil {
+			return err
+		}
+	}
+
+	UnstakedMap, err := p.flushUnstakingAmountMap(ctw, ctw.TargetHeight())
+	if err != nil {
+		return err
+	}
+	for Addr, AmountMap := range UnstakedMap {
+		var inErr error
+		AmountMap.EachAll(func(HyperAddr common.Address, am *amount.Amount) bool {
+			if err := p.vault.AddBalance(ctw, Addr, am); err != nil {
+				inErr = err
+				return false
+			}
+			ev := &UnstakedEvent{
+				Height_:         ctw.TargetHeight(),
+				Index_:          65535,
+				HyperFormulator: HyperAddr,
+				Address:         Addr,
+				Amount:          am,
+			}
+			if err := ctw.EmitEvent(ev); err != nil {
+				inErr = err
+				return false
+			}
+			return true
+		})
+		if inErr != nil {
+			return inErr
+		}
+		if err := p.removeUnstakingAmount(ctw, Addr, ctw.TargetHeight()); err != nil {
+			return err
+		}
 	}
 	return nil
 }
