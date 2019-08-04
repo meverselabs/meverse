@@ -13,13 +13,13 @@ import (
 
 // TokenIn is a TokenIn
 type TokenIn struct {
-	Timestamp_ uint64
-	Seq_       uint64
-	From_      common.Address
-	ERC20TXID  hash.Hash256
-	ERC20From  ERC20Address
-	To         common.Address
-	Amount     *amount.Amount
+	Timestamp_  uint64
+	Seq_        uint64
+	From_       common.Address
+	ERC20TXID   hash.Hash256
+	ERC20From   ERC20Address
+	ToAddresses []common.Address
+	Amounts     []*amount.Amount
 }
 
 // Timestamp returns the timestamp of the transaction
@@ -44,8 +44,13 @@ func (tx *TokenIn) Validate(p types.Process, loader types.LoaderWrapper, signers
 	if tx.From() != sp.admin.AdminAddress(loader, p.Name()) {
 		return admin.ErrUnauthorizedTransaction
 	}
-	if tx.Amount.Less(amount.COIN.DivC(10)) {
-		return types.ErrDustAmount
+	if len(tx.Amounts) != len(tx.ToAddresses) {
+		return ErrInvalidAddressCount
+	}
+	for _, am := range tx.Amounts {
+		if am.Less(amount.COIN.DivC(10)) {
+			return types.ErrDustAmount
+		}
 	}
 	if tx.Seq() <= loader.Seq(tx.From()) {
 		return types.ErrInvalidSequence
@@ -55,10 +60,12 @@ func (tx *TokenIn) Validate(p types.Process, loader types.LoaderWrapper, signers
 		return ErrProcessedERC20TXID
 	}
 
-	if has, err := loader.HasAccount(tx.To); err != nil {
-		return err
-	} else if !has {
-		return types.ErrNotExistAccount
+	for _, To := range tx.ToAddresses {
+		if has, err := loader.HasAccount(To); err != nil {
+			return err
+		} else if !has {
+			return types.ErrNotExistAccount
+		}
 	}
 
 	fromAcc, err := loader.Account(tx.From())
@@ -75,11 +82,13 @@ func (tx *TokenIn) Validate(p types.Process, loader types.LoaderWrapper, signers
 func (tx *TokenIn) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Gateway)
 
-	if err := sp.vault.SubBalance(ctw, tx.From(), tx.Amount); err != nil {
-		return err
-	}
-	if err := sp.vault.AddBalance(ctw, tx.To, tx.Amount); err != nil {
-		return err
+	for i, am := range tx.Amounts {
+		if err := sp.vault.SubBalance(ctw, tx.From(), am); err != nil {
+			return err
+		}
+		if err := sp.vault.AddBalance(ctw, tx.ToAddresses[i], am); err != nil {
+			return err
+		}
 	}
 
 	sp.setERC20TXID(ctw, tx.ERC20TXID)
@@ -127,18 +136,32 @@ func (tx *TokenIn) MarshalJSON() ([]byte, error) {
 	}
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"to":`)
-	if bs, err := tx.To.MarshalJSON(); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
+	buffer.WriteString(`[`)
+	for i, To := range tx.ToAddresses {
+		if i > 0 {
+			buffer.WriteString(`,`)
+		}
+		if bs, err := To.MarshalJSON(); err != nil {
+			return nil, err
+		} else {
+			buffer.Write(bs)
+		}
 	}
+	buffer.WriteString(`]`)
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"amount":`)
-	if bs, err := tx.Amount.MarshalJSON(); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
+	buffer.WriteString(`[`)
+	for i, am := range tx.Amounts {
+		if i > 0 {
+			buffer.WriteString(`,`)
+		}
+		if bs, err := am.MarshalJSON(); err != nil {
+			return nil, err
+		} else {
+			buffer.Write(bs)
+		}
 	}
+	buffer.WriteString(`]`)
 	buffer.WriteString(`}`)
 	return buffer.Bytes(), nil
 }

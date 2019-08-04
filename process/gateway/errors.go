@@ -10,6 +10,7 @@ var (
 	ErrInvalidRequiredKeyHashCount      = errors.New("invalid required key hash count")
 	ErrInvalidERC20AddressFormat        = errors.New("invalid erc20 address format")
 	ErrInvalidPolicy                    = errors.New("invalid policy")
+	ErrInvalidAddressCount              = errors.New("invalid address count")
 	ErrProcessedERC20TXID               = errors.New("processed erc20 txid")
 	ErrPolicyShouldBeSetupInApplication = errors.New("policy should be setup in application")
 )
