@@ -7,9 +7,9 @@ import (
 	"github.com/fletaio/fleta/core/types"
 )
 
-func (p *Formulator) getGenCount(lw types.LoaderWrapper, addr common.Address) uint64 {
+func (p *Formulator) getGenCount(lw types.LoaderWrapper, addr common.Address) uint32 {
 	if bs := lw.ProcessData(toGenCountKey(addr)); len(bs) > 0 {
-		return util.BytesToUint64(bs)
+		return util.BytesToUint32(bs)
 	} else {
 		return 0
 	}
@@ -26,11 +26,11 @@ func (p *Formulator) addGenCount(ctw *types.ContextWrapper, addr common.Address)
 		Count++
 		ctw.SetProcessData(tagGenCountCount, util.Uint32ToBytes(Count))
 	}
-	ctw.SetProcessData(toGenCountKey(addr), util.Uint64ToBytes(p.getGenCount(ctw, addr)+1))
+	ctw.SetProcessData(toGenCountKey(addr), util.Uint32ToBytes(p.getGenCount(ctw, addr)+1))
 }
 
-func (p *Formulator) flushGenCountMap(ctw *types.ContextWrapper) (map[common.Address]uint64, error) {
-	CountMap := map[common.Address]uint64{}
+func (p *Formulator) flushGenCountMap(ctw *types.ContextWrapper) (map[common.Address]uint32, error) {
+	CountMap := map[common.Address]uint32{}
 	if bs := ctw.ProcessData(tagGenCountCount); len(bs) > 0 {
 		Count := util.BytesToUint32(bs)
 		for i := uint32(0); i < Count; i++ {

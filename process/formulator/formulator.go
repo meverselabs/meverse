@@ -176,6 +176,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 		ev := &RewardEvent{
 			Height_:        ctw.TargetHeight(),
 			Index_:         65535,
+			GenBlockMap:    types.NewAddressUint32Map(),
 			RewardMap:      types.NewAddressAmountMap(),
 			CommissionMap:  types.NewAddressAmountMap(),
 			StackedMap:     types.NewAddressAmountMap(),
@@ -195,6 +196,8 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 		StakingRewardPowerMap := map[common.Address]*amount.Amount{}
 		Hypers := []*FormulatorAccount{}
 		for GenAddress, GenCount := range CountMap {
+			ev.GenBlockMap.Put(GenAddress, GenCount)
+
 			if has, err := ctw.HasAccount(GenAddress); err != nil {
 				return err
 			} else if !has {

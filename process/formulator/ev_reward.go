@@ -14,6 +14,7 @@ type RewardEvent struct {
 	Height_        uint32
 	Index_         uint16
 	N_             uint16
+	GenBlockMap    *types.AddressUint32Map
 	RewardMap      *types.AddressAmountMap
 	StackedMap     *types.AddressAmountMap
 	CommissionMap  *types.AddressAmountMap
