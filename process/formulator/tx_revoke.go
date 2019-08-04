@@ -64,7 +64,7 @@ func (tx *Revoke) Validate(p types.Process, loader types.LoaderWrapper, signers 
 		return types.ErrInvalidAccountType
 	}
 	if frAcc.IsRevoked {
-		return ErrAlreadyRovoked
+		return ErrRevokedFormulator
 	}
 	if err := frAcc.Validate(loader, signers); err != nil {
 		return err

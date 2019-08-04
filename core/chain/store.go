@@ -201,6 +201,9 @@ func (st *Store) Hash(height uint32) (hash.Hash256, error) {
 				return err
 			}
 		}
+		if item.IsDeletedOrExpired() {
+			return ErrNotExistKey
+		}
 		value, err := item.ValueCopy(nil)
 		if err != nil {
 			return err
@@ -239,6 +242,9 @@ func (st *Store) Header(height uint32) (*types.Header, error) {
 			} else {
 				return err
 			}
+		}
+		if item.IsDeletedOrExpired() {
+			return ErrNotExistKey
 		}
 		value, err := item.ValueCopy(nil)
 		if err != nil {
@@ -281,6 +287,9 @@ func (st *Store) Block(height uint32) (*types.Block, error) {
 				return err
 			}
 		}
+		if item.IsDeletedOrExpired() {
+			return ErrNotExistKey
+		}
 		value, err := item.ValueCopy(nil)
 		if err != nil {
 			return err
@@ -317,6 +326,9 @@ func (st *Store) Height() uint32 {
 				return err
 			}
 		}
+		if item.IsDeletedOrExpired() {
+			return ErrNotExistKey
+		}
 		value, err := item.ValueCopy(nil)
 		if err != nil {
 			return err
@@ -342,18 +354,22 @@ func (st *Store) Accounts() ([]types.Account, error) {
 		defer it.Close()
 		for it.Seek(tagAccount); it.ValidForPrefix(tagAccount); it.Next() {
 			item := it.Item()
-			value, err := item.ValueCopy(nil)
-			if err != nil {
-				return err
+			if !item.IsDeletedOrExpired() {
+				value, err := item.ValueCopy(nil)
+				if err != nil {
+					return err
+				}
+				if len(value) > 1 {
+					acc, err := fc.Create(util.BytesToUint16(value))
+					if err != nil {
+						return err
+					}
+					if err := encoding.Unmarshal(value[2:], &acc); err != nil {
+						return err
+					}
+					list = append(list, acc.(types.Account))
+				}
 			}
-			acc, err := fc.Create(util.BytesToUint16(value))
-			if err != nil {
-				return err
-			}
-			if err := encoding.Unmarshal(value[2:], &acc); err != nil {
-				return err
-			}
-			list = append(list, acc.(types.Account))
 		}
 		return nil
 	}); err != nil {
@@ -381,6 +397,9 @@ func (st *Store) Seq(addr common.Address) uint64 {
 			item, err := txn.Get(toAccountSeqKey(addr))
 			if err != nil {
 				return err
+			}
+			if item.IsDeletedOrExpired() {
+				return ErrNotExistKey
 			}
 			value, err := item.ValueCopy(nil)
 			if err != nil {
@@ -416,9 +435,15 @@ func (st *Store) Account(addr common.Address) (types.Account, error) {
 				return err
 			}
 		}
+		if item.IsDeletedOrExpired() {
+			return ErrNotExistKey
+		}
 		value, err := item.ValueCopy(nil)
 		if err != nil {
 			return err
+		}
+		if len(value) == 1 && value[0] == 0 {
+			return types.ErrDeletedAccount
 		}
 		v, err := fc.Create(util.BytesToUint16(value))
 		if err != nil {
@@ -457,16 +482,32 @@ func (st *Store) AddressByName(Name string) (common.Address, error) {
 				return err
 			}
 		}
+		if item.IsDeletedOrExpired() {
+			return ErrNotExistKey
+		}
 		value, err := item.ValueCopy(nil)
 		if err != nil {
 			return err
 		}
 		copy(addr[:], value)
-		if _, err := txn.Get(toAccountKey(addr)); err != nil {
-			if err == badger.ErrKeyNotFound {
-				return types.ErrDeletedAccount
-			} else {
+		if true {
+			item, err := txn.Get(toAccountKey(addr))
+			if err != nil {
+				if err == badger.ErrKeyNotFound {
+					return ErrNotExistKey
+				} else {
+					return err
+				}
+			}
+			if item.IsDeletedOrExpired() {
+				return ErrNotExistKey
+			}
+			value, err := item.ValueCopy(nil)
+			if err != nil {
 				return err
+			}
+			if len(value) == 1 && value[0] == 0 {
+				return types.ErrDeletedAccount
 			}
 		}
 		return nil
@@ -498,7 +539,17 @@ func (st *Store) HasAccount(addr common.Address) (bool, error) {
 				return err
 			}
 		}
-		Has = !item.IsDeletedOrExpired()
+		if item.IsDeletedOrExpired() {
+			return ErrNotExistKey
+		}
+		value, err := item.ValueCopy(nil)
+		if err != nil {
+			return err
+		}
+		if len(value) == 1 && value[0] == 0 {
+			return types.ErrDeletedAccount
+		}
+		Has = true
 		return nil
 	}); err != nil {
 		if err == ErrNotExistKey {
@@ -528,20 +579,33 @@ func (st *Store) HasAccountName(Name string) (bool, error) {
 				return err
 			}
 		}
-		Has = !item.IsDeletedOrExpired()
-		if Has {
-			var addr common.Address
+		if item.IsDeletedOrExpired() {
+			return ErrNotExistKey
+		}
+		var addr common.Address
+		value, err := item.ValueCopy(nil)
+		if err != nil {
+			return err
+		}
+		copy(addr[:], value)
+		if true {
+			item, err := txn.Get(toAccountKey(addr))
+			if err != nil {
+				if err == badger.ErrKeyNotFound {
+					return ErrNotExistKey
+				} else {
+					return err
+				}
+			}
+			if item.IsDeletedOrExpired() {
+				return ErrNotExistKey
+			}
 			value, err := item.ValueCopy(nil)
 			if err != nil {
 				return err
 			}
-			copy(addr[:], value)
-			if _, err := txn.Get(toAccountKey(addr)); err != nil {
-				if err == badger.ErrKeyNotFound {
-					return types.ErrDeletedAccount
-				} else {
-					return err
-				}
+			if len(value) == 1 && value[0] == 0 {
+				return types.ErrDeletedAccount
 			}
 		}
 		return nil
@@ -570,6 +634,9 @@ func (st *Store) AccountData(addr common.Address, pid uint8, name []byte) []byte
 		if err != nil {
 			return err
 		}
+		if item.IsDeletedOrExpired() {
+			return ErrNotExistKey
+		}
 		value, err := item.ValueCopy(nil)
 		if err != nil {
 			return err
@@ -596,18 +663,20 @@ func (st *Store) UTXOs() ([]*types.UTXO, error) {
 		defer it.Close()
 		for it.Seek(tagUTXO); it.ValidForPrefix(tagUTXO); it.Next() {
 			item := it.Item()
-			value, err := item.ValueCopy(nil)
-			if err != nil {
-				return err
+			if !item.IsDeletedOrExpired() {
+				value, err := item.ValueCopy(nil)
+				if err != nil {
+					return err
+				}
+				utxo := &types.UTXO{
+					TxIn:  types.NewTxIn(fromUTXOKey(item.Key())),
+					TxOut: types.NewTxOut(),
+				}
+				if err := encoding.Unmarshal(value, &(utxo.TxOut)); err != nil {
+					return err
+				}
+				list = append(list, utxo)
 			}
-			utxo := &types.UTXO{
-				TxIn:  types.NewTxIn(fromUTXOKey(item.Key())),
-				TxOut: types.NewTxOut(),
-			}
-			if err := encoding.Unmarshal(value, &(utxo.TxOut)); err != nil {
-				return err
-			}
-			list = append(list, utxo)
 		}
 		return nil
 	}); err != nil {
@@ -634,7 +703,10 @@ func (st *Store) HasUTXO(id uint64) (bool, error) {
 				return err
 			}
 		}
-		Has = !item.IsDeletedOrExpired()
+		if item.IsDeletedOrExpired() {
+			return ErrNotExistKey
+		}
+		Has = true
 		return nil
 	}); err != nil {
 		if err == ErrNotExistKey {
@@ -663,6 +735,9 @@ func (st *Store) UTXO(id uint64) (*types.UTXO, error) {
 			} else {
 				return err
 			}
+		}
+		if item.IsDeletedOrExpired() {
+			return ErrNotExistKey
 		}
 		value, err := item.ValueCopy(nil)
 		if err != nil {
@@ -696,6 +771,9 @@ func (st *Store) ProcessData(pid uint8, name []byte) []byte {
 		item, err := txn.Get(toProcessDataKey(key))
 		if err != nil {
 			return err
+		}
+		if item.IsDeletedOrExpired() {
+			return ErrNotExistKey
 		}
 		value, err := item.ValueCopy(nil)
 		if err != nil {
@@ -734,28 +812,30 @@ func (st *Store) Events(From uint32, To uint32) ([]types.Event, error) {
 					return err
 				}
 			}
-			value, err := item.ValueCopy(nil)
-			if err != nil {
-				return err
-			}
-			dec := encoding.NewDecoder(bytes.NewReader(value))
-			EvLen, err := dec.DecodeArrayLen()
-			if err != nil {
-				return err
-			}
-			for i := 0; i < EvLen; i++ {
-				t, err := dec.DecodeUint16()
+			if !item.IsDeletedOrExpired() {
+				value, err := item.ValueCopy(nil)
 				if err != nil {
 					return err
 				}
-				ev, err := fc.Create(t)
+				dec := encoding.NewDecoder(bytes.NewReader(value))
+				EvLen, err := dec.DecodeArrayLen()
 				if err != nil {
 					return err
 				}
-				if err := dec.Decode(&ev); err != nil {
-					return err
+				for i := 0; i < EvLen; i++ {
+					t, err := dec.DecodeUint16()
+					if err != nil {
+						return err
+					}
+					ev, err := fc.Create(t)
+					if err != nil {
+						return err
+					}
+					if err := dec.Decode(&ev); err != nil {
+						return err
+					}
+					list = append(list, ev.(types.Event))
 				}
-				list = append(list, ev.(types.Event))
 			}
 		}
 		return nil
@@ -904,7 +984,7 @@ func applyContextData(txn *badger.Txn, ctd *types.ContextData) error {
 		return inErr
 	}
 	ctd.DeletedAccountMap.EachAll(func(addr common.Address, acc types.Account) bool {
-		if err := txn.Delete(toAccountKey(addr)); err != nil {
+		if err := txn.Set(toAccountKey(addr), []byte{0}); err != nil {
 			inErr = err
 			return false
 		}
@@ -915,9 +995,11 @@ func applyContextData(txn *badger.Txn, ctd *types.ContextData) error {
 		prefix := toAccountDataKey(string(addr[:]))
 		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
 			item := it.Item()
-			if err := txn.Delete(item.Key()); err != nil {
-				inErr = err
-				return false
+			if !item.IsDeletedOrExpired() {
+				if err := txn.Delete(item.Key()); err != nil {
+					inErr = err
+					return false
+				}
 			}
 		}
 		return true

@@ -91,7 +91,7 @@ func (ctd *ContextData) AddSeq(addr common.Address) {
 // Account returns the account instance of the address
 func (ctd *ContextData) Account(addr common.Address) (Account, error) {
 	if ctd.DeletedAccountMap.Has(addr) {
-		return nil, ErrNotExistAccount
+		return nil, ErrDeletedAccount
 	}
 	if acc, has := ctd.AccountMap.Get(addr); has {
 		return acc.(Account), nil

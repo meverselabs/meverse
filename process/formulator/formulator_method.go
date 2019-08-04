@@ -181,7 +181,7 @@ func (p *Formulator) getRevokedFormulator(lw types.LoaderWrapper, addr common.Ad
 
 func (p *Formulator) addRevokedFormulator(ctw *types.ContextWrapper, addr common.Address, RevokeHeight uint32, Heritor common.Address) error {
 	if bs := ctw.AccountData(addr, tagRevokedHeight); len(bs) > 0 {
-		return ErrAlreadyRovoked
+		return ErrRevokedFormulator
 	}
 	ctw.SetAccountData(addr, tagRevokedHeight, util.Uint32ToBytes(RevokeHeight))
 	if ns := ctw.ProcessData(toRevokedFormulatorNumberKey(RevokeHeight, addr)); len(ns) == 0 {

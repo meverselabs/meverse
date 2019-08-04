@@ -65,6 +65,9 @@ func (tx *Staking) Validate(p types.Process, loader types.LoaderWrapper, signers
 	if frAcc.FormulatorType != HyperFormulatorType {
 		return types.ErrInvalidAccountType
 	}
+	if frAcc.IsRevoked {
+		return ErrRevokedFormulator
+	}
 	if !frAcc.Policy.MinimumStaking.IsZero() && tx.Amount.Less(frAcc.Policy.MinimumStaking) {
 		return ErrInvalidStakingAmount
 	}
