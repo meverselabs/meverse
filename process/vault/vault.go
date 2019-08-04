@@ -98,14 +98,20 @@ func (p *Vault) AfterExecuteTransactions(b *types.Block, ctw *types.ContextWrapp
 	}
 
 	for addr, am := range LockedBalanceMap {
-		if err := p.AddBalance(ctw, addr, am); err != nil {
+		if has, err := ctw.HasAccount(addr); err != nil {
 			return err
-		}
-		sum := p.TotalLockedBalanceByAddress(ctw, addr).Sub(am)
-		if !sum.IsZero() {
-			ctw.SetAccountData(addr, tagLockedBalanceSum, sum.Bytes())
-		} else {
+		} else if !has {
 			ctw.SetAccountData(addr, tagLockedBalanceSum, nil)
+		} else {
+			if err := p.AddBalance(ctw, addr, am); err != nil {
+				return err
+			}
+			sum := p.TotalLockedBalanceByAddress(ctw, addr).Sub(am)
+			if !sum.IsZero() {
+				ctw.SetAccountData(addr, tagLockedBalanceSum, sum.Bytes())
+			} else {
+				ctw.SetAccountData(addr, tagLockedBalanceSum, nil)
+			}
 		}
 	}
 	return nil

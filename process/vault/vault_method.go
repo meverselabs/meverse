@@ -45,10 +45,18 @@ func (p *Vault) SubBalance(ctw *types.ContextWrapper, addr common.Address, am *a
 
 	sum = sum.Sub(am)
 	if sum.IsZero() {
-		ctw.SetAccountData(addr, tagBalance, nil)
+		p.RemoveBalance(ctw, addr)
 	} else {
 		ctw.SetAccountData(addr, tagBalance, sum.Bytes())
 	}
+	return nil
+}
+
+// RemoveBalance removes balance to the account of the address
+func (p *Vault) RemoveBalance(ctw *types.ContextWrapper, addr common.Address) error {
+	ctw = types.SwitchContextWrapper(p.pid, ctw)
+
+	ctw.SetAccountData(addr, tagBalance, nil)
 	return nil
 }
 
@@ -110,7 +118,7 @@ func (p *Vault) flushLockedBalanceMap(ctw *types.ContextWrapper, UnlockedHeight 
 			ctw.SetProcessData(toLockedBalanceNumberKey(UnlockedHeight, addr), nil)
 			ctw.SetProcessData(toLockedBalanceReverseKey(UnlockedHeight, i), nil)
 		}
-		ctw.SetProcessData(tagLockedBalanceCount, nil)
+		ctw.SetProcessData(toLockedBalanceCountKey(UnlockedHeight), nil)
 	}
 	return LockedBalanceMap, nil
 }
