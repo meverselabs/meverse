@@ -14,8 +14,8 @@ type AddTopic struct {
 	Timestamp_ uint64
 	Seq_       uint64
 	From_      common.Address
-	TopicName  string
 	Topic      uint64
+	TopicName  string
 }
 
 // Timestamp returns the timestamp of the transaction
@@ -51,7 +51,7 @@ func (tx *AddTopic) Validate(p types.Process, loader types.LoaderWrapper, signer
 	if err != nil {
 		return err
 	}
-	if err := fromAcc.Validate(loader, signers[1:]); err != nil {
+	if err := fromAcc.Validate(loader, signers); err != nil {
 		return err
 	}
 	return nil

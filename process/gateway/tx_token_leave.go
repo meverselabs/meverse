@@ -52,6 +52,10 @@ func (tx *TokenLeave) Validate(p types.Process, loader types.LoaderWrapper, sign
 		return types.ErrInvalidSequence
 	}
 
+	if sp.HasOutTXID(loader, tx.CoinTXID) {
+		return ErrProcessedOutTXID
+	}
+
 	fromAcc, err := loader.Account(tx.From())
 	if err != nil {
 		return err
@@ -64,6 +68,8 @@ func (tx *TokenLeave) Validate(p types.Process, loader types.LoaderWrapper, sign
 
 // Execute updates the context by the transaction
 func (tx *TokenLeave) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
+	sp := p.(*Gateway)
+	sp.setOutTXID(ctw, tx.CoinTXID)
 	return nil
 }
 

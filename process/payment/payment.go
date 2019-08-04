@@ -59,7 +59,25 @@ func (p *Payment) Init(reg *types.Register, pm types.ProcessManager, cn types.Pr
 		p.admin = v
 	}
 
-	reg.RegisterTransaction(1, &RequestPayment{})
+	reg.RegisterTransaction(1, &AddTopic{})
+	reg.RegisterTransaction(2, &RemoveTopic{})
+	reg.RegisterTransaction(3, &RequestPayment{})
+	reg.RegisterTransaction(4, &ResponsePayment{})
+	reg.RegisterTransaction(5, &Subscribe{})
+	reg.RegisterTransaction(6, &Unsubscribe{})
+	reg.RegisterTransaction(7, &Billing{})
+	return nil
+}
+
+// InitTopics called at OnInitGenesis of an application
+func (p *Payment) InitTopics(ctw *types.ContextWrapper, TopicNames []string) error {
+	ctw = types.SwitchContextWrapper(p.pid, ctw)
+
+	for _, name := range TopicNames {
+		if err := p.addTopic(ctw, Topic(name), name); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

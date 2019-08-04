@@ -8,7 +8,6 @@ import (
 	"github.com/fletaio/fleta/common/amount"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/process/admin"
-	"github.com/fletaio/fleta/process/vault"
 )
 
 // Billing is a Billing
@@ -59,8 +58,8 @@ func (tx *Billing) Validate(p types.Process, loader types.LoaderWrapper, signers
 	if err != nil {
 		return err
 	}
-	if !am.IsZero() && !am.Equal(tx.Amount) {
-		return ErrInvalidRequestPayment
+	if !am.IsZero() && am.Less(tx.Amount) {
+		return ErrInvalidBillingAmount
 	}
 
 	fromAcc, err := loader.Account(tx.From())
@@ -69,11 +68,6 @@ func (tx *Billing) Validate(p types.Process, loader types.LoaderWrapper, signers
 	}
 	if err := fromAcc.Validate(loader, signers); err != nil {
 		return err
-	}
-
-	b := sp.vault.Balance(loader, tx.From())
-	if b.Less(tx.Amount) {
-		return vault.ErrInsufficientBalance
 	}
 	return nil
 }

@@ -43,8 +43,12 @@ func (p *Payment) GetTopicName(lw types.LoaderWrapper, topic uint64) (string, er
 	}
 }
 
-func (p *Payment) addTopic(ctw *types.ContextWrapper, topic uint64, Name string) {
+func (p *Payment) addTopic(ctw *types.ContextWrapper, topic uint64, Name string) error {
+	if bs := ctw.ProcessData(toTopicKey(topic)); len(bs) > 0 {
+		return ErrExistTopic
+	}
 	ctw.SetProcessData(toTopicKey(topic), []byte(Name))
+	return nil
 }
 
 func (p *Payment) removeTopic(ctw *types.ContextWrapper, topic uint64) {
@@ -56,7 +60,7 @@ func (p *Payment) getSubscribe(lw types.LoaderWrapper, topic uint64, addr common
 		am := amount.NewAmountFromBytes(bs)
 		return am, nil
 	} else {
-		return nil, ErrNotExistRequestPayment
+		return nil, ErrNotExistSubscribe
 	}
 }
 

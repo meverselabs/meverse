@@ -58,7 +58,7 @@ func (tx *ResponsePayment) Validate(p types.Process, loader types.LoaderWrapper,
 		return ErrInvalidRequestPayment
 	}
 	if !req.Amount.Equal(tx.Amount) {
-		return ErrInvalidRequestPayment
+		return ErrInvalidPaymentAmount
 	}
 	if _, err := sp.GetTopicName(loader, req.Topic); err != nil {
 		return err
@@ -72,9 +72,11 @@ func (tx *ResponsePayment) Validate(p types.Process, loader types.LoaderWrapper,
 		return err
 	}
 
-	b := sp.vault.Balance(loader, tx.From())
-	if b.Less(tx.Amount) {
-		return vault.ErrInsufficientBalance
+	if tx.IsAccept {
+		b := sp.vault.Balance(loader, tx.From())
+		if b.Less(tx.Amount) {
+			return vault.ErrInsufficientBalance
+		}
 	}
 	return nil
 }

@@ -12,5 +12,6 @@ var (
 	ErrInvalidPolicy                    = errors.New("invalid policy")
 	ErrInvalidAddressCount              = errors.New("invalid address count")
 	ErrProcessedERC20TXID               = errors.New("processed erc20 txid")
+	ErrProcessedOutTXID                 = errors.New("processed out txid")
 	ErrPolicyShouldBeSetupInApplication = errors.New("policy should be setup in application")
 )
