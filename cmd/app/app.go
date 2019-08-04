@@ -126,8 +126,9 @@ func (app *FletaApp) InitGenesis(ctw *types.ContextWrapper) error {
 		totalDeligated := amount.NewCoinAmount(50585413, 290667405989600000)
 		totalProvided := amount.NewCoinAmount(31076795, 184877310172010000)
 		gatewaySupply := totalSupply.Sub(alphaCreated).Sub(sigmaCreated).Sub(hyperCreated).Sub(totalDeligated).Sub(totalProvided)
-		addSingleAccount(sp, ctw, common.MustParsePublicHash("4d5aH1brXeatoDYh6UauLemK1gYiHbEDyTqBj8FSKu6"), common.MustParseAddress("3CUsUpv9v"), "fleta.gateway", gatewaySupply)
-		addSingleAccount(sp, ctw, common.MustParsePublicHash("3VH7Bhv3Q2vnhQEcmbDoeXVvYu1VPfZUwz5SYs2iWKH"), common.MustParseAddress("5PxjxeqJq"), "fleta.formulator", amount.NewCoinAmount(0, 0))
+		addSingleAccount(sp, ctw, common.MustParsePublicHash("4ArFPXfZF2MH7ZADqj8wD98cTuRSGXbqqNKpU3zPEgk"), common.MustParseAddress("3CUsUpv9v"), "fleta.gateway", gatewaySupply)
+		addSingleAccount(sp, ctw, common.MustParsePublicHash("3M227UoMP81Hp8bvpG8XpUqjHgcL7an2QEm44ENMJYi"), common.MustParseAddress("5PxjxeqJq"), "fleta.formulator", amount.NewCoinAmount(0, 0))
+		addSingleAccount(sp, ctw, common.MustParsePublicHash("4DBkqwYsmKFysTQFqsMxbtndDHx1V7YbKYQNZC4G33k"), common.MustParseAddress("7bScSUkTk"), "fleta.payment", amount.NewCoinAmount(0, 0))
 
 		addHyperFormulator(sp, ctw, hyperPolicy, 0, common.MustParsePublicHash("fv5X9PVeujGRCGNg9AkSFG8ZPFVXzCfMxrk61RxYv4"), common.MustParsePublicHash("4pciwh34bUy1tcHkjZA7B3zp4YzqpqY8jMxU8RzgffB"), common.MustParseAddress("385ujsGNZt"), "HashTower")
 		addHyperFormulator(sp, ctw, hyperPolicy, 0, common.MustParsePublicHash("UvixpAjKFckZZxu4gKoZvFGFTgC1CCXPztnTkS5kop"), common.MustParsePublicHash("2bhwWjkDVmxMxXxKFpk2Hij2NerxuykN8B4a2NZD9EP"), common.MustParseAddress("9nvUvJibL"), "Cosmostation")

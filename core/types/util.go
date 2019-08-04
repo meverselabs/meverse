@@ -2,10 +2,9 @@ package types
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"strings"
-
-	"github.com/fletaio/fleta/common/util"
 
 	"github.com/fletaio/fleta/common"
 	"github.com/petar/GoLLRB/llrb"
@@ -60,10 +59,34 @@ func IsAllowedAccountName(Name string) bool {
 	return true
 }
 
+// UnmarshalID returns the block height, the transaction index in the block, the output index in the transaction
+func UnmarshalID(id uint64) (uint32, uint16, uint16) {
+	return uint32(id >> 32), uint16(id >> 16), uint16(id)
+}
+
+// MarshalID returns the packed id
+func MarshalID(height uint32, index uint16, n uint16) uint64 {
+	return uint64(height)<<32 | uint64(index)<<16 | uint64(n)
+}
+
 // TransactionID returns the id of the transaction
 func TransactionID(Height uint32, Index uint16) string {
 	bs := make([]byte, 6)
-	copy(bs, util.Uint32ToBytes(Height))
-	copy(bs[4:], util.Uint16ToBytes(Index))
+	binary.BigEndian.PutUint32(bs, Height)
+	binary.BigEndian.PutUint16(bs[4:], Index)
 	return hex.EncodeToString(bs)
+}
+
+// ParseTransactionID returns the id of the transaction
+func ParseTransactionID(TXID string) (uint32, uint16, error) {
+	if len(TXID) != 12 {
+		return 0, 0, ErrInvalidTransactionIDFormat
+	}
+	bs, err := hex.DecodeString(TXID)
+	if err != nil {
+		return 0, 0, err
+	}
+	Height := binary.BigEndian.Uint32(bs)
+	Index := binary.BigEndian.Uint16(bs[4:])
+	return Height, Index, nil
 }

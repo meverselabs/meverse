@@ -11,5 +11,6 @@ var (
 	ErrInvalidRequiredKeyHashCount = errors.New("invalid required key hash count")
 	ErrInvalidLockedBalanceKey     = errors.New("invalid locked balance key")
 	ErrInsufficientFee             = errors.New("insufficient fee")
+	ErrInsufficientBalance         = errors.New("insufficient balance")
 	ErrNotExistFeeOfTransaction    = errors.New("not exist fee of transaction")
 )

@@ -33,13 +33,3 @@ func NewTxIn(id uint64) *TxIn {
 func (in *TxIn) ID() uint64 {
 	return MarshalID(in.Height, in.Index, in.N)
 }
-
-// UnmarshalID returns the block height, the transaction index in the block, the output index in the transaction
-func UnmarshalID(id uint64) (uint32, uint16, uint16) {
-	return uint32(id >> 32), uint16(id >> 16), uint16(id)
-}
-
-// MarshalID returns the packed id
-func MarshalID(height uint32, index uint16, seq uint16) uint64 {
-	return uint64(height)<<32 | uint64(index)<<16 | uint64(seq)
-}

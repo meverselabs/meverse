@@ -28,4 +28,5 @@ var (
 	ErrInvalidTxInCount             = errors.New("invalid tx in count")
 	ErrInvalidOutputAmount          = errors.New("invalid output amount")
 	ErrDustAmount                   = errors.New("dust amount")
+	ErrInvalidTransactionIDFormat   = errors.New("invalid transaction id format")
 )
