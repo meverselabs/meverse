@@ -73,8 +73,11 @@ func (p *Formulator) Init(reg *types.Register, pm types.ProcessManager, cn types
 	reg.RegisterTransaction(8, &UpdateValidatorPolicy{})
 	reg.RegisterTransaction(9, &UpdateUserAutoStaking{})
 	reg.RegisterTransaction(10, &ChangeOwner{})
+	reg.RegisterTransaction(11, &RevertRevoke{})
+	reg.RegisterTransaction(12, &RevertUnstaking{})
 	reg.RegisterEvent(1, &RewardEvent{})
 	reg.RegisterEvent(2, &RevokedEvent{})
+	reg.RegisterEvent(3, &UnstakedEvent{})
 	return nil
 }
 
@@ -543,9 +546,6 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 		})
 		if inErr != nil {
 			return inErr
-		}
-		if err := p.removeUnstakingAmount(ctw, Addr, ctw.TargetHeight()); err != nil {
-			return err
 		}
 	}
 	return nil

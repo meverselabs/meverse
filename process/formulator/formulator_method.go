@@ -302,7 +302,7 @@ func (p *Formulator) addUnstakingAmount(ctw *types.ContextWrapper, HyperAddr com
 	if !has {
 		sum = amount.NewCoinAmount(0, 0)
 	}
-	mp.Put(addr, sum.Add(am))
+	mp.Put(HyperAddr, sum.Add(am))
 	data, err := encoding.Marshal(mp)
 	if err != nil {
 		return err
