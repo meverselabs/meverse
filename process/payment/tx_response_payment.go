@@ -47,11 +47,12 @@ func (tx *ResponsePayment) Validate(p types.Process, loader types.LoaderWrapper,
 		return types.ErrInvalidSequence
 	}
 
+	adminAddr := sp.admin.AdminAddress(loader, p.Name())
 	req, err := sp.getRequestPayment(loader, tx.TXID)
 	if err != nil {
 		return err
 	}
-	if req.From() != sp.admin.AdminAddress(loader, p.Name()) {
+	if req.From() != adminAddr {
 		return admin.ErrUnauthorizedTransaction
 	}
 	if req.To != tx.From() {
@@ -62,6 +63,12 @@ func (tx *ResponsePayment) Validate(p types.Process, loader types.LoaderWrapper,
 	}
 	if _, err := sp.GetTopicName(loader, req.Topic); err != nil {
 		return err
+	}
+
+	if has, err := loader.HasAccount(adminAddr); err != nil {
+		return err
+	} else if !has {
+		return types.ErrNotExistAccount
 	}
 
 	fromAcc, err := loader.Account(tx.From())

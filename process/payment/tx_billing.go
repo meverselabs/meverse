@@ -54,6 +54,12 @@ func (tx *Billing) Validate(p types.Process, loader types.LoaderWrapper, signers
 		return err
 	}
 
+	if has, err := loader.HasAccount(tx.To); err != nil {
+		return err
+	} else if !has {
+		return types.ErrNotExistAccount
+	}
+
 	am, err := sp.getSubscribe(loader, tx.Topic, tx.To)
 	if err != nil {
 		return err
