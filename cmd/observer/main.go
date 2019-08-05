@@ -20,6 +20,7 @@ import (
 	"github.com/fletaio/fleta/process/admin"
 	"github.com/fletaio/fleta/process/formulator"
 	"github.com/fletaio/fleta/process/gateway"
+	"github.com/fletaio/fleta/process/payment"
 	"github.com/fletaio/fleta/process/vault"
 )
 
@@ -110,6 +111,7 @@ func main() {
 	cn.MustAddProcess(vault.NewVault(2))
 	cn.MustAddProcess(formulator.NewFormulator(3))
 	cn.MustAddProcess(gateway.NewGateway(4))
+	cn.MustAddProcess(payment.NewPayment(5))
 	if err := cn.Init(); err != nil {
 		panic(err)
 	}
