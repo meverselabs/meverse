@@ -608,6 +608,7 @@ func (st *Store) HasAccountName(Name string) (bool, error) {
 				return types.ErrDeletedAccount
 			}
 		}
+		Has = true
 		return nil
 	}); err != nil {
 		if err == ErrNotExistKey {
