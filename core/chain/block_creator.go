@@ -85,7 +85,7 @@ func (bc *BlockCreator) AddTx(Generator common.Address, tx types.Transaction, si
 }
 
 // UnsafeAddTx adds transactions without signer validation if signers is not empty
-func (bc *BlockCreator) UnsafeAddTx(Generator common.Address, t uint16, TxHsah hash.Hash256, tx types.Transaction, sigs []common.Signature, signers []common.PublicHash) error {
+func (bc *BlockCreator) UnsafeAddTx(Generator common.Address, t uint16, TxHash hash.Hash256, tx types.Transaction, sigs []common.Signature, signers []common.PublicHash) error {
 	pid := uint8(t >> 8)
 	p, err := bc.cn.Process(pid)
 	if err != nil {
@@ -134,7 +134,7 @@ func (bc *BlockCreator) UnsafeAddTx(Generator common.Address, t uint16, TxHsah h
 	bc.b.Transactions = append(bc.b.Transactions, tx)
 	bc.b.TransactionSignatures = append(bc.b.TransactionSignatures, sigs)
 	bc.b.TransactionResults = append(bc.b.TransactionResults, Result)
-	bc.txHashes = append(bc.txHashes, TxHsah)
+	bc.txHashes = append(bc.txHashes, TxHash)
 	return nil
 }
 

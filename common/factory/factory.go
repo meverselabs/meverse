@@ -2,12 +2,14 @@ package factory
 
 import (
 	"reflect"
+	"sync"
 
 	"github.com/fletaio/fleta/common/hash"
 )
 
 // Factory provides type's factory
 type Factory struct {
+	sync.Mutex
 	nameTypeMap     map[string]uint16
 	nameHashTypeMap map[hash.Hash256]uint16
 	typeNameMap     map[uint16]string
@@ -27,6 +29,9 @@ func NewFactory() *Factory {
 
 // Register add the type
 func (fc *Factory) Register(t uint16, v interface{}) error {
+	fc.Lock()
+	defer fc.Unlock()
+
 	rt := reflect.TypeOf(v)
 	for rt.Kind() == reflect.Ptr {
 		rt = rt.Elem()

@@ -7,6 +7,7 @@ import (
 	"github.com/fletaio/fleta/process/admin"
 	"github.com/fletaio/fleta/process/formulator"
 	"github.com/fletaio/fleta/process/gateway"
+	"github.com/fletaio/fleta/process/payment"
 	"github.com/fletaio/fleta/process/vault"
 )
 
@@ -24,6 +25,7 @@ func NewFletaApp() *FletaApp {
 		addrMap: map[string]common.Address{
 			"fleta.gateway":    common.MustParseAddress("3CUsUpv9v"),
 			"fleta.formulator": common.MustParseAddress("5PxjxeqJq"),
+			"fleta.payment":    common.MustParseAddress("7bScSUkTk"),
 		},
 	}
 }
@@ -77,6 +79,15 @@ func (app *FletaApp) InitGenesis(ctw *types.ContextWrapper) error {
 		StakingUnlockRequiredBlocks: 2592000,                          // 15 days
 	}
 
+	if p, err := app.pm.ProcessByName("fleta.admin"); err != nil {
+		return err
+	} else if ap, is := p.(*admin.Admin); !is {
+		return types.ErrNotExistProcess
+	} else {
+		if err := ap.InitAdmin(ctw, app.addrMap); err != nil {
+			return err
+		}
+	}
 	if p, err := app.pm.ProcessByName("fleta.formulator"); err != nil {
 		return err
 	} else if fp, is := p.(*formulator.Formulator); !is {
@@ -92,6 +103,17 @@ func (app *FletaApp) InitGenesis(ctw *types.ContextWrapper) error {
 			return err
 		}
 	}
+	if p, err := app.pm.ProcessByName("fleta.payment"); err != nil {
+		return err
+	} else if pp, is := p.(*payment.Payment); !is {
+		return types.ErrNotExistProcess
+	} else {
+		if err := pp.InitTopics(ctw, []string{
+			"fleta.formulator.server.cost",
+		}); err != nil {
+			return err
+		}
+	}
 	if p, err := app.pm.ProcessByName("fleta.gateway"); err != nil {
 		return err
 	} else if fp, is := p.(*gateway.Gateway); !is {
@@ -102,15 +124,6 @@ func (app *FletaApp) InitGenesis(ctw *types.ContextWrapper) error {
 				WithdrawFee: amount.NewCoinAmount(30, 0),
 			},
 		); err != nil {
-			return err
-		}
-	}
-	if p, err := app.pm.ProcessByName("fleta.admin"); err != nil {
-		return err
-	} else if ap, is := p.(*admin.Admin); !is {
-		return types.ErrNotExistProcess
-	} else {
-		if err := ap.InitAdmin(ctw, app.addrMap); err != nil {
 			return err
 		}
 	}

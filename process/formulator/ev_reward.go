@@ -163,6 +163,13 @@ func (ev *RewardEvent) MarshalJSON() ([]byte, error) {
 	} else {
 		buffer.Write(bs)
 	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"gen_block_map":`)
+	if bs, err := ev.GenBlockMap.MarshalJSON(); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
 	buffer.WriteString(`}`)
 	return buffer.Bytes(), nil
 }
