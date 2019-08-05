@@ -50,6 +50,9 @@ func IsAllowedAccountName(Name string) bool {
 	if len(Name) < 8 || len(Name) > 40 {
 		return false
 	}
+	if _, err := common.ParseAddress(Name); err == nil {
+		return false
+	}
 	for i := 0; i < len(Name); i++ {
 		c := Name[i]
 		if (c < '0' || '9' < c) && (c < 'a' || 'z' < c) && (c < 'A' || 'Z' < c) && c != '.' && c != '-' && c != '_' && c != '@' {

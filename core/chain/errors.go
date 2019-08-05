@@ -30,4 +30,5 @@ var (
 	ErrApplicationIDMustBe255       = errors.New("application id must be 255")
 	ErrFoundForkedBlock             = errors.New("found forked block")
 	ErrCannotDeleteGeneratorAccount = errors.New("cannot delete generator account")
+	ErrInvalidAccountName           = errors.New("invalid account name")
 )

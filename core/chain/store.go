@@ -569,6 +569,10 @@ func (st *Store) HasAccountName(Name string) (bool, error) {
 		return false, ErrStoreClosed
 	}
 
+	if _, err := common.ParseAddress(Name); err == nil {
+		return false, ErrInvalidAccountName
+	}
+
 	var Has bool
 	if err := st.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(toAccountNameKey(Name))

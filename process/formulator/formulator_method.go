@@ -169,7 +169,18 @@ func (p *Formulator) setUserAutoStaking(ctw *types.ContextWrapper, HyperAddress 
 	}
 }
 
-func (p *Formulator) getRevokedFormulator(lw types.LoaderWrapper, addr common.Address, RevokeHeight uint32) (common.Address, error) {
+// GetRevokedFormulatorHeight returns the revoke height of the formulator
+func (p *Formulator) GetRevokedFormulatorHeight(lw types.LoaderWrapper, addr common.Address) (uint32, error) {
+	lw = types.SwitchLoaderWrapper(p.pid, lw)
+
+	if bs := lw.AccountData(addr, tagRevokedHeight); len(bs) > 0 {
+		return util.BytesToUint32(bs), nil
+	} else {
+		return 0, ErrNotRevoked
+	}
+}
+
+func (p *Formulator) getRevokedFormulatorHeritor(lw types.LoaderWrapper, addr common.Address, RevokeHeight uint32) (common.Address, error) {
 	if bs := lw.ProcessData(toRevokedFormulatorKey(RevokeHeight, addr)); len(bs) > 0 {
 		var Heritor common.Address
 		copy(Heritor[:], bs)
@@ -199,11 +210,10 @@ func (p *Formulator) addRevokedFormulator(ctw *types.ContextWrapper, addr common
 }
 
 func (p *Formulator) removeRevokedFormulator(ctw *types.ContextWrapper, addr common.Address) error {
-	bs := ctw.AccountData(addr, tagRevokedHeight)
-	if len(bs) == 0 {
-		return ErrNotRevoked
+	RevokeHeight, err := p.GetRevokedFormulatorHeight(ctw, addr)
+	if err != nil {
+		return err
 	}
-	RevokeHeight := util.BytesToUint32(bs)
 	ctw.SetAccountData(addr, tagRevokedHeight, nil)
 
 	ns := ctw.ProcessData(toRevokedFormulatorNumberKey(RevokeHeight, addr))
@@ -239,7 +249,7 @@ func (p *Formulator) flushRevokedFormulatorMap(ctw *types.ContextWrapper, Revoke
 		for i := uint32(0); i < Count; i++ {
 			var addr common.Address
 			copy(addr[:], ctw.ProcessData(toRevokedFormulatorReverseKey(RevokeHeight, i)))
-			Heritor, err := p.getRevokedFormulator(ctw, addr, RevokeHeight)
+			Heritor, err := p.getRevokedFormulatorHeritor(ctw, addr, RevokeHeight)
 			if err != nil {
 				return nil, err
 			}
