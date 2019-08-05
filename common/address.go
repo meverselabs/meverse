@@ -53,8 +53,8 @@ func (addr Address) String() string {
 	if len(result) < 7 {
 		bs = make([]byte, 7)
 		copy(bs[1:], result[:])
-	} else if len(result) < 13 {
-		bs = make([]byte, 13)
+	} else if len(result) < 15 {
+		bs = make([]byte, 15)
 		copy(bs[1:], result[:])
 	}
 	bs[0] = checksum
@@ -107,7 +107,7 @@ func ParseAddress(str string) (Address, error) {
 	if err != nil {
 		return Address{}, err
 	}
-	if len(bs) != 7 && len(bs) != 13 {
+	if len(bs) != 7 && len(bs) != 15 {
 		return Address{}, ErrInvalidAddressFormat
 	}
 	cs := bs[0]
