@@ -49,8 +49,8 @@ func (p *Formulator) flushGenCountMap(ctw *types.ContextWrapper) (map[common.Add
 }
 
 // GetStakingAmount returns the staking amount of the address at the hyper formulator
-func (p *Formulator) GetStakingAmount(lw types.LoaderWrapper, HyperAddress common.Address, StakingAddress common.Address) *amount.Amount {
-	lw = types.SwitchLoaderWrapper(p.pid, lw)
+func (p *Formulator) GetStakingAmount(loader types.Loader, HyperAddress common.Address, StakingAddress common.Address) *amount.Amount {
+	lw := types.NewLoaderWrapper(p.pid, loader)
 
 	if bs := lw.AccountData(HyperAddress, toStakingAmountKey(StakingAddress)); len(bs) > 0 {
 		return amount.NewAmountFromBytes(bs)
@@ -114,8 +114,8 @@ func (p *Formulator) subStakingAmount(ctw *types.ContextWrapper, HyperAddress co
 }
 
 // GetStakingAmountMap returns all staking amount of the hyper formulator
-func (p *Formulator) GetStakingAmountMap(lw types.LoaderWrapper, HyperAddress common.Address) (map[common.Address]*amount.Amount, error) {
-	lw = types.SwitchLoaderWrapper(p.pid, lw)
+func (p *Formulator) GetStakingAmountMap(loader types.Loader, HyperAddress common.Address) (map[common.Address]*amount.Amount, error) {
+	lw := types.NewLoaderWrapper(p.pid, loader)
 
 	PowerMap := map[common.Address]*amount.Amount{}
 	if bs := lw.AccountData(HyperAddress, tagStakingAmountCount); len(bs) > 0 {
@@ -153,7 +153,10 @@ func (p *Formulator) setLastStakingPaidHeight(ctw *types.ContextWrapper, Address
 	ctw.SetAccountData(Address, tagLastStakingPaidHeight, util.Uint32ToBytes(lastPaidHeight))
 }
 
-func (p *Formulator) getUserAutoStaking(lw types.LoaderWrapper, HyperAddress common.Address, StakingAddress common.Address) bool {
+// GetUserAutoStaking returns the user auto staking status of the address
+func (p *Formulator) GetUserAutoStaking(loader types.Loader, HyperAddress common.Address, StakingAddress common.Address) bool {
+	lw := types.NewLoaderWrapper(p.pid, loader)
+
 	if bs := lw.AccountData(HyperAddress, toAutoStakingKey(StakingAddress)); len(bs) > 0 {
 		return bs[0] == 1
 	} else {
@@ -170,8 +173,8 @@ func (p *Formulator) setUserAutoStaking(ctw *types.ContextWrapper, HyperAddress 
 }
 
 // GetRevokedFormulatorHeight returns the revoke height of the formulator
-func (p *Formulator) GetRevokedFormulatorHeight(lw types.LoaderWrapper, addr common.Address) (uint32, error) {
-	lw = types.SwitchLoaderWrapper(p.pid, lw)
+func (p *Formulator) GetRevokedFormulatorHeight(loader types.Loader, addr common.Address) (uint32, error) {
+	lw := types.NewLoaderWrapper(p.pid, loader)
 
 	if bs := lw.AccountData(addr, tagRevokedHeight); len(bs) > 0 {
 		return util.BytesToUint32(bs), nil
@@ -267,7 +270,7 @@ func (p *Formulator) flushRevokedFormulatorMap(ctw *types.ContextWrapper, Revoke
 }
 
 func (p *Formulator) getUnstakingAmount(lw types.LoaderWrapper, HyperAddr common.Address, addr common.Address, UnstakedHeight uint32) (*amount.Amount, error) {
-	mp, err := p.getUnstakingAmountMap(lw, addr, UnstakedHeight)
+	mp, err := p.GetUnstakingAmountMap(lw, addr, UnstakedHeight)
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +281,10 @@ func (p *Formulator) getUnstakingAmount(lw types.LoaderWrapper, HyperAddr common
 	return am, nil
 }
 
-func (p *Formulator) getUnstakingAmountMap(lw types.LoaderWrapper, addr common.Address, UnstakedHeight uint32) (*types.AddressAmountMap, error) {
+// GetUnstakingAmountMap returns the amount map of the unstaking
+func (p *Formulator) GetUnstakingAmountMap(loader types.Loader, addr common.Address, UnstakedHeight uint32) (*types.AddressAmountMap, error) {
+	lw := types.NewLoaderWrapper(p.pid, loader)
+
 	if bs := lw.ProcessData(toUnstakingAmountKey(UnstakedHeight, addr)); len(bs) > 0 {
 		mp := types.NewAddressAmountMap()
 		if err := encoding.Unmarshal(bs, &mp); err != nil {
@@ -301,7 +307,7 @@ func (p *Formulator) addUnstakingAmount(ctw *types.ContextWrapper, HyperAddr com
 		Count++
 		ctw.SetProcessData(toUnstakingAmountCountKey(UnstakedHeight), util.Uint32ToBytes(Count))
 	}
-	mp, err := p.getUnstakingAmountMap(ctw, addr, UnstakedHeight)
+	mp, err := p.GetUnstakingAmountMap(ctw, addr, UnstakedHeight)
 	if err != nil {
 		if err != ErrNotExistUnstakingAmount {
 			return err
@@ -322,7 +328,7 @@ func (p *Formulator) addUnstakingAmount(ctw *types.ContextWrapper, HyperAddr com
 }
 
 func (p *Formulator) subUnstakingAmount(ctw *types.ContextWrapper, HyperAddr common.Address, addr common.Address, UnstakedHeight uint32, am *amount.Amount) error {
-	mp, err := p.getUnstakingAmountMap(ctw, addr, UnstakedHeight)
+	mp, err := p.GetUnstakingAmountMap(ctw, addr, UnstakedHeight)
 	if err != nil {
 		return err
 	}
@@ -384,7 +390,7 @@ func (p *Formulator) flushUnstakingAmountMap(ctw *types.ContextWrapper, RevokeHe
 		for i := uint32(0); i < Count; i++ {
 			var addr common.Address
 			copy(addr[:], ctw.ProcessData(toUnstakingAmountReverseKey(RevokeHeight, i)))
-			mp, err := p.getUnstakingAmountMap(ctw, addr, RevokeHeight)
+			mp, err := p.GetUnstakingAmountMap(ctw, addr, RevokeHeight)
 			if err != nil {
 				return nil, err
 			}
@@ -397,4 +403,59 @@ func (p *Formulator) flushUnstakingAmountMap(ctw *types.ContextWrapper, RevokeHe
 		ctw.SetProcessData(toUnstakingAmountCountKey(RevokeHeight), nil)
 	}
 	return UnstakingAmountMap, nil
+}
+
+// GetRewardPolicy returns the reward policy
+func (p *Formulator) GetRewardPolicy(loader types.Loader) (*RewardPolicy, error) {
+	lw := types.NewLoaderWrapper(p.pid, loader)
+
+	policy := &RewardPolicy{}
+	if err := encoding.Unmarshal(lw.ProcessData(tagRewardPolicy), &policy); err != nil {
+		return nil, err
+	}
+	return policy, nil
+}
+
+// GetAlphaPolicy returns the alpha policy
+func (p *Formulator) GetAlphaPolicy(loader types.Loader) (*AlphaPolicy, error) {
+	lw := types.NewLoaderWrapper(p.pid, loader)
+
+	policy := &AlphaPolicy{}
+	if err := encoding.Unmarshal(lw.ProcessData(tagAlphaPolicy), &policy); err != nil {
+		return nil, err
+	}
+	return policy, nil
+}
+
+// GetSigmaPolicy returns the sigma policy
+func (p *Formulator) GetSigmaPolicy(loader types.Loader) (*SigmaPolicy, error) {
+	lw := types.NewLoaderWrapper(p.pid, loader)
+
+	policy := &SigmaPolicy{}
+	if err := encoding.Unmarshal(lw.ProcessData(tagSigmaPolicy), &policy); err != nil {
+		return nil, err
+	}
+	return policy, nil
+}
+
+// GetOmegaPolicy returns the omega policy
+func (p *Formulator) GetOmegaPolicy(loader types.Loader) (*OmegaPolicy, error) {
+	lw := types.NewLoaderWrapper(p.pid, loader)
+
+	policy := &OmegaPolicy{}
+	if err := encoding.Unmarshal(lw.ProcessData(tagOmegaPolicy), &policy); err != nil {
+		return nil, err
+	}
+	return policy, nil
+}
+
+// GetHyperPolicy returns the hyper policy
+func (p *Formulator) GetHyperPolicy(loader types.Loader) (*HyperPolicy, error) {
+	lw := types.NewLoaderWrapper(p.pid, loader)
+
+	policy := &HyperPolicy{}
+	if err := encoding.Unmarshal(lw.ProcessData(tagHyperPolicy), &policy); err != nil {
+		return nil, err
+	}
+	return policy, nil
 }

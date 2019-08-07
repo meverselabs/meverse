@@ -416,7 +416,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 								RewardAmount = RewardAmount.Sub(Commission)
 							}
 							if !RewardAmount.IsZero() {
-								if p.getUserAutoStaking(ctw, frAcc.Address(), StakingAddress) {
+								if p.GetUserAutoStaking(ctw, frAcc.Address(), StakingAddress) {
 									p.AddStakingAmount(ctw, frAcc.Address(), StakingAddress, RewardAmount)
 									ev.AddStaked(frAcc.Address(), StakingAddress, RewardAmount)
 								} else {

@@ -33,8 +33,8 @@ func (p *Payment) removeRequestPayment(ctw *types.ContextWrapper, TXID string) {
 }
 
 // GetTopicName returns the topic name of the topic
-func (p *Payment) GetTopicName(lw types.LoaderWrapper, topic uint64) (string, error) {
-	lw = types.SwitchLoaderWrapper(p.pid, lw)
+func (p *Payment) GetTopicName(loader types.Loader, topic uint64) (string, error) {
+	lw := types.NewLoaderWrapper(p.pid, loader)
 
 	if bs := lw.ProcessData(toTopicKey(topic)); len(bs) > 0 {
 		return string(bs), nil

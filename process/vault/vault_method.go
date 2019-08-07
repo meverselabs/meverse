@@ -8,8 +8,8 @@ import (
 )
 
 // Balance returns balance of the account of the address
-func (p *Vault) Balance(lw types.LoaderWrapper, addr common.Address) *amount.Amount {
-	lw = types.SwitchLoaderWrapper(p.pid, lw)
+func (p *Vault) Balance(loader types.Loader, addr common.Address) *amount.Amount {
+	lw := types.NewLoaderWrapper(p.pid, loader)
 
 	var total *amount.Amount
 	if bs := lw.AccountData(addr, tagBalance); len(bs) > 0 {
@@ -61,8 +61,8 @@ func (p *Vault) RemoveBalance(ctw *types.ContextWrapper, addr common.Address) er
 }
 
 // LockedBalance returns locked balance of the account of the address
-func (p *Vault) LockedBalance(lw types.LoaderWrapper, addr common.Address, UnlockedHeight uint32) *amount.Amount {
-	lw = types.SwitchLoaderWrapper(p.pid, lw)
+func (p *Vault) LockedBalance(loader types.Loader, addr common.Address, UnlockedHeight uint32) *amount.Amount {
+	lw := types.NewLoaderWrapper(p.pid, loader)
 
 	if bs := lw.ProcessData(toLockedBalanceKey(UnlockedHeight, addr)); len(bs) > 0 {
 		return amount.NewAmountFromBytes(bs)
@@ -72,8 +72,8 @@ func (p *Vault) LockedBalance(lw types.LoaderWrapper, addr common.Address, Unloc
 }
 
 // TotalLockedBalanceByAddress returns all locked balance of the account of the address
-func (p *Vault) TotalLockedBalanceByAddress(lw types.LoaderWrapper, addr common.Address) *amount.Amount {
-	lw = types.SwitchLoaderWrapper(p.pid, lw)
+func (p *Vault) TotalLockedBalanceByAddress(loader types.Loader, addr common.Address) *amount.Amount {
+	lw := types.NewLoaderWrapper(p.pid, loader)
 
 	if bs := lw.AccountData(addr, tagLockedBalanceSum); len(bs) > 0 {
 		return amount.NewAmountFromBytes(bs)
@@ -124,13 +124,13 @@ func (p *Vault) flushLockedBalanceMap(ctw *types.ContextWrapper, UnlockedHeight 
 }
 
 // CheckFeePayable returns tx fee can be paid or not
-func (p *Vault) CheckFeePayable(lw types.LoaderWrapper, tx FeeTransaction) error {
-	return p.CheckFeePayableWith(lw, tx, nil)
+func (p *Vault) CheckFeePayable(loader types.Loader, tx FeeTransaction) error {
+	return p.CheckFeePayableWith(loader, tx, nil)
 }
 
 // CheckFeePayableWith returns tx fee and amount can be paid or not
-func (p *Vault) CheckFeePayableWith(lw types.LoaderWrapper, tx FeeTransaction, am *amount.Amount) error {
-	lw = types.SwitchLoaderWrapper(p.pid, lw)
+func (p *Vault) CheckFeePayableWith(loader types.Loader, tx FeeTransaction, am *amount.Amount) error {
+	lw := types.NewLoaderWrapper(p.pid, loader)
 
 	if has, err := lw.HasAccount(tx.From()); err != nil {
 		return err
@@ -172,8 +172,8 @@ func (p *Vault) WithFee(ctw *types.ContextWrapper, tx FeeTransaction, fn func() 
 }
 
 // CollectedFee returns a total collected fee
-func (p *Vault) CollectedFee(lw types.LoaderWrapper) *amount.Amount {
-	lw = types.SwitchLoaderWrapper(p.pid, lw)
+func (p *Vault) CollectedFee(loader types.LoaderWrapper) *amount.Amount {
+	lw := types.NewLoaderWrapper(p.pid, loader)
 
 	var total *amount.Amount
 	if bs := lw.ProcessData(tagCollectedFee); len(bs) > 0 {

@@ -6,8 +6,8 @@ import (
 )
 
 // AdminAddress returns the admin address
-func (p *Admin) AdminAddress(lw types.LoaderWrapper, name string) common.Address {
-	lw = types.SwitchLoaderWrapper(p.pid, lw)
+func (p *Admin) AdminAddress(loader types.Loader, name string) common.Address {
+	lw := types.NewLoaderWrapper(p.pid, loader)
 
 	if bs := lw.ProcessData(toAdminAddressKey(name)); len(bs) == 0 {
 		panic(ErrNotExistAdminAddress)
