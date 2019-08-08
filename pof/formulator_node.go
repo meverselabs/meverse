@@ -657,7 +657,10 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 			fr.lastGenHeight = ctx.TargetHeight()
 			fr.lastGenTime = time.Now().UnixNano()
 
-			ExpectedTime := time.Duration(i+1) * 200 * time.Millisecond
+			ExpectedTime := time.Duration(i+1) * 500 * time.Millisecond
+			if i >= 7 {
+				ExpectedTime = time.Duration(i+1) * 200 * time.Millisecond
+			}
 			PastTime := time.Duration(time.Now().UnixNano() - start)
 			if !bNoDelay && ExpectedTime > PastTime {
 				time.Sleep(ExpectedTime - PastTime)
