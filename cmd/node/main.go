@@ -44,7 +44,7 @@ func main() {
 		panic(err)
 	}
 	if len(cfg.StoreRoot) == 0 {
-		cfg.StoreRoot = "./node"
+		cfg.StoreRoot = "./ndata"
 	}
 
 	var ndkey key.Key

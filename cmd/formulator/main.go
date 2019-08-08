@@ -45,7 +45,7 @@ func main() {
 		panic(err)
 	}
 	if len(cfg.StoreRoot) == 0 {
-		cfg.StoreRoot = "./observer"
+		cfg.StoreRoot = "./fdata"
 	}
 
 	var frkey key.Key

@@ -22,6 +22,7 @@ import (
 	"github.com/fletaio/fleta/process/gateway"
 	"github.com/fletaio/fleta/process/payment"
 	"github.com/fletaio/fleta/process/vault"
+	"github.com/fletaio/fleta/service/apiserver"
 )
 
 // Config is a configuration for the cmd
@@ -41,7 +42,7 @@ func main() {
 		panic(err)
 	}
 	if len(cfg.StoreRoot) == 0 {
-		cfg.StoreRoot = "./observer"
+		cfg.StoreRoot = "./odata"
 	}
 
 	var obkey key.Key
@@ -112,6 +113,8 @@ func main() {
 	cn.MustAddProcess(formulator.NewFormulator(3))
 	cn.MustAddProcess(gateway.NewGateway(4))
 	cn.MustAddProcess(payment.NewPayment(5))
+	as := apiserver.NewAPIServer()
+	cn.MustAddService(as)
 	if err := cn.Init(); err != nil {
 		panic(err)
 	}
@@ -126,6 +129,7 @@ func main() {
 	cm.Add("observer", ob)
 
 	go ob.Run(":"+strconv.Itoa(cfg.ObseverPort), ":"+strconv.Itoa(cfg.FormulatorPort))
+	go as.Run(":" + strconv.Itoa(cfg.APIPort))
 
 	cm.Wait()
 }
