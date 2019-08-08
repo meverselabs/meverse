@@ -465,7 +465,7 @@ func (fr *FormulatorNode) tryRequestBlocks() {
 		}
 		enableCount := 0
 		for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
-			if !fr.requestTimer.Exist(i) {
+			if !fr.requestNodeTimer.Exist(i) {
 				enableCount++
 			}
 		}
@@ -476,7 +476,7 @@ func (fr *FormulatorNode) tryRequestBlocks() {
 			fr.sendRequestBlockToNode(TargetPublicHash, BaseHeight+1, 10)
 		} else if enableCount > 0 {
 			for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
-				if !fr.requestTimer.Exist(i) {
+				if !fr.requestNodeTimer.Exist(i) {
 					fr.sendRequestBlockToNode(TargetPublicHash, i, 1)
 				}
 			}
