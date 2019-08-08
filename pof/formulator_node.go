@@ -371,7 +371,7 @@ func (fr *FormulatorNode) OnRecv(p peer.Peer, m interface{}) error {
 				}
 				enableCount := 0
 				for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
-					if !fr.requestTimer.Exist(i) {
+					if !fr.requestNodeTimer.Exist(i) {
 						enableCount++
 					}
 				}
@@ -379,7 +379,7 @@ func (fr *FormulatorNode) OnRecv(p peer.Peer, m interface{}) error {
 					fr.sendRequestBlockToNode(SenderPublicHash, BaseHeight+1, 10)
 				} else if enableCount > 0 {
 					for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
-						if !fr.requestTimer.Exist(i) {
+						if !fr.requestNodeTimer.Exist(i) {
 							fr.sendRequestBlockToNode(SenderPublicHash, i, 1)
 						}
 					}
