@@ -57,7 +57,6 @@ func (ctx *Context) NextContext(NextHash hash.Hash256, Timestamp uint64) *Contex
 	nctx.genTargetHeight = ctx.genTargetHeight + 1
 	nctx.genLastHash = NextHash
 	nctx.genTimestamp = Timestamp
-	nctx.cache = newContextCache(ctx)
 	return nctx
 }
 
