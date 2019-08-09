@@ -89,7 +89,7 @@ func (st *Store) Close() {
 	MaxCount := 10
 	Count := 0
 again:
-	if err := st.db.RunValueLogGC(1); err != nil {
+	if err := st.db.RunValueLogGC(0.9); err != nil {
 	} else {
 		Count++
 		if Count < MaxCount {
