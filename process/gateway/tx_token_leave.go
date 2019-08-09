@@ -119,6 +119,13 @@ func (tx *TokenLeave) MarshalJSON() ([]byte, error) {
 		buffer.Write(bs)
 	}
 	buffer.WriteString(`,`)
+	buffer.WriteString(`"erc20_to":`)
+	if bs, err := tx.ERC20To.MarshalJSON(); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
 	buffer.WriteString(`"amount":`)
 	if bs, err := tx.Amount.MarshalJSON(); err != nil {
 		return nil, err

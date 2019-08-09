@@ -135,7 +135,7 @@ func (tx *TokenIn) MarshalJSON() ([]byte, error) {
 		buffer.Write(bs)
 	}
 	buffer.WriteString(`,`)
-	buffer.WriteString(`"to":`)
+	buffer.WriteString(`"to_addresses":`)
 	buffer.WriteString(`[`)
 	for i, To := range tx.ToAddresses {
 		if i > 0 {
