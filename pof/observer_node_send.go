@@ -328,15 +328,26 @@ func (ob *ObserverNode) sendBlockVoteTo(gen *BlockGenMessage, TargetPubHash comm
 	return nil
 }
 
-func (ob *ObserverNode) sendBlockGenRequestAnyone() {
+func (ob *ObserverNode) sendBlockGenRequestAnyone() error {
 	nm := &BlockGenRequestMessage{
-		PrevHash:             ob.round.MinRoundVoteAck.LastHash,
-		TargetHeight:         ob.round.MinRoundVoteAck.TargetHeight,
-		TimeoutCount:         ob.round.MinRoundVoteAck.TimeoutCount,
-		Formulator:           ob.round.MinRoundVoteAck.Formulator,
-		FormulatorPublicHash: ob.round.MinRoundVoteAck.FormulatorPublicHash,
+		BlockGenRequest: &BlockGenRequest{
+			ChainID:              ob.round.MinRoundVoteAck.ChainID,
+			LastHash:             ob.round.MinRoundVoteAck.LastHash,
+			TargetHeight:         ob.round.MinRoundVoteAck.TargetHeight,
+			TimeoutCount:         ob.round.MinRoundVoteAck.TimeoutCount,
+			Formulator:           ob.round.MinRoundVoteAck.Formulator,
+			FormulatorPublicHash: ob.round.MinRoundVoteAck.FormulatorPublicHash,
+			PublicHash:           ob.round.MinRoundVoteAck.PublicHash,
+			Timestamp:            uint64(time.Now().UnixNano()),
+		},
+	}
+	if sig, err := ob.key.Sign(encoding.Hash(nm.BlockGenRequest)); err != nil {
+		return err
+	} else {
+		nm.Signature = sig
 	}
 	ob.ms.SendAnyone(nm)
+	return nil
 }
 
 func (ob *ObserverNode) sendStatusTo(TargetPubHash common.PublicHash) error {

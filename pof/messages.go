@@ -87,11 +87,20 @@ type BlockObSignMessage struct {
 	ObserverSignatures []common.Signature
 }
 
-// BlockGenRequestMessage is a message to request block gen
-type BlockGenRequestMessage struct {
-	PrevHash             hash.Hash256
+// BlockGenRequest is a message to request block gen
+type BlockGenRequest struct {
+	ChainID              uint8
+	LastHash             hash.Hash256
 	TargetHeight         uint32
 	TimeoutCount         uint32
 	Formulator           common.Address
 	FormulatorPublicHash common.PublicHash
+	PublicHash           common.PublicHash
+	Timestamp            uint64
+}
+
+// BlockGenRequestMessage is a message to request block gen
+type BlockGenRequestMessage struct {
+	BlockGenRequest *BlockGenRequest
+	Signature       common.Signature
 }

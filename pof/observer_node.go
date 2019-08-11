@@ -75,6 +75,7 @@ func (ob *ObserverNode) Init() error {
 	fc.Register(types.DefineHashedType("pof.BlockGenMessage"), &BlockGenMessage{})
 	fc.Register(types.DefineHashedType("pof.BlockVoteMessage"), &BlockVoteMessage{})
 	fc.Register(types.DefineHashedType("pof.BlockObSignMessage"), &BlockObSignMessage{})
+	fc.Register(types.DefineHashedType("pof.BlockGenRequestMessage"), &BlockGenRequestMessage{})
 	fc.Register(types.DefineHashedType("p2p.PingMessage"), &p2p.PingMessage{})
 	fc.Register(types.DefineHashedType("p2p.StatusMessage"), &p2p.StatusMessage{})
 	fc.Register(types.DefineHashedType("p2p.BlockMessage"), &p2p.BlockMessage{})
@@ -789,6 +790,59 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 				Message:    msg,
 			})
 		}
+	case BlockGenRequestMessage:
+		msgh := encoding.Hash(msg.BlockGenRequest)
+		if pubkey, err := common.RecoverPubkey(msgh, msg.Signature); err != nil {
+			return err
+		} else if obkey := common.NewPublicHash(pubkey); SenderPublicHash != obkey {
+			return common.ErrInvalidPublicHash
+		} else if !ob.cs.observerKeyMap.Has(obkey) {
+			return ErrInvalidObserverKey
+		}
+
+		//[check round]
+		br, has := ob.round.BlockRoundMap[msg.BlockGenRequest.TargetHeight]
+		if !has {
+			log.Println("br, has := ob.round.BlockRoundMap[msg.BlockGenRequest.TargetHeight]")
+			return ErrInvalidVote
+		}
+
+		if msg.BlockGenRequest.TargetHeight != ob.round.TargetHeight {
+			if msg.BlockGenRequest.TargetHeight < ob.round.TargetHeight {
+				if SenderPublicHash != ob.myPublicHash {
+					ob.sendStatusTo(SenderPublicHash)
+				}
+			}
+			return ErrInvalidVote
+		}
+		if msg.BlockGenRequest.ChainID != cp.ChainID() {
+			log.Println("if msg.BlockGenRequest.ChainID != cp.ChainID() {")
+			return ErrInvalidVote
+		}
+		if msg.BlockGenRequest.LastHash != cp.LastHash() {
+			log.Println("if msg.BlockGenRequest.LastHash != cp.LastHash() {")
+			return ErrInvalidVote
+		}
+		Top, err := ob.cs.rt.TopRank(int(msg.BlockGenRequest.TimeoutCount))
+		if err != nil {
+			return err
+		}
+		if msg.BlockGenRequest.Formulator != Top.Address {
+			log.Println("if msg.BlockGenRequest.Formulator != Top.Address {")
+			return ErrInvalidVote
+		}
+		if msg.BlockGenRequest.FormulatorPublicHash != Top.PublicHash {
+			log.Println("if msg.BlockGenRequest.FormulatorPublicHash != Top.PublicHash {")
+			return ErrInvalidVote
+		}
+
+		//[check state]
+		if ob.round.RoundState == BlockVoteState {
+			if _, has := br.BlockVoteMap[SenderPublicHash]; !has {
+				ob.sendBlockGenTo(br.BlockGenMessage, SenderPublicHash)
+			}
+			ob.sendBlockVoteTo(br.BlockGenMessage, SenderPublicHash)
+		}
 	case *BlockVoteMessage:
 		log.Println("Observer", ob.myPublicHash.String(), cp.Height(), encoding.Hash(msg.BlockVote.Header), "BlockVoteMessage", ob.round.RoundState, msg.BlockVote.Header.Height, (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
 		msgh := encoding.Hash(msg.BlockVote)
@@ -987,7 +1041,6 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 				ob.round.VoteFailCount = 0
 				ob.round.TargetHeight++
 				if brNext.BlockGenMessageWait != nil && brNext.BlockGenMessage == nil {
-					log.Println("brNext", brNext.BlockGenMessageWait.Block.Header.Height, NextHeight)
 					ob.messageQueue.Push(&messageItem{
 						Message: brNext.BlockGenMessageWait,
 					})
