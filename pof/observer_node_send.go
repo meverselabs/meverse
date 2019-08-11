@@ -328,7 +328,21 @@ func (ob *ObserverNode) sendBlockVoteTo(gen *BlockGenMessage, TargetPubHash comm
 	return nil
 }
 
-func (ob *ObserverNode) sendBlockGenRequestAnyone() error {
+func (ob *ObserverNode) sendBlockGenRequest(br *BlockRound) error {
+	var PublicHash common.PublicHash
+	has := false
+	for pubhash := range br.BlockVoteMap {
+		PublicHash = pubhash
+		has = true
+		break
+	}
+	if !has {
+		for pubhash := range br.BlockVoteMessageWaitMap {
+			PublicHash = pubhash
+			has = true
+			break
+		}
+	}
 	nm := &BlockGenRequestMessage{
 		BlockGenRequest: &BlockGenRequest{
 			ChainID:              ob.round.MinRoundVoteAck.ChainID,
@@ -346,7 +360,11 @@ func (ob *ObserverNode) sendBlockGenRequestAnyone() error {
 	} else {
 		nm.Signature = sig
 	}
-	ob.ms.SendAnyone(nm)
+	if has {
+		ob.ms.SendTo(PublicHash, nm)
+	} else {
+		ob.ms.SendAnyone(nm)
+	}
 	return nil
 }
 

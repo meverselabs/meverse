@@ -1045,7 +1045,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 						Message: brNext.BlockGenMessageWait,
 					})
 				} else {
-					ob.sendBlockGenRequestAnyone()
+					ob.sendBlockGenRequest(brNext)
 				}
 			} else {
 				ob.resetVoteRound(false)
