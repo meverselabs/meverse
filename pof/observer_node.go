@@ -151,7 +151,7 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 					break
 				}
 				if debug.DEBUG {
-					log.Println("Observer", ob.myPublicHash.String(), cp.Height(), "BlockConnected", b.Header.Generator.String(), ob.round.RoundState, b.Header.Height, (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
+					log.Println("Observer", ob.myPublicHash.String(), cp.Height(), "BlockConnectedQ", b.Header.Generator.String(), ob.round.RoundState, b.Header.Height, (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
 				}
 				ob.broadcastStatus()
 				TargetHeight++
@@ -425,16 +425,16 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 			return ErrInvalidVote
 		}
 		if msg.RoundVote.LastHash != cp.LastHash() {
-			log.Println("if msg.RoundVote.LastHash != cp.LastHash() {")
+			log.Println("if msg.RoundVote.LastHash != cp.LastHash() {", msg.RoundVote.LastHash.String(), cp.LastHash().String())
 			return ErrInvalidVote
 		}
 		Top, err := ob.cs.rt.TopRank(int(msg.RoundVote.TimeoutCount))
 		if err != nil {
-			log.Println("Top, err := ob.cs.rt.TopRank(int(msg.RoundVote.TimeoutCount))")
+			log.Println("Top, err := ob.cs.rt.TopRank(int(msg.RoundVote.TimeoutCount))", msg.RoundVote.TimeoutCount)
 			return err
 		}
 		if msg.RoundVote.Formulator != Top.Address {
-			log.Println("if msg.RoundVote.Formulator != Top.Address {")
+			log.Println("if msg.RoundVote.Formulator != Top.Address {", msg.RoundVote.Formulator.String(), Top.Address.String(), msg.RoundVote.TimeoutCount)
 			return ErrInvalidVote
 		}
 		if msg.RoundVote.FormulatorPublicHash != Top.PublicHash {
@@ -691,7 +691,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 			return ErrInvalidVote
 		}
 		if br.BlockGenMessage != nil {
-			log.Println(msg.Block.Header.Generator.String(), "if br.BlockGenMessage != nil {")
+			log.Println(msg.Block.Header.Generator.String(), "if br.BlockGenMessage != nil {", msg.Block.Header.Height, ob.round.TargetHeight)
 			return ErrInvalidVote
 		}
 
@@ -986,6 +986,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 				ob.round.VoteFailCount = 0
 				ob.round.TargetHeight++
 				if brNext.BlockGenMessageWait != nil && brNext.BlockGenMessage == nil {
+					log.Println("brNext", brNext.BlockGenMessageWait.Block.Header.Height, NextHeight)
 					ob.messageQueue.Push(&messageItem{
 						Message: brNext.BlockGenMessageWait,
 					})
