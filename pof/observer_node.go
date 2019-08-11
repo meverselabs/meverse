@@ -211,6 +211,15 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 				if ob.round.RoundState == RoundVoteState {
 					ob.sendRoundVote()
 					ob.broadcastStatus()
+				} else if ob.round.RoundState == BlockVoteState {
+					br, has := ob.round.BlockRoundMap[ob.round.TargetHeight]
+					if has {
+						ob.sendBlockVote(br.BlockGenMessage)
+						if debug.DEBUG {
+							log.Println("Observer", ob.myPublicHash.String(), cp.Height(), "sendBlockVote", ob.round.MinRoundVoteAck.Formulator.String(), encoding.Hash(br.BlockGenMessage.Block.Header), ob.round.RoundState, len(ob.adjustFormulatorMap()), ob.fs.PeerCount(), (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
+						}
+						IsFailable = false
+					}
 				}
 			} else {
 				if debug.DEBUG {
@@ -982,6 +991,8 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 					ob.messageQueue.Push(&messageItem{
 						Message: brNext.BlockGenMessageWait,
 					})
+				} else {
+					ob.sendBlockGenRequestAnyone()
 				}
 			} else {
 				ob.resetVoteRound(false)

@@ -328,6 +328,17 @@ func (ob *ObserverNode) sendBlockVoteTo(gen *BlockGenMessage, TargetPubHash comm
 	return nil
 }
 
+func (ob *ObserverNode) sendBlockGenRequestAnyone() {
+	nm := &BlockGenRequestMessage{
+		PrevHash:             ob.round.MinRoundVoteAck.LastHash,
+		TargetHeight:         ob.round.MinRoundVoteAck.TargetHeight,
+		TimeoutCount:         ob.round.MinRoundVoteAck.TimeoutCount,
+		Formulator:           ob.round.MinRoundVoteAck.Formulator,
+		FormulatorPublicHash: ob.round.MinRoundVoteAck.FormulatorPublicHash,
+	}
+	ob.ms.SendAnyone(nm)
+}
+
 func (ob *ObserverNode) sendStatusTo(TargetPubHash common.PublicHash) error {
 	if TargetPubHash == ob.myPublicHash {
 		return nil

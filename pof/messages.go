@@ -86,3 +86,12 @@ type BlockObSignMessage struct {
 	BlockSign          *types.BlockSign
 	ObserverSignatures []common.Signature
 }
+
+// BlockGenRequestMessage is a message to request block gen
+type BlockGenRequestMessage struct {
+	PrevHash             hash.Hash256
+	TargetHeight         uint32
+	TimeoutCount         uint32
+	Formulator           common.Address
+	FormulatorPublicHash common.PublicHash
+}

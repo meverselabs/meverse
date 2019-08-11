@@ -144,6 +144,32 @@ func (ms *ObserverNodeMesh) SendTo(pubhash common.PublicHash, m interface{}) err
 	return nil
 }
 
+// SendAnyone sends a message to the one of observers
+func (ms *ObserverNodeMesh) SendAnyone(m interface{}) error {
+	ms.Lock()
+	var p peer.Peer
+	for _, v := range ms.clientPeerMap {
+		p = v
+		break
+	}
+	if p == nil {
+		for _, v := range ms.serverPeerMap {
+			p = v
+			break
+		}
+	}
+	ms.Unlock()
+	if p == nil {
+		return ErrNotExistObserverPeer
+	}
+
+	if err := p.Send(m); err != nil {
+		log.Println(err)
+		ms.RemovePeer(p.ID())
+	}
+	return nil
+}
+
 // BroadcastRaw sends a message to all peers
 func (ms *ObserverNodeMesh) BroadcastRaw(bs []byte) {
 	peerMap := map[string]peer.Peer{}
