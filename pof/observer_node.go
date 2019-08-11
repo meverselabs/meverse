@@ -153,10 +153,10 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 				if debug.DEBUG {
 					log.Println("Observer", ob.myPublicHash.String(), cp.Height(), "BlockConnectedQ", b.Header.Generator.String(), ob.round.RoundState, b.Header.Height, (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
 				}
-				ob.broadcastStatus()
 				TargetHeight++
 				item = ob.blockQ.PopUntil(TargetHeight)
 			}
+			ob.broadcastStatus()
 			ob.Unlock()
 			blockTimer.Reset(50 * time.Millisecond)
 		case <-queueTimer.C:
@@ -186,19 +186,6 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 						log.Println("Observer", ob.myPublicHash.String(), cp.Height(), "Current State", ob.round.RoundState, len(ob.adjustFormulatorMap()), ob.fs.PeerCount(), (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
 					}
 				}
-				if ob.round.RoundState == RoundVoteState {
-					ob.sendRoundVote()
-					ob.broadcastStatus()
-				} else if ob.round.RoundState == BlockVoteState {
-					br, has := ob.round.BlockRoundMap[ob.round.TargetHeight]
-					if has {
-						ob.sendBlockVote(br.BlockGenMessage)
-						if debug.DEBUG {
-							log.Println("Observer", ob.myPublicHash.String(), cp.Height(), "sendBlockVote", ob.round.MinRoundVoteAck.Formulator.String(), encoding.Hash(br.BlockGenMessage.Block.Header), ob.round.RoundState, len(ob.adjustFormulatorMap()), ob.fs.PeerCount(), (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
-						}
-						IsFailable = false
-					}
-				}
 				if IsFailable {
 					ob.round.VoteFailCount++
 					if ob.round.VoteFailCount > 20 {
@@ -219,8 +206,11 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 							}
 						}
 						ob.resetVoteRound(true)
-						ob.sendRoundVote()
 					}
+				}
+				if ob.round.RoundState == RoundVoteState {
+					ob.sendRoundVote()
+					ob.broadcastStatus()
 				}
 			} else {
 				if debug.DEBUG {
@@ -678,7 +668,9 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 
 		//[check state]
 		if ob.round.RoundState == BlockVoteState {
-			ob.sendBlockGenTo(br.BlockGenMessage, SenderPublicHash)
+			if _, has := br.BlockVoteMap[SenderPublicHash]; !has {
+				ob.sendBlockGenTo(br.BlockGenMessage, SenderPublicHash)
+			}
 			ob.sendBlockVoteTo(br.BlockGenMessage, SenderPublicHash)
 		}
 	case *BlockGenMessage:

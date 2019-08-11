@@ -179,12 +179,12 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 					break
 				}
 				log.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Transactions))
-				fr.broadcastStatus()
 				fr.cleanPool(b)
 				TargetHeight++
 				item = fr.blockQ.PopUntil(TargetHeight)
 				hasItem = true
 			}
+			fr.broadcastStatus()
 			fr.Unlock()
 
 			if hasItem {
