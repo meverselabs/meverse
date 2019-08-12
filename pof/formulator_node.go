@@ -2,7 +2,6 @@ package pof
 
 import (
 	"bytes"
-	"log"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -85,6 +84,7 @@ func NewFormulatorNode(Config *FormulatorConfig, key key.Key, ndkey key.Key, Net
 	fr.txQ.AddGroup(600 * time.Second)
 	fr.txQ.AddGroup(3600 * time.Second)
 	fr.txQ.AddHandler(fr)
+	setRLogAddress("fr:" + Config.Formulator.String())
 	return fr
 }
 
@@ -178,7 +178,7 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 				if err := fr.cs.cn.ConnectBlock(b); err != nil {
 					break
 				}
-				log.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Transactions))
+				rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Transactions))
 				fr.cleanPool(b)
 				TargetHeight++
 				item = fr.blockQ.PopUntil(TargetHeight)
@@ -392,7 +392,7 @@ func (fr *FormulatorNode) OnRecv(p peer.Peer, m interface{}) error {
 			}
 			if h != msg.LastHash {
 				//TODO : critical error signal
-				log.Println(p.Name(), h.String(), msg.LastHash.String(), msg.Height)
+				rlog.Println(p.Name(), h.String(), msg.LastHash.String(), msg.Height)
 				fr.nm.RemovePeer(p.ID())
 			}
 		}
@@ -486,7 +486,7 @@ func (fr *FormulatorNode) tryRequestBlocks() {
 
 func (fr *FormulatorNode) onRecv(p peer.Peer, m interface{}) error {
 	if err := fr.handleMessage(p, m, 0); err != nil {
-		//log.Println(err)
+		//rlog.Println(err)
 		return nil
 	}
 	return nil
@@ -497,7 +497,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 
 	switch msg := m.(type) {
 	case *BlockReqMessage:
-		log.Println("Formulator", fr.Config.Formulator.String(), "BlockReqMessage", msg.TargetHeight)
+		rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockReqMessage", msg.TargetHeight)
 
 		fr.Lock()
 		defer fr.Unlock()
@@ -621,7 +621,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 						break TxLoop
 					}
 					if err := bc.UnsafeAddTx(fr.Config.Formulator, item.TxType, item.TxHash, item.Transaction, item.Signatures, item.Signers); err != nil {
-						log.Println(err)
+						rlog.Println(err)
 						continue
 					}
 					Count++
@@ -650,7 +650,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 			if err := p.Send(nm); err != nil {
 				return err
 			}
-			log.Println("Formulator", fr.Config.Formulator.String(), "BlockGenMessage", nm.Block.Header.Height, len(nm.Block.Transactions))
+			rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockGenMessage", nm.Block.Header.Height, len(nm.Block.Transactions))
 
 			fr.lastGenMessages = append(fr.lastGenMessages, nm)
 			fr.lastContextes = append(fr.lastContextes, ctx)
@@ -668,7 +668,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 		}
 		return nil
 	case *BlockObSignMessage:
-		log.Println("Formulator", fr.Config.Formulator.String(), "BlockObSignMessage", msg.TargetHeight)
+		rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockObSignMessage", msg.TargetHeight)
 
 		fr.Lock()
 		defer fr.Unlock()
@@ -710,7 +710,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 				}
 				fr.broadcastStatus()
 				fr.cleanPool(b)
-				log.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Transactions))
+				rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Transactions))
 
 				if status, has := fr.obStatusMap[p.ID()]; has {
 					if status.Height < GenMessage.Block.Header.Height {

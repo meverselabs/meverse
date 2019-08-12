@@ -329,6 +329,12 @@ func (ob *ObserverNode) sendBlockVoteTo(gen *BlockGenMessage, TargetPubHash comm
 }
 
 func (ob *ObserverNode) sendBlockGenRequest(br *BlockRound) error {
+	now := uint64(time.Now().UnixNano())
+	if br.LastBlockGenRequestTime+uint64(1*time.Second) > now {
+		return nil
+	}
+	br.LastBlockGenRequestTime = now
+
 	var PublicHash common.PublicHash
 	has := false
 	for pubhash := range br.BlockVoteMap {

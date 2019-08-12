@@ -52,6 +52,7 @@ type BlockRound struct {
 	Context                 *types.Context
 	BlockVoteMessageWaitMap map[common.PublicHash]*BlockVoteMessage
 	BlockGenMessageWait     *BlockGenMessage
+	LastBlockGenRequestTime uint64
 }
 
 // NewBlockRound returns a VoteRound

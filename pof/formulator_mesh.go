@@ -4,7 +4,6 @@ import (
 	"bytes"
 	crand "crypto/rand"
 	"encoding/binary"
-	"log"
 	"sync"
 	"time"
 
@@ -50,7 +49,7 @@ func (ms *FormulatorNodeMesh) Run() {
 				ms.Unlock()
 				if !has {
 					if err := ms.client(NetAddr, pubhash); err != nil {
-						log.Println("[client]", err, NetAddr)
+						rlog.Println("[client]", err, NetAddr)
 					}
 				}
 				time.Sleep(1 * time.Second)
@@ -95,7 +94,7 @@ func (ms *FormulatorNodeMesh) SendTo(ID string, m interface{}) error {
 	}
 
 	if err := p.Send(m); err != nil {
-		log.Println(err)
+		rlog.Println(err)
 		ms.RemovePeer(p.ID())
 	}
 	return nil
@@ -151,12 +150,12 @@ func (ms *FormulatorNodeMesh) client(Address string, TargetPubHash common.Public
 	defer conn.Close()
 
 	if err := ms.recvHandshake(conn); err != nil {
-		log.Println("[recvHandshake]", err)
+		rlog.Println("[recvHandshake]", err)
 		return err
 	}
 	pubhash, err := ms.sendHandshake(conn)
 	if err != nil {
-		log.Println("[sendHandshake]", err)
+		rlog.Println("[sendHandshake]", err)
 		return err
 	}
 	if pubhash != TargetPubHash {
@@ -175,14 +174,14 @@ func (ms *FormulatorNodeMesh) client(Address string, TargetPubHash common.Public
 	defer ms.RemovePeer(p.ID())
 
 	if err := ms.handleConnection(p); err != nil {
-		log.Println("[handleConnection]", err)
+		rlog.Println("[handleConnection]", err)
 	}
 	return nil
 }
 
 func (ms *FormulatorNodeMesh) handleConnection(p peer.Peer) error {
 	if debug.DEBUG {
-		log.Println("Formulator", common.NewPublicHash(ms.key.PublicKey()).String(), "Observer Connected", p.Name())
+		rlog.Println("Formulator", common.NewPublicHash(ms.key.PublicKey()).String(), "Observer Connected", p.Name())
 	}
 
 	ms.fr.OnObserverConnected(p)
@@ -200,7 +199,7 @@ func (ms *FormulatorNodeMesh) handleConnection(p peer.Peer) error {
 }
 
 func (ms *FormulatorNodeMesh) recvHandshake(conn *websocket.Conn) error {
-	//log.Println("recvHandshake")
+	//rlog.Println("recvHandshake")
 	_, req, err := conn.ReadMessage()
 	if err != nil {
 		return err
@@ -220,7 +219,7 @@ func (ms *FormulatorNodeMesh) recvHandshake(conn *websocket.Conn) error {
 	if diff > time.Second*30 {
 		return p2p.ErrInvalidHandshake
 	}
-	//log.Println("sendHandshakeAck")
+	//rlog.Println("sendHandshakeAck")
 	if sig, err := ms.key.Sign(hash.Hash(req)); err != nil {
 		return err
 	} else if err := conn.WriteMessage(websocket.BinaryMessage, sig[:]); err != nil {
@@ -230,7 +229,7 @@ func (ms *FormulatorNodeMesh) recvHandshake(conn *websocket.Conn) error {
 }
 
 func (ms *FormulatorNodeMesh) sendHandshake(conn *websocket.Conn) (common.PublicHash, error) {
-	//log.Println("sendHandshake")
+	//rlog.Println("sendHandshake")
 	req := make([]byte, 40+common.AddressSize)
 	if _, err := crand.Read(req[:32]); err != nil {
 		return common.PublicHash{}, err
@@ -241,7 +240,7 @@ func (ms *FormulatorNodeMesh) sendHandshake(conn *websocket.Conn) (common.Public
 	if err := conn.WriteMessage(websocket.BinaryMessage, req); err != nil {
 		return common.PublicHash{}, err
 	}
-	//log.Println("recvHandshakeAsk")
+	//rlog.Println("recvHandshakeAsk")
 	_, bs, err := conn.ReadMessage()
 	if err != nil {
 		return common.PublicHash{}, err

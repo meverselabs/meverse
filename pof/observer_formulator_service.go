@@ -4,7 +4,6 @@ import (
 	"bytes"
 	crand "crypto/rand"
 	"encoding/binary"
-	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -79,7 +78,7 @@ func (ms *FormulatorService) SendTo(addr common.Address, m interface{}) error {
 	}
 
 	if err := p.Send(m); err != nil {
-		log.Println(err)
+		rlog.Println(err)
 		ms.RemovePeer(p.ID())
 	}
 	return nil
@@ -147,7 +146,7 @@ func (ms *FormulatorService) UpdateGuessHeight(addr common.Address, height uint3
 
 func (ms *FormulatorService) server(BindAddress string) error {
 	if debug.DEBUG {
-		log.Println("FormulatorService", common.NewPublicHash(ms.key.PublicKey()), "Start to Listen", BindAddress)
+		rlog.Println("FormulatorService", common.NewPublicHash(ms.key.PublicKey()), "Start to Listen", BindAddress)
 	}
 
 	var upgrader = websocket.Upgrader{
@@ -165,16 +164,16 @@ func (ms *FormulatorService) server(BindAddress string) error {
 
 		pubhash, err := ms.sendHandshake(conn)
 		if err != nil {
-			log.Println("[sendHandshake]", err)
+			rlog.Println("[sendHandshake]", err)
 			return err
 		}
 		Formulator, err := ms.recvHandshake(conn)
 		if err != nil {
-			log.Println("[recvHandshakeAck]", err)
+			rlog.Println("[recvHandshakeAck]", err)
 			return err
 		}
 		if !ms.ob.cs.rt.IsFormulator(Formulator, pubhash) {
-			log.Println("[IsFormulator]", Formulator.String(), pubhash.String())
+			rlog.Println("[IsFormulator]", Formulator.String(), pubhash.String())
 			return err
 		}
 
@@ -187,7 +186,7 @@ func (ms *FormulatorService) server(BindAddress string) error {
 		defer ms.RemovePeer(p.ID())
 
 		if err := ms.handleConnection(p); err != nil {
-			log.Println("[handleConnection]", err)
+			rlog.Println("[handleConnection]", err)
 			return nil
 		}
 		return nil
@@ -197,7 +196,7 @@ func (ms *FormulatorService) server(BindAddress string) error {
 
 func (ms *FormulatorService) handleConnection(p peer.Peer) error {
 	if debug.DEBUG {
-		log.Println("Observer", common.NewPublicHash(ms.key.PublicKey()).String(), "Fromulator Connected", p.Name())
+		rlog.Println("Observer", common.NewPublicHash(ms.key.PublicKey()).String(), "Fromulator Connected", p.Name())
 	}
 
 	cp := ms.ob.cs.cn.Provider()
@@ -220,7 +219,7 @@ func (ms *FormulatorService) handleConnection(p peer.Peer) error {
 }
 
 func (ms *FormulatorService) recvHandshake(conn *websocket.Conn) (common.Address, error) {
-	//log.Println("recvHandshake")
+	//rlog.Println("recvHandshake")
 	_, req, err := conn.ReadMessage()
 	if err != nil {
 		return common.Address{}, err
@@ -242,7 +241,7 @@ func (ms *FormulatorService) recvHandshake(conn *websocket.Conn) (common.Address
 	if diff > time.Second*30 {
 		return common.Address{}, p2p.ErrInvalidHandshake
 	}
-	//log.Println("sendHandshakeAck")
+	//rlog.Println("sendHandshakeAck")
 	if sig, err := ms.key.Sign(hash.Hash(req)); err != nil {
 		return common.Address{}, err
 	} else if err := conn.WriteMessage(websocket.BinaryMessage, sig[:]); err != nil {
@@ -252,7 +251,7 @@ func (ms *FormulatorService) recvHandshake(conn *websocket.Conn) (common.Address
 }
 
 func (ms *FormulatorService) sendHandshake(conn *websocket.Conn) (common.PublicHash, error) {
-	//log.Println("sendHandshake")
+	//rlog.Println("sendHandshake")
 	req := make([]byte, 40)
 	if _, err := crand.Read(req[:32]); err != nil {
 		return common.PublicHash{}, err
@@ -262,7 +261,7 @@ func (ms *FormulatorService) sendHandshake(conn *websocket.Conn) (common.PublicH
 	if err := conn.WriteMessage(websocket.BinaryMessage, req); err != nil {
 		return common.PublicHash{}, err
 	}
-	//log.Println("recvHandshakeAsk")
+	//rlog.Println("recvHandshakeAsk")
 	_, bs, err := conn.ReadMessage()
 	if err != nil {
 		return common.PublicHash{}, err
