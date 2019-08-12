@@ -37,6 +37,9 @@ type Config struct {
 	APIPort        int
 	StoreRoot      string
 	ForceRecover   bool
+	RLogHost       string
+	RLogPath       string
+	UseRLog        bool
 }
 
 func main() {
@@ -46,6 +49,13 @@ func main() {
 	}
 	if len(cfg.StoreRoot) == 0 {
 		cfg.StoreRoot = "./fdata"
+	}
+	if len(cfg.RLogHost) > 0 && cfg.UseRLog {
+		if len(cfg.RLogPath) == 0 {
+			cfg.RLogPath = "./fdata_rlog"
+		}
+		pof.SetRLogHost(cfg.RLogHost)
+		pof.EnableRLog(cfg.RLogPath)
 	}
 
 	var frkey key.Key

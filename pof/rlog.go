@@ -2,7 +2,6 @@ package pof
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -19,7 +18,13 @@ import (
 var rlog *log.Logger
 var rlogAddress string
 var rlogHost string
+var rlogUse bool
 
+func init() {
+	rlog = log.New(os.Stderr, "", log.LstdFlags)
+}
+
+// errors
 var (
 	ErrNoLog = errors.New("no log")
 )
@@ -28,12 +33,16 @@ func setRLogAddress(address string) {
 	rlogAddress = address
 }
 
-func setRLogHost(host string) {
+// SetRLogHost sets the host of the remote log
+func SetRLogHost(host string) {
 	rlogHost = host
 }
 
-func init() {
-	lw, err := NewLogWriter("./_rlog")
+// EnableRLog turn on of the remote log
+func EnableRLog(path string) {
+	rlogUse = true
+
+	lw, err := NewLogWriter(path)
 	if err != nil {
 		panic(err)
 	}
@@ -72,13 +81,20 @@ func NewLogWriter(path string) (*LogWriter, error) {
 
 func (lw *LogWriter) Write(bs []byte) (int, error) {
 	os.Stderr.Write(bs)
+	if !rlogUse {
+		return len(bs), nil
+	}
 
 	if bs[len(bs)-1] == '\n' {
 		bs = bs[:len(bs)-1]
 	}
+	if len(bs) > 65535 {
+		bs = bs[:65535]
+	}
 
 	var buffer bytes.Buffer
 	buffer.Write(util.Uint64ToBytes(uint64(time.Now().UnixNano())))
+	buffer.Write(util.Uint16ToBytes(uint16(len(bs))))
 	buffer.Write(bs)
 
 	lw.Lock()
@@ -96,6 +112,7 @@ func (lw *LogWriter) Write(bs []byte) (int, error) {
 	return len(bs), nil
 }
 
+// Upload uploads logs to the remote log server
 func (lw *LogWriter) Upload() error {
 	lw.Lock()
 	count, err := lw.db.LLen([]byte("log"))
@@ -111,15 +128,7 @@ func (lw *LogWriter) Upload() error {
 		if err != nil {
 			break
 		}
-		item := &LogData{
-			Timestamp: util.BytesToUint64(bs[:8]),
-			Data:      string(bs[8:]),
-		}
-		body, err := json.Marshal(item)
-		if err != nil {
-			break
-		}
-		buffer.Write(body)
+		buffer.Write(bs)
 		appended++
 	}
 	if buffer.Len() == 0 {
@@ -149,9 +158,4 @@ func (lw *LogWriter) Upload() error {
 		return ErrNoLog
 	}
 	return nil
-}
-
-type LogData struct {
-	Timestamp uint64
-	Data      string
 }

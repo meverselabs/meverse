@@ -9,6 +9,9 @@ Port = 31000
 APIPort = 58000
 StoreRoot = "./ndata"
 ForceRecover = true
+RLogHost = ""
+RLogPath = ""
+UseRLog = false
 
 [SeedNodeMap]
 3yTFnJJqx3wCiK2Edk9f9JwdvdkC4DP4T1y8xYztMkf = "seednode1.fletamain.net:31000"

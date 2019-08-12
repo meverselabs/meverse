@@ -4,6 +4,9 @@ GenKeyHex = "THIS_IS_A_PRIVATE_KEY_THAT_IS_FORMATTED_WITH_HEX"
 Formulator = "THIS_IS_A_ADDRESS_OF_THE_FORMULATOR"
 StoreRoot = "./fdata"
 ForceRecover = true
+RLogHost = ""
+RLogPath = ""
+UseRLog = false
 
 [ObserverKeyMap]
 3UwhKPR25vZyycKXzvTjTTEvaQhLYNdga7Qfu96nkFS = "observer1.fletamain.net"

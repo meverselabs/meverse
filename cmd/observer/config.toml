@@ -5,6 +5,9 @@ ObseverPort = 35000
 FormulatorPort = 37000
 StoreRoot = "./odata"
 ForceRecover = true
+RLogHost = ""
+RLogPath = ""
+UseRLog = false
 
 [ObserverKeyMap]
 3UwhKPR25vZyycKXzvTjTTEvaQhLYNdga7Qfu96nkFS = "observer1.fletamain.net:35000"
