@@ -1,7 +1,6 @@
 package p2p
 
 import (
-	"log"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -13,6 +12,7 @@ import (
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/common/queue"
+	"github.com/fletaio/fleta/common/rlog"
 	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/core/txpool"
 	"github.com/fletaio/fleta/core/types"
@@ -56,6 +56,7 @@ func NewNode(key key.Key, SeedNodeMap map[common.PublicHash]string, cn *chain.Ch
 	nd.txQ.AddGroup(600 * time.Second)
 	nd.txQ.AddGroup(3600 * time.Second)
 	nd.txQ.AddHandler(nd)
+	rlog.SetRLogAddress("nd:" + nd.myPublicHash.String())
 	return nd
 }
 
@@ -153,11 +154,11 @@ func (nd *Node) Run(BindAddress string) {
 			for item != nil {
 				b := item.(*types.Block)
 				if err := nd.cn.ConnectBlock(b); err != nil {
-					log.Println(err)
+					rlog.Println(err)
 					panic(err)
 					break
 				}
-				log.Println("Node", nd.myPublicHash.String(), nd.cn.Provider().Height(), "BlockConnected", b.Header.Generator.String(), b.Header.Height)
+				rlog.Println("Node", nd.myPublicHash.String(), nd.cn.Provider().Height(), "BlockConnected", b.Header.Generator.String(), b.Header.Height)
 				nd.broadcastStatus()
 				TargetHeight++
 				item = nd.blockQ.PopUntil(TargetHeight)
@@ -278,7 +279,7 @@ func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
 			}
 			if h != msg.LastHash {
 				//TODO : critical error signal
-				log.Println(chain.ErrFoundForkedBlock, p.Name(), h.String(), msg.LastHash.String(), msg.Height)
+				rlog.Println(chain.ErrFoundForkedBlock, p.Name(), h.String(), msg.LastHash.String(), msg.Height)
 				nd.ms.RemovePeer(p.ID())
 			}
 		}

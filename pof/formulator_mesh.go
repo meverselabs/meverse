@@ -7,13 +7,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fletaio/fleta/common/debug"
-	"github.com/fletaio/fleta/core/chain"
-
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/debug"
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/key"
+	"github.com/fletaio/fleta/common/rlog"
 	"github.com/fletaio/fleta/common/util"
+	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/service/p2p"
 	"github.com/fletaio/fleta/service/p2p/peer"

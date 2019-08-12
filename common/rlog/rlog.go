@@ -1,4 +1,4 @@
-package pof
+package rlog
 
 import (
 	"bytes"
@@ -15,13 +15,28 @@ import (
 	"github.com/siddontang/ledisdb/ledis"
 )
 
-var rlog *log.Logger
-var rlogAddress string
-var rlogHost string
-var rlogUse bool
+var logger *log.Logger
+var loggerAddress string
+var loggerHost string
+var loggerUse bool
 
 func init() {
-	rlog = log.New(os.Stderr, "", log.LstdFlags)
+	logger = log.New(os.Stderr, "", log.LstdFlags)
+}
+
+// Println calls l.Output to print to the logger.
+func Println(v ...interface{}) {
+	logger.Println(v...)
+}
+
+// Fatal is equivalent to l.Print() followed by a call to os.Exit(1).
+func Fatal(v ...interface{}) {
+	logger.Fatal(v...)
+}
+
+// Fatalln is equivalent to l.Println() followed by a call to os.Exit(1).
+func Fatalln(v ...interface{}) {
+	logger.Fatalln(v...)
 }
 
 // errors
@@ -29,24 +44,25 @@ var (
 	ErrNoLog = errors.New("no log")
 )
 
-func setRLogAddress(address string) {
-	rlogAddress = address
+// SetRLogAddress sets the addres of the current node
+func SetRLogAddress(address string) {
+	loggerAddress = address
 }
 
 // SetRLogHost sets the host of the remote log
 func SetRLogHost(host string) {
-	rlogHost = host
+	loggerHost = host
 }
 
-// EnableRLog turn on of the remote log
-func EnableRLog(path string) {
-	rlogUse = true
+// Enablelogger turn on of the remote log
+func Enablelogger(path string) {
+	loggerUse = true
 
 	lw, err := NewLogWriter(path)
 	if err != nil {
 		panic(err)
 	}
-	rlog = log.New(lw, "", log.LstdFlags)
+	logger = log.New(lw, "", log.LstdFlags)
 
 	go func() {
 		for {
@@ -81,7 +97,7 @@ func NewLogWriter(path string) (*LogWriter, error) {
 
 func (lw *LogWriter) Write(bs []byte) (int, error) {
 	os.Stderr.Write(bs)
-	if !rlogUse {
+	if !loggerUse {
 		return len(bs), nil
 	}
 
@@ -134,7 +150,7 @@ func (lw *LogWriter) Upload() error {
 	if buffer.Len() == 0 {
 		return ErrNoLog
 	}
-	req, err := http.Post(rlogHost+"/api/addresses/"+rlogAddress+"/logs", "application/json", bytes.NewReader(buffer.Bytes()))
+	req, err := http.Post(loggerHost+"/api/addresses/"+loggerAddress+"/logs", "application/json", bytes.NewReader(buffer.Bytes()))
 	if err != nil {
 		return err
 	}

@@ -3,17 +3,16 @@ package p2p
 import (
 	crand "crypto/rand"
 	"encoding/binary"
-	"log"
 	"net"
 	"sync"
 	"time"
 
-	"github.com/fletaio/fleta/core/chain"
-	"github.com/fletaio/fleta/service/p2p/nodepoolmanage"
-
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/key"
+	"github.com/fletaio/fleta/common/rlog"
+	"github.com/fletaio/fleta/core/chain"
+	"github.com/fletaio/fleta/service/p2p/nodepoolmanage"
 	"github.com/fletaio/fleta/service/p2p/peer"
 )
 
@@ -79,7 +78,7 @@ func (ms *NodeMesh) Run(BindAddress string) {
 					}
 					if !hasC && !hasS {
 						if err := ms.client(NetAddr, pubhash); err != nil {
-							log.Println("[client]", err, NetAddr)
+							rlog.Println("[client]", err, NetAddr)
 						}
 					}
 					time.Sleep(30 * time.Second)
@@ -176,7 +175,7 @@ func (ms *NodeMesh) SendTo(pubhash common.PublicHash, m interface{}) error {
 	}
 
 	if err := p.Send(m); err != nil {
-		log.Println(err)
+		rlog.Println(err)
 		ms.RemovePeer(p.ID())
 	}
 	return nil
@@ -294,12 +293,12 @@ func (ms *NodeMesh) client(Address string, TargetPubHash common.PublicHash) erro
 
 	start := time.Now()
 	if err := ms.recvHandshake(conn); err != nil {
-		log.Println("[recvHandshake]", err)
+		rlog.Println("[recvHandshake]", err)
 		return err
 	}
 	pubhash, bindAddress, err := ms.sendHandshake(conn)
 	if err != nil {
-		log.Println("[sendHandshake]", err)
+		rlog.Println("[sendHandshake]", err)
 		return err
 	}
 	if pubhash != TargetPubHash {
@@ -326,7 +325,7 @@ func (ms *NodeMesh) client(Address string, TargetPubHash common.PublicHash) erro
 	defer ms.removePeerInMap(p.ID(), ms.clientPeerMap)
 
 	if err := ms.handleConnection(p); err != nil {
-		log.Println("[handleConnection]", err)
+		rlog.Println("[handleConnection]", err)
 	}
 	return nil
 }
@@ -336,7 +335,7 @@ func (ms *NodeMesh) server(BindAddress string) error {
 	if err != nil {
 		return err
 	}
-	log.Println(common.NewPublicHash(ms.key.PublicKey()), "Start to Listen", BindAddress)
+	rlog.Println(common.NewPublicHash(ms.key.PublicKey()), "Start to Listen", BindAddress)
 	for {
 		conn, err := lstn.Accept()
 		if err != nil {
@@ -348,11 +347,11 @@ func (ms *NodeMesh) server(BindAddress string) error {
 			start := time.Now()
 			pubhash, bindAddress, err := ms.sendHandshake(conn)
 			if err != nil {
-				log.Println("[sendHandshake]", err)
+				rlog.Println("[sendHandshake]", err)
 				return
 			}
 			if err := ms.recvHandshake(conn); err != nil {
-				log.Println("[recvHandshakeAck]", err)
+				rlog.Println("[recvHandshakeAck]", err)
 				return
 			}
 			duration := time.Since(start)
@@ -376,14 +375,14 @@ func (ms *NodeMesh) server(BindAddress string) error {
 			defer ms.removePeerInMap(p.ID(), ms.serverPeerMap)
 
 			if err := ms.handleConnection(p); err != nil {
-				log.Println("[handleConnection]", err)
+				rlog.Println("[handleConnection]", err)
 			}
 		}()
 	}
 }
 
 func (ms *NodeMesh) handleConnection(p peer.Peer) error {
-	// log.Println("Node", common.NewPublicHash(ms.key.PublicKey()).String(), "Node Connected", p.Name())
+	// rlog.Println("Node", common.NewPublicHash(ms.key.PublicKey()).String(), "Node Connected", p.Name())
 
 	ms.handler.OnConnected(p)
 	defer ms.handler.OnDisconnected(p)
@@ -400,7 +399,7 @@ func (ms *NodeMesh) handleConnection(p peer.Peer) error {
 }
 
 func (ms *NodeMesh) recvHandshake(conn net.Conn) error {
-	//log.Println("recvHandshake")
+	//rlog.Println("recvHandshake")
 	req := make([]byte, 40)
 	if _, err := FillBytes(conn, req); err != nil {
 		return err
@@ -417,7 +416,7 @@ func (ms *NodeMesh) recvHandshake(conn net.Conn) error {
 	if diff > time.Second*30 {
 		return ErrInvalidHandshake
 	}
-	//log.Println("sendHandshakeAck")
+	//rlog.Println("sendHandshakeAck")
 	h := hash.Hash(req)
 	if sig, err := ms.key.Sign(h); err != nil {
 		return err
@@ -437,7 +436,7 @@ func (ms *NodeMesh) recvHandshake(conn net.Conn) error {
 }
 
 func (ms *NodeMesh) sendHandshake(conn net.Conn) (common.PublicHash, string, error) {
-	//log.Println("sendHandshake")
+	//rlog.Println("sendHandshake")
 	req := make([]byte, 40)
 	if _, err := crand.Read(req[:32]); err != nil {
 		return common.PublicHash{}, "", err
@@ -447,7 +446,7 @@ func (ms *NodeMesh) sendHandshake(conn net.Conn) (common.PublicHash, string, err
 	if _, err := conn.Write(req); err != nil {
 		return common.PublicHash{}, "", err
 	}
-	//log.Println("recvHandshakeAsk")
+	//rlog.Println("recvHandshakeAsk")
 	var sig common.Signature
 	if _, err := FillBytes(conn, sig[:]); err != nil {
 		return common.PublicHash{}, "", err

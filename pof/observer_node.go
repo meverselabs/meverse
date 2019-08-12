@@ -10,6 +10,7 @@ import (
 	"github.com/fletaio/fleta/common/debug"
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/common/queue"
+	"github.com/fletaio/fleta/common/rlog"
 	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/core/types"
@@ -62,7 +63,7 @@ func NewObserverNode(key key.Key, NetAddressMap map[common.PublicHash]string, cs
 	ob.fs = NewFormulatorService(ob)
 	ob.requestTimer = p2p.NewRequestTimer(ob)
 
-	setRLogAddress("ob:" + ob.myPublicHash.String())
+	rlog.SetRLogAddress("ob:" + ob.myPublicHash.String())
 	return ob
 }
 

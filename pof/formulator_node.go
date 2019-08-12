@@ -11,6 +11,7 @@ import (
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/common/queue"
+	"github.com/fletaio/fleta/common/rlog"
 	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/core/txpool"
 	"github.com/fletaio/fleta/core/types"
@@ -84,7 +85,7 @@ func NewFormulatorNode(Config *FormulatorConfig, key key.Key, ndkey key.Key, Net
 	fr.txQ.AddGroup(600 * time.Second)
 	fr.txQ.AddGroup(3600 * time.Second)
 	fr.txQ.AddHandler(fr)
-	setRLogAddress("fr:" + Config.Formulator.String())
+	rlog.SetRLogAddress("fr:" + Config.Formulator.String())
 	return fr
 }
 
