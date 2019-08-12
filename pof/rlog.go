@@ -18,6 +18,7 @@ import (
 
 var rlog *log.Logger
 var rlogAddress string
+var rlogHost string
 
 var (
 	ErrNoLog = errors.New("no log")
@@ -25,6 +26,10 @@ var (
 
 func setRLogAddress(address string) {
 	rlogAddress = address
+}
+
+func setRLogHost(host string) {
+	rlogHost = host
 }
 
 func init() {
@@ -120,7 +125,7 @@ func (lw *LogWriter) Upload() error {
 	if buffer.Len() == 0 {
 		return ErrNoLog
 	}
-	req, err := http.Post("http://localhost:8080/api/addresses/"+rlogAddress+"/logs", "application/json", bytes.NewReader(buffer.Bytes()))
+	req, err := http.Post(rlogHost+"/api/addresses/"+rlogAddress+"/logs", "application/json", bytes.NewReader(buffer.Bytes()))
 	if err != nil {
 		return err
 	}

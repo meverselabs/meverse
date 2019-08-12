@@ -420,7 +420,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 				}
 			}
 			return ErrInvalidVote
-		}z
+		}
 		if msg.RoundVote.ChainID != cp.ChainID() {
 			rlog.Println("if msg.RoundVote.ChainID != cp.ChainID() {")
 			return ErrInvalidVote
