@@ -16,6 +16,7 @@ import (
 	"github.com/fletaio/fleta/cmd/config"
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/key"
+	"github.com/fletaio/fleta/common/rlog"
 	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/pof"
 	"github.com/fletaio/fleta/process/admin"
@@ -54,8 +55,8 @@ func main() {
 		if len(cfg.RLogPath) == 0 {
 			cfg.RLogPath = "./fdata_rlog"
 		}
-		pof.SetRLogHost(cfg.RLogHost)
-		pof.EnableRLog(cfg.RLogPath)
+		rlog.SetRLogHost(cfg.RLogHost)
+		rlog.Enablelogger(cfg.RLogPath)
 	}
 
 	var frkey key.Key
