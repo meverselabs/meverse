@@ -126,7 +126,7 @@ func (nd *Node) Run(BindAddress string) {
 				case item := <-(*pMsgCh):
 					if err := nd.addTx(item.Message.TxType, item.Message.Tx, item.Message.Sigs); err != nil {
 						rlog.Println("TransactionError", chain.HashTransactionByType(nd.cn.Provider().ChainID(), item.Message.TxType, item.Message.Tx).String(), err.Error())
-						if err != txpool.ErrPastSeq || err != txpool.ErrTooFarSeq {
+						if err != txpool.ErrPastSeq && err != txpool.ErrTooFarSeq {
 							(*item.ErrCh) <- err
 						} else {
 							(*item.ErrCh) <- nil
