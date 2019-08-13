@@ -18,7 +18,7 @@ type TransactionPool struct {
 	turnQ        *queue.Queue
 	numberQ      *queue.Queue
 	utxoQ        *queue.LinkedQueue
-	txidMap      map[hash.Hash256]bool
+	txhashMap    map[hash.Hash256]bool
 	turnOutMap   map[bool]int
 	numberOutMap map[common.Address]int
 	bucketMap    map[common.Address]*queue.SortedQueue
@@ -30,7 +30,7 @@ func NewTransactionPool() *TransactionPool {
 		turnQ:        queue.NewQueue(),
 		numberQ:      queue.NewQueue(),
 		utxoQ:        queue.NewLinkedQueue(),
-		txidMap:      map[hash.Hash256]bool{},
+		txhashMap:    map[hash.Hash256]bool{},
 		turnOutMap:   map[bool]int{},
 		numberOutMap: map[common.Address]int{},
 		bucketMap:    map[common.Address]*queue.SortedQueue{},
@@ -43,7 +43,7 @@ func (tp *TransactionPool) IsExist(TxHash hash.Hash256) bool {
 	tp.Lock()
 	defer tp.Unlock()
 
-	return tp.txidMap[TxHash]
+	return tp.txhashMap[TxHash]
 }
 
 // Size returns the size of TxPool
@@ -65,7 +65,7 @@ func (tp *TransactionPool) Push(ChainID uint8, t uint16, TxHash hash.Hash256, tx
 	tp.Lock()
 	defer tp.Unlock()
 
-	if tp.txidMap[TxHash] {
+	if tp.txhashMap[TxHash] {
 		return ErrExistTransaction
 	}
 
@@ -92,7 +92,7 @@ func (tp *TransactionPool) Push(ChainID uint8, t uint16, TxHash hash.Hash256, tx
 		tp.numberQ.Push(addr)
 		tp.turnQ.Push(false)
 	}
-	tp.txidMap[TxHash] = true
+	tp.txhashMap[TxHash] = true
 	return nil
 }
 
@@ -106,7 +106,7 @@ func (tp *TransactionPool) Remove(TxHash hash.Hash256, t types.Transaction) {
 	if !is {
 		if tp.utxoQ.Remove(TxHash) != nil {
 			tp.turnOutMap[true]++
-			delete(tp.txidMap, TxHash)
+			delete(tp.txhashMap, TxHash)
 		}
 	} else {
 		addr := tx.From()
@@ -121,7 +121,7 @@ func (tp *TransactionPool) Remove(TxHash hash.Hash256, t types.Transaction) {
 					break
 				}
 				q.Pop()
-				delete(tp.txidMap, chain.HashTransaction(item.ChainID, item.Transaction))
+				delete(tp.txhashMap, chain.HashTransaction(item.ChainID, item.Transaction))
 				tp.turnOutMap[false]++
 				tp.numberOutMap[addr]++
 			}
@@ -158,7 +158,7 @@ func (tp *TransactionPool) UnsafePop(SeqCache SeqCache) *PoolItem {
 	}
 	if bTurn {
 		item := tp.utxoQ.Pop().(*PoolItem)
-		delete(tp.txidMap, chain.HashTransaction(item.ChainID, item.Transaction))
+		delete(tp.txhashMap, chain.HashTransaction(item.ChainID, item.Transaction))
 		return item
 	} else {
 		remain := tp.numberQ.Size()
@@ -205,7 +205,7 @@ func (tp *TransactionPool) UnsafePop(SeqCache SeqCache) *PoolItem {
 				}
 			}
 			q.Pop()
-			delete(tp.txidMap, chain.HashTransaction(item.ChainID, item.Transaction))
+			delete(tp.txhashMap, chain.HashTransaction(item.ChainID, item.Transaction))
 			if q.Size() == 0 {
 				delete(tp.bucketMap, addr)
 			}
