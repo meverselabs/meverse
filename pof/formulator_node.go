@@ -148,6 +148,7 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 				select {
 				case item := <-(*pMsgCh):
 					if err := fr.addTx(item.Message.TxType, item.Message.Tx, item.Message.Sigs); err != nil {
+						rlog.Println("TransactionError", chain.HashTransactionByType(fr.cs.cn.Provider().ChainID(), item.Message.TxType, item.Message.Tx).String(), err.Error())
 						if err != txpool.ErrPastSeq || err != txpool.ErrTooFarSeq {
 							(*item.ErrCh) <- err
 						} else {
@@ -155,6 +156,7 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 						}
 						break
 					}
+					rlog.Println("TransactionAppended", chain.HashTransactionByType(fr.cs.cn.Provider().ChainID(), item.Message.TxType, item.Message.Tx).String())
 					(*item.ErrCh) <- nil
 
 					fr.nm.ExceptCastLimit(item.PeerID, item.Message, 7)
