@@ -161,11 +161,11 @@ func (nd *Node) Run(BindAddress string) {
 					break
 				}
 				rlog.Println("Node", nd.myPublicHash.String(), nd.cn.Provider().Height(), "BlockConnected", b.Header.Generator.String(), b.Header.Height)
-				nd.broadcastStatus()
 				TargetHeight++
 				item = nd.blockQ.PopUntil(TargetHeight)
 				hasItem = true
 			}
+			nd.broadcastStatus()
 			nd.Unlock()
 
 			if hasItem {
