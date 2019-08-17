@@ -189,10 +189,10 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 				item = fr.blockQ.PopUntil(TargetHeight)
 				hasItem = true
 			}
-			fr.broadcastStatus()
 			fr.Unlock()
 
 			if hasItem {
+				fr.broadcastStatus()
 				fr.tryRequestBlocks()
 			}
 

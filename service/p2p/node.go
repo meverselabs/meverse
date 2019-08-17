@@ -25,6 +25,7 @@ type Node struct {
 	key          key.Key
 	ms           *NodeMesh
 	cn           *chain.Chain
+	statusLock   sync.Mutex
 	myPublicHash common.PublicHash
 	requestTimer *RequestTimer
 	requestLock  sync.RWMutex
@@ -165,10 +166,10 @@ func (nd *Node) Run(BindAddress string) {
 				item = nd.blockQ.PopUntil(TargetHeight)
 				hasItem = true
 			}
-			nd.broadcastStatus()
 			nd.Unlock()
 
 			if hasItem {
+				nd.broadcastStatus()
 				nd.tryRequestBlocks()
 			}
 
@@ -187,9 +188,9 @@ func (nd *Node) OnTimerExpired(height uint32, value string) {
 
 // OnConnected called when peer connected
 func (nd *Node) OnConnected(p peer.Peer) {
-	nd.Lock()
+	nd.statusLock.Lock()
 	nd.statusMap[p.ID()] = &Status{}
-	nd.Unlock()
+	nd.statusLock.Unlock()
 
 	var SenderPublicHash common.PublicHash
 	copy(SenderPublicHash[:], []byte(p.ID()))
@@ -198,9 +199,10 @@ func (nd *Node) OnConnected(p peer.Peer) {
 
 // OnDisconnected called when peer disconnected
 func (nd *Node) OnDisconnected(p peer.Peer) {
-	nd.Lock()
+	nd.statusLock.Lock()
 	delete(nd.statusMap, p.ID())
-	nd.Unlock()
+	nd.statusLock.Unlock()
+
 	nd.requestTimer.RemovesByValue(p.ID())
 	go nd.tryRequestBlocks()
 }
@@ -241,7 +243,7 @@ func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
 		}
 		return nil
 	case *StatusMessage:
-		nd.Lock()
+		nd.statusLock.Lock()
 		if status, has := nd.statusMap[p.ID()]; has {
 			if status.Height < msg.Height {
 				status.Version = msg.Version
@@ -249,7 +251,7 @@ func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
 				status.LastHash = msg.LastHash
 			}
 		}
-		nd.Unlock()
+		nd.statusLock.Unlock()
 
 		Height := nd.cn.Provider().Height()
 		if Height < msg.Height {
@@ -298,14 +300,14 @@ func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
 		}
 
 		if len(msg.Blocks) > 0 {
-			nd.Lock()
+			nd.statusLock.Lock()
 			if status, has := nd.statusMap[p.ID()]; has {
 				lastHeight := msg.Blocks[len(msg.Blocks)-1].Header.Height
 				if status.Height < lastHeight {
 					status.Height = lastHeight
 				}
 			}
-			nd.Unlock()
+			nd.statusLock.Unlock()
 		}
 		return nil
 	case *TransactionMessage:
@@ -431,14 +433,14 @@ func (nd *Node) tryRequestBlocks() {
 		BaseHeight := Height + q*10
 
 		var selectedPubHash string
-		nd.Lock()
+		nd.statusLock.Lock()
 		for pubhash, status := range nd.statusMap {
 			if BaseHeight <= status.Height {
 				selectedPubHash = pubhash
 				break
 			}
 		}
-		nd.Unlock()
+		nd.statusLock.Unlock()
 
 		if len(selectedPubHash) == 0 {
 			break
