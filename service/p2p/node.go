@@ -1,7 +1,6 @@
 package p2p
 
 import (
-	"log"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -290,7 +289,6 @@ func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
 		}
 		return nil
 	case *BlockMessage:
-		log.Println("BlockMessage", uint64(msg.Blocks[0].Header.Height), len(msg.Blocks))
 		for _, b := range msg.Blocks {
 			if err := nd.addBlock(b); err != nil {
 				if err == chain.ErrFoundForkedBlock {
@@ -350,7 +348,6 @@ func (nd *Node) addBlock(b *types.Block) error {
 			return chain.ErrFoundForkedBlock
 		}
 	} else {
-		log.Println("addBlock", uint64(b.Header.Height))
 		if item := nd.blockQ.FindOrInsert(b, uint64(b.Header.Height)); item != nil {
 			old := item.(*types.Block)
 			if encoding.Hash(old.Header) != encoding.Hash(b.Header) {

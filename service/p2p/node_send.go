@@ -1,7 +1,6 @@
 package p2p
 
 import (
-	"log"
 	"time"
 
 	"github.com/fletaio/fleta/common"
@@ -32,8 +31,6 @@ func (nd *Node) broadcastStatus() error {
 		LastHash: lastHash,
 	}
 	nd.ms.BroadcastMessage(nm)
-
-	log.Println("broadcastStatus", height)
 	return nil
 }
 
@@ -41,7 +38,6 @@ func (nd *Node) sendRequestBlockTo(TargetPubHash common.PublicHash, Height uint3
 	if TargetPubHash == nd.myPublicHash {
 		return nil
 	}
-	log.Println("sendRequestBlockTo", TargetPubHash.String(), Height, Count)
 
 	nm := &RequestMessage{
 		Height: Height,
