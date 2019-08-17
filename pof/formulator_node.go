@@ -36,6 +36,8 @@ type FormulatorNode struct {
 	key                  key.Key
 	ndkey                key.Key
 	myPublicHash         common.PublicHash
+	statusLock           sync.Mutex
+	genLock              sync.Mutex
 	lastGenMessages      []*BlockGenMessage
 	lastObSignMessageMap map[uint32]*BlockObSignMessage
 	lastContextes        []*types.Context
@@ -289,32 +291,32 @@ func (fr *FormulatorNode) OnItemExpired(Interval time.Duration, Key string, Item
 
 // OnObserverConnected is called after a new observer peer is connected
 func (fr *FormulatorNode) OnObserverConnected(p peer.Peer) {
-	fr.Lock()
+	fr.statusLock.Lock()
 	fr.obStatusMap[p.ID()] = &p2p.Status{}
-	fr.Unlock()
+	fr.statusLock.Unlock()
 }
 
 // OnObserverDisconnected is called when the observer peer is disconnected
 func (fr *FormulatorNode) OnObserverDisconnected(p peer.Peer) {
-	fr.Lock()
+	fr.statusLock.Lock()
 	delete(fr.obStatusMap, p.ID())
-	fr.Unlock()
+	fr.statusLock.Unlock()
 	fr.requestTimer.RemovesByValue(p.ID())
 	go fr.tryRequestNext()
 }
 
 // OnConnected is called after a new  peer is connected
 func (fr *FormulatorNode) OnConnected(p peer.Peer) {
-	fr.Lock()
+	fr.statusLock.Lock()
 	fr.statusMap[p.ID()] = &p2p.Status{}
-	fr.Unlock()
+	fr.statusLock.Unlock()
 }
 
 // OnDisconnected is called when the  peer is disconnected
 func (fr *FormulatorNode) OnDisconnected(p peer.Peer) {
-	fr.Lock()
+	fr.statusLock.Lock()
 	delete(fr.statusMap, p.ID())
-	fr.Unlock()
+	fr.statusLock.Unlock()
 	fr.requestNodeTimer.RemovesByValue(p.ID())
 	go fr.tryRequestBlocks()
 }
@@ -355,7 +357,7 @@ func (fr *FormulatorNode) OnRecv(p peer.Peer, m interface{}) error {
 			return err
 		}
 	case *p2p.StatusMessage:
-		fr.Lock()
+		fr.statusLock.Lock()
 		if status, has := fr.statusMap[p.ID()]; has {
 			if status.Height < msg.Height {
 				status.Version = msg.Version
@@ -363,7 +365,7 @@ func (fr *FormulatorNode) OnRecv(p peer.Peer, m interface{}) error {
 				status.LastHash = msg.LastHash
 			}
 		}
-		fr.Unlock()
+		fr.statusLock.Unlock()
 
 		Height := fr.cs.cn.Provider().Height()
 		if Height < msg.Height {
@@ -410,14 +412,14 @@ func (fr *FormulatorNode) OnRecv(p peer.Peer, m interface{}) error {
 		}
 
 		if len(msg.Blocks) > 0 {
-			fr.Lock()
+			fr.statusLock.Lock()
 			if status, has := fr.statusMap[p.ID()]; has {
 				lastHeight := msg.Blocks[len(msg.Blocks)-1].Header.Height
 				if status.Height < lastHeight {
 					status.Height = lastHeight
 				}
 			}
-			fr.Unlock()
+			fr.statusLock.Unlock()
 		}
 	case *p2p.TransactionMessage:
 		errCh := make(chan error)
@@ -454,14 +456,14 @@ func (fr *FormulatorNode) tryRequestBlocks() {
 		BaseHeight := Height + q*10
 
 		var selectedPubHash string
-		fr.Lock()
+		fr.statusLock.Lock()
 		for pubhash, status := range fr.statusMap {
 			if BaseHeight <= status.Height {
 				selectedPubHash = pubhash
 				break
 			}
 		}
-		fr.Unlock()
+		fr.statusLock.Unlock()
 
 		if len(selectedPubHash) == 0 {
 			break
@@ -509,6 +511,11 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 		if msg.TargetHeight <= fr.lastGenHeight && fr.lastGenTime+int64(30*time.Second) > time.Now().UnixNano() {
 			return nil
 		}
+		if fr.lastReqMessage != nil {
+			if msg.TargetHeight <= fr.lastReqMessage.TargetHeight {
+				return nil
+			}
+		}
 		if msg.TargetHeight <= Height {
 			return nil
 		}
@@ -555,120 +562,22 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 		if msg.TargetHeight != Height+1 {
 			return ErrInvalidRequest
 		}
-
-		fr.lastGenMessages = []*BlockGenMessage{}
-		fr.lastObSignMessageMap = map[uint32]*BlockObSignMessage{}
-		fr.lastContextes = []*types.Context{}
 		fr.lastReqMessage = msg
 
-		start := time.Now().UnixNano()
-		Now := uint64(time.Now().UnixNano())
-		StartBlockTime := Now
-		bNoDelay := false
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func(req *BlockReqMessage) error {
+			wg.Done()
 
-		RemainBlocks := fr.cs.maxBlocksPerFormulator
-		if msg.TimeoutCount == 0 {
-			RemainBlocks = fr.cs.maxBlocksPerFormulator - fr.cs.blocksBySameFormulator
-		}
+			fr.Lock()
+			defer fr.Unlock()
 
-		LastTimestamp := cp.LastTimestamp()
-		if StartBlockTime < LastTimestamp {
-			StartBlockTime = LastTimestamp + uint64(time.Millisecond)
-		} else if StartBlockTime > LastTimestamp+uint64(RemainBlocks)*uint64(500*time.Millisecond) {
-			bNoDelay = true
-		}
-		ctx := fr.cs.ct.NewContext()
-		for i := uint32(0); i < RemainBlocks; i++ {
-			var TimeoutCount uint32
-			if i == 0 {
-				TimeoutCount = msg.TimeoutCount
-			} else {
-				lastHeader := fr.lastGenMessages[len(fr.lastGenMessages)-1].Block.Header
-				ctx = ctx.NextContext(encoding.Hash(lastHeader), lastHeader.Timestamp)
-			}
+			fr.genLock.Lock()
+			defer fr.genLock.Unlock()
 
-			Timestamp := StartBlockTime
-			if bNoDelay || Timestamp > Now+uint64(3*time.Second) {
-				Timestamp += uint64(i) * uint64(time.Millisecond)
-			} else {
-				Timestamp += uint64(i) * uint64(500*time.Millisecond)
-			}
-			if Timestamp <= ctx.LastTimestamp() {
-				Timestamp = ctx.LastTimestamp() + 1
-			}
-
-			var buffer bytes.Buffer
-			enc := encoding.NewEncoder(&buffer)
-			if err := enc.EncodeUint32(TimeoutCount); err != nil {
-				return err
-			}
-			bc := chain.NewBlockCreator(fr.cs.cn, ctx, msg.Formulator, buffer.Bytes())
-			if err := bc.Init(); err != nil {
-				return err
-			}
-
-			timer := time.NewTimer(200 * time.Millisecond)
-
-			fr.txpool.Lock() // Prevent delaying from TxPool.Push
-			Count := 0
-		TxLoop:
-			for {
-				select {
-				case <-timer.C:
-					break TxLoop
-				default:
-					sn := ctx.Snapshot()
-					item := fr.txpool.UnsafePop(ctx)
-					ctx.Revert(sn)
-					if item == nil {
-						break TxLoop
-					}
-					if err := bc.UnsafeAddTx(fr.Config.Formulator, item.TxType, item.TxHash, item.Transaction, item.Signatures, item.Signers); err != nil {
-						rlog.Println(err)
-						continue
-					}
-					Count++
-					if Count > fr.Config.MaxTransactionsPerBlock {
-						break TxLoop
-					}
-				}
-			}
-			fr.txpool.Unlock() // Prevent delaying from TxPool.Push
-
-			b, err := bc.Finalize(Timestamp)
-			if err != nil {
-				return err
-			}
-
-			nm := &BlockGenMessage{
-				Block: b,
-			}
-
-			if sig, err := fr.key.Sign(encoding.Hash(b.Header)); err != nil {
-				return err
-			} else {
-				nm.GeneratorSignature = sig
-			}
-
-			if err := p.Send(nm); err != nil {
-				return err
-			}
-			rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockGenMessage", nm.Block.Header.Height, len(nm.Block.Transactions))
-
-			fr.lastGenMessages = append(fr.lastGenMessages, nm)
-			fr.lastContextes = append(fr.lastContextes, ctx)
-			fr.lastGenHeight = ctx.TargetHeight()
-			fr.lastGenTime = time.Now().UnixNano()
-
-			ExpectedTime := time.Duration(i+1) * 500 * time.Millisecond
-			if i >= 7 {
-				ExpectedTime = time.Duration(i+1) * 200 * time.Millisecond
-			}
-			PastTime := time.Duration(time.Now().UnixNano() - start)
-			if !bNoDelay && ExpectedTime > PastTime {
-				time.Sleep(ExpectedTime - PastTime)
-			}
-		}
+			return fr.genBlock(p, req)
+		}(msg)
+		wg.Wait()
 		return nil
 	case *BlockObSignMessage:
 		rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockObSignMessage", msg.TargetHeight)
@@ -676,10 +585,8 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 		fr.Lock()
 		defer fr.Unlock()
 
-		if len(fr.lastGenMessages) == 0 {
-			return nil
-		}
-		if msg.TargetHeight <= fr.cs.cn.Provider().Height() {
+		TargetHeight := fr.cs.cn.Provider().Height() + 1
+		if msg.TargetHeight < TargetHeight {
 			return nil
 		}
 		if msg.TargetHeight >= fr.lastReqMessage.TargetHeight+10 {
@@ -689,6 +596,19 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 
 		for len(fr.lastGenMessages) > 0 {
 			GenMessage := fr.lastGenMessages[0]
+			if GenMessage.Block.Header.Height < TargetHeight {
+				if len(fr.lastGenMessages) > 1 {
+					fr.lastGenMessages = fr.lastGenMessages[1:]
+					fr.lastContextes = fr.lastContextes[1:]
+				} else {
+					fr.lastGenMessages = []*BlockGenMessage{}
+					fr.lastContextes = []*types.Context{}
+				}
+				continue
+			}
+			if GenMessage.Block.Header.Height > TargetHeight {
+				break
+			}
 			sm, has := fr.lastObSignMessageMap[GenMessage.Block.Header.Height]
 			if !has {
 				break
@@ -715,11 +635,13 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 				fr.cleanPool(b)
 				rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Transactions))
 
+				fr.statusLock.Lock()
 				if status, has := fr.obStatusMap[p.ID()]; has {
 					if status.Height < GenMessage.Block.Header.Height {
 						status.Height = GenMessage.Block.Header.Height
 					}
 				}
+				fr.statusLock.Unlock()
 
 				if len(fr.lastGenMessages) > 1 {
 					fr.lastGenMessages = fr.lastGenMessages[1:]
@@ -771,20 +693,20 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 		}
 
 		if len(msg.Blocks) > 0 {
-			fr.Lock()
+			fr.statusLock.Lock()
 			if status, has := fr.obStatusMap[p.ID()]; has {
 				lastHeight := msg.Blocks[len(msg.Blocks)-1].Header.Height
 				if status.Height < lastHeight {
 					status.Height = lastHeight
 				}
 			}
-			fr.Unlock()
+			fr.statusLock.Unlock()
 
 			fr.tryRequestNext()
 		}
 		return nil
 	case *p2p.StatusMessage:
-		fr.Lock()
+		fr.statusLock.Lock()
 		if status, has := fr.obStatusMap[p.ID()]; has {
 			if status.Height < msg.Height {
 				status.Version = msg.Version
@@ -792,7 +714,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 				status.LastHash = msg.LastHash
 			}
 		}
-		fr.Unlock()
+		fr.statusLock.Unlock()
 
 		TargetHeight := cp.Height() + 1
 		for TargetHeight <= msg.Height {
@@ -859,7 +781,7 @@ func (fr *FormulatorNode) tryRequestNext() {
 	TargetHeight := fr.cs.cn.Provider().Height() + 1
 	if !fr.requestTimer.Exist(TargetHeight) {
 		if fr.blockQ.Find(uint64(TargetHeight)) == nil {
-			fr.Lock()
+			fr.statusLock.Lock()
 			var TargetPubHash string
 			for pubhash, status := range fr.obStatusMap {
 				if TargetHeight <= status.Height {
@@ -867,7 +789,7 @@ func (fr *FormulatorNode) tryRequestNext() {
 					break
 				}
 			}
-			fr.Unlock()
+			fr.statusLock.Unlock()
 
 			if len(TargetPubHash) > 0 {
 				fr.sendRequestBlockTo(TargetPubHash, TargetHeight, 1)
@@ -883,4 +805,126 @@ func (fr *FormulatorNode) cleanPool(b *types.Block) {
 		fr.txpool.Remove(TxHash, tx)
 		fr.txQ.Remove(string(TxHash[:]))
 	}
+}
+
+func (fr *FormulatorNode) genBlock(p peer.Peer, msg *BlockReqMessage) error {
+	cp := fr.cs.cn.Provider()
+
+	fr.lastGenMessages = []*BlockGenMessage{}
+	fr.lastObSignMessageMap = map[uint32]*BlockObSignMessage{}
+	fr.lastContextes = []*types.Context{}
+
+	start := time.Now().UnixNano()
+	Now := uint64(time.Now().UnixNano())
+	StartBlockTime := Now
+	bNoDelay := false
+
+	RemainBlocks := fr.cs.maxBlocksPerFormulator
+	if msg.TimeoutCount == 0 {
+		RemainBlocks = fr.cs.maxBlocksPerFormulator - fr.cs.blocksBySameFormulator
+	}
+
+	LastTimestamp := cp.LastTimestamp()
+	if StartBlockTime < LastTimestamp {
+		StartBlockTime = LastTimestamp + uint64(time.Millisecond)
+	} else if StartBlockTime > LastTimestamp+uint64(RemainBlocks)*uint64(500*time.Millisecond) {
+		bNoDelay = true
+	}
+
+	var lastHeader *types.Header
+	ctx := fr.cs.ct.NewContext()
+	for i := uint32(0); i < RemainBlocks; i++ {
+		var TimeoutCount uint32
+		if i == 0 {
+			TimeoutCount = msg.TimeoutCount
+		} else {
+			ctx = ctx.NextContext(encoding.Hash(lastHeader), lastHeader.Timestamp)
+		}
+
+		Timestamp := StartBlockTime
+		if bNoDelay || Timestamp > Now+uint64(3*time.Second) {
+			Timestamp += uint64(i) * uint64(time.Millisecond)
+		} else {
+			Timestamp += uint64(i) * uint64(500*time.Millisecond)
+		}
+		if Timestamp <= ctx.LastTimestamp() {
+			Timestamp = ctx.LastTimestamp() + 1
+		}
+
+		var buffer bytes.Buffer
+		enc := encoding.NewEncoder(&buffer)
+		if err := enc.EncodeUint32(TimeoutCount); err != nil {
+			return err
+		}
+		bc := chain.NewBlockCreator(fr.cs.cn, ctx, msg.Formulator, buffer.Bytes())
+		if err := bc.Init(); err != nil {
+			return err
+		}
+
+		timer := time.NewTimer(200 * time.Millisecond)
+
+		fr.txpool.Lock() // Prevent delaying from TxPool.Push
+		Count := 0
+	TxLoop:
+		for {
+			select {
+			case <-timer.C:
+				break TxLoop
+			default:
+				sn := ctx.Snapshot()
+				item := fr.txpool.UnsafePop(ctx)
+				ctx.Revert(sn)
+				if item == nil {
+					break TxLoop
+				}
+				if err := bc.UnsafeAddTx(fr.Config.Formulator, item.TxType, item.TxHash, item.Transaction, item.Signatures, item.Signers); err != nil {
+					rlog.Println(err)
+					continue
+				}
+				Count++
+				if Count > fr.Config.MaxTransactionsPerBlock {
+					break TxLoop
+				}
+			}
+		}
+		fr.txpool.Unlock() // Prevent delaying from TxPool.Push
+
+		b, err := bc.Finalize(Timestamp)
+		if err != nil {
+			return err
+		}
+
+		nm := &BlockGenMessage{
+			Block: b,
+		}
+		lastHeader = &b.Header
+
+		if sig, err := fr.key.Sign(encoding.Hash(b.Header)); err != nil {
+			return err
+		} else {
+			nm.GeneratorSignature = sig
+		}
+
+		if err := p.Send(nm); err != nil {
+			return err
+		}
+		rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockGenMessage", nm.Block.Header.Height, len(nm.Block.Transactions))
+
+		fr.lastGenMessages = append(fr.lastGenMessages, nm)
+		fr.lastContextes = append(fr.lastContextes, ctx)
+		fr.lastGenHeight = ctx.TargetHeight()
+		fr.lastGenTime = time.Now().UnixNano()
+
+		ExpectedTime := time.Duration(i+1) * 500 * time.Millisecond
+		if i >= 7 {
+			ExpectedTime = time.Duration(i+1) * 200 * time.Millisecond
+		}
+		PastTime := time.Duration(time.Now().UnixNano() - start)
+		if !bNoDelay && ExpectedTime > PastTime {
+			fr.Unlock()
+			time.Sleep(ExpectedTime - PastTime)
+			fr.Lock()
+		}
+	}
+	return nil
 }
