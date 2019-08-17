@@ -144,7 +144,7 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 		case <-blockTimer.C:
 			cp := ob.cs.cn.Provider()
 			ob.Lock()
-			hasTime := false
+			hasItem := false
 			TargetHeight := uint64(cp.Height() + 1)
 			item := ob.blockQ.PopUntil(TargetHeight)
 			for item != nil {
@@ -159,11 +159,11 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 				}
 				TargetHeight++
 				item = ob.blockQ.PopUntil(TargetHeight)
-				hasTime = true
+				hasItem = true
 			}
 			ob.Unlock()
 
-			if hasTime {
+			if hasItem {
 				ob.broadcastStatus()
 			}
 			blockTimer.Reset(50 * time.Millisecond)
