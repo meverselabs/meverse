@@ -1103,7 +1103,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 					break
 				}
 				enableCount := 0
-				for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
+				for i := BaseHeight + 1; i <= BaseHeight+10 && i <= msg.Height; i++ {
 					if !ob.requestTimer.Exist(i) {
 						enableCount++
 					}
@@ -1111,7 +1111,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 				if enableCount == 10 {
 					ob.sendRequestBlockTo(SenderPublicHash, BaseHeight+1, 10)
 				} else if enableCount > 0 {
-					for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
+					for i := BaseHeight + 1; i <= BaseHeight+10 && i <= msg.Height; i++ {
 						if !ob.requestTimer.Exist(i) {
 							ob.sendRequestBlockTo(SenderPublicHash, i, 1)
 						}

@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"log"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -261,7 +262,7 @@ func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
 					break
 				}
 				enableCount := 0
-				for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
+				for i := BaseHeight + 1; i <= BaseHeight+10 && i <= msg.Height; i++ {
 					if !nd.requestTimer.Exist(i) {
 						enableCount++
 					}
@@ -269,7 +270,7 @@ func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
 				if enableCount == 10 {
 					nd.sendRequestBlockTo(SenderPublicHash, BaseHeight+1, 10)
 				} else if enableCount > 0 {
-					for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
+					for i := BaseHeight + 1; i <= BaseHeight+10 && i <= msg.Height; i++ {
 						if !nd.requestTimer.Exist(i) {
 							nd.sendRequestBlockTo(SenderPublicHash, i, 1)
 						}
@@ -289,6 +290,7 @@ func (nd *Node) OnRecv(p peer.Peer, m interface{}) error {
 		}
 		return nil
 	case *BlockMessage:
+		log.Println("BlockMessage", uint64(msg.Blocks[0].Header.Height), len(msg.Blocks))
 		for _, b := range msg.Blocks {
 			if err := nd.addBlock(b); err != nil {
 				if err == chain.ErrFoundForkedBlock {
@@ -348,6 +350,7 @@ func (nd *Node) addBlock(b *types.Block) error {
 			return chain.ErrFoundForkedBlock
 		}
 	} else {
+		log.Println("addBlock", uint64(b.Header.Height))
 		if item := nd.blockQ.FindOrInsert(b, uint64(b.Header.Height)); item != nil {
 			old := item.(*types.Block)
 			if encoding.Hash(old.Header) != encoding.Hash(b.Header) {
@@ -432,12 +435,23 @@ func (nd *Node) tryRequestBlocks() {
 	for q := uint32(0); q < 10; q++ {
 		BaseHeight := Height + q*10
 
+		var LimitHeight uint32
 		var selectedPubHash string
 		nd.statusLock.Lock()
 		for pubhash, status := range nd.statusMap {
-			if BaseHeight <= status.Height {
+			if BaseHeight+10 <= status.Height {
 				selectedPubHash = pubhash
+				LimitHeight = status.Height
 				break
+			}
+		}
+		if len(selectedPubHash) == 0 {
+			for pubhash, status := range nd.statusMap {
+				if BaseHeight <= status.Height {
+					selectedPubHash = pubhash
+					LimitHeight = status.Height
+					break
+				}
 			}
 		}
 		nd.statusLock.Unlock()
@@ -446,7 +460,7 @@ func (nd *Node) tryRequestBlocks() {
 			break
 		}
 		enableCount := 0
-		for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
+		for i := BaseHeight + 1; i <= BaseHeight+10 && i <= LimitHeight; i++ {
 			if !nd.requestTimer.Exist(i) {
 				enableCount++
 			}
@@ -457,7 +471,7 @@ func (nd *Node) tryRequestBlocks() {
 		if enableCount == 10 {
 			nd.sendRequestBlockTo(TargetPublicHash, BaseHeight+1, 10)
 		} else if enableCount > 0 {
-			for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
+			for i := BaseHeight + 1; i <= BaseHeight+10 && i <= LimitHeight; i++ {
 				if !nd.requestTimer.Exist(i) {
 					nd.sendRequestBlockTo(TargetPublicHash, i, 1)
 				}

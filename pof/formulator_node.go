@@ -375,7 +375,7 @@ func (fr *FormulatorNode) OnRecv(p peer.Peer, m interface{}) error {
 					break
 				}
 				enableCount := 0
-				for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
+				for i := BaseHeight + 1; i <= BaseHeight+10 && i <= msg.Height; i++ {
 					if !fr.requestNodeTimer.Exist(i) {
 						enableCount++
 					}
@@ -383,7 +383,7 @@ func (fr *FormulatorNode) OnRecv(p peer.Peer, m interface{}) error {
 				if enableCount == 10 {
 					fr.sendRequestBlockToNode(SenderPublicHash, BaseHeight+1, 10)
 				} else if enableCount > 0 {
-					for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
+					for i := BaseHeight + 1; i <= BaseHeight+10 && i <= msg.Height; i++ {
 						if !fr.requestNodeTimer.Exist(i) {
 							fr.sendRequestBlockToNode(SenderPublicHash, i, 1)
 						}
@@ -455,12 +455,23 @@ func (fr *FormulatorNode) tryRequestBlocks() {
 	for q := uint32(0); q < 10; q++ {
 		BaseHeight := Height + q*10
 
+		var LimitHeight uint32
 		var selectedPubHash string
 		fr.statusLock.Lock()
 		for pubhash, status := range fr.statusMap {
-			if BaseHeight <= status.Height {
+			if BaseHeight+10 <= status.Height {
 				selectedPubHash = pubhash
+				LimitHeight = status.Height
 				break
+			}
+		}
+		if len(selectedPubHash) == 0 {
+			for pubhash, status := range fr.statusMap {
+				if BaseHeight <= status.Height {
+					selectedPubHash = pubhash
+					LimitHeight = status.Height
+					break
+				}
 			}
 		}
 		fr.statusLock.Unlock()
@@ -469,7 +480,7 @@ func (fr *FormulatorNode) tryRequestBlocks() {
 			break
 		}
 		enableCount := 0
-		for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
+		for i := BaseHeight + 1; i <= BaseHeight+10 && i <= LimitHeight; i++ {
 			if !fr.requestNodeTimer.Exist(i) {
 				enableCount++
 			}
@@ -480,7 +491,7 @@ func (fr *FormulatorNode) tryRequestBlocks() {
 		if enableCount == 10 {
 			fr.sendRequestBlockToNode(TargetPublicHash, BaseHeight+1, 10)
 		} else if enableCount > 0 {
-			for i := BaseHeight + 1; i <= BaseHeight+10; i++ {
+			for i := BaseHeight + 1; i <= BaseHeight+10 && i <= LimitHeight; i++ {
 				if !fr.requestNodeTimer.Exist(i) {
 					fr.sendRequestBlockToNode(TargetPublicHash, i, 1)
 				}
