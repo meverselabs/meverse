@@ -535,17 +535,19 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 				return nil
 			}
 
-			Count := uint8(msg.TargetHeight - Height - 1)
-			if Count > 10 {
-				Count = 10
-			}
+			if RetryCount == 0 {
+				Count := uint8(msg.TargetHeight - Height - 1)
+				if Count > 10 {
+					Count = 10
+				}
 
-			sm := &p2p.RequestMessage{
-				Height: Height + 1,
-				Count:  Count,
-			}
-			if err := p.Send(sm); err != nil {
-				return err
+				sm := &p2p.RequestMessage{
+					Height: Height + 1,
+					Count:  Count,
+				}
+				if err := p.Send(sm); err != nil {
+					return err
+				}
 			}
 			go func() {
 				time.Sleep(50 * time.Millisecond)
