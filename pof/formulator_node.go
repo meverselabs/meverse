@@ -531,7 +531,7 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 			return nil
 		}
 		if msg.TargetHeight > Height+1 {
-			if RetryCount >= 5 {
+			if RetryCount >= 10 {
 				return nil
 			}
 
