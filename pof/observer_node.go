@@ -344,8 +344,6 @@ func (ob *ObserverNode) onFormulatorRecv(p peer.Peer, m interface{}, raw []byte)
 				enable = rankMap[p.ID()]
 			}
 			if enable {
-				p.UpdateGuessHeight(msg.Height)
-
 				if msg.Count == 0 {
 					msg.Count = 1
 				}
@@ -372,6 +370,9 @@ func (ob *ObserverNode) onFormulatorRecv(p peer.Peer, m interface{}, raw []byte)
 				}
 				if err := p.Send(sm); err != nil {
 					return err
+				}
+				if len(list) > 0 {
+					p.UpdateGuessHeight(list[len(list)-1].Header.Height)
 				}
 			}
 		}
@@ -1005,7 +1006,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 				ob.fs.SendTo(ob.round.MinRoundVoteAck.Formulator, nm)
 				ob.fs.UpdateGuessHeight(ob.round.MinRoundVoteAck.Formulator, nm.TargetHeight)
 
-				if NextTop != nil && NextTop.Address != ob.round.MinRoundVoteAck.Formulator {
+				if NextTop != nil {
 					ob.fs.SendTo(NextTop.Address, &p2p.StatusMessage{
 						Version:  b.Header.Version,
 						Height:   b.Header.Height,
@@ -1015,7 +1016,6 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 			} else {
 				if NextTop != nil {
 					delete(adjustMap, NextTop.Address)
-					ob.fs.UpdateGuessHeight(NextTop.Address, b.Header.Height)
 				}
 				if len(adjustMap) > 0 {
 					ranks, err := ob.cs.rt.RanksInMap(adjustMap, 3)
