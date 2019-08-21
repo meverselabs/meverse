@@ -294,6 +294,15 @@ func (fr *FormulatorNode) OnObserverConnected(p peer.Peer) {
 	fr.statusLock.Lock()
 	fr.obStatusMap[p.ID()] = &p2p.Status{}
 	fr.statusLock.Unlock()
+
+	cp := fr.cs.cn.Provider()
+	height, lastHash, _ := cp.LastStatus()
+	nm := &p2p.StatusMessage{
+		Version:  cp.Version(),
+		Height:   height,
+		LastHash: lastHash,
+	}
+	p.Send(nm)
 }
 
 // OnObserverDisconnected is called when the observer peer is disconnected
