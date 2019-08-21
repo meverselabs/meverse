@@ -1,6 +1,8 @@
 package txpool
 
 import (
+	"bytes"
+	"strconv"
 	"sync"
 
 	"github.com/fletaio/fleta/common"
@@ -88,7 +90,9 @@ func (tp *TransactionPool) Push(ChainID uint8, t uint16, TxHash hash.Hash256, tx
 			q = queue.NewSortedQueue()
 			tp.bucketMap[addr] = q
 		}
-		q.Insert(item, atx.Seq())
+		if q.FindOrInsert(item, atx.Seq()) != nil {
+			return ErrExistTransactionSeq
+		}
 		tp.numberQ.Push(addr)
 		tp.turnQ.Push(false)
 	}
@@ -117,11 +121,11 @@ func (tp *TransactionPool) Remove(TxHash hash.Hash256, t types.Transaction) {
 				}
 				v, _ := q.Peek()
 				item := v.(*PoolItem)
-				if tx.Seq() < item.Transaction.(chain.AccountTransaction).Seq() {
+				if tx.Seq() <= item.Transaction.(chain.AccountTransaction).Seq() {
 					break
 				}
 				q.Pop()
-				delete(tp.txhashMap, chain.HashTransaction(item.ChainID, item.Transaction))
+				delete(tp.txhashMap, item.TxHash)
 				tp.turnOutMap[false]++
 				tp.numberOutMap[addr]++
 			}
@@ -158,7 +162,7 @@ func (tp *TransactionPool) UnsafePop(SeqCache SeqCache) *PoolItem {
 	}
 	if bTurn {
 		item := tp.utxoQ.Pop().(*PoolItem)
-		delete(tp.txhashMap, chain.HashTransaction(item.ChainID, item.Transaction))
+		delete(tp.txhashMap, item.TxHash)
 		return item
 	} else {
 		remain := tp.numberQ.Size()
@@ -197,6 +201,7 @@ func (tp *TransactionPool) UnsafePop(SeqCache SeqCache) *PoolItem {
 			lastSeq := SeqCache.Seq(addr)
 			if item.Transaction.(chain.AccountTransaction).Seq() != lastSeq+1 {
 				ignoreMap[addr] = true
+				tp.turnQ.Push(false)
 				tp.numberQ.Push(addr)
 				if remain > 0 {
 					continue
@@ -205,7 +210,7 @@ func (tp *TransactionPool) UnsafePop(SeqCache SeqCache) *PoolItem {
 				}
 			}
 			q.Pop()
-			delete(tp.txhashMap, chain.HashTransaction(item.ChainID, item.Transaction))
+			delete(tp.txhashMap, item.TxHash)
 			if q.Size() == 0 {
 				delete(tp.bucketMap, addr)
 			}
@@ -222,4 +227,87 @@ type PoolItem struct {
 	Transaction types.Transaction
 	Signatures  []common.Signature
 	Signers     []common.PublicHash
+}
+
+// Dump do dump
+func (tp *TransactionPool) Dump() string {
+	tp.Lock()
+	defer tp.Unlock()
+
+	var buffer bytes.Buffer
+	if tp.turnQ.Size() > 0 {
+		buffer.WriteString("turnQ\n")
+		tp.turnQ.Iter(func(value interface{}) {
+			if value.(bool) {
+				buffer.WriteString("true")
+			} else {
+				buffer.WriteString("false")
+			}
+			buffer.WriteString("\n")
+		})
+		buffer.WriteString("\n")
+	}
+	if tp.numberQ.Size() > 0 {
+		buffer.WriteString("numberQ\n")
+		tp.numberQ.Iter(func(value interface{}) {
+			buffer.WriteString(value.(common.Address).String())
+			buffer.WriteString("\n")
+		})
+		buffer.WriteString("\n")
+	}
+	if len(tp.txhashMap) > 0 {
+		buffer.WriteString("txhashMap\n")
+		for k, v := range tp.txhashMap {
+			buffer.WriteString(k.String() + ":")
+			if v {
+				buffer.WriteString("true")
+			} else {
+				buffer.WriteString("false")
+			}
+			buffer.WriteString("\n")
+		}
+		buffer.WriteString("\n")
+	}
+	if len(tp.turnOutMap) > 0 {
+		buffer.WriteString("turnOutMap\n")
+		for k, v := range tp.turnOutMap {
+			if k {
+				buffer.WriteString("true")
+			} else {
+				buffer.WriteString("false")
+			}
+			buffer.WriteString(":")
+			buffer.WriteString(strconv.Itoa(v))
+			buffer.WriteString("\n")
+		}
+		buffer.WriteString("\n")
+	}
+	if len(tp.numberOutMap) > 0 {
+		buffer.WriteString("numberOutMap\n")
+		for k, v := range tp.numberOutMap {
+			buffer.WriteString(k.String())
+			buffer.WriteString(":")
+			buffer.WriteString(strconv.Itoa(v))
+			buffer.WriteString("\n")
+		}
+		buffer.WriteString("\n")
+	}
+	if len(tp.bucketMap) > 0 {
+		buffer.WriteString("bucketMap\n")
+		for k, v := range tp.bucketMap {
+			buffer.WriteString(k.String())
+			buffer.WriteString(":")
+			buffer.WriteString("\n")
+			v.Iter(func(value interface{}, priority uint64) {
+				buffer.WriteString(strconv.FormatUint(priority, 10))
+				buffer.WriteString(":")
+				k := value.(*PoolItem)
+				buffer.WriteString(k.TxHash.String())
+				buffer.WriteString("\n")
+			})
+			buffer.WriteString("\n")
+		}
+		buffer.WriteString("\n")
+	}
+	return buffer.String()
 }

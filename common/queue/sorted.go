@@ -171,6 +171,17 @@ func (q *SortedQueue) Size() int {
 	return q.size
 }
 
+// Iter iterates queue items
+func (q *SortedQueue) Iter(fn func(v interface{}, priority uint64)) {
+	q.Lock()
+	defer q.Unlock()
+
+	for i := 0; i < q.size; i++ {
+		item := q.items[q.head+i]
+		fn(item.value, item.priority)
+	}
+}
+
 type sortedQueueItem struct {
 	value    interface{}
 	priority uint64

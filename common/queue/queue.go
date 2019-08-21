@@ -127,3 +127,21 @@ func (page *queuePage) pop() interface{} {
 func (page *queuePage) cap() int {
 	return len(page.queue)
 }
+
+// Iter iterates queue items
+func (q *Queue) Iter(fn func(v interface{})) {
+	q.Lock()
+	defer q.Unlock()
+
+	for _, page := range q.pages {
+		page.iter(fn)
+	}
+}
+
+// Iter iterates queue items
+func (page *queuePage) iter(fn func(v interface{})) {
+	for i := 0; i < page.size; i++ {
+		item := page.queue[(page.head+i)%page.cap()]
+		fn(item)
+	}
+}
