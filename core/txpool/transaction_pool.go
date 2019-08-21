@@ -109,7 +109,12 @@ func (tp *TransactionPool) Remove(TxHash hash.Hash256, t types.Transaction) {
 	tx, is := t.(chain.AccountTransaction)
 	if !is {
 		if tp.utxoQ.Remove(TxHash) != nil {
-			tp.turnOutMap[true]++
+			turn := tp.turnQ.Peek()
+			if turn != nil && turn == true {
+				tp.turnQ.Pop()
+			} else {
+				tp.turnOutMap[true]++
+			}
 			delete(tp.txhashMap, TxHash)
 		}
 	} else {
@@ -126,8 +131,18 @@ func (tp *TransactionPool) Remove(TxHash hash.Hash256, t types.Transaction) {
 				}
 				q.Pop()
 				delete(tp.txhashMap, item.TxHash)
-				tp.turnOutMap[false]++
-				tp.numberOutMap[addr]++
+				turn := tp.turnQ.Peek()
+				if turn != nil && turn == false {
+					tp.turnQ.Pop()
+				} else {
+					tp.turnOutMap[false]++
+				}
+				number := tp.numberQ.Peek()
+				if number != nil && number == addr {
+					tp.numberQ.Pop()
+				} else {
+					tp.numberOutMap[addr]++
+				}
 			}
 			if q.Size() == 0 {
 				delete(tp.bucketMap, addr)
@@ -192,6 +207,7 @@ func (tp *TransactionPool) UnsafePop(SeqCache SeqCache) *PoolItem {
 				if remain > 0 {
 					continue
 				} else {
+					tp.turnQ.Push(false)
 					return nil
 				}
 			}
@@ -199,13 +215,27 @@ func (tp *TransactionPool) UnsafePop(SeqCache SeqCache) *PoolItem {
 			v, _ := q.Peek()
 			item := v.(*PoolItem)
 			lastSeq := SeqCache.Seq(addr)
-			if item.Transaction.(chain.AccountTransaction).Seq() != lastSeq+1 {
+			txSeq := item.Transaction.(chain.AccountTransaction).Seq()
+			if txSeq < lastSeq+1 {
+				turn := tp.turnQ.Peek()
+				if turn != nil && turn == false {
+					tp.turnQ.Pop()
+				} else {
+					tp.turnOutMap[false]++
+				}
+				q.Pop()
+				delete(tp.txhashMap, item.TxHash)
+				if q.Size() == 0 {
+					delete(tp.bucketMap, addr)
+				}
+				continue
+			} else if txSeq > lastSeq+1 {
 				ignoreMap[addr] = true
-				tp.turnQ.Push(false)
 				tp.numberQ.Push(addr)
 				if remain > 0 {
 					continue
 				} else {
+					tp.turnQ.Push(false)
 					return nil
 				}
 			}
