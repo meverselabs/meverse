@@ -161,21 +161,25 @@ func (tp *TransactionPool) Pop(SeqCache SeqCache) *PoolItem {
 
 // UnsafePop returns and removes the proper transaction without mutex locking
 func (tp *TransactionPool) UnsafePop(SeqCache SeqCache) *PoolItem {
-	var bTurn bool
+	var turn bool
 	for {
-		turn := tp.turnQ.Pop()
-		if turn == nil {
+		if tp.turnQ.Size() == 0 {
 			return nil
 		}
-		bTurn = turn.(bool)
-		tout := tp.turnOutMap[bTurn]
+		turn = tp.turnQ.Pop().(bool)
+		tout := tp.turnOutMap[turn]
 		if tout > 0 {
-			tp.turnOutMap[bTurn] = tout - 1
-			continue
+			tout--
+			if tout == 0 {
+				delete(tp.turnOutMap, turn)
+			} else {
+				tp.turnOutMap[turn] = tout
+			}
+		} else {
+			break
 		}
-		break
 	}
-	if bTurn {
+	if turn {
 		item := tp.utxoQ.Pop().(*PoolItem)
 		delete(tp.txhashMap, item.TxHash)
 		return item
@@ -198,9 +202,9 @@ func (tp *TransactionPool) UnsafePop(SeqCache SeqCache) *PoolItem {
 					} else {
 						tp.numberOutMap[addr] = nout
 					}
-					continue
+				} else {
+					break
 				}
-				break
 			}
 			if ignoreMap[addr] {
 				tp.numberQ.Push(addr)
@@ -217,18 +221,22 @@ func (tp *TransactionPool) UnsafePop(SeqCache SeqCache) *PoolItem {
 			lastSeq := SeqCache.Seq(addr)
 			txSeq := item.Transaction.(chain.AccountTransaction).Seq()
 			if txSeq < lastSeq+1 {
-				turn := tp.turnQ.Peek()
-				if turn != nil && turn == false {
-					tp.turnQ.Pop()
-				} else {
-					tp.turnOutMap[false]++
-				}
 				q.Pop()
 				delete(tp.txhashMap, item.TxHash)
 				if q.Size() == 0 {
 					delete(tp.bucketMap, addr)
 				}
-				continue
+				if remain > 0 {
+					turn := tp.turnQ.Peek()
+					if turn != nil && turn == false {
+						tp.turnQ.Pop()
+					} else {
+						tp.turnOutMap[false]++
+					}
+					continue
+				} else {
+					return nil
+				}
 			} else if txSeq > lastSeq+1 {
 				ignoreMap[addr] = true
 				tp.numberQ.Push(addr)
