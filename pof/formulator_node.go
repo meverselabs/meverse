@@ -183,8 +183,8 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 				if err := fr.cs.cn.ConnectBlock(b); err != nil {
 					break
 				}
-				rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Transactions))
 				fr.cleanPool(b)
+				rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Transactions))
 				TargetHeight++
 				item = fr.blockQ.PopUntil(TargetHeight)
 				hasItem = true
@@ -875,6 +875,8 @@ func (fr *FormulatorNode) genBlock(p peer.Peer, msg *BlockReqMessage) error {
 		}
 
 		timer := time.NewTimer(200 * time.Millisecond)
+
+		rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockGenBegin", msg.TargetHeight)
 
 		fr.txpool.Lock() // Prevent delaying from TxPool.Push
 		Count := 0
