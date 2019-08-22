@@ -606,9 +606,13 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 				if MinRoundVoteAck.TimeoutCount == 0 {
 					RemainBlocks = ob.cs.maxBlocksPerFormulator - ob.cs.blocksBySameFormulator
 				}
-				for TargetHeight := range ob.round.BlockRoundMap {
+				for TargetHeight, br := range ob.round.BlockRoundMap {
 					if TargetHeight >= ob.round.TargetHeight+RemainBlocks {
 						delete(ob.round.BlockRoundMap, TargetHeight)
+					} else if br.BlockGenMessageWait != nil {
+						if br.BlockGenMessageWait.Block.Header.Generator != ob.round.MinRoundVoteAck.Formulator {
+							br.BlockGenMessageWait = nil
+						}
 					}
 				}
 
@@ -744,7 +748,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 			return err
 		}
 		if msg.Block.Header.Generator != Top.Address {
-			rlog.Println(msg.Block.Header.Generator.String(), "if msg.Block.Header.Generator != Top.Address {", msg.Block.Header.Generator.String(), Top.Address.String())
+			rlog.Println(msg.Block.Header.Generator.String(), "if msg.Block.Header.Generator != Top.Address {", msg.Block.Header.Generator.String(), Top.Address.String(), TimeoutCount)
 			return ErrInvalidVote
 		}
 		if msg.Block.Header.Generator != ob.round.MinRoundVoteAck.Formulator {
