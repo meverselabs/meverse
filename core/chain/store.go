@@ -54,30 +54,35 @@ func NewStore(path string, ChainID uint8, name string, version uint16, bRecover 
 		return nil, err
 	}
 
-	ticker := time.NewTicker(5 * time.Minute)
-	go func() {
-		for range ticker.C {
-			MaxCount := 10
-			Count := 0
-		again:
-			if err := db.RunValueLogGC(0.5); err != nil {
-			} else {
-				Count++
-				if Count < MaxCount {
-					goto again
-				}
-			}
-		}
-	}()
-
-	return &Store{
+	st := &Store{
 		db:      db,
-		ticker:  ticker,
+		ticker:  time.NewTicker(5 * time.Minute),
 		chainID: ChainID,
 		name:    name,
 		version: version,
 		SeqMap:  map[common.Address]uint64{},
-	}, nil
+	}
+
+	go func() {
+		for range st.ticker.C {
+			MaxCount := 10
+			Count := 0
+			st.closeLock.RLock()
+			if !st.isClose {
+			again:
+				if err := st.db.RunValueLogGC(0.5); err != nil {
+				} else {
+					Count++
+					if Count < MaxCount {
+						goto again
+					}
+				}
+			}
+			st.closeLock.RUnlock()
+		}
+	}()
+
+	return st, nil
 }
 
 // Close terminate and clean store

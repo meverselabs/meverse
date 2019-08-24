@@ -263,6 +263,7 @@ func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context) err
 	}
 
 	if b.Header.ContextHash != ctx.Hash() {
+		log.Println(ctx.Dump())
 		return ErrInvalidContextHash
 	}
 
