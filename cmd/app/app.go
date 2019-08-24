@@ -26,6 +26,7 @@ func NewFletaApp() *FletaApp {
 			"fleta.gateway":    common.MustParseAddress("3CUsUpv9v"),
 			"fleta.formulator": common.MustParseAddress("5PxjxeqJq"),
 			"fleta.payment":    common.MustParseAddress("7bScSUkTk"),
+			"fleta.vault":      common.MustParseAddress("9nvUvJfcf"),
 		},
 	}
 }
@@ -132,6 +133,14 @@ func (app *FletaApp) InitGenesis(ctw *types.ContextWrapper) error {
 	} else if sp, is := p.(*vault.Vault); !is {
 		return types.ErrNotExistProcess
 	} else {
+		if err := sp.InitPolicy(ctw,
+			&vault.Policy{
+				AccountCreationAmount: amount.NewCoinAmount(10, 0),
+			},
+		); err != nil {
+			return err
+		}
+
 		totalSupply := amount.NewCoinAmount(2000000000, 0)
 		alphaCreated := alphaPolicy.AlphaCreationAmount.MulC(189)
 		sigmaCreated := alphaPolicy.AlphaCreationAmount.MulC(int64(sigmaPolicy.SigmaRequiredAlphaCount)).MulC(108)
@@ -142,6 +151,7 @@ func (app *FletaApp) InitGenesis(ctw *types.ContextWrapper) error {
 		addSingleAccount(sp, ctw, common.MustParsePublicHash("4ArFPXfZF2MH7ZADqj8wD98cTuRSGXbqqNKpU3zPEgk"), common.MustParseAddress("3CUsUpv9v"), "fleta.gateway", gatewaySupply)
 		addSingleAccount(sp, ctw, common.MustParsePublicHash("3M227UoMP81Hp8bvpG8XpUqjHgcL7an2QEm44ENMJYi"), common.MustParseAddress("5PxjxeqJq"), "fleta.formulator", amount.NewCoinAmount(0, 0))
 		addSingleAccount(sp, ctw, common.MustParsePublicHash("4DBkqwYsmKFysTQFqsMxbtndDHx1V7YbKYQNZC4G33k"), common.MustParseAddress("7bScSUkTk"), "fleta.payment", amount.NewCoinAmount(0, 0))
+		addSingleAccount(sp, ctw, common.MustParsePublicHash("THsEv149dTGWvzLohKy7tvSzEA8MQw3hMA9nAXEDGp"), common.MustParseAddress("9nvUvJfcf"), "fleta.vault", amount.NewCoinAmount(0, 0))
 
 		addHyperFormulator(sp, ctw, hyperPolicy, 0, common.MustParsePublicHash("fv5X9PVeujGRCGNg9AkSFG8ZPFVXzCfMxrk61RxYv4"), common.MustParsePublicHash("4pciwh34bUy1tcHkjZA7B3zp4YzqpqY8jMxU8RzgffB"), common.MustParseAddress("385ujsGNZt"), "HashTower")
 		addHyperFormulator(sp, ctw, hyperPolicy, 0, common.MustParsePublicHash("UvixpAjKFckZZxu4gKoZvFGFTgC1CCXPztnTkS5kop"), common.MustParsePublicHash("2bhwWjkDVmxMxXxKFpk2Hij2NerxuykN8B4a2NZD9EP"), common.MustParseAddress("9nvUvJibL"), "Cosmostation")

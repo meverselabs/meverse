@@ -4,15 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 
-	"github.com/fletaio/fleta/encoding"
-
 	"github.com/fletaio/fleta/common"
-	"github.com/fletaio/fleta/common/amount"
 	"github.com/fletaio/fleta/core/types"
+	"github.com/fletaio/fleta/process/admin"
 )
 
-// CreateAccount is used to make a account
-type CreateAccount struct {
+// IssueAccount is used to make a account
+type IssueAccount struct {
 	Timestamp_ uint64
 	Seq_       uint64
 	From_      common.Address
@@ -21,31 +19,26 @@ type CreateAccount struct {
 }
 
 // Timestamp returns the timestamp of the transaction
-func (tx *CreateAccount) Timestamp() uint64 {
+func (tx *IssueAccount) Timestamp() uint64 {
 	return tx.Timestamp_
 }
 
 // Seq returns the sequence of the transaction
-func (tx *CreateAccount) Seq() uint64 {
+func (tx *IssueAccount) Seq() uint64 {
 	return tx.Seq_
 }
 
 // From returns the from address of the transaction
-func (tx *CreateAccount) From() common.Address {
+func (tx *IssueAccount) From() common.Address {
 	return tx.From_
 }
 
-// Fee returns the fee of the transaction
-func (tx *CreateAccount) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
-}
-
 // Validate validates signatures of the transaction
-func (tx *CreateAccount) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
+func (tx *IssueAccount) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	sp := p.(*Vault)
 
-	if !types.IsAllowedAccountName(tx.Name) {
-		return types.ErrInvalidAccountName
+	if tx.From() != sp.admin.AdminAddress(loader, p.Name()) {
+		return admin.ErrUnauthorizedTransaction
 	}
 
 	if tx.Seq() <= loader.Seq(tx.From()) {
@@ -65,49 +58,24 @@ func (tx *CreateAccount) Validate(p types.Process, loader types.LoaderWrapper, s
 	if err := fromAcc.Validate(loader, signers); err != nil {
 		return err
 	}
+	return nil
+}
 
-	policy := &Policy{}
-	if err := encoding.Unmarshal(loader.ProcessData(tagPolicy), &policy); err != nil {
-		return err
+// Execute updates the context by the transaction
+func (tx *IssueAccount) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
+	acc := &SingleAccount{
+		Address_: common.NewAddress(ctw.TargetHeight(), index, 0),
+		Name_:    tx.Name,
+		KeyHash:  tx.KeyHash,
 	}
-
-	if err := sp.CheckFeePayableWith(loader, tx, policy.AccountCreationAmount); err != nil {
+	if err := ctw.CreateAccount(acc); err != nil {
 		return err
 	}
 	return nil
 }
 
-// Execute updates the context by the transaction
-func (tx *CreateAccount) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
-	sp := p.(*Vault)
-
-	return sp.WithFee(ctw, tx, func() error {
-		policy := &Policy{}
-		if err := encoding.Unmarshal(ctw.ProcessData(tagPolicy), &policy); err != nil {
-			return err
-		}
-
-		if err := sp.SubBalance(ctw, tx.From(), policy.AccountCreationAmount); err != nil {
-			return err
-		}
-		if err := sp.AddCollectedFee(ctw, policy.AccountCreationAmount); err != nil {
-			return err
-		}
-
-		acc := &SingleAccount{
-			Address_: common.NewAddress(ctw.TargetHeight(), index, 0),
-			Name_:    tx.Name,
-			KeyHash:  tx.KeyHash,
-		}
-		if err := ctw.CreateAccount(acc); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
 // MarshalJSON is a marshaler function
-func (tx *CreateAccount) MarshalJSON() ([]byte, error) {
+func (tx *IssueAccount) MarshalJSON() ([]byte, error) {
 	var buffer bytes.Buffer
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)

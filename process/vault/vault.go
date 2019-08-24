@@ -3,15 +3,18 @@ package vault
 import (
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/core/types"
+	"github.com/fletaio/fleta/encoding"
+	"github.com/fletaio/fleta/process/admin"
 	"github.com/fletaio/fleta/service/apiserver"
 )
 
 // Vault manages balance of accounts of the chain
 type Vault struct {
 	*types.ProcessBase
-	pid uint8
-	pm  types.ProcessManager
-	cn  types.Provider
+	pid   uint8
+	pm    types.ProcessManager
+	cn    types.Provider
+	admin *admin.Admin
 }
 
 // NewVault returns a Vault
@@ -45,13 +48,18 @@ func (p *Vault) Init(reg *types.Register, pm types.ProcessManager, cn types.Prov
 	reg.RegisterAccount(2, &MultiAccount{})
 	reg.RegisterTransaction(1, &Transfer{})
 	reg.RegisterTransaction(2, &Burn{})
-	reg.RegisterTransaction(3, &Withdraw{})
 	reg.RegisterTransaction(4, &CreateAccount{})
 	reg.RegisterTransaction(5, &CreateMultiAccount{})
-	reg.RegisterTransaction(6, &Assign{})
-	reg.RegisterTransaction(7, &Deposit{})
-	reg.RegisterTransaction(8, &OpenAccount{})
+	reg.RegisterTransaction(9, &IssueAccount{})
+	reg.RegisterTransaction(10, &UpdatePolicy{})
 
+	if vp, err := pm.ProcessByName("fleta.admin"); err != nil {
+		return err
+	} else if v, is := vp.(*admin.Admin); !is {
+		return types.ErrInvalidProcess
+	} else {
+		p.admin = v
+	}
 	if vs, err := pm.ServiceByName("fleta.apiserver"); err != nil {
 		//ignore when not loaded
 	} else if v, is := vs.(*apiserver.APIServer); !is {
@@ -80,8 +88,24 @@ func (p *Vault) Init(reg *types.Register, pm types.ProcessManager, cn types.Prov
 	return nil
 }
 
+// InitPolicy called at OnInitGenesis of an application
+func (p *Vault) InitPolicy(ctw *types.ContextWrapper, policy *Policy) error {
+	ctw = types.SwitchContextWrapper(p.pid, ctw)
+
+	if bs, err := encoding.Marshal(policy); err != nil {
+		return err
+	} else {
+		ctw.SetProcessData(tagPolicy, bs)
+	}
+	return nil
+}
+
 // OnLoadChain called when the chain loaded
 func (p *Vault) OnLoadChain(loader types.LoaderWrapper) error {
+	p.admin.AdminAddress(loader, p.Name())
+	if bs := loader.ProcessData(tagPolicy); len(bs) == 0 {
+		return ErrPolicyShouldBeSetupInApplication
+	}
 	return nil
 }
 
@@ -99,7 +123,11 @@ func (p *Vault) AfterExecuteTransactions(b *types.Block, ctw *types.ContextWrapp
 
 	for addr, am := range LockedBalanceMap {
 		if has, err := ctw.HasAccount(addr); err != nil {
-			return err
+			if err == types.ErrDeletedAccount {
+				ctw.SetAccountData(addr, tagLockedBalanceSum, nil)
+			} else {
+				return err
+			}
 		} else if !has {
 			ctw.SetAccountData(addr, tagLockedBalanceSum, nil)
 		} else {

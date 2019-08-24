@@ -203,7 +203,11 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 			ev.GenBlockMap.Put(GenAddress, GenCount)
 
 			if has, err := ctw.HasAccount(GenAddress); err != nil {
-				return err
+				if err == types.ErrDeletedAccount {
+					StackRewardMap.Delete(GenAddress)
+				} else {
+					return err
+				}
 			} else if !has {
 				StackRewardMap.Delete(GenAddress)
 			} else {
@@ -252,7 +256,11 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 					CrossAmountMap := map[common.Address]*amount.Amount{}
 					for StakingAddress, StakingAmount := range AmountMap {
 						if has, err := ctw.HasAccount(StakingAddress); err != nil {
-							return err
+							if err == types.ErrDeletedAccount {
+								p.subStakingAmount(ctw, frAcc.Address(), StakingAddress, StakingAmount)
+							} else {
+								return err
+							}
 						} else if !has {
 							p.subStakingAmount(ctw, frAcc.Address(), StakingAddress, StakingAmount)
 						} else {
@@ -297,8 +305,12 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 						var inErr error
 						StakingPowerMap.EachAll(func(StakingAddress common.Address, StakingPower *amount.Amount) bool {
 							if has, err := ctw.HasAccount(StakingAddress); err != nil {
-								inErr = err
-								return false
+								if err == types.ErrDeletedAccount {
+									Deleteds = append(Deleteds, StakingAddress)
+								} else {
+									inErr = err
+									return false
+								}
 							} else if !has {
 								Deleteds = append(Deleteds, StakingAddress)
 							} else {
@@ -360,8 +372,12 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 			}
 			for GenAddress, StakingRewardPower := range StakingRewardPowerMap {
 				if has, err := ctw.HasAccount(GenAddress); err != nil {
-					return err
-				} else if has {
+					if err == types.ErrDeletedAccount {
+					} else {
+						return err
+					}
+				} else if !has {
+				} else {
 					RewardAmount := StakingRewardPower.Mul(Ratio).Div(amount.COIN)
 					if sm, has := StackRewardMap.Get(GenAddress); has {
 						StackRewardMap.Put(GenAddress, sm.Add(RewardAmount))
@@ -389,8 +405,12 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 					Deleteds := []common.Address{}
 					StakingPowerMap.EachAll(func(StakingAddress common.Address, StakingPower *amount.Amount) bool {
 						if has, err := ctw.HasAccount(StakingAddress); err != nil {
-							inErr = err
-							return false
+							if err == types.ErrDeletedAccount {
+								Deleteds = append(Deleteds, StakingAddress)
+							} else {
+								inErr = err
+								return false
+							}
 						} else if !has {
 							Deleteds = append(Deleteds, StakingAddress)
 						} else {
@@ -475,7 +495,10 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 			return types.ErrInvalidAccountType
 		}
 		if has, err := ctw.HasAccount(Heritor); err != nil {
-			return err
+			if err == types.ErrDeletedAccount {
+			} else {
+				return err
+			}
 		} else if !has {
 		} else {
 			if err := p.vault.AddBalance(ctw, Heritor, frAcc.Amount); err != nil {

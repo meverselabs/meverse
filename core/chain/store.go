@@ -988,6 +988,16 @@ func applyContextData(txn *badger.Txn, ctd *types.ContextData) error {
 	if inErr != nil {
 		return inErr
 	}
+	ctd.AccountDataMap.EachAll(func(key string, value []byte) bool {
+		if err := txn.Set(toAccountDataKey(key), value); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
 	ctd.DeletedAccountMap.EachAll(func(addr common.Address, acc types.Account) bool {
 		if err := txn.Set(toAccountKey(addr), []byte{0}); err != nil {
 			inErr = err
@@ -1006,16 +1016,6 @@ func applyContextData(txn *badger.Txn, ctd *types.ContextData) error {
 					return false
 				}
 			}
-		}
-		return true
-	})
-	if inErr != nil {
-		return inErr
-	}
-	ctd.AccountDataMap.EachAll(func(key string, value []byte) bool {
-		if err := txn.Set(toAccountDataKey(key), value); err != nil {
-			inErr = err
-			return false
 		}
 		return true
 	})

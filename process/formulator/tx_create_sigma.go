@@ -95,25 +95,29 @@ func (tx *CreateSigma) Execute(p types.Process, ctw *types.ContextWrapper, index
 		if err := encoding.Unmarshal(ctw.ProcessData(tagSigmaPolicy), &policy); err != nil {
 			return err
 		}
+		acc, err := ctw.Account(tx.AlphaFormulators[0])
+		if err != nil {
+			return err
+		}
+		frAcc := acc.(*FormulatorAccount)
 		for _, addr := range tx.AlphaFormulators[1:] {
 			if acc, err := ctw.Account(addr); err != nil {
 				return err
 			} else {
 				subAcc := acc.(*FormulatorAccount)
-				if err := sp.vault.AddBalance(ctw, tx.AlphaFormulators[0], subAcc.Amount); err != nil {
+				if err := sp.vault.AddBalance(ctw, tx.AlphaFormulators[0], sp.vault.Balance(ctw, addr)); err != nil {
 					return err
 				}
+				if err := sp.vault.RemoveBalance(ctw, addr); err != nil {
+					return err
+				}
+				frAcc.Amount = frAcc.Amount.Add(subAcc.Amount)
 				if err := ctw.DeleteAccount(subAcc); err != nil {
 					return err
 				}
 			}
 		}
 
-		acc, err := ctw.Account(tx.AlphaFormulators[0])
-		if err != nil {
-			return err
-		}
-		frAcc := acc.(*FormulatorAccount)
 		frAcc.FormulatorType = SigmaFormulatorType
 		frAcc.PreHeight = 0
 		frAcc.UpdatedHeight = ctw.TargetHeight()

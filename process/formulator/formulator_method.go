@@ -339,7 +339,7 @@ func (p *Formulator) subUnstakingAmount(ctw *types.ContextWrapper, HyperAddr com
 	if sum.Less(am) {
 		return ErrMinustUnstakingAmount
 	}
-	if am.IsZero() {
+	if sum.IsZero() {
 		mp.Delete(HyperAddr)
 	} else {
 		mp.Put(HyperAddr, sum.Sub(am))
