@@ -485,56 +485,69 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 	if err != nil {
 		return err
 	}
-	for FormulatorAddr, Heritor := range RevokedMap {
+	var inErr error
+	RevokedMap.EachAll(func(FormulatorAddr common.Address, Heritor common.Address) bool {
 		acc, err := ctw.Account(FormulatorAddr)
 		if err != nil {
-			return err
+			inErr = err
+			return false
 		}
 		frAcc, is := acc.(*FormulatorAccount)
 		if !is {
-			return types.ErrInvalidAccountType
+			inErr = types.ErrInvalidAccountType
+			return false
 		}
 		if has, err := ctw.HasAccount(Heritor); err != nil {
 			if err == types.ErrDeletedAccount {
 			} else {
-				return err
+				inErr = err
+				return false
 			}
 		} else if !has {
 		} else {
 			if err := p.vault.AddBalance(ctw, Heritor, frAcc.Amount); err != nil {
-				return err
+				inErr = err
+				return false
 			}
 			if err := p.vault.AddBalance(ctw, Heritor, p.vault.Balance(ctw, FormulatorAddr)); err != nil {
-				return err
+				inErr = err
+				return false
 			}
 			if err := p.vault.RemoveBalance(ctw, FormulatorAddr); err != nil {
-				return err
+				inErr = err
+				return false
 			}
 		}
 		if frAcc.FormulatorType == HyperFormulatorType {
 			StakingAmountMap, err := p.GetStakingAmountMap(ctw, FormulatorAddr)
 			if err != nil {
-				return err
+				inErr = err
+				return false
 			}
 			for addr, StakingAmount := range StakingAmountMap {
 				if StakingAmount.IsZero() {
-					return ErrInvalidStakingAddress
+					inErr = ErrInvalidStakingAddress
+					return false
 				}
 				if frAcc.StakingAmount.Less(StakingAmount) {
-					return ErrCriticalStakingAmount
+					inErr = ErrCriticalStakingAmount
+					return false
 				}
 				frAcc.StakingAmount = frAcc.StakingAmount.Sub(StakingAmount)
 
 				if err := p.vault.AddBalance(ctw, addr, StakingAmount); err != nil {
-					return err
+					inErr = err
+					return false
 				}
 			}
 			if !frAcc.StakingAmount.IsZero() {
-				return ErrCriticalStakingAmount
+				inErr = ErrCriticalStakingAmount
+				return false
 			}
 		}
 		if err := ctw.DeleteAccount(frAcc); err != nil {
-			return err
+			inErr = err
+			return false
 		}
 		ev := &RevokedEvent{
 			Height_:    ctw.TargetHeight(),
@@ -542,16 +555,20 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 			Formulator: FormulatorAddr,
 		}
 		if err := ctw.EmitEvent(ev); err != nil {
-			return err
+			inErr = err
+			return false
 		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
 	}
 
 	UnstakedMap, err := p.flushUnstakingAmountMap(ctw, ctw.TargetHeight())
 	if err != nil {
 		return err
 	}
-	for Addr, AmountMap := range UnstakedMap {
-		var inErr error
+	UnstakedMap.EachAll(func(Addr common.Address, AmountMap *types.AddressAmountMap) bool {
 		AmountMap.EachAll(func(HyperAddr common.Address, am *amount.Amount) bool {
 			if err := p.vault.AddBalance(ctw, Addr, am); err != nil {
 				inErr = err
@@ -571,8 +588,12 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 			return true
 		})
 		if inErr != nil {
-			return inErr
+			return false
 		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
 	}
 	return nil
 }

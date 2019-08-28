@@ -245,8 +245,8 @@ func (p *Formulator) removeRevokedFormulator(ctw *types.ContextWrapper, addr com
 	return nil
 }
 
-func (p *Formulator) flushRevokedFormulatorMap(ctw *types.ContextWrapper, RevokeHeight uint32) (map[common.Address]common.Address, error) {
-	RevokedFormulatorMap := map[common.Address]common.Address{}
+func (p *Formulator) flushRevokedFormulatorMap(ctw *types.ContextWrapper, RevokeHeight uint32) (*types.AddressAddressMap, error) {
+	RevokedFormulatorMap := types.NewAddressAddressMap()
 	if bs := ctw.ProcessData(toRevokedFormulatorCountKey(RevokeHeight)); len(bs) > 0 {
 		Count := util.BytesToUint32(bs)
 		for i := uint32(0); i < Count; i++ {
@@ -256,7 +256,7 @@ func (p *Formulator) flushRevokedFormulatorMap(ctw *types.ContextWrapper, Revoke
 			if err != nil {
 				return nil, err
 			}
-			RevokedFormulatorMap[addr] = Heritor
+			RevokedFormulatorMap.Put(addr, Heritor)
 
 			ctw.SetAccountData(addr, tagRevokedHeight, nil)
 
@@ -383,8 +383,8 @@ func (p *Formulator) removeUnstakingAmount(ctw *types.ContextWrapper, addr commo
 	return nil
 }
 
-func (p *Formulator) flushUnstakingAmountMap(ctw *types.ContextWrapper, RevokeHeight uint32) (map[common.Address]*types.AddressAmountMap, error) {
-	UnstakingAmountMap := map[common.Address]*types.AddressAmountMap{}
+func (p *Formulator) flushUnstakingAmountMap(ctw *types.ContextWrapper, RevokeHeight uint32) (*types.AddressAddressAmountMap, error) {
+	UnstakingAmountMap := types.NewAddressAddressAmountMap()
 	if bs := ctw.ProcessData(toUnstakingAmountCountKey(RevokeHeight)); len(bs) > 0 {
 		Count := util.BytesToUint32(bs)
 		for i := uint32(0); i < Count; i++ {
@@ -394,7 +394,7 @@ func (p *Formulator) flushUnstakingAmountMap(ctw *types.ContextWrapper, RevokeHe
 			if err != nil {
 				return nil, err
 			}
-			UnstakingAmountMap[addr] = mp
+			UnstakingAmountMap.Put(addr, mp)
 
 			ctw.SetProcessData(toUnstakingAmountKey(RevokeHeight, addr), nil)
 			ctw.SetProcessData(toUnstakingAmountNumberKey(RevokeHeight, addr), nil)
