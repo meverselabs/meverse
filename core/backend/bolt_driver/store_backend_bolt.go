@@ -3,6 +3,8 @@ package bolt_driver
 import (
 	"bytes"
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -19,8 +21,10 @@ type StoreBackendBolt struct {
 }
 
 func NewStoreBackendBolt(path string) (backend.StoreBackend, error) {
+	os.MkdirAll(path, os.ModePerm)
+
 	start := time.Now()
-	db, err := bolt.Open(path, 0600, nil)
+	db, err := bolt.Open(filepath.Join(path, "chain.db"), 0600, nil)
 	if err != nil {
 		return nil, err
 	}

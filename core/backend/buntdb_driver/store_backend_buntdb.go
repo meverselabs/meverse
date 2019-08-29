@@ -3,6 +3,8 @@ package buntdb_driver
 import (
 	"bytes"
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/tidwall/buntdb"
@@ -19,8 +21,10 @@ type StoreBackendBuntDB struct {
 }
 
 func NewStoreBackendBuntDB(path string) (backend.StoreBackend, error) {
+	os.MkdirAll(path, os.ModePerm)
+
 	start := time.Now()
-	db, err := buntdb.Open(path)
+	db, err := buntdb.Open(filepath.Join(path, "chain.db"))
 	if err != nil {
 		return nil, err
 	}
