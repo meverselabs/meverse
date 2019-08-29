@@ -579,7 +579,11 @@ func (st *Store) UTXO(id uint64) (*types.UTXO, error) {
 		}
 		return nil
 	}); err != nil {
-		return nil, err
+		if err == backend.ErrNotExistKey {
+			return nil, types.ErrNotExistUTXO
+		} else {
+			return nil, err
+		}
 	}
 	return utxo, nil
 }
