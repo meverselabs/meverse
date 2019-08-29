@@ -44,6 +44,7 @@ func (st *StoreBackendBuntDB) Shrink() {
 
 func (st *StoreBackendBuntDB) Close() {
 	start := time.Now()
+	st.db.Shrink()
 	st.db.Close()
 	log.Println("BuntDB is closed in", time.Now().Sub(start))
 }
