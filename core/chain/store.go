@@ -2,25 +2,22 @@ package chain
 
 import (
 	"bytes"
-	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
-	"github.com/fletaio/fleta/encoding"
-
-	"github.com/dgraph-io/badger"
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/util"
+	"github.com/fletaio/fleta/core/backend"
 	"github.com/fletaio/fleta/core/types"
+	"github.com/fletaio/fleta/encoding"
 )
 
 // Store saves the target chain state
 // All updates are executed in one transaction with FileSync option
 type Store struct {
 	sync.Mutex
-	db         *badger.DB
+	db         backend.StoreBackend
 	chainID    uint8
 	name       string
 	version    uint16
@@ -40,23 +37,11 @@ type storecache struct {
 }
 
 // NewStore returns a Store
-func NewStore(path string, ChainID uint8, name string, version uint16, bRecover bool) (*Store, error) {
-	opts := badger.DefaultOptions(path)
-	opts.Truncate = bRecover
-	opts.SyncWrites = true
-	lockfilePath := filepath.Join(opts.Dir, "LOCK")
-	os.MkdirAll(path, os.ModePerm)
-
-	os.Remove(lockfilePath)
-
-	db, err := badger.Open(opts)
-	if err != nil {
-		return nil, err
-	}
-
+func NewStore(db backend.StoreBackend, ChainID uint8, name string, version uint16) (*Store, error) {
+	ticker := time.NewTicker(5 * time.Minute)
 	st := &Store{
 		db:      db,
-		ticker:  time.NewTicker(5 * time.Minute),
+		ticker:  ticker,
 		chainID: ChainID,
 		name:    name,
 		version: version,
@@ -64,19 +49,10 @@ func NewStore(path string, ChainID uint8, name string, version uint16, bRecover 
 	}
 
 	go func() {
-		for range st.ticker.C {
-			MaxCount := 10
-			Count := 0
+		for range ticker.C {
 			st.closeLock.RLock()
-			if !st.isClose {
-			again:
-				if err := st.db.RunValueLogGC(0.5); err != nil {
-				} else {
-					Count++
-					if Count < MaxCount {
-						goto again
-					}
-				}
+			if st.db != nil {
+				st.db.Shrink()
 			}
 			st.closeLock.RUnlock()
 		}
@@ -91,18 +67,12 @@ func (st *Store) Close() {
 	defer st.closeLock.Unlock()
 
 	st.isClose = true
-	MaxCount := 10
-	Count := 0
-again:
-	if err := st.db.RunValueLogGC(0.9); err != nil {
-	} else {
-		Count++
-		if Count < MaxCount {
-			goto again
-		}
+	if st.db != nil {
+		st.db.Close()
 	}
-	st.db.Close()
-	st.ticker.Stop()
+	if st.ticker != nil {
+		st.ticker.Stop()
+	}
 	st.db = nil
 	st.ticker = nil
 }
@@ -197,19 +167,8 @@ func (st *Store) Hash(height uint32) (hash.Hash256, error) {
 	}
 
 	var h hash.Hash256
-	if err := st.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(toHeightHashKey(height))
-		if err != nil {
-			if err == badger.ErrKeyNotFound {
-				return ErrNotExistKey
-			} else {
-				return err
-			}
-		}
-		if item.IsDeletedOrExpired() {
-			return ErrNotExistKey
-		}
-		value, err := item.ValueCopy(nil)
+	if err := st.db.View(func(txn backend.StoreReader) error {
+		value, err := txn.Get(toHeightHashKey(height))
 		if err != nil {
 			return err
 		}
@@ -230,7 +189,7 @@ func (st *Store) Header(height uint32) (*types.Header, error) {
 	}
 
 	if height < 1 {
-		return nil, ErrNotExistKey
+		return nil, backend.ErrNotExistKey
 	}
 	if st.cache.cached {
 		if st.cache.height == height {
@@ -239,19 +198,8 @@ func (st *Store) Header(height uint32) (*types.Header, error) {
 	}
 
 	var bh types.Header
-	if err := st.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(toHeightHeaderKey(height))
-		if err != nil {
-			if err == badger.ErrKeyNotFound {
-				return ErrNotExistKey
-			} else {
-				return err
-			}
-		}
-		if item.IsDeletedOrExpired() {
-			return ErrNotExistKey
-		}
-		value, err := item.ValueCopy(nil)
+	if err := st.db.View(func(txn backend.StoreReader) error {
+		value, err := txn.Get(toHeightHeaderKey(height))
 		if err != nil {
 			return err
 		}
@@ -274,7 +222,7 @@ func (st *Store) Block(height uint32) (*types.Block, error) {
 	}
 
 	if height < 1 {
-		return nil, ErrNotExistKey
+		return nil, backend.ErrNotExistKey
 	}
 	if st.cache.cached {
 		if st.cache.height == height {
@@ -283,19 +231,8 @@ func (st *Store) Block(height uint32) (*types.Block, error) {
 	}
 
 	var b types.Block
-	if err := st.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(toHeightBlockKey(height))
-		if err != nil {
-			if err == badger.ErrKeyNotFound {
-				return ErrNotExistKey
-			} else {
-				return err
-			}
-		}
-		if item.IsDeletedOrExpired() {
-			return ErrNotExistKey
-		}
-		value, err := item.ValueCopy(nil)
+	if err := st.db.View(func(txn backend.StoreReader) error {
+		value, err := txn.Get(toHeightBlockKey(height))
 		if err != nil {
 			return err
 		}
@@ -322,19 +259,8 @@ func (st *Store) Height() uint32 {
 	}
 
 	var height uint32
-	st.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(tagHeight)
-		if err != nil {
-			if err == badger.ErrKeyNotFound {
-				return ErrNotExistKey
-			} else {
-				return err
-			}
-		}
-		if item.IsDeletedOrExpired() {
-			return ErrNotExistKey
-		}
-		value, err := item.ValueCopy(nil)
+	st.db.View(func(txn backend.StoreReader) error {
+		value, err := txn.Get(tagHeight)
 		if err != nil {
 			return err
 		}
@@ -354,27 +280,21 @@ func (st *Store) Accounts() ([]types.Account, error) {
 
 	fc := encoding.Factory("account")
 	list := []types.Account{}
-	if err := st.db.View(func(txn *badger.Txn) error {
-		it := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer it.Close()
-		for it.Seek(tagAccount); it.ValidForPrefix(tagAccount); it.Next() {
-			item := it.Item()
-			if !item.IsDeletedOrExpired() {
-				value, err := item.ValueCopy(nil)
+	if err := st.db.View(func(txn backend.StoreReader) error {
+		if err := txn.Iterate(tagAccount, func(key []byte, value []byte) error {
+			if len(value) > 1 {
+				acc, err := fc.Create(util.BytesToUint16(value))
 				if err != nil {
 					return err
 				}
-				if len(value) > 1 {
-					acc, err := fc.Create(util.BytesToUint16(value))
-					if err != nil {
-						return err
-					}
-					if err := encoding.Unmarshal(value[2:], &acc); err != nil {
-						return err
-					}
-					list = append(list, acc.(types.Account))
+				if err := encoding.Unmarshal(value[2:], &acc); err != nil {
+					return err
 				}
+				list = append(list, acc.(types.Account))
 			}
+			return nil
+		}); err != nil {
+			return err
 		}
 		return nil
 	}); err != nil {
@@ -398,15 +318,8 @@ func (st *Store) Seq(addr common.Address) uint64 {
 		return seq
 	} else {
 		var seq uint64
-		if err := st.db.View(func(txn *badger.Txn) error {
-			item, err := txn.Get(toAccountSeqKey(addr))
-			if err != nil {
-				return err
-			}
-			if item.IsDeletedOrExpired() {
-				return ErrNotExistKey
-			}
-			value, err := item.ValueCopy(nil)
+		if err := st.db.View(func(txn backend.StoreReader) error {
+			value, err := txn.Get(toAccountSeqKey(addr))
 			if err != nil {
 				return err
 			}
@@ -431,19 +344,8 @@ func (st *Store) Account(addr common.Address) (types.Account, error) {
 	fc := encoding.Factory("account")
 
 	var acc types.Account
-	if err := st.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(toAccountKey(addr))
-		if err != nil {
-			if err == badger.ErrKeyNotFound {
-				return ErrNotExistKey
-			} else {
-				return err
-			}
-		}
-		if item.IsDeletedOrExpired() {
-			return ErrNotExistKey
-		}
-		value, err := item.ValueCopy(nil)
+	if err := st.db.View(func(txn backend.StoreReader) error {
+		value, err := txn.Get(toAccountKey(addr))
 		if err != nil {
 			return err
 		}
@@ -460,7 +362,7 @@ func (st *Store) Account(addr common.Address) (types.Account, error) {
 		acc = v.(types.Account)
 		return nil
 	}); err != nil {
-		if err == ErrNotExistKey {
+		if err == backend.ErrNotExistKey {
 			return nil, types.ErrNotExistAccount
 		} else {
 			return nil, err
@@ -478,36 +380,14 @@ func (st *Store) AddressByName(Name string) (common.Address, error) {
 	}
 
 	var addr common.Address
-	if err := st.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(toAccountNameKey(Name))
-		if err != nil {
-			if err == badger.ErrKeyNotFound {
-				return ErrNotExistKey
-			} else {
-				return err
-			}
-		}
-		if item.IsDeletedOrExpired() {
-			return ErrNotExistKey
-		}
-		value, err := item.ValueCopy(nil)
+	if err := st.db.View(func(txn backend.StoreReader) error {
+		value, err := txn.Get(toAccountNameKey(Name))
 		if err != nil {
 			return err
 		}
 		copy(addr[:], value)
 		if true {
-			item, err := txn.Get(toAccountKey(addr))
-			if err != nil {
-				if err == badger.ErrKeyNotFound {
-					return ErrNotExistKey
-				} else {
-					return err
-				}
-			}
-			if item.IsDeletedOrExpired() {
-				return ErrNotExistKey
-			}
-			value, err := item.ValueCopy(nil)
+			value, err := txn.Get(toAccountKey(addr))
 			if err != nil {
 				return err
 			}
@@ -517,7 +397,7 @@ func (st *Store) AddressByName(Name string) (common.Address, error) {
 		}
 		return nil
 	}); err != nil {
-		if err == ErrNotExistKey {
+		if err == backend.ErrNotExistKey {
 			return common.Address{}, types.ErrNotExistAccount
 		} else {
 			return common.Address{}, err
@@ -535,19 +415,8 @@ func (st *Store) HasAccount(addr common.Address) (bool, error) {
 	}
 
 	var Has bool
-	if err := st.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(toAccountKey(addr))
-		if err != nil {
-			if err == badger.ErrKeyNotFound {
-				return ErrNotExistKey
-			} else {
-				return err
-			}
-		}
-		if item.IsDeletedOrExpired() {
-			return ErrNotExistKey
-		}
-		value, err := item.ValueCopy(nil)
+	if err := st.db.View(func(txn backend.StoreReader) error {
+		value, err := txn.Get(toAccountKey(addr))
 		if err != nil {
 			return err
 		}
@@ -557,7 +426,7 @@ func (st *Store) HasAccount(addr common.Address) (bool, error) {
 		Has = true
 		return nil
 	}); err != nil {
-		if err == ErrNotExistKey {
+		if err == backend.ErrNotExistKey {
 			return false, nil
 		} else {
 			return false, err
@@ -579,37 +448,15 @@ func (st *Store) HasAccountName(Name string) (bool, error) {
 	}
 
 	var Has bool
-	if err := st.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(toAccountNameKey(Name))
-		if err != nil {
-			if err == badger.ErrKeyNotFound {
-				return ErrNotExistKey
-			} else {
-				return err
-			}
-		}
-		if item.IsDeletedOrExpired() {
-			return ErrNotExistKey
-		}
-		var addr common.Address
-		value, err := item.ValueCopy(nil)
+	if err := st.db.View(func(txn backend.StoreReader) error {
+		value, err := txn.Get(toAccountNameKey(Name))
 		if err != nil {
 			return err
 		}
+		var addr common.Address
 		copy(addr[:], value)
 		if true {
-			item, err := txn.Get(toAccountKey(addr))
-			if err != nil {
-				if err == badger.ErrKeyNotFound {
-					return ErrNotExistKey
-				} else {
-					return err
-				}
-			}
-			if item.IsDeletedOrExpired() {
-				return ErrNotExistKey
-			}
-			value, err := item.ValueCopy(nil)
+			value, err := txn.Get(toAccountKey(addr))
 			if err != nil {
 				return err
 			}
@@ -620,7 +467,7 @@ func (st *Store) HasAccountName(Name string) (bool, error) {
 		Has = true
 		return nil
 	}); err != nil {
-		if err == ErrNotExistKey {
+		if err == backend.ErrNotExistKey {
 			return false, nil
 		} else {
 			return false, err
@@ -639,19 +486,13 @@ func (st *Store) AccountData(addr common.Address, pid uint8, name []byte) []byte
 
 	key := string(addr[:]) + string(pid) + string(name)
 	var data []byte
-	if err := st.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(toAccountDataKey(key))
+	if err := st.db.View(func(txn backend.StoreReader) error {
+		value, err := txn.Get(toAccountDataKey(key))
 		if err != nil {
 			return err
 		}
-		if item.IsDeletedOrExpired() {
-			return ErrNotExistKey
-		}
-		value, err := item.ValueCopy(nil)
-		if err != nil {
-			return err
-		}
-		data = value
+		data = make([]byte, len(value))
+		copy(data, value)
 		return nil
 	}); err != nil {
 		return nil
@@ -668,25 +509,19 @@ func (st *Store) UTXOs() ([]*types.UTXO, error) {
 	}
 
 	list := []*types.UTXO{}
-	if err := st.db.View(func(txn *badger.Txn) error {
-		it := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer it.Close()
-		for it.Seek(tagUTXO); it.ValidForPrefix(tagUTXO); it.Next() {
-			item := it.Item()
-			if !item.IsDeletedOrExpired() {
-				value, err := item.ValueCopy(nil)
-				if err != nil {
-					return err
-				}
-				utxo := &types.UTXO{
-					TxIn:  types.NewTxIn(fromUTXOKey(item.Key())),
-					TxOut: types.NewTxOut(),
-				}
-				if err := encoding.Unmarshal(value, &(utxo.TxOut)); err != nil {
-					return err
-				}
-				list = append(list, utxo)
+	if err := st.db.View(func(txn backend.StoreReader) error {
+		if err := txn.Iterate(tagUTXO, func(key []byte, value []byte) error {
+			utxo := &types.UTXO{
+				TxIn:  types.NewTxIn(fromUTXOKey(key)),
+				TxOut: types.NewTxOut(),
 			}
+			if err := encoding.Unmarshal(value, &(utxo.TxOut)); err != nil {
+				return err
+			}
+			list = append(list, utxo)
+			return nil
+		}); err != nil {
+			return err
 		}
 		return nil
 	}); err != nil {
@@ -704,22 +539,15 @@ func (st *Store) HasUTXO(id uint64) (bool, error) {
 	}
 
 	var Has bool
-	if err := st.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(toUTXOKey(id))
+	if err := st.db.View(func(txn backend.StoreReader) error {
+		value, err := txn.Get(toUTXOKey(id))
 		if err != nil {
-			if err == badger.ErrKeyNotFound {
-				return ErrNotExistKey
-			} else {
-				return err
-			}
+			return err
 		}
-		if item.IsDeletedOrExpired() {
-			return ErrNotExistKey
-		}
-		Has = true
+		Has = (len(value) > 0)
 		return nil
 	}); err != nil {
-		if err == ErrNotExistKey {
+		if err == backend.ErrNotExistKey {
 			return false, nil
 		} else {
 			return false, err
@@ -737,19 +565,8 @@ func (st *Store) UTXO(id uint64) (*types.UTXO, error) {
 	}
 
 	var utxo *types.UTXO
-	if err := st.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(toUTXOKey(id))
-		if err != nil {
-			if err == badger.ErrKeyNotFound {
-				return types.ErrNotExistUTXO
-			} else {
-				return err
-			}
-		}
-		if item.IsDeletedOrExpired() {
-			return ErrNotExistKey
-		}
-		value, err := item.ValueCopy(nil)
+	if err := st.db.View(func(txn backend.StoreReader) error {
+		value, err := txn.Get(toUTXOKey(id))
 		if err != nil {
 			return err
 		}
@@ -777,19 +594,13 @@ func (st *Store) ProcessData(pid uint8, name []byte) []byte {
 
 	key := string(pid) + string(name)
 	var data []byte
-	if err := st.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(toProcessDataKey(key))
+	if err := st.db.View(func(txn backend.StoreReader) error {
+		value, err := txn.Get(toProcessDataKey(key))
 		if err != nil {
 			return err
 		}
-		if item.IsDeletedOrExpired() {
-			return ErrNotExistKey
-		}
-		value, err := item.ValueCopy(nil)
-		if err != nil {
-			return err
-		}
-		data = value
+		data = make([]byte, len(value))
+		copy(data, value)
 		return nil
 	}); err != nil {
 		return nil
@@ -812,40 +623,34 @@ func (st *Store) Events(From uint32, To uint32) ([]types.Event, error) {
 
 	fc := encoding.Factory("event")
 	list := []types.Event{}
-	if err := st.db.View(func(txn *badger.Txn) error {
+	if err := st.db.View(func(txn backend.StoreReader) error {
 		for i := From; i <= To; i++ {
-			item, err := txn.Get(toEventKey(i))
+			value, err := txn.Get(toEventKey(i))
 			if err != nil {
-				if err == badger.ErrKeyNotFound {
+				if err == backend.ErrNotExistKey {
 					continue
 				} else {
 					return err
 				}
 			}
-			if !item.IsDeletedOrExpired() {
-				value, err := item.ValueCopy(nil)
+			dec := encoding.NewDecoder(bytes.NewReader(value))
+			EvLen, err := dec.DecodeArrayLen()
+			if err != nil {
+				return err
+			}
+			for i := 0; i < EvLen; i++ {
+				t, err := dec.DecodeUint16()
 				if err != nil {
 					return err
 				}
-				dec := encoding.NewDecoder(bytes.NewReader(value))
-				EvLen, err := dec.DecodeArrayLen()
+				ev, err := fc.Create(t)
 				if err != nil {
 					return err
 				}
-				for i := 0; i < EvLen; i++ {
-					t, err := dec.DecodeUint16()
-					if err != nil {
-						return err
-					}
-					ev, err := fc.Create(t)
-					if err != nil {
-						return err
-					}
-					if err := dec.Decode(&ev); err != nil {
-						return err
-					}
-					list = append(list, ev.(types.Event))
+				if err := dec.Decode(&ev); err != nil {
+					return err
 				}
+				list = append(list, ev.(types.Event))
 			}
 		}
 		return nil
@@ -866,7 +671,7 @@ func (st *Store) StoreGenesis(genHash hash.Hash256, ctd *types.ContextData) erro
 	if st.Height() > 0 {
 		return ErrAlreadyGenesised
 	}
-	if err := st.db.Update(func(txn *badger.Txn) error {
+	if err := st.db.Update(func(txn backend.StoreWriter) error {
 		{
 			if err := txn.Set(toHeightHashKey(0), genHash[:]); err != nil {
 				return err
@@ -902,7 +707,7 @@ func (st *Store) StoreBlock(b *types.Block, ctd *types.ContextData) error {
 	}
 
 	DataHash := encoding.Hash(b.Header)
-	if err := st.db.Update(func(txn *badger.Txn) error {
+	if err := st.db.Update(func(txn backend.StoreWriter) error {
 		{
 			data, err := encoding.Marshal(b)
 			if err != nil {
@@ -953,7 +758,7 @@ func (st *Store) StoreBlock(b *types.Block, ctd *types.ContextData) error {
 	return nil
 }
 
-func applyContextData(txn *badger.Txn, ctd *types.ContextData) error {
+func applyContextData(txn backend.StoreWriter, ctd *types.ContextData) error {
 	var inErr error
 	ctd.SeqMap.EachAll(func(addr common.Address, value uint64) bool {
 		if err := txn.Set(toAccountSeqKey(addr), util.Uint64ToBytes(value)); err != nil {
@@ -1008,18 +813,19 @@ func applyContextData(txn *badger.Txn, ctd *types.ContextData) error {
 			inErr = err
 			return false
 		}
-		it := txn.NewIterator(badger.IteratorOptions{
-			PrefetchValues: false,
-		})
-		defer it.Close()
 		prefix := toAccountDataKey(string(addr[:]))
-		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
-			item := it.Item()
-			if !item.IsDeletedOrExpired() {
-				if err := txn.Delete(item.Key()); err != nil {
-					inErr = err
-					return false
-				}
+		Deletes := [][]byte{}
+		if err := txn.Iterate(prefix, func(key []byte, value []byte) error {
+			Deletes = append(Deletes, key)
+			return nil
+		}); err != nil {
+			inErr = err
+			return false
+		}
+		for _, v := range Deletes {
+			if err := txn.Delete(v); err != nil {
+				inErr = err
+				return false
 			}
 		}
 		return true

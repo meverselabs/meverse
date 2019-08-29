@@ -7,6 +7,7 @@ import (
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
+	"github.com/fletaio/fleta/core/backend"
 	"github.com/fletaio/fleta/core/types"
 )
 
@@ -87,7 +88,7 @@ func (cn *Chain) Init() error {
 
 	GenesisHash := hash.Hashes(hash.Hash([]byte(cn.store.Name())), hash.Hash([]byte{cn.store.ChainID()}), genesisContext.Hash())
 	if h, err := cn.Provider().Hash(0); err != nil {
-		if err != ErrNotExistKey {
+		if err != backend.ErrNotExistKey {
 			return err
 		} else {
 			if err := cn.store.StoreGenesis(GenesisHash, top); err != nil {

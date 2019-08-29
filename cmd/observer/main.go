@@ -2,20 +2,20 @@ package main
 
 import (
 	"encoding/hex"
-	"fmt"
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 
-	"github.com/dgraph-io/badger"
 	"github.com/fletaio/fleta/cmd/app"
 	"github.com/fletaio/fleta/cmd/closer"
 	"github.com/fletaio/fleta/cmd/config"
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/common/rlog"
+	"github.com/fletaio/fleta/core/backend"
+	_ "github.com/fletaio/fleta/core/backend/badger_driver"
+	_ "github.com/fletaio/fleta/core/backend/buntdb_driver"
 	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/pof"
 	"github.com/fletaio/fleta/process/admin"
@@ -34,7 +34,7 @@ type Config struct {
 	FormulatorPort int
 	APIPort        int
 	StoreRoot      string
-	ForceRecover   bool
+	Backend        string
 	RLogHost       string
 	RLogPath       string
 	UseRLog        bool
@@ -47,6 +47,9 @@ func main() {
 	}
 	if len(cfg.StoreRoot) == 0 {
 		cfg.StoreRoot = "./odata"
+	}
+	if len(cfg.Backend) == 0 {
+		cfg.Backend = "badger"
 	}
 	if len(cfg.RLogHost) > 0 && cfg.UseRLog {
 		if len(cfg.RLogPath) == 0 {
@@ -94,25 +97,14 @@ func main() {
 	}()
 	defer cm.CloseAll()
 
-	st, err := chain.NewStore(cfg.StoreRoot, ChainID, Name, Version, cfg.ForceRecover)
+	back, err := backend.Create(cfg.Backend, cfg.StoreRoot)
 	if err != nil {
-		if cfg.ForceRecover || err != badger.ErrTruncateNeeded {
-			panic(err)
-		} else {
-			fmt.Println(err)
-			fmt.Println("Do you want to recover database(it can be failed)? [y/n]")
-			var answer string
-			fmt.Scanf("%s", &answer)
-			if strings.ToLower(answer) == "y" {
-				if s, err := chain.NewStore(cfg.StoreRoot, ChainID, Name, Version, true); err != nil {
-					panic(err)
-				} else {
-					st = s
-				}
-			} else {
-				os.Exit(1)
-			}
-		}
+		panic(err)
+	}
+
+	st, err := chain.NewStore(back, ChainID, Name, Version)
+	if err != nil {
+		panic(err)
 	}
 	cm.Add("store", st)
 

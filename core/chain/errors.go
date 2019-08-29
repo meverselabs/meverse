@@ -22,7 +22,6 @@ var (
 	ErrInvalidResult                = errors.New("invalid result")
 	ErrChainClosed                  = errors.New("chain closed")
 	ErrStoreClosed                  = errors.New("store closed")
-	ErrNotExistKey                  = errors.New("not exist key")
 	ErrAlreadyGenesised             = errors.New("already genesised")
 	ErrDirtyContext                 = errors.New("dirty context")
 	ErrReservedID                   = errors.New("reserved id")
