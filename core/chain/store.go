@@ -24,7 +24,7 @@ type Store struct {
 	SeqMapLock sync.Mutex
 	SeqMap     map[common.Address]uint64
 	cache      storecache
-	ticker     *time.Ticker
+	timer      *time.Timer
 	closeLock  sync.RWMutex
 	isClose    bool
 }
@@ -38,10 +38,10 @@ type storecache struct {
 
 // NewStore returns a Store
 func NewStore(db backend.StoreBackend, ChainID uint8, name string, version uint16) (*Store, error) {
-	ticker := time.NewTicker(5 * time.Minute)
+	timer := time.NewTimer(5 * time.Minute)
 	st := &Store{
 		db:      db,
-		ticker:  ticker,
+		timer:   timer,
 		chainID: ChainID,
 		name:    name,
 		version: version,
@@ -49,10 +49,13 @@ func NewStore(db backend.StoreBackend, ChainID uint8, name string, version uint1
 	}
 
 	go func() {
-		for range ticker.C {
+		for range timer.C {
 			st.closeLock.RLock()
 			if st.db != nil {
 				st.db.Shrink()
+			}
+			if st.timer != nil {
+				st.timer.Reset(5 * time.Minute)
 			}
 			st.closeLock.RUnlock()
 		}
@@ -70,11 +73,11 @@ func (st *Store) Close() {
 	if st.db != nil {
 		st.db.Close()
 	}
-	if st.ticker != nil {
-		st.ticker.Stop()
+	if st.timer != nil {
+		st.timer.Stop()
 	}
 	st.db = nil
-	st.ticker = nil
+	st.timer = nil
 }
 
 // ChainID returns the chain id of the target chain
