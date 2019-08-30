@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/tidwall/buntdb"
@@ -17,6 +18,7 @@ func init() {
 }
 
 type StoreBackendBuntDB struct {
+	sync.Mutex
 	db *buntdb.DB
 }
 
@@ -36,6 +38,9 @@ func NewStoreBackendBuntDB(path string) (backend.StoreBackend, error) {
 }
 
 func (st *StoreBackendBuntDB) Shrink() {
+	st.Lock()
+	defer st.Unlock()
+
 	defer func() {
 		recover()
 	}()
@@ -43,6 +48,14 @@ func (st *StoreBackendBuntDB) Shrink() {
 }
 
 func (st *StoreBackendBuntDB) Close() {
+	st.Lock()
+	defer st.Unlock()
+
+	defer func() {
+		recover()
+		st.db.Close()
+	}()
+
 	start := time.Now()
 	st.db.Shrink()
 	st.db.Close()
