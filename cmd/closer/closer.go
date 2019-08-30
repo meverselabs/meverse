@@ -28,6 +28,11 @@ func NewManager() *Manager {
 	return cm
 }
 
+// IsClosed returns it is closed or not
+func (cm *Manager) IsClosed() bool {
+	return cm.isClosed
+}
+
 // RemoveAll removes all closers
 func (cm *Manager) RemoveAll() {
 	cm.Names = []string{}
