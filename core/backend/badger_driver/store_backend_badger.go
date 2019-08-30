@@ -129,7 +129,7 @@ func (r *storeBackendBadgerTx) Iterate(prefix []byte, fn func(key []byte, value 
 				if err != nil {
 					return err
 				}
-				if err := fn(item.Key(), value); err != nil {
+				if err := fn(item.KeyCopy(nil), value); err != nil {
 					return err
 				}
 			}
@@ -142,7 +142,7 @@ func (r *storeBackendBadgerTx) Iterate(prefix []byte, fn func(key []byte, value 
 				if err != nil {
 					return err
 				}
-				if err := fn(item.Key(), value); err != nil {
+				if err := fn(item.KeyCopy(nil), value); err != nil {
 					return err
 				}
 			}
