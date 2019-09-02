@@ -126,6 +126,7 @@ func (p *Pile) Close() {
 	defer p.Unlock()
 
 	if p.file != nil {
+		p.file.Sync()
 		p.file.Close()
 		p.file = nil
 	}
@@ -239,6 +240,9 @@ func (p *Pile) GetData(Height uint32, index int) ([]byte, error) {
 
 	FromHeight := Height - p.BeginHeight
 	if Height > p.BeginHeight+ChunkUnit {
+		return nil, ErrInvalidHeight
+	}
+	if Height > p.HeadHeight {
 		return nil, ErrInvalidHeight
 	}
 
