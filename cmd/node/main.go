@@ -20,6 +20,7 @@ import (
 	_ "github.com/fletaio/fleta/core/backend/badger_driver"
 	_ "github.com/fletaio/fleta/core/backend/buntdb_driver"
 	"github.com/fletaio/fleta/core/chain"
+	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/pof"
 	"github.com/fletaio/fleta/process/admin"
 	"github.com/fletaio/fleta/process/formulator"
@@ -155,6 +156,12 @@ func main() {
 	}
 	cm.Add("store", st)
 
+	if st.Height() > 0 {
+		if _, err := cdb.GetData(st.Height(), 0); err != nil {
+			panic(err)
+		}
+	}
+
 	cs := pof.NewConsensus(MaxBlocksPerFormulator, ObserverKeys)
 	app := app.NewFletaApp()
 	cn := chain.NewChain(cs, app, st)
@@ -170,6 +177,21 @@ func main() {
 	}
 	cm.RemoveAll()
 	cm.Add("chain", cn)
+
+	if err := st.IterBlockAfterContext(func(b *types.Block) error {
+		if cm.IsClosed() {
+			return chain.ErrStoreClosed
+		}
+		if err := cn.ConnectBlock(b); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		if err == chain.ErrStoreClosed {
+			return
+		}
+		panic(err)
+	}
 
 	nd := p2p.NewNode(ndkey, SeedNodeMap, cn, cfg.StoreRoot+"/peer")
 	if err := nd.Init(); err != nil {
