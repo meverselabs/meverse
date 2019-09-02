@@ -290,3 +290,64 @@ func (p *Pile) GetData(Height uint32, index int) ([]byte, error) {
 	}
 	return data, nil
 }
+
+func (p *Pile) GetDatas(Height uint32, from int, count int) ([]byte, error) {
+	p.Lock()
+	defer p.Unlock()
+
+	FromHeight := Height - p.BeginHeight
+	if Height > p.BeginHeight+ChunkUnit {
+		return nil, ErrInvalidHeight
+	}
+
+	Offset := ChunkHeaderSize
+	if FromHeight > 1 {
+		if _, err := p.file.Seek(ChunkMetaSize+(int64(FromHeight)-2)*8, 0); err != nil {
+			return nil, err
+		}
+		bs := make([]byte, 8)
+		if _, err := p.file.Read(bs); err != nil {
+			return nil, err
+		}
+		Offset = int64(util.BytesToUint64(bs))
+	}
+	if _, err := p.file.Seek(Offset+32, 0); err != nil {
+		return nil, err
+	}
+	lbs := make([]byte, 1)
+	if _, err := p.file.Read(lbs); err != nil {
+		return nil, err
+	}
+	if from+count > int(lbs[0]) {
+		return nil, ErrInvalidDataIndex
+	}
+	zlbs := make([]byte, 4*lbs[0])
+	if _, err := p.file.Read(zlbs); err != nil {
+		return nil, err
+	}
+	zofs := Offset + 32 + 1 + int64(4*lbs[0])
+	for i := 0; i < from; i++ {
+		zofs += int64(util.BytesToUint32(zlbs[4*i:]))
+	}
+	if _, err := p.file.Seek(zofs, 0); err != nil {
+		return nil, err
+	}
+	var buffer bytes.Buffer
+	for i := 0; i < count; i++ {
+		zsize := util.BytesToUint32(zlbs[4*(from+i):])
+		zd := make([]byte, zsize)
+		if _, err := p.file.Read(zd); err != nil {
+			return nil, err
+		}
+		zr, err := gzip.NewReader(bytes.NewReader(zd))
+		if err != nil {
+			return nil, err
+		}
+		data, err := ioutil.ReadAll(zr)
+		if err != nil {
+			return nil, err
+		}
+		buffer.Write(data)
+	}
+	return buffer.Bytes(), nil
+}

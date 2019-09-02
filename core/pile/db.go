@@ -185,3 +185,24 @@ func (db *DB) GetData(Height uint32, index int) ([]byte, error) {
 	}
 	return data, nil
 }
+
+func (db *DB) GetDatas(Height uint32, from int, count int) ([]byte, error) {
+	db.Lock()
+	defer db.Unlock()
+
+	if Height == 0 {
+		return nil, ErrInvalidHeight
+	}
+
+	idx := (Height - 1) / ChunkUnit
+	if len(db.piles) <= int(idx) {
+		return nil, ErrInvalidHeight
+	}
+	p := db.piles[idx]
+
+	data, err := p.GetDatas(Height, from, count)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}

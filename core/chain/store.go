@@ -285,7 +285,7 @@ func (st *Store) Block(height uint32) (*types.Block, error) {
 		}
 		return &b, nil
 	} else {
-		value, err := st.cdb.GetData(height, 1)
+		value, err := st.cdb.GetDatas(height, 0, 2)
 		if err != nil {
 			if err == pile.ErrInvalidHeight {
 				return nil, backend.ErrNotExistKey
@@ -882,7 +882,7 @@ func (st *Store) StoreBlock(b *types.Block, ctd *types.ContextData) error {
 			if err != nil {
 				return err
 			}
-			Datas = append(Datas, data)
+			Datas = append(Datas, data[len(Datas[0]):]) // cut header data
 		}
 		if len(ctd.Events) > 0 {
 			var buffer bytes.Buffer
