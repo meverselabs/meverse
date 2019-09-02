@@ -8,9 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tidwall/buntdb"
-
 	"github.com/fletaio/fleta/core/backend"
+	"github.com/fletaio/fleta/core/backend/buntdb_driver/buntdb"
 )
 
 func init() {
@@ -45,6 +44,21 @@ func (st *StoreBackendBuntDB) Shrink() {
 		recover()
 	}()
 	st.db.Shrink()
+}
+
+func (st *StoreBackendBuntDB) Backup(dst string) (ret error) {
+	st.Lock()
+	defer st.Unlock()
+
+	defer func() {
+		if e := recover(); e != nil {
+			ret = e.(error)
+		}
+	}()
+	if err := st.db.Backup(dst); err != nil {
+		return err
+	}
+	return
 }
 
 func (st *StoreBackendBuntDB) Close() {
