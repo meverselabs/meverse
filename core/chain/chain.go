@@ -87,7 +87,7 @@ func (cn *Chain) Init() error {
 	top := genesisContext.Top()
 
 	GenesisHash := hash.Hashes(hash.Hash([]byte(cn.store.Name())), hash.Hash([]byte{cn.store.ChainID()}), genesisContext.Hash())
-	if h, err := cn.Provider().Hash(0); err != nil {
+	if h, err := cn.store.Hash(0); err != nil {
 		if err != backend.ErrNotExistKey {
 			return err
 		} else {
@@ -140,7 +140,10 @@ func (cn *Chain) Close() {
 	defer cn.Unlock()
 
 	cn.isClose = true
-	cn.store.Close()
+	if cn.store != nil {
+		cn.store.Close()
+		cn.store = nil
+	}
 }
 
 // Processes returns processes

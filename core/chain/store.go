@@ -9,6 +9,7 @@ import (
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/core/backend"
+	"github.com/fletaio/fleta/core/pile"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
 )
@@ -18,6 +19,7 @@ import (
 type Store struct {
 	sync.Mutex
 	db         backend.StoreBackend
+	cdb        *pile.DB
 	chainID    uint8
 	name       string
 	version    uint16
@@ -37,10 +39,11 @@ type storecache struct {
 }
 
 // NewStore returns a Store
-func NewStore(db backend.StoreBackend, ChainID uint8, name string, version uint16) (*Store, error) {
+func NewStore(db backend.StoreBackend, cdb *pile.DB, ChainID uint8, name string, version uint16) (*Store, error) {
 	timer := time.NewTimer(5 * time.Minute)
 	st := &Store{
 		db:      db,
+		cdb:     cdb,
 		timer:   timer,
 		chainID: ChainID,
 		name:    name,
@@ -71,11 +74,16 @@ func (st *Store) Close() {
 
 	st.isClose = true
 	if st.db != nil {
+		st.db.Shrink()
 		st.db.Close()
+	}
+	if st.cdb != nil {
+		st.cdb.Close()
 	}
 	if st.timer != nil {
 		st.timer.Stop()
 	}
+	st.cdb = nil
 	st.db = nil
 	st.timer = nil
 }
@@ -169,18 +177,30 @@ func (st *Store) Hash(height uint32) (hash.Hash256, error) {
 		}
 	}
 
-	var h hash.Hash256
-	if err := st.db.View(func(txn backend.StoreReader) error {
-		value, err := txn.Get(toHeightHashKey(height))
-		if err != nil {
-			return err
+	if st.cdb == nil { // old version
+		var h hash.Hash256
+		if err := st.db.View(func(txn backend.StoreReader) error {
+			value, err := txn.Get(toHeightHashKey(height))
+			if err != nil {
+				return err
+			}
+			copy(h[:], value)
+			return nil
+		}); err != nil {
+			return hash.Hash256{}, err
 		}
-		copy(h[:], value)
-		return nil
-	}); err != nil {
-		return hash.Hash256{}, err
+		return h, nil
+	} else {
+		h, err := st.cdb.GetHash(height)
+		if err != nil {
+			if err == pile.ErrInvalidHeight {
+				return hash.Hash256{}, backend.ErrNotExistKey
+			} else {
+				return hash.Hash256{}, err
+			}
+		}
+		return h, nil
 	}
-	return h, nil
 }
 
 // Header returns the header of the data by height
@@ -200,20 +220,36 @@ func (st *Store) Header(height uint32) (*types.Header, error) {
 		}
 	}
 
-	var bh types.Header
-	if err := st.db.View(func(txn backend.StoreReader) error {
-		value, err := txn.Get(toHeightHeaderKey(height))
+	if st.cdb == nil { // old version
+		var bh types.Header
+		if err := st.db.View(func(txn backend.StoreReader) error {
+			value, err := txn.Get(toHeightHeaderKey(height))
+			if err != nil {
+				return err
+			}
+			if err := encoding.Unmarshal(value, &bh); err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+		return &bh, nil
+	} else {
+		value, err := st.cdb.GetData(height, 0)
 		if err != nil {
-			return err
+			if err == pile.ErrInvalidHeight {
+				return nil, backend.ErrNotExistKey
+			} else {
+				return nil, err
+			}
 		}
+		var bh types.Header
 		if err := encoding.Unmarshal(value, &bh); err != nil {
-			return err
+			return nil, err
 		}
-		return nil
-	}); err != nil {
-		return nil, err
+		return &bh, nil
 	}
-	return &bh, nil
 }
 
 // Block returns the block by height
@@ -233,20 +269,36 @@ func (st *Store) Block(height uint32) (*types.Block, error) {
 		}
 	}
 
-	var b types.Block
-	if err := st.db.View(func(txn backend.StoreReader) error {
-		value, err := txn.Get(toHeightBlockKey(height))
+	if st.cdb == nil { // old version
+		var b types.Block
+		if err := st.db.View(func(txn backend.StoreReader) error {
+			value, err := txn.Get(toHeightBlockKey(height))
+			if err != nil {
+				return err
+			}
+			if err := encoding.Unmarshal(value, &b); err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+		return &b, nil
+	} else {
+		value, err := st.cdb.GetData(height, 1)
 		if err != nil {
-			return err
+			if err == pile.ErrInvalidHeight {
+				return nil, backend.ErrNotExistKey
+			} else {
+				return nil, err
+			}
 		}
+		var b types.Block
 		if err := encoding.Unmarshal(value, &b); err != nil {
-			return err
+			return nil, err
 		}
-		return nil
-	}); err != nil {
-		return nil, err
+		return &b, nil
 	}
-	return &b, nil
 }
 
 // Height returns the current height of the target chain
@@ -629,42 +681,80 @@ func (st *Store) Events(From uint32, To uint32) ([]types.Event, error) {
 	}
 
 	fc := encoding.Factory("event")
-	list := []types.Event{}
-	if err := st.db.View(func(txn backend.StoreReader) error {
-		for i := From; i <= To; i++ {
-			value, err := txn.Get(toEventKey(i))
-			if err != nil {
-				if err == backend.ErrNotExistKey {
-					continue
-				} else {
+	if st.cdb == nil { // old version
+		list := []types.Event{}
+		if err := st.db.View(func(txn backend.StoreReader) error {
+			for i := From; i <= To; i++ {
+				value, err := txn.Get(toEventKey(i))
+				if err != nil {
+					if err == backend.ErrNotExistKey {
+						continue
+					} else {
+						return err
+					}
+				}
+				dec := encoding.NewDecoder(bytes.NewReader(value))
+				EvLen, err := dec.DecodeArrayLen()
+				if err != nil {
 					return err
 				}
+				for i := 0; i < EvLen; i++ {
+					t, err := dec.DecodeUint16()
+					if err != nil {
+						return err
+					}
+					ev, err := fc.Create(t)
+					if err != nil {
+						return err
+					}
+					if err := dec.Decode(&ev); err != nil {
+						return err
+					}
+					list = append(list, ev.(types.Event))
+				}
 			}
-			dec := encoding.NewDecoder(bytes.NewReader(value))
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+		return list, nil
+	} else {
+		list := []types.Event{}
+		for i := From; i <= To; i++ {
+			value, err := st.cdb.GetData(i, 2)
+			if err != nil {
+				if err == pile.ErrInvalidHeight {
+					continue
+				} else {
+					return nil, err
+				}
+			}
+			blen := util.BytesToUint32(value)
+			if uint32(len(value)) == blen+4 {
+				continue
+			}
+			dec := encoding.NewDecoder(bytes.NewReader(value[blen+4:]))
 			EvLen, err := dec.DecodeArrayLen()
 			if err != nil {
-				return err
+				return nil, err
 			}
 			for i := 0; i < EvLen; i++ {
 				t, err := dec.DecodeUint16()
 				if err != nil {
-					return err
+					return nil, err
 				}
 				ev, err := fc.Create(t)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				if err := dec.Decode(&ev); err != nil {
-					return err
+					return nil, err
 				}
 				list = append(list, ev.(types.Event))
 			}
 		}
-		return nil
-	}); err != nil {
-		return nil, err
+		return list, nil
 	}
-	return list, nil
 }
 
 // StoreGenesis stores the genesis data
@@ -678,25 +768,50 @@ func (st *Store) StoreGenesis(genHash hash.Hash256, ctd *types.ContextData) erro
 	if st.Height() > 0 {
 		return ErrAlreadyGenesised
 	}
-	if err := st.db.Update(func(txn backend.StoreWriter) error {
-		{
-			if err := txn.Set(toHeightHashKey(0), genHash[:]); err != nil {
+	if st.cdb == nil { // old version
+		if err := st.db.Update(func(txn backend.StoreWriter) error {
+			{
+				if err := txn.Set(toHeightHashKey(0), genHash[:]); err != nil {
+					return err
+				}
+				bsHeight := util.Uint32ToBytes(0)
+				if err := txn.Set(toHashHeightKey(genHash), bsHeight); err != nil {
+					return err
+				}
+				if err := txn.Set(tagHeight, bsHeight); err != nil {
+					return err
+				}
+			}
+			if err := applyContextData(txn, ctd); err != nil {
 				return err
 			}
-			bsHeight := util.Uint32ToBytes(0)
-			if err := txn.Set(toHashHeightKey(genHash), bsHeight); err != nil {
-				return err
-			}
-			if err := txn.Set(tagHeight, bsHeight); err != nil {
-				return err
-			}
-		}
-		if err := applyContextData(txn, ctd); err != nil {
+			return nil
+		}); err != nil {
 			return err
 		}
-		return nil
-	}); err != nil {
-		return err
+	} else {
+		if err := st.cdb.Init(genHash); err != nil {
+			if err != pile.ErrAlreadyInitialized {
+				return err
+			}
+		}
+		if err := st.db.Update(func(txn backend.StoreWriter) error {
+			{
+				if err := txn.Set(toHeightHashKey(0), genHash[:]); err != nil {
+					return err
+				}
+				bsHeight := util.Uint32ToBytes(0)
+				if err := txn.Set(tagHeight, bsHeight); err != nil {
+					return err
+				}
+			}
+			if err := applyContextData(txn, ctd); err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
 	}
 	st.cache.height = 0
 	st.cache.heightHash = genHash
@@ -714,43 +829,101 @@ func (st *Store) StoreBlock(b *types.Block, ctd *types.ContextData) error {
 	}
 
 	DataHash := encoding.Hash(b.Header)
-	if err := st.db.Update(func(txn backend.StoreWriter) error {
-		{
-			data, err := encoding.Marshal(b)
-			if err != nil {
+	if st.cdb == nil { // old version
+		if err := st.db.Update(func(txn backend.StoreWriter) error {
+			{
+				data, err := encoding.Marshal(b)
+				if err != nil {
+					return err
+				}
+				if err := txn.Set(toHeightBlockKey(b.Header.Height), data); err != nil {
+					return err
+				}
+			}
+			{
+				data, err := encoding.Marshal(b.Header)
+				if err != nil {
+					return err
+				}
+				if err := txn.Set(toHeightHeaderKey(b.Header.Height), data); err != nil {
+					return err
+				}
+			}
+			{
+				if err := txn.Set(toHeightHashKey(b.Header.Height), DataHash[:]); err != nil {
+					return err
+				}
+				bsHeight := util.Uint32ToBytes(b.Header.Height)
+				if err := txn.Set(toHashHeightKey(DataHash), bsHeight); err != nil {
+					return err
+				}
+				if err := txn.Set(tagHeight, bsHeight); err != nil {
+					return err
+				}
+			}
+			if err := applyContextDataOld(txn, ctd); err != nil {
 				return err
 			}
-			if err := txn.Set(toHeightBlockKey(b.Header.Height), data); err != nil {
-				return err
-			}
+			return nil
+		}); err != nil {
+			return err
 		}
+	} else {
+		Datas := [][]byte{}
 		{
 			data, err := encoding.Marshal(b.Header)
 			if err != nil {
 				return err
 			}
-			if err := txn.Set(toHeightHeaderKey(b.Header.Height), data); err != nil {
-				return err
-			}
+			Datas = append(Datas, data)
 		}
 		{
-			if err := txn.Set(toHeightHashKey(b.Header.Height), DataHash[:]); err != nil {
+			data, err := encoding.Marshal(b)
+			if err != nil {
 				return err
 			}
-			bsHeight := util.Uint32ToBytes(b.Header.Height)
-			if err := txn.Set(toHashHeightKey(DataHash), bsHeight); err != nil {
+			Datas = append(Datas, data)
+		}
+		if len(ctd.Events) > 0 {
+			var buffer bytes.Buffer
+			efc := encoding.Factory("event")
+			enc := encoding.NewEncoder(&buffer)
+			if err := enc.EncodeArrayLen(len(ctd.Events)); err != nil {
 				return err
 			}
-			if err := txn.Set(tagHeight, bsHeight); err != nil {
+			for _, ev := range ctd.Events {
+				t, err := efc.TypeOf(ev)
+				if err != nil {
+					return err
+				}
+				if err := enc.EncodeUint16(t); err != nil {
+					return err
+				}
+				if err := enc.Encode(ev); err != nil {
+					return err
+				}
+			}
+			Datas = append(Datas, buffer.Bytes())
+		}
+		if err := st.cdb.AppendData(b.Header.Height, DataHash, Datas); err != nil {
+			if err != pile.ErrInvalidAppendHeight {
 				return err
 			}
 		}
-		if err := applyContextData(txn, ctd); err != nil {
+		if err := st.db.Update(func(txn backend.StoreWriter) error {
+			{
+				bsHeight := util.Uint32ToBytes(b.Header.Height)
+				if err := txn.Set(tagHeight, bsHeight); err != nil {
+					return err
+				}
+			}
+			if err := applyContextData(txn, ctd); err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
 			return err
 		}
-		return nil
-	}); err != nil {
-		return err
 	}
 	st.SeqMapLock.Lock()
 	ctd.SeqMap.EachAll(func(addr common.Address, value uint64) bool {
@@ -765,7 +938,175 @@ func (st *Store) StoreBlock(b *types.Block, ctd *types.ContextData) error {
 	return nil
 }
 
+func (st *Store) IterBlockAfterContext(fn func(b *types.Block) error) error {
+	for h := st.Height() + 1; ; h++ {
+		b, err := st.Block(h)
+		if err != nil {
+			if err == backend.ErrNotExistKey {
+				return nil
+			} else {
+				return err
+			}
+		}
+		if err := fn(b); err != nil {
+			return err
+		}
+	}
+}
+
 func applyContextData(txn backend.StoreWriter, ctd *types.ContextData) error {
+	var inErr error
+	ctd.SeqMap.EachAll(func(addr common.Address, value uint64) bool {
+		if err := txn.Set(toAccountSeqKey(addr), util.Uint64ToBytes(value)); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
+	afc := encoding.Factory("account")
+	ctd.AccountMap.EachAll(func(addr common.Address, acc types.Account) bool {
+		t, err := afc.TypeOf(acc)
+		if err != nil {
+			inErr = err
+			return false
+		}
+		var buffer bytes.Buffer
+		buffer.Write(util.Uint16ToBytes(t))
+		data, err := encoding.Marshal(acc)
+		if err != nil {
+			inErr = err
+			return false
+		}
+		buffer.Write(data)
+		if err := txn.Set(toAccountKey(addr), buffer.Bytes()); err != nil {
+			inErr = err
+			return false
+		}
+		if err := txn.Set(toAccountNameKey(acc.Name()), addr[:]); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
+	ctd.AccountDataMap.EachAll(func(key string, value []byte) bool {
+		if err := txn.Set(toAccountDataKey(key), value); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
+	ctd.DeletedAccountMap.EachAll(func(addr common.Address, acc types.Account) bool {
+		if err := txn.Set(toAccountKey(addr), []byte{0}); err != nil {
+			inErr = err
+			return false
+		}
+		prefix := toAccountDataKey(string(addr[:]))
+		Deletes := [][]byte{}
+		if err := txn.Iterate(prefix, func(key []byte, value []byte) error {
+			Deletes = append(Deletes, key)
+			return nil
+		}); err != nil {
+			inErr = err
+			return false
+		}
+		for _, v := range Deletes {
+			if err := txn.Delete(v); err != nil {
+				inErr = err
+				return false
+			}
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
+	ctd.DeletedAccountDataMap.EachAll(func(key string, value bool) bool {
+		if err := txn.Delete(toAccountDataKey(key)); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
+	ctd.UTXOMap.EachAll(func(id uint64, utxo *types.UTXO) bool {
+		if utxo.TxIn.ID() != id {
+			inErr = ErrInvalidTxInKey
+			return false
+		}
+		data, err := encoding.Marshal(utxo.TxOut)
+		if err != nil {
+			inErr = err
+			return false
+		}
+		if err := txn.Set(toUTXOKey(id), data); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
+	ctd.CreatedUTXOMap.EachAll(func(id uint64, vout *types.TxOut) bool {
+		data, err := encoding.Marshal(vout)
+		if err != nil {
+			inErr = err
+			return false
+		}
+		if err := txn.Set(toUTXOKey(id), data); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
+	ctd.DeletedUTXOMap.EachAll(func(id uint64, utxo *types.UTXO) bool {
+		if err := txn.Delete(toUTXOKey(id)); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
+	ctd.ProcessDataMap.EachAll(func(key string, value []byte) bool {
+		if err := txn.Set(toProcessDataKey(key), value); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
+	ctd.DeletedProcessDataMap.EachAll(func(key string, value bool) bool {
+		if err := txn.Delete(toProcessDataKey(key)); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
+	return nil
+}
+
+func applyContextDataOld(txn backend.StoreWriter, ctd *types.ContextData) error {
 	var inErr error
 	ctd.SeqMap.EachAll(func(addr common.Address, value uint64) bool {
 		if err := txn.Set(toAccountSeqKey(addr), util.Uint64ToBytes(value)); err != nil {

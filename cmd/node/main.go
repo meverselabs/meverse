@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"syscall"
 
+	"github.com/fletaio/fleta/core/pile"
+
 	"github.com/fletaio/fleta/cmd/app"
 	"github.com/fletaio/fleta/cmd/closer"
 	"github.com/fletaio/fleta/cmd/config"
@@ -30,16 +32,16 @@ import (
 
 // Config is a configuration for the cmd
 type Config struct {
-	SeedNodeMap  map[string]string
-	NodeKeyHex   string
-	ObserverKeys []string
-	Port         int
-	APIPort      int
-	StoreRoot    string
-	Backend      string
-	RLogHost     string
-	RLogPath     string
-	UseRLog      bool
+	SeedNodeMap    map[string]string
+	NodeKeyHex     string
+	ObserverKeys   []string
+	Port           int
+	APIPort        int
+	StoreRoot      string
+	BackendVersion int
+	RLogHost       string
+	RLogPath       string
+	UseRLog        bool
 }
 
 func main() {
@@ -49,9 +51,6 @@ func main() {
 	}
 	if len(cfg.StoreRoot) == 0 {
 		cfg.StoreRoot = "./ndata"
-	}
-	if len(cfg.Backend) == 0 {
-		cfg.Backend = "badger"
 	}
 	if len(cfg.RLogHost) > 0 && cfg.UseRLog {
 		if len(cfg.RLogPath) == 0 {
@@ -128,12 +127,29 @@ func main() {
 	}()
 	defer cm.CloseAll()
 
-	back, err := backend.Create(cfg.Backend, cfg.StoreRoot)
-	if err != nil {
-		panic(err)
+	var back backend.StoreBackend
+	var cdb *pile.DB
+	switch cfg.BackendVersion {
+	case 0:
+		contextDB, err := backend.Create("badger", cfg.StoreRoot)
+		if err != nil {
+			panic(err)
+		}
+		back = contextDB
+	case 1:
+		contextDB, err := backend.Create("buntdb", cfg.StoreRoot+"/context")
+		if err != nil {
+			panic(err)
+		}
+		chainDB, err := pile.Open(cfg.StoreRoot + "/chain")
+		if err != nil {
+			panic(err)
+		}
+		chainDB.SetSyncMode(true)
+		back = contextDB
+		cdb = chainDB
 	}
-
-	st, err := chain.NewStore(back, ChainID, Name, Version)
+	st, err := chain.NewStore(back, cdb, ChainID, Name, Version)
 	if err != nil {
 		panic(err)
 	}

@@ -131,7 +131,7 @@ func (p *Pile) Close() {
 	}
 }
 
-func (p *Pile) AppendData(Sync bool, Height uint32, DataHash hash.Hash256, Data []byte) error {
+func (p *Pile) AppendData(Sync bool, Height uint32, DataHash hash.Hash256, Datas [][]byte) error {
 	p.Lock()
 	defer p.Unlock()
 
@@ -158,22 +158,33 @@ func (p *Pile) AppendData(Sync bool, Height uint32, DataHash hash.Hash256, Data 
 	if _, err := p.file.Seek(Offset, 0); err != nil {
 		return err
 	}
-	var buffer bytes.Buffer
-	buffer.Write(DataHash[:])
-	zw := gzip.NewWriter(&buffer)
-	if _, err := zw.Write(Data); err != nil {
-		return err
+	totalLen := int64(32 + 1 + 4*len(Datas))
+	p.file.Write(DataHash[:])
+	p.file.Write([]byte{uint8(len(Datas))})
+	zdatas := make([][]byte, 0, len(Datas))
+	for _, v := range Datas {
+		var buffer bytes.Buffer
+		zw := gzip.NewWriter(&buffer)
+		if _, err := zw.Write(v); err != nil {
+			return err
+		}
+		zw.Flush()
+		zw.Close()
+		zd := buffer.Bytes()
+		zdatas = append(zdatas, zd)
+
+		p.file.Write(util.Uint32ToBytes(uint32(len(zd))))
 	}
-	zw.Flush()
-	zw.Close()
-	data := buffer.Bytes()
-	p.file.Write(data)
+	for _, zd := range zdatas {
+		p.file.Write(zd)
+		totalLen += int64(len(zd))
+	}
 
 	// update offset
 	if _, err := p.file.Seek(ChunkMetaSize+int64(FromHeight)*8, 0); err != nil {
 		return err
 	}
-	p.file.Write(util.Uint64ToBytes(uint64(Offset + int64(len(data)))))
+	p.file.Write(util.Uint64ToBytes(uint64(Offset + totalLen)))
 
 	// update head height
 	if _, err := p.file.Seek(0, 0); err != nil {
@@ -222,7 +233,7 @@ func (p *Pile) GetHash(Height uint32) (hash.Hash256, error) {
 	return h, nil
 }
 
-func (p *Pile) GetData(Height uint32) ([]byte, error) {
+func (p *Pile) GetData(Height uint32, index int) ([]byte, error) {
 	p.Lock()
 	defer p.Unlock()
 
@@ -242,22 +253,30 @@ func (p *Pile) GetData(Height uint32) ([]byte, error) {
 		}
 		Offset = int64(util.BytesToUint64(bs))
 	}
-	var Size int64
-	if true {
-		if _, err := p.file.Seek(ChunkMetaSize+(int64(FromHeight)-1)*8, 0); err != nil {
-			return nil, err
-		}
-		bs := make([]byte, 8)
-		if _, err := p.file.Read(bs); err != nil {
-			return nil, err
-		}
-		Size = int64(util.BytesToUint64(bs)) - Offset
-	}
-
 	if _, err := p.file.Seek(Offset+32, 0); err != nil {
 		return nil, err
 	}
-	zd := make([]byte, Size-32)
+	lbs := make([]byte, 1)
+	if _, err := p.file.Read(lbs); err != nil {
+		return nil, err
+	}
+	if index >= int(lbs[0]) {
+		return nil, ErrInvalidDataIndex
+	}
+	zlbs := make([]byte, 4*lbs[0])
+	if _, err := p.file.Read(zlbs); err != nil {
+		return nil, err
+	}
+	zofs := Offset + 32 + 1 + int64(4*lbs[0])
+	for i := 0; i < index; i++ {
+		zofs += int64(util.BytesToUint32(zlbs[4*i:]))
+	}
+	if _, err := p.file.Seek(zofs, 0); err != nil {
+		return nil, err
+	}
+
+	zsize := util.BytesToUint32(zlbs[4*index:])
+	zd := make([]byte, zsize)
 	if _, err := p.file.Read(zd); err != nil {
 		return nil, err
 	}

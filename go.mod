@@ -4,6 +4,7 @@ go 1.12
 
 require (
 	github.com/BurntSushi/toml v0.3.1
+	github.com/bluele/gcache v0.0.0-20190518031135-bc40bd653833
 	github.com/boltdb/bolt v1.3.1
 	github.com/cupcake/rdb v0.0.0-20161107195141-43ba34106c76 // indirect
 	github.com/davecgh/go-spew v1.1.1
@@ -29,6 +30,7 @@ require (
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/xujiajun/nutsdb v0.4.0
 	golang.org/x/net v0.0.0-20190620200207-3b0461eec859
+	golang.org/x/sys v0.0.0-20190626221950-04f50cda93cb
 	gopkg.in/tucnak/telebot.v2 v2.0.0-20190415090633-8c1c512262f2
 	gopkg.in/yaml.v2 v2.2.2
 )

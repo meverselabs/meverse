@@ -103,9 +103,13 @@ func (db *DB) SetSyncMode(sync bool) {
 	db.syncMode = sync
 }
 
-func (db *DB) AppendData(Height uint32, DataHash hash.Hash256, Data []byte) error {
+func (db *DB) AppendData(Height uint32, DataHash hash.Hash256, Datas [][]byte) error {
 	db.Lock()
 	defer db.Unlock()
+
+	if len(Datas) > 255 {
+		return ErrExeedMaximumDataArrayLength
+	}
 
 	p := db.piles[len(db.piles)-1]
 	if Height != p.HeadHeight+1 {
@@ -127,7 +131,7 @@ func (db *DB) AppendData(Height uint32, DataHash hash.Hash256, Data []byte) erro
 			sync = true
 		}
 	}
-	if err := p.AppendData(sync, Height, DataHash, Data); err != nil {
+	if err := p.AppendData(sync, Height, DataHash, Datas); err != nil {
 		return err
 	}
 	if sync {
@@ -161,7 +165,7 @@ func (db *DB) GetHash(Height uint32) (hash.Hash256, error) {
 	return h, nil
 }
 
-func (db *DB) GetData(Height uint32) ([]byte, error) {
+func (db *DB) GetData(Height uint32, index int) ([]byte, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -175,7 +179,7 @@ func (db *DB) GetData(Height uint32) ([]byte, error) {
 	}
 	p := db.piles[idx]
 
-	data, err := p.GetData(Height)
+	data, err := p.GetData(Height, index)
 	if err != nil {
 		return nil, err
 	}
