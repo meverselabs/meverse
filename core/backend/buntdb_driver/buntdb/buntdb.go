@@ -661,6 +661,11 @@ func (db *DB) Shrink() error {
 		if err != nil {
 			return err
 		}
+		if done {
+			if _, err := f.WriteString("*1\r\n$5\r\ntxend\r\n"); err != nil {
+				return err
+			}
+		}
 	}
 	// We reached this far so all of the items have been written to a new tmp
 	// There's some more work to do by appending the new line from the aof
@@ -785,6 +790,11 @@ func (db *DB) Backup(dst string) error {
 		}()
 		if err != nil {
 			return err
+		}
+		if done {
+			if _, err := f.WriteString("*1\r\n$5\r\ntxend\r\n"); err != nil {
+				return err
+			}
 		}
 	}
 	// We reached this far so all of the items have been written to a new tmp

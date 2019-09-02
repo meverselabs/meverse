@@ -138,10 +138,9 @@ func (cn *Chain) Close() {
 	cn.Lock()
 	defer cn.Unlock()
 
-	cn.isClose = true
-	if cn.store != nil {
+	if !cn.isClose {
 		cn.store.Close()
-		cn.store = nil
+		cn.isClose = true
 	}
 }
 
