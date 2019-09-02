@@ -177,6 +177,7 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 			fr.Lock()
 			hasItem := false
 			TargetHeight := uint64(fr.cs.cn.Provider().Height() + 1)
+			Count := 0
 			item := fr.blockQ.PopUntil(TargetHeight)
 			for item != nil {
 				b := item.(*types.Block)
@@ -186,6 +187,10 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 				fr.cleanPool(b)
 				rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Transactions))
 				TargetHeight++
+				Count++
+				if Count > 100 {
+					break
+				}
 				item = fr.blockQ.PopUntil(TargetHeight)
 				hasItem = true
 			}

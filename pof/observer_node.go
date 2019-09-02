@@ -146,6 +146,7 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 			ob.Lock()
 			hasItem := false
 			TargetHeight := uint64(cp.Height() + 1)
+			Count := 0
 			item := ob.blockQ.PopUntil(TargetHeight)
 			for item != nil {
 				b := item.(*types.Block)
@@ -158,6 +159,10 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 					rlog.Println(cp.Height(), "BlockConnectedQ", b.Header.Generator.String(), ob.round.RoundState, b.Header.Height, (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
 				}
 				TargetHeight++
+				Count++
+				if Count > 100 {
+					break
+				}
 				item = ob.blockQ.PopUntil(TargetHeight)
 				hasItem = true
 			}

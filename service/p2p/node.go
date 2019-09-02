@@ -153,6 +153,7 @@ func (nd *Node) Run(BindAddress string) {
 			nd.Lock()
 			hasItem := false
 			TargetHeight := uint64(nd.cn.Provider().Height() + 1)
+			Count := 0
 			item := nd.blockQ.PopUntil(TargetHeight)
 			for item != nil {
 				b := item.(*types.Block)
@@ -163,6 +164,10 @@ func (nd *Node) Run(BindAddress string) {
 				}
 				rlog.Println("Node", nd.myPublicHash.String(), nd.cn.Provider().Height(), "BlockConnected", b.Header.Generator.String(), b.Header.Height)
 				TargetHeight++
+				Count++
+				if Count > 100 {
+					break
+				}
 				item = nd.blockQ.PopUntil(TargetHeight)
 				hasItem = true
 			}
