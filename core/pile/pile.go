@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io/ioutil"
+	"log"
 	"os"
 	"sync"
 
@@ -42,10 +43,12 @@ func NewPile(path string, GenHash hash.Hash256, BaseHeight uint32) (*Pile, error
 			file.Close()
 			return nil, ErrInvalidChunkBeginHeight
 		}
-		copy(meta, util.Uint32ToBytes(BaseHeight))               //HeadHeight (0, 4)
-		copy(meta[4:], util.Uint32ToBytes(BaseHeight))           //BeginHeight (4, 8)
-		copy(meta[8:], util.Uint32ToBytes(BaseHeight+ChunkUnit)) //EndHeight (8, 12)
-		copy(meta[12:], GenHash[:])                              //GenesisHash (12, 44)
+		copy(meta, util.Uint32ToBytes(BaseHeight))                //HeadHeight (0, 4)
+		copy(meta[4:], util.Uint32ToBytes(BaseHeight))            //HeadHeightCheckA (4, 8)
+		copy(meta[8:], util.Uint32ToBytes(BaseHeight))            //HeadHeightCheckB (8, 12)
+		copy(meta[12:], util.Uint32ToBytes(BaseHeight))           //BeginHeight (12, 16)
+		copy(meta[16:], util.Uint32ToBytes(BaseHeight+ChunkUnit)) //EndHeight (16, 20)
+		copy(meta[20:], GenHash[:])                               //GenesisHash (20, 52)
 		if _, err := file.Write(meta); err != nil {
 			file.Close()
 			return nil, err
@@ -77,10 +80,12 @@ func LoadPile(path string) (*Pile, error) {
 		return nil, err
 	}
 	HeadHeight := util.BytesToUint32(meta)
-	BeginHeight := util.BytesToUint32(meta[4:])
-	EndHeight := util.BytesToUint32(meta[8:])
+	HeadHeightCheckA := util.BytesToUint32(meta[4:])
+	HeadHeightCheckB := util.BytesToUint32(meta[8:])
+	BeginHeight := util.BytesToUint32(meta[12:])
+	EndHeight := util.BytesToUint32(meta[16:])
 	var GenHash hash.Hash256
-	copy(GenHash[:], meta[12:])
+	copy(GenHash[:], meta[20:])
 	if BeginHeight%ChunkUnit != 0 {
 		file.Close()
 		return nil, ErrInvalidChunkBeginHeight
@@ -88,6 +93,36 @@ func LoadPile(path string) (*Pile, error) {
 	if BeginHeight+ChunkUnit != EndHeight {
 		file.Close()
 		return nil, ErrInvalidChunkEndHeight
+	}
+	if HeadHeight != HeadHeightCheckA || HeadHeightCheckA != HeadHeightCheckB { // crashed when file.Sync()
+		if HeadHeightCheckA == HeadHeightCheckB { //crashed at HeadHeight
+			if _, err := file.Seek(0, 0); err != nil {
+				return nil, err
+			}
+			HeadHeight = HeadHeightCheckA
+			if _, err := file.Write(util.Uint32ToBytes(HeadHeight)); err != nil {
+				return nil, err
+			}
+		} else if HeadHeight == HeadHeightCheckB+1 { //crashed at HeadHeightCheckA
+			if _, err := file.Seek(4, 0); err != nil {
+				return nil, err
+			}
+			HeadHeightCheckA = HeadHeight
+			if _, err := file.Write(util.Uint32ToBytes(HeadHeightCheckA)); err != nil {
+				return nil, err
+			}
+		} else if HeadHeight == HeadHeightCheckA { //crashed at HeadHeightCheckB
+			if _, err := file.Seek(8, 0); err != nil {
+				return nil, err
+			}
+			HeadHeightCheckB = HeadHeight
+			if _, err := file.Write(util.Uint32ToBytes(HeadHeightCheckB)); err != nil {
+				return nil, err
+			}
+		} else {
+			log.Println("PileDB height crashed", HeadHeight, HeadHeightCheckA, HeadHeightCheckB)
+			return nil, ErrHeightCrashed
+		}
 	}
 	if true {
 		// truncate unfinished data
@@ -160,8 +195,12 @@ func (p *Pile) AppendData(Sync bool, Height uint32, DataHash hash.Hash256, Datas
 		return err
 	}
 	totalLen := int64(32 + 1 + 4*len(Datas))
-	p.file.Write(DataHash[:])
-	p.file.Write([]byte{uint8(len(Datas))})
+	if _, err := p.file.Write(DataHash[:]); err != nil {
+		return err
+	}
+	if _, err := p.file.Write([]byte{uint8(len(Datas))}); err != nil {
+		return err
+	}
 	zdatas := make([][]byte, 0, len(Datas))
 	for _, v := range Datas {
 		var buffer bytes.Buffer
@@ -174,10 +213,14 @@ func (p *Pile) AppendData(Sync bool, Height uint32, DataHash hash.Hash256, Datas
 		zd := buffer.Bytes()
 		zdatas = append(zdatas, zd)
 
-		p.file.Write(util.Uint32ToBytes(uint32(len(zd))))
+		if _, err := p.file.Write(util.Uint32ToBytes(uint32(len(zd)))); err != nil {
+			return err
+		}
 	}
 	for _, zd := range zdatas {
-		p.file.Write(zd)
+		if _, err := p.file.Write(zd); err != nil {
+			return err
+		}
 		totalLen += int64(len(zd))
 	}
 
@@ -185,14 +228,43 @@ func (p *Pile) AppendData(Sync bool, Height uint32, DataHash hash.Hash256, Datas
 	if _, err := p.file.Seek(ChunkMetaSize+int64(FromHeight)*8, 0); err != nil {
 		return err
 	}
-	p.file.Write(util.Uint64ToBytes(uint64(Offset + totalLen)))
+	if _, err := p.file.Write(util.Uint64ToBytes(uint64(Offset + totalLen))); err != nil {
+		return err
+	}
 
 	// update head height
 	if _, err := p.file.Seek(0, 0); err != nil {
 		return err
 	}
-	p.file.Write(util.Uint32ToBytes(p.HeadHeight + 1))
+	if _, err := p.file.Write(util.Uint32ToBytes(p.HeadHeight + 1)); err != nil {
+		return err
+	}
+	if Sync {
+		if err := p.file.Sync(); err != nil {
+			return err
+		}
+	}
 
+	// update head height check A
+	if _, err := p.file.Seek(4, 0); err != nil {
+		return err
+	}
+	if _, err := p.file.Write(util.Uint32ToBytes(p.HeadHeight + 1)); err != nil {
+		return err
+	}
+	if Sync {
+		if err := p.file.Sync(); err != nil {
+			return err
+		}
+	}
+
+	// update head height check B
+	if _, err := p.file.Seek(8, 0); err != nil {
+		return err
+	}
+	if _, err := p.file.Write(util.Uint32ToBytes(p.HeadHeight + 1)); err != nil {
+		return err
+	}
 	if Sync {
 		if err := p.file.Sync(); err != nil {
 			return err

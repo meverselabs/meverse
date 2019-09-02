@@ -14,4 +14,5 @@ var (
 	ErrMissingPile                 = errors.New("invalid missing pile")
 	ErrAlreadyInitialized          = errors.New("already initialized")
 	ErrExeedMaximumDataArrayLength = errors.New("exceed maximum data array length")
+	ErrHeightCrashed               = errors.New("height crashed")
 )
