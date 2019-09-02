@@ -303,6 +303,9 @@ func (p *Pile) GetDatas(Height uint32, from int, count int) ([]byte, error) {
 	if Height > p.BeginHeight+ChunkUnit {
 		return nil, ErrInvalidHeight
 	}
+	if Height > p.HeadHeight {
+		return nil, ErrInvalidHeight
+	}
 
 	Offset := ChunkHeaderSize
 	if FromHeight > 1 {
