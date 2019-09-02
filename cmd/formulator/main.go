@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"syscall"
 
+	"github.com/fletaio/fleta/core/types"
+
 	"github.com/fletaio/fleta/core/pile"
 
 	"github.com/fletaio/fleta/cmd/app"
@@ -167,6 +169,12 @@ func main() {
 	}
 	cm.Add("store", st)
 
+	if st.Height() > 0 {
+		if _, err := cdb.GetData(st.Height(), 0); err != nil {
+			panic(err)
+		}
+	}
+
 	cs := pof.NewConsensus(MaxBlocksPerFormulator, ObserverKeys)
 	app := app.NewFletaApp()
 	cn := chain.NewChain(cs, app, st)
@@ -182,6 +190,21 @@ func main() {
 	}
 	cm.RemoveAll()
 	cm.Add("chain", cn)
+
+	if err := st.IterBlockAfterContext(func(b *types.Block) error {
+		if cm.IsClosed() {
+			return chain.ErrStoreClosed
+		}
+		if err := cn.ConnectBlock(b); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		if err == chain.ErrStoreClosed {
+			return
+		}
+		panic(err)
+	}
 
 	fr := pof.NewFormulatorNode(&pof.FormulatorConfig{
 		Formulator:              common.MustParseAddress(cfg.Formulator),
