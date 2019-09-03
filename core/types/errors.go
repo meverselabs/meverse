@@ -21,6 +21,7 @@ var (
 	ErrInvalidSequence              = errors.New("invalid sequence")
 	ErrInvalidTransactionCount      = errors.New("invalid transaction count")
 	ErrNotAllowedZeroAddressAccount = errors.New("not allowed zero address account")
+	ErrNotAllowedAddressAccountName = errors.New("not allowed address account name")
 	ErrInvalidAddressHeight         = errors.New("invalid address height")
 	ErrInvalidSignerCount           = errors.New("invalid signer count")
 	ErrInvalidAccountSigner         = errors.New("invalid account signer")

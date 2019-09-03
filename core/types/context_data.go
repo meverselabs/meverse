@@ -186,6 +186,9 @@ func (ctd *ContextData) CreateAccount(acc Account) error {
 	if acc.Address() == common.NewAddress(0, 0, 0) {
 		return ErrNotAllowedZeroAddressAccount
 	}
+	if _, err := common.ParseAddress(acc.Name()); err == nil {
+		return ErrNotAllowedAddressAccountName
+	}
 	if has, err := ctd.HasAccount(acc.Address()); err != nil {
 		if err != ErrNotExistAccount {
 			return err
@@ -511,9 +514,9 @@ func (ctd *ContextData) Dump() string {
 	buffer.WriteString("\n")
 	buffer.WriteString("AccountDataMap\n")
 	ctd.AccountDataMap.EachAll(func(key string, value []byte) bool {
-		buffer.WriteString(hash.Hash([]byte(key)).String())
+		buffer.WriteString(hex.EncodeToString([]byte(key)) + ":" + hash.Hash([]byte(key)).String())
 		buffer.WriteString(": ")
-		buffer.WriteString(hash.Hash(value).String())
+		buffer.WriteString(hex.EncodeToString(value) + ":" + hash.Hash(value).String())
 		buffer.WriteString("\n")
 		return true
 	})
