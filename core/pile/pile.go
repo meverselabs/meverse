@@ -12,6 +12,7 @@ import (
 	"github.com/fletaio/fleta/common/util"
 )
 
+// Pile proivdes a part of stack like store
 type Pile struct {
 	sync.Mutex
 	file        *os.File
@@ -20,6 +21,7 @@ type Pile struct {
 	GenHash     hash.Hash256
 }
 
+// NewPile returns a Pile
 func NewPile(path string, GenHash hash.Hash256, BaseHeight uint32) (*Pile, error) {
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
@@ -64,6 +66,7 @@ func NewPile(path string, GenHash hash.Hash256, BaseHeight uint32) (*Pile, error
 	return p, nil
 }
 
+// LoadPile loads a pile from the file
 func LoadPile(path string) (*Pile, error) {
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
@@ -138,7 +141,6 @@ func LoadPile(path string) (*Pile, error) {
 		}
 	}
 	if true {
-		// truncate unfinished data
 		Offset := ChunkHeaderSize
 		FromHeight := HeadHeight - BeginHeight
 		if FromHeight > 0 {
@@ -169,6 +171,7 @@ func LoadPile(path string) (*Pile, error) {
 	return p, nil
 }
 
+// Close closes a pile
 func (p *Pile) Close() {
 	p.Lock()
 	defer p.Unlock()
@@ -180,6 +183,7 @@ func (p *Pile) Close() {
 	}
 }
 
+// AppendData pushes data to the top of the pile
 func (p *Pile) AppendData(Sync bool, Height uint32, DataHash hash.Hash256, Datas [][]byte) error {
 	p.Lock()
 	defer p.Unlock()
@@ -287,6 +291,7 @@ func (p *Pile) AppendData(Sync bool, Height uint32, DataHash hash.Hash256, Datas
 	return nil
 }
 
+// GetHash returns a hash value of the height
 func (p *Pile) GetHash(Height uint32) (hash.Hash256, error) {
 	p.Lock()
 	defer p.Unlock()
@@ -319,6 +324,7 @@ func (p *Pile) GetHash(Height uint32) (hash.Hash256, error) {
 	return h, nil
 }
 
+// GetData returns a data at the index of the height
 func (p *Pile) GetData(Height uint32, index int) ([]byte, error) {
 	p.Lock()
 	defer p.Unlock()
@@ -380,6 +386,7 @@ func (p *Pile) GetData(Height uint32, index int) ([]byte, error) {
 	return data, nil
 }
 
+// GetDatas returns datas of the height between from and from + count
 func (p *Pile) GetDatas(Height uint32, from int, count int) ([]byte, error) {
 	p.Lock()
 	defer p.Unlock()

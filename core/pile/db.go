@@ -11,15 +11,18 @@ import (
 	"github.com/fletaio/fleta/common/hash"
 )
 
+// DB provides stack like value store using piles
 type DB struct {
 	sync.Mutex
 	path         string
 	piles        []*Pile
 	genHash      hash.Hash256
 	syncMode     bool
+	hasDirty     bool
 	lastSyncTime time.Time
 }
 
+// Open creates a DB that includes loaded piles
 func Open(path string) (*DB, error) {
 	os.MkdirAll(path, os.ModePerm)
 
@@ -64,9 +67,33 @@ func Open(path string) (*DB, error) {
 	if len(piles) > 0 {
 		copy(db.genHash[:], db.piles[0].GenHash[:])
 	}
+
+	timer := time.NewTimer(time.Second)
+	go func() {
+		for {
+			select {
+			case <-timer.C:
+				db.Lock()
+				if len(db.piles) > 0 {
+					if db.hasDirty {
+						now := time.Now()
+						if now.Sub(db.lastSyncTime) > time.Second {
+							db.piles[len(db.piles)-1].file.Sync()
+							db.lastSyncTime = now
+							db.hasDirty = false
+						}
+					}
+				}
+				db.Unlock()
+				timer.Reset(time.Second)
+			}
+		}
+	}()
+
 	return db, nil
 }
 
+// Init initialize database when not initialized
 func (db *DB) Init(genHash hash.Hash256) error {
 	db.Lock()
 	defer db.Unlock()
@@ -84,6 +111,7 @@ func (db *DB) Init(genHash hash.Hash256) error {
 	return nil
 }
 
+// Close closes pile DB
 func (db *DB) Close() {
 	db.Lock()
 	defer db.Unlock()
@@ -96,6 +124,7 @@ func (db *DB) Close() {
 	db.piles = []*Pile{}
 }
 
+// SetSyncMode changes sync mode(sync every second when disabled)
 func (db *DB) SetSyncMode(sync bool) {
 	db.Lock()
 	defer db.Unlock()
@@ -103,6 +132,7 @@ func (db *DB) SetSyncMode(sync bool) {
 	db.syncMode = sync
 }
 
+// AppendData pushes data to top of the pile in piles
 func (db *DB) AppendData(Height uint32, DataHash hash.Hash256, Datas [][]byte) error {
 	db.Lock()
 	defer db.Unlock()
@@ -116,6 +146,9 @@ func (db *DB) AppendData(Height uint32, DataHash hash.Hash256, Datas [][]byte) e
 		return ErrInvalidAppendHeight
 	}
 	if p.HeadHeight-p.BeginHeight >= ChunkUnit {
+		if len(db.piles) > 0 {
+			db.piles[len(db.piles)-1].file.Sync()
+		}
 		v, err := NewPile(filepath.Join(db.path, "chain_"+strconv.Itoa(len(db.piles)+1)+".pile"), db.genHash, p.BeginHeight+ChunkUnit)
 		if err != nil {
 			return err
@@ -136,10 +169,14 @@ func (db *DB) AppendData(Height uint32, DataHash hash.Hash256, Datas [][]byte) e
 	}
 	if sync {
 		db.lastSyncTime = now
+		db.hasDirty = false
+	} else {
+		db.hasDirty = true
 	}
 	return nil
 }
 
+// GetHash returns a hash value of the height
 func (db *DB) GetHash(Height uint32) (hash.Hash256, error) {
 	db.Lock()
 	defer db.Unlock()
@@ -165,6 +202,7 @@ func (db *DB) GetHash(Height uint32) (hash.Hash256, error) {
 	return h, nil
 }
 
+// GetData returns a data at the index of the height
 func (db *DB) GetData(Height uint32, index int) ([]byte, error) {
 	db.Lock()
 	defer db.Unlock()
@@ -186,6 +224,7 @@ func (db *DB) GetData(Height uint32, index int) ([]byte, error) {
 	return data, nil
 }
 
+// GetDatas returns datas of the height between from and from + count
 func (db *DB) GetDatas(Height uint32, from int, count int) ([]byte, error) {
 	db.Lock()
 	defer db.Unlock()
