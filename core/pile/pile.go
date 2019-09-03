@@ -131,6 +131,7 @@ func LoadPile(path string) (*Pile, error) {
 			if err := file.Sync(); err != nil {
 				return nil, err
 			}
+			HeadHeightCheckB = HeadHeight
 		} else {
 			log.Println("PileDB height crashed", HeadHeight, HeadHeightCheckA, HeadHeightCheckB)
 			return nil, ErrHeightCrashed
