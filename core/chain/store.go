@@ -723,22 +723,18 @@ func (st *Store) Events(From uint32, To uint32) ([]types.Event, error) {
 		for i := From; i <= To; i++ {
 			value, err := st.cdb.GetData(i, 2)
 			if err != nil {
-				if err == pile.ErrInvalidHeight {
+				if err == pile.ErrInvalidHeight || err == pile.ErrInvalidDataIndex {
 					continue
 				} else {
 					return nil, err
 				}
 			}
-			blen := util.BytesToUint32(value)
-			if uint32(len(value)) == blen+4 {
-				continue
-			}
-			dec := encoding.NewDecoder(bytes.NewReader(value[blen+4:]))
+			dec := encoding.NewDecoder(bytes.NewReader(value))
 			EvLen, err := dec.DecodeArrayLen()
 			if err != nil {
 				return nil, err
 			}
-			for i := 0; i < EvLen; i++ {
+			for j := 0; j < EvLen; j++ {
 				t, err := dec.DecodeUint16()
 				if err != nil {
 					return nil, err
