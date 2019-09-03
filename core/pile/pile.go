@@ -99,24 +99,36 @@ func LoadPile(path string) (*Pile, error) {
 			if _, err := file.Seek(0, 0); err != nil {
 				return nil, err
 			}
-			HeadHeight = HeadHeightCheckA
-			if _, err := file.Write(util.Uint32ToBytes(HeadHeight)); err != nil {
+			if _, err := file.Write(util.Uint32ToBytes(HeadHeightCheckA)); err != nil {
 				return nil, err
 			}
+			if err := file.Sync(); err != nil {
+				return nil, err
+			}
+			HeadHeight = HeadHeightCheckA
 		} else if HeadHeight == HeadHeightCheckB+1 { //crashed at HeadHeightCheckA
 			if _, err := file.Seek(4, 0); err != nil {
 				return nil, err
 			}
-			HeadHeightCheckA = HeadHeight
-			if _, err := file.Write(util.Uint32ToBytes(HeadHeightCheckA)); err != nil {
+			if _, err := file.Write(util.Uint32ToBytes(HeadHeight)); err != nil {
 				return nil, err
 			}
+			if _, err := file.Write(util.Uint32ToBytes(HeadHeight)); err != nil {
+				return nil, err
+			}
+			if err := file.Sync(); err != nil {
+				return nil, err
+			}
+			HeadHeightCheckA = HeadHeight
+			HeadHeightCheckB = HeadHeight
 		} else if HeadHeight == HeadHeightCheckA { //crashed at HeadHeightCheckB
 			if _, err := file.Seek(8, 0); err != nil {
 				return nil, err
 			}
-			HeadHeightCheckB = HeadHeight
-			if _, err := file.Write(util.Uint32ToBytes(HeadHeightCheckB)); err != nil {
+			if _, err := file.Write(util.Uint32ToBytes(HeadHeight)); err != nil {
+				return nil, err
+			}
+			if err := file.Sync(); err != nil {
 				return nil, err
 			}
 		} else {
