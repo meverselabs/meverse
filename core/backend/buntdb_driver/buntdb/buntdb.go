@@ -651,6 +651,7 @@ func (db *DB) Shrink() error {
 				},
 			)
 			if len(buf) > 0 {
+				buf = append(buf, "*1\r\n$5\r\ntxend\r\n"...)
 				if _, err := f.Write(buf); err != nil {
 					return err
 				}
@@ -660,11 +661,6 @@ func (db *DB) Shrink() error {
 		}()
 		if err != nil {
 			return err
-		}
-		if done {
-			if _, err := f.WriteString("*1\r\n$5\r\ntxend\r\n"); err != nil {
-				return err
-			}
 		}
 	}
 	// We reached this far so all of the items have been written to a new tmp
@@ -781,6 +777,7 @@ func (db *DB) Backup(dst string) error {
 				},
 			)
 			if len(buf) > 0 {
+				buf = append(buf, "*1\r\n$5\r\ntxend\r\n"...)
 				if _, err := f.Write(buf); err != nil {
 					return err
 				}
@@ -790,11 +787,6 @@ func (db *DB) Backup(dst string) error {
 		}()
 		if err != nil {
 			return err
-		}
-		if done {
-			if _, err := f.WriteString("*1\r\n$5\r\ntxend\r\n"); err != nil {
-				return err
-			}
 		}
 	}
 	// We reached this far so all of the items have been written to a new tmp
