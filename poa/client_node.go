@@ -136,7 +136,7 @@ func (ci *ClientNode) Run(BindAddress string) {
 					rlog.Println("TransactionAppended", chain.HashTransactionByType(ci.cs.cn.Provider().ChainID(), item.Message.TxType, item.Message.Tx).String())
 					(*item.ErrCh) <- nil
 
-					ci.nm.ExceptCastLimit(item.PeerID, item.Message, 7)
+					ci.ms.BroadcastMessage(item.Message)
 				case <-(*pEndCh):
 					return
 				}
@@ -198,11 +198,11 @@ func (ci *ClientNode) AddTx(tx types.Transaction, sigs []common.Signature) error
 	if err := ci.addTx(t, tx, sigs); err != nil {
 		return err
 	}
-	ci.nm.ExceptCastLimit("", &p2p.TransactionMessage{
+	ci.ms.BroadcastMessage(&p2p.TransactionMessage{
 		TxType: t,
 		Tx:     tx,
 		Sigs:   sigs,
-	}, 7)
+	})
 	return nil
 }
 
@@ -261,7 +261,7 @@ func (ci *ClientNode) OnTimerExpired(height uint32, value string) {
 // OnItemExpired is called when the item is expired
 func (ci *ClientNode) OnItemExpired(Interval time.Duration, Key string, Item interface{}, IsLast bool) {
 	msg := Item.(*p2p.TransactionMessage)
-	ci.nm.ExceptCastLimit("", msg, 7)
+	ci.ms.BroadcastMessage(msg)
 	if IsLast {
 		var TxHash hash.Hash256
 		copy(TxHash[:], []byte(Key))
