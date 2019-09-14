@@ -46,6 +46,21 @@ func (acc *FormulatorAccount) Name() string {
 	return acc.Name_
 }
 
+// IsFormulator returns it is formulator or not
+func (acc *FormulatorAccount) IsFormulator() bool {
+	return true
+}
+
+// GeneratorHash returns a generator public hash
+func (acc *FormulatorAccount) GeneratorHash() common.PublicHash {
+	return acc.GenHash
+}
+
+// IsActivated returns it is activated or not
+func (acc *FormulatorAccount) IsActivated() bool {
+	return !acc.IsRevoked
+}
+
 // Clone returns the clonend value of it
 func (acc *FormulatorAccount) Clone() types.Account {
 	c := &FormulatorAccount{

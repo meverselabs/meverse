@@ -7,7 +7,6 @@ import (
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
-	"github.com/fletaio/fleta/process/formulator"
 )
 
 // Candidates returns a candidates
@@ -22,29 +21,29 @@ func (cs *Consensus) updateFormulatorList(ctw *types.ContextWrapper) error {
 	var inErr error
 	phase := cs.rt.largestPhase() + 1
 	ctw.Top().AccountMap.EachAll(func(addr common.Address, a types.Account) bool {
-		if acc, is := a.(*formulator.FormulatorAccount); is {
+		if acc, is := a.(FormulatorAccount); is && acc.IsFormulator() {
 			if a.Address().Height() == ctw.TargetHeight() {
-				if err := cs.rt.addRank(NewRank(addr, acc.GenHash, phase, hash.DoubleHash(addr[:]))); err != nil {
+				if err := cs.rt.addRank(NewRank(addr, acc.GeneratorHash(), phase, hash.DoubleHash(addr[:]))); err != nil {
 					inErr = err
 					return false
 				}
 			} else {
 				r, has := cs.rt.rankMap[addr]
 				if has {
-					if acc.IsRevoked {
+					if !acc.IsActivated() {
 						cs.rt.removeRank(addr)
 					} else {
-						if r.PublicHash != acc.GenHash {
+						if r.PublicHash != acc.GeneratorHash() {
 							cs.rt.removeRank(addr)
-							if err := cs.rt.addRank(NewRank(addr, acc.GenHash, phase, hash.DoubleHash(addr[:]))); err != nil {
+							if err := cs.rt.addRank(NewRank(addr, acc.GeneratorHash(), phase, hash.DoubleHash(addr[:]))); err != nil {
 								inErr = err
 								return false
 							}
 						}
 					}
 				} else {
-					if !acc.IsRevoked {
-						if err := cs.rt.addRank(NewRank(addr, acc.GenHash, phase, hash.DoubleHash(addr[:]))); err != nil {
+					if acc.IsActivated() {
+						if err := cs.rt.addRank(NewRank(addr, acc.GeneratorHash(), phase, hash.DoubleHash(addr[:]))); err != nil {
 							inErr = err
 							return false
 						}
@@ -58,7 +57,7 @@ func (cs *Consensus) updateFormulatorList(ctw *types.ContextWrapper) error {
 		return inErr
 	}
 	ctw.Top().DeletedAccountMap.EachAll(func(addr common.Address, a types.Account) bool {
-		if acc, is := a.(*formulator.FormulatorAccount); is {
+		if acc, is := a.(FormulatorAccount); is && acc.IsFormulator() {
 			cs.rt.removeRank(acc.Address())
 		}
 		return true
