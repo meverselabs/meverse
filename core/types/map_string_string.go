@@ -69,7 +69,7 @@ func (a *pairStringStringMap) Less(b llrb.Item) bool {
 	}
 }
 
-// StringStringMap valueess and bool map
+// StringStringMap string and string map
 type StringStringMap struct {
 	m *llrb.LLRB
 }

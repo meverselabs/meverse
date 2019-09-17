@@ -68,7 +68,7 @@ func (a *pairUint64BoolMap) Less(b llrb.Item) bool {
 	}
 }
 
-// Uint64BoolMap valueess and bool map
+// Uint64BoolMap uint64 and bool map
 type Uint64BoolMap struct {
 	m *llrb.LLRB
 }

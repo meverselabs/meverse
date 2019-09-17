@@ -67,7 +67,7 @@ func (a *pairStringBytesMap) Less(b llrb.Item) bool {
 	}
 }
 
-// StringBytesMap valueess and []byte map
+// StringBytesMap string and []byte map
 type StringBytesMap struct {
 	m *llrb.LLRB
 }
