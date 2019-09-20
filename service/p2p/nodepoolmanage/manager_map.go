@@ -6,16 +6,15 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 
-	"github.com/dgraph-io/badger"
+	"github.com/fletaio/fleta/core/backend/buntdb_driver/buntdb"
 	"github.com/fletaio/fleta/service/p2p/peermessage"
 )
 
 //NodeStore is the structure of the connection information.
 type nodeStore struct {
 	l  sync.Mutex
-	db *badger.DB
+	db *buntdb.DB
 	a  []peermessage.ConnectInfo
 	m  map[string]*peermessage.ConnectInfo
 }
@@ -30,22 +29,15 @@ func newNodeStore(dbpath string) (*nodeStore, error) {
 		db: db,
 	}
 
-	if err := db.View(func(txn *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-		it := txn.NewIterator(opts)
-		defer it.Close()
-		for it.Rewind(); it.Valid(); it.Next() {
-			value, err := it.Item().ValueCopy(nil)
-			if err != nil {
-				return err
-			}
-			bf := bytes.NewBuffer(value)
-
+	if err := db.View(func(txn *buntdb.Tx) error {
+		txn.Ascend("", func(key string, value string) bool {
+			bf := bytes.NewBuffer([]byte(value))
 			var ci peermessage.ConnectInfo
 			ci.ReadFrom(bf)
 			ci.PingScoreBoard = &peermessage.ScoreBoardMap{}
 			n.LoadOrStore(ci.Address, ci)
-		}
+			return true
+		})
 		return nil
 	}); err != nil {
 		return nil, err
@@ -53,40 +45,13 @@ func newNodeStore(dbpath string) (*nodeStore, error) {
 	return n, nil
 }
 
-func openNodesDB(dbPath string) (*badger.DB, error) {
-	opts := badger.DefaultOptions(dbPath)
-	opts.Truncate = true
-	opts.SyncWrites = true
-	opts.ValueLogFileSize = 1 << 24
-	lockfilePath := filepath.Join(opts.Dir, "LOCK")
-	os.MkdirAll(dbPath, os.ModePerm)
+func openNodesDB(dbPath string) (*buntdb.DB, error) {
+	os.MkdirAll(filepath.Dir(dbPath), os.ModePerm)
 
-	os.Remove(lockfilePath)
-
-	db, err := badger.Open(opts)
+	db, err := buntdb.Open(dbPath)
 	if err != nil {
 		return nil, err
 	}
-
-	{
-	again:
-		if err := db.RunValueLogGC(0.7); err != nil {
-		} else {
-			goto again
-		}
-	}
-
-	ticker := time.NewTicker(5 * time.Minute)
-	go func() {
-		for range ticker.C {
-		again:
-			if err := db.RunValueLogGC(0.7); err != nil {
-			} else {
-				goto again
-			}
-		}
-	}()
-
 	return db, nil
 }
 
@@ -134,10 +99,10 @@ func (n *nodeStore) unsafeStore(key string, value peermessage.ConnectInfo) {
 			n.m[key] = &value
 		}
 	}
-	n.db.Update(func(txn *badger.Txn) error {
+	n.db.Update(func(txn *buntdb.Tx) error {
 		bf := bytes.Buffer{}
 		value.WriteTo(&bf)
-		if err := txn.Set([]byte(key), bf.Bytes()); err != nil {
+		if _, _, err := txn.Set(key, string(bf.Bytes()), nil); err != nil {
 			return err
 		}
 		return nil
