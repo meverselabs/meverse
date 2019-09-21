@@ -2,6 +2,8 @@ package nodepoolmanage
 
 import (
 	"bytes"
+	"time"
+
 	// "github.com/fletaio/fleta/service/p2p/storage"
 	"os"
 	"path/filepath"
@@ -29,18 +31,29 @@ func newNodeStore(dbpath string) (*nodeStore, error) {
 		db: db,
 	}
 
-	if err := db.View(func(txn *buntdb.Tx) error {
+	go func() {
+		for {
+			n.shrink()
+			time.Sleep(time.Minute)
+		}
+	}()
+
+	mp := map[string]string{}
+	if err := db.Update(func(txn *buntdb.Tx) error {
 		txn.Ascend("", func(key string, value string) bool {
-			bf := bytes.NewBuffer([]byte(value))
-			var ci peermessage.ConnectInfo
-			ci.ReadFrom(bf)
-			ci.PingScoreBoard = &peermessage.ScoreBoardMap{}
-			n.LoadOrStore(ci.Address, ci)
+			mp[key] = value
 			return true
 		})
 		return nil
 	}); err != nil {
 		return nil, err
+	}
+	for _, value := range mp {
+		bf := bytes.NewBuffer([]byte(value))
+		var ci peermessage.ConnectInfo
+		ci.ReadFrom(bf)
+		ci.PingScoreBoard = &peermessage.ScoreBoardMap{}
+		n.LoadOrStore(ci.Address, ci)
 	}
 	return n, nil
 }
@@ -53,6 +66,13 @@ func openNodesDB(dbPath string) (*buntdb.DB, error) {
 		return nil, err
 	}
 	return db, nil
+}
+
+func (pm *nodeStore) shrink() {
+	defer func() {
+		recover()
+	}()
+	pm.db.Shrink()
 }
 
 // LoadOrStore returns the existing value for the key if present.
