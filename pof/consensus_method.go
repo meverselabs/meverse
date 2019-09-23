@@ -23,9 +23,11 @@ func (cs *Consensus) updateFormulatorList(ctw *types.ContextWrapper) error {
 	ctw.Top().AccountMap.EachAll(func(addr common.Address, a types.Account) bool {
 		if acc, is := a.(FormulatorAccount); is && acc.IsFormulator() {
 			if a.Address().Height() == ctw.TargetHeight() {
-				if err := cs.rt.addRank(NewRank(addr, acc.GeneratorHash(), phase, hash.DoubleHash(addr[:]))); err != nil {
-					inErr = err
-					return false
+				if acc.IsActivated() {
+					if err := cs.rt.addRank(NewRank(addr, acc.GeneratorHash(), phase, hash.DoubleHash(addr[:]))); err != nil {
+						inErr = err
+						return false
+					}
 				}
 			} else {
 				r, has := cs.rt.rankMap[addr]
