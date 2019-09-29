@@ -492,6 +492,8 @@ func (db *DB) deleteFromDatabase(item *dbItem) *dbItem {
 // backgroundManager runs continuously in the background and performs various
 // operations such as removing expired items and syncing to disk.
 func (db *DB) backgroundManager() {
+	defer recover()
+
 	flushes := 0
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
