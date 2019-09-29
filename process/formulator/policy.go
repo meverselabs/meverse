@@ -257,3 +257,30 @@ func (pc *ValidatorPolicy) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`}`)
 	return buffer.Bytes(), nil
 }
+
+// TransmutePolicy defines a transmute policy
+type TransmutePolicy struct {
+	TransmuteEnableHeightFrom uint32
+	TransmuteEnableHeightTo   uint32
+}
+
+// MarshalJSON is a marshaler function
+func (pc *TransmutePolicy) MarshalJSON() ([]byte, error) {
+	var buffer bytes.Buffer
+	buffer.WriteString(`{`)
+	buffer.WriteString(`"transmute_enable_height_from":`)
+	if bs, err := json.Marshal(pc.TransmuteEnableHeightFrom); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"transmute_enable_height_to":`)
+	if bs, err := json.Marshal(pc.TransmuteEnableHeightTo); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`}`)
+	return buffer.Bytes(), nil
+}

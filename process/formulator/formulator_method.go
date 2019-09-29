@@ -459,3 +459,19 @@ func (p *Formulator) GetHyperPolicy(loader types.Loader) (*HyperPolicy, error) {
 	}
 	return policy, nil
 }
+
+// GetTransmutePolicy returns the transmute policy
+func (p *Formulator) GetTransmutePolicy(loader types.Loader) (*TransmutePolicy, error) {
+	lw := types.NewLoaderWrapper(p.pid, loader)
+
+	bs := lw.ProcessData(tagTransmutePolicy)
+	if len(bs) == 0 {
+		return nil, ErrNotExistTransmutePolicy
+	}
+
+	policy := &TransmutePolicy{}
+	if err := encoding.Unmarshal(bs, &policy); err != nil {
+		return nil, err
+	}
+	return policy, nil
+}
