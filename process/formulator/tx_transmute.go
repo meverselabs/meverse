@@ -56,6 +56,9 @@ func (tx *Transmute) Validate(p types.Process, loader types.LoaderWrapper, signe
 		return ErrInvalidTransmuteHeight
 	}
 
+	if len(tx.Amounts) > 10 {
+		return ErrInvalidTransmuteCount
+	}
 	if len(tx.Amounts) != len(tx.HyperFormulators) {
 		return ErrInvalidTransmuteCount
 	}
