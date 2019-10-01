@@ -13,14 +13,12 @@ const AddressSize = 14
 // Address is the [AddressSize]byte with methods
 type Address [AddressSize]byte
 
-// NewAddress returns a Address by the AccountCoordinate, by the nonce
-func NewAddress(height uint32, index uint16, nonce uint64) Address {
+// NewAddress returns a Address by the AccountCoordinate and the magic
+func NewAddress(height uint32, index uint16, magic uint64) Address {
 	var addr Address
 	binary.BigEndian.PutUint32(addr[:], height)
 	binary.BigEndian.PutUint16(addr[4:], index)
-	if nonce > 0 {
-		binary.BigEndian.PutUint64(addr[6:], nonce)
-	}
+	binary.BigEndian.PutUint64(addr[6:], magic)
 	return addr
 }
 
@@ -66,14 +64,6 @@ func (addr Address) String() string {
 func (addr Address) Clone() Address {
 	var cp Address
 	copy(cp[:], addr[:])
-	return cp
-}
-
-// WithNonce returns derive the address using the nonce
-func (addr Address) WithNonce(nonce uint64) Address {
-	var cp Address
-	copy(cp[:], addr[:])
-	binary.BigEndian.PutUint64(addr[6:], nonce)
 	return cp
 }
 
@@ -126,4 +116,31 @@ func MustParseAddress(str string) Address {
 		panic(err)
 	}
 	return addr
+}
+
+// TickerUsageToMagicNumber convert a name and a usage to the magic number
+func TickerUsageToMagicNumber(Ticker string, Usage string) uint64 {
+	base := []byte{95, 65, 69, 84, 122, 64, 11, 43}
+	Salt := "PoweredByFLETABlockchain"
+	ls := Ticker + " " + Usage + " " + Salt
+	cnt := len(ls) / 8
+	if len(ls)%8 != 0 {
+		cnt++
+	}
+	for i := 0; i < cnt; i++ {
+		from := i * 8
+		to := (i + 1) * 8
+		if to > len(ls) {
+			to = len(ls)
+		}
+		str := ls[from:to]
+		for j := 0; j < 8; j++ {
+			v := byte(0)
+			if j < len(str) {
+				v = byte(str[j])
+			}
+			base[j] = base[j] ^ v
+		}
+	}
+	return binary.BigEndian.Uint64(base)
 }
