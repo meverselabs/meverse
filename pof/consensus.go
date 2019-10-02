@@ -21,6 +21,7 @@ type Consensus struct {
 	blocksBySameFormulator uint32
 	observerKeyMap         *types.PublicHashBoolMap
 	rt                     *RankTable
+	maxPhaseDiff           func(Height uint32) uint32
 }
 
 // NewConsensus returns a Consensus
@@ -33,6 +34,7 @@ func NewConsensus(MaxBlocksPerFormulator uint32, ObserverKeys []common.PublicHas
 		maxBlocksPerFormulator: MaxBlocksPerFormulator,
 		observerKeyMap:         ObserverKeyMap,
 		rt:                     NewRankTable(),
+		maxPhaseDiff:           nil,
 	}
 	return cs
 }
@@ -74,6 +76,14 @@ func (cs *Consensus) InitGenesis(ctw *types.ContextWrapper) error {
 		ctw.SetProcessData(tagState, data)
 	}
 	return nil
+}
+
+// SetMaxPhaseDiff returns the max phase difference from the smallest phase(0 means no limit)
+func (cs *Consensus) SetMaxPhaseDiff(fn func(Height uint32) uint32) {
+	cs.Lock()
+	defer cs.Unlock()
+
+	cs.maxPhaseDiff = fn
 }
 
 // OnLoadChain called when the chain loaded

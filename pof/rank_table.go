@@ -153,6 +153,13 @@ func (rt *RankTable) IsFormulator(Formulator common.Address, Publichash common.P
 	return true
 }
 
+func (rt *RankTable) smallestPhase() uint32 {
+	if len(rt.candidates) == 0 {
+		return 0
+	}
+	return rt.candidates[0].phase
+}
+
 func (rt *RankTable) largestPhase() uint32 {
 	if len(rt.candidates) == 0 {
 		return 0

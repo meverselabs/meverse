@@ -19,7 +19,28 @@ func (cs *Consensus) Candidates() []*Rank {
 
 func (cs *Consensus) updateFormulatorList(ctw *types.ContextWrapper) error {
 	var inErr error
-	phase := cs.rt.largestPhase() + 1
+	phase := cs.rt.smallestPhase() + 2
+	if cs.maxPhaseDiff != nil {
+		diff := cs.maxPhaseDiff(ctw.TargetHeight())
+		phase = cs.rt.largestPhase() + 1
+		if diff != 0 {
+			maxPhase := cs.rt.smallestPhase() + diff
+			if phase > maxPhase {
+				phase = maxPhase
+			}
+			if cs.rt.largestPhase() > maxPhase {
+				list := cs.rt.Candidates()
+				for _, r := range list {
+					if r.phase > maxPhase {
+						cs.rt.removeRank(r.Address)
+						if err := cs.rt.addRank(NewRank(r.Address, r.PublicHash, maxPhase, r.hashSpace)); err != nil {
+							return err
+						}
+					}
+				}
+			}
+		}
+	}
 	ctw.Top().AccountMap.EachAll(func(addr common.Address, a types.Account) bool {
 		if acc, is := a.(FormulatorAccount); is && acc.IsFormulator() {
 			if a.Address().Height() == ctw.TargetHeight() {
