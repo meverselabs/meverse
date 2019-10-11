@@ -596,11 +596,11 @@ func (fr *FormulatorNode) handleMessage(p peer.Peer, m interface{}, RetryCount i
 		go func(req *BlockReqMessage) error {
 			wg.Done()
 
-			fr.Lock()
-			defer fr.Unlock()
-
 			fr.genLock.Lock()
 			defer fr.genLock.Unlock()
+
+			fr.Lock()
+			defer fr.Unlock()
 
 			return fr.genBlock(p, req)
 		}(msg)
