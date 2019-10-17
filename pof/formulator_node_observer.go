@@ -141,7 +141,10 @@ func (fr *FormulatorNode) handleObserverMessage(p peer.Peer, m interface{}, Retr
 		if msg.Block.Header.Generator != fr.Config.Formulator {
 			fr.lastReqMessage = nil
 		}
+
 		fr.Lock()
+		defer fr.Unlock()
+
 		item, has := fr.lastGenItemMap[msg.Block.Header.Height]
 		if has {
 			if item.ObSign != nil {
@@ -160,7 +163,6 @@ func (fr *FormulatorNode) handleObserverMessage(p peer.Peer, m interface{}, Retr
 			}
 			fr.lastGenItemMap[msg.Block.Header.Height] = item
 		}
-		fr.Unlock()
 
 		go fr.updateByGenItem()
 		return nil

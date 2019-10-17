@@ -264,7 +264,6 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 			}
 			if !isConnected {
 				if err := fr.cs.cn.ConnectBlock(b); err != nil {
-					fr.Lock()
 					break
 				}
 			}
