@@ -18,7 +18,6 @@ type TCPAsyncPeer struct {
 	isClose       bool
 	connectedTime int64
 	pingCount     uint64
-	pingType      uint16
 	writeQ        *queue.Queue
 }
 

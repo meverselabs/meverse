@@ -19,7 +19,6 @@ type TCPPeer struct {
 	isClose       bool
 	connectedTime int64
 	pingCount     uint64
-	pingType      uint16
 }
 
 // NewTCPPeer returns a TCPPeer

@@ -8,6 +8,7 @@ import (
 
 	"github.com/fletaio/fleta/common/binutil"
 	"github.com/fletaio/fleta/common/queue"
+	"github.com/fletaio/fleta/core/types"
 )
 
 // TCPAsyncPeer manages send and recv of the connection
@@ -33,6 +34,7 @@ func NewTCPAsyncPeer(conn net.Conn, ID string, Name string, connectedTime int64)
 		name:          Name,
 		connectedTime: connectedTime,
 		writeQ:        queue.NewQueue(),
+		pingType:      types.DefineHashedType("p2p.PingMessage"),
 	}
 
 	go func() {
