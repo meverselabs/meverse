@@ -37,51 +37,46 @@ func (q *ExpireQueue) AddGroup(interval time.Duration) {
 	q.groups = append(q.groups, g)
 
 	go func() {
-		timer := time.NewTimer(time.Millisecond)
 		for {
-			select {
-			case <-timer.C:
-				now := time.Now().UnixNano()
-				expiredMap := map[string]interface{}{}
+			now := time.Now().UnixNano()
+			expiredMap := map[string]interface{}{}
+			q.Lock()
+			deletes := []string{}
+			for k, v := range g.itemMap {
+				if v.expiredAt <= now {
+					expiredMap[k] = v.item
+					deletes = append(deletes, k)
+				}
+			}
+			for _, k := range deletes {
+				delete(g.itemMap, k)
+			}
+			q.Unlock()
+
+			if len(expiredMap) > 0 {
 				q.Lock()
-				deletes := []string{}
-				for k, v := range g.itemMap {
-					if v.expiredAt <= now {
-						expiredMap[k] = v.item
-						deletes = append(deletes, k)
-					}
-				}
-				for _, k := range deletes {
-					delete(g.itemMap, k)
-				}
+				IsLast := idx+1 == len(q.groups)
 				q.Unlock()
 
-				if len(expiredMap) > 0 {
-					q.Lock()
-					IsLast := idx+1 == len(q.groups)
-					q.Unlock()
-
-					for _, h := range q.handlers {
-						for k, v := range expiredMap {
-							h.OnItemExpired(g.Interval, k, v, IsLast)
-						}
+				for _, h := range q.handlers {
+					for k, v := range expiredMap {
+						h.OnItemExpired(g.Interval, k, v, IsLast)
 					}
-
-					q.Lock()
-					if !IsLast {
-						next := q.groups[idx+1]
-						for k, v := range expiredMap {
-							next.itemMap[k] = &groupItem{
-								expiredAt: time.Now().Add(next.Interval).UnixNano(),
-								item:      v,
-							}
-						}
-					}
-					q.Unlock()
 				}
 
-				timer.Reset(time.Second)
+				q.Lock()
+				if !IsLast {
+					next := q.groups[idx+1]
+					for k, v := range expiredMap {
+						next.itemMap[k] = &groupItem{
+							expiredAt: time.Now().Add(next.Interval).UnixNano(),
+							item:      v,
+						}
+					}
+				}
+				q.Unlock()
 			}
+			time.Sleep(time.Second)
 		}
 	}()
 }

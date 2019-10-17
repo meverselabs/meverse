@@ -1,11 +1,9 @@
 package chain
 
 import (
-	"encoding/binary"
-
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/binutil"
 	"github.com/fletaio/fleta/common/hash"
-	"github.com/fletaio/fleta/common/util"
 )
 
 var (
@@ -28,21 +26,21 @@ var (
 func toHeightBlockKey(height uint32) []byte {
 	bs := make([]byte, 6)
 	copy(bs, tagHeightBlock)
-	binary.BigEndian.PutUint32(bs[2:], height)
+	binutil.BigEndian.PutUint32(bs[2:], height)
 	return bs
 }
 
 func toHeightHeaderKey(height uint32) []byte {
 	bs := make([]byte, 6)
 	copy(bs, tagHeightHeader)
-	binary.BigEndian.PutUint32(bs[2:], height)
+	binutil.BigEndian.PutUint32(bs[2:], height)
 	return bs
 }
 
 func toHeightHashKey(height uint32) []byte {
 	bs := make([]byte, 6)
 	copy(bs, tagHeightHash)
-	binary.BigEndian.PutUint32(bs[2:], height)
+	binutil.BigEndian.PutUint32(bs[2:], height)
 	return bs
 }
 
@@ -84,12 +82,12 @@ func toAccountDataKey(key string) []byte {
 func toUTXOKey(id uint64) []byte {
 	bs := make([]byte, 10)
 	copy(bs, tagUTXO)
-	binary.BigEndian.PutUint64(bs[2:], id)
+	binutil.BigEndian.PutUint64(bs[2:], id)
 	return bs
 }
 
 func fromUTXOKey(bs []byte) uint64 {
-	return binary.BigEndian.Uint64(bs[2:])
+	return binutil.BigEndian.Uint64(bs[2:])
 }
 
 func toProcessDataKey(key string) []byte {
@@ -102,7 +100,7 @@ func toProcessDataKey(key string) []byte {
 func toEventKey(id uint32) []byte {
 	bs := make([]byte, 6)
 	copy(bs, tagEvent)
-	binary.BigEndian.PutUint32(bs[2:], id)
+	binutil.BigEndian.PutUint32(bs[2:], id)
 	return bs
 }
 
@@ -117,27 +115,27 @@ func toLockedBalanceKey(Address common.Address, UnlockHeight uint32) []byte {
 	bs := make([]byte, 6+common.AddressSize)
 	copy(bs, tagLockedBalance)
 	copy(bs[2:], Address[:])
-	binary.BigEndian.PutUint32(bs[2+common.AddressSize:], UnlockHeight)
+	binutil.BigEndian.PutUint32(bs[2+common.AddressSize:], UnlockHeight)
 	return bs
 }
 
 func fromLockedBalanceKey(bs []byte) (common.Address, uint32) {
 	var addr common.Address
 	copy(addr[:], bs[2:])
-	return addr, util.BytesToUint32(bs[2+common.AddressSize:])
+	return addr, binutil.LittleEndian.Uint32(bs[2+common.AddressSize:])
 }
 
 func toLockedBalanceHeightPrefix(Height uint32) []byte {
 	bs := make([]byte, 6)
 	copy(bs, tagLockedBalance)
-	binary.BigEndian.PutUint32(bs[2:], Height)
+	binutil.BigEndian.PutUint32(bs[2:], Height)
 	return bs
 }
 
 func toLockedBalanceHeightKey(UnlockHeight uint32, Address common.Address) []byte {
 	bs := make([]byte, 6+common.AddressSize)
 	copy(bs, tagLockedBalance)
-	binary.BigEndian.PutUint32(bs[2:], UnlockHeight)
+	binutil.BigEndian.PutUint32(bs[2:], UnlockHeight)
 	copy(bs[6:], Address[:])
 	return bs
 }
@@ -145,5 +143,5 @@ func toLockedBalanceHeightKey(UnlockHeight uint32, Address common.Address) []byt
 func fromLockedBalanceHeightKey(bs []byte) (common.Address, uint32) {
 	var addr common.Address
 	copy(addr[:], bs[6:])
-	return addr, util.BytesToUint32(bs[2:])
+	return addr, binutil.LittleEndian.Uint32(bs[2:])
 }

@@ -19,7 +19,6 @@ type VoteRound struct {
 	RoundState                 int
 	TargetHeight               uint32
 	RoundVoteMessageMap        map[common.PublicHash]*RoundVoteMessage
-	MinVotePublicHash          common.PublicHash
 	RoundVoteAckMessageMap     map[common.PublicHash]*RoundVoteAckMessage
 	MinRoundVoteAck            *RoundVoteAck
 	BlockRoundMap              map[uint32]*BlockRound

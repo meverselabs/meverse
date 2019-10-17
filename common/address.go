@@ -2,8 +2,8 @@ package common
 
 import (
 	"bytes"
-	"encoding/binary"
 
+	"github.com/fletaio/fleta/common/binutil"
 	"github.com/mr-tron/base58/base58"
 )
 
@@ -16,9 +16,9 @@ type Address [AddressSize]byte
 // NewAddress returns a Address by the AccountCoordinate and the magic
 func NewAddress(height uint32, index uint16, magic uint64) Address {
 	var addr Address
-	binary.BigEndian.PutUint32(addr[:], height)
-	binary.BigEndian.PutUint16(addr[4:], index)
-	binary.BigEndian.PutUint64(addr[6:], magic)
+	binutil.BigEndian.PutUint32(addr[:], height)
+	binutil.BigEndian.PutUint16(addr[4:], index)
+	binutil.BigEndian.PutUint64(addr[6:], magic)
 	return addr
 }
 
@@ -78,17 +78,17 @@ func (addr Address) Checksum() byte {
 
 // Height returns the height of the address created
 func (addr Address) Height() uint32 {
-	return binary.BigEndian.Uint32(addr[:])
+	return binutil.BigEndian.Uint32(addr[:])
 }
 
 // Index returns the index of the address created
 func (addr Address) Index() uint16 {
-	return binary.BigEndian.Uint16(addr[4:])
+	return binutil.BigEndian.Uint16(addr[4:])
 }
 
 // Nonce returns the nonce of the address created
 func (addr Address) Nonce() uint64 {
-	return binary.BigEndian.Uint64(addr[6:])
+	return binutil.BigEndian.Uint64(addr[6:])
 }
 
 // ParseAddress parse the address from the string
@@ -142,5 +142,5 @@ func TickerUsageToMagicNumber(Ticker string, Usage string) uint64 {
 			base[j] = base[j] ^ v
 		}
 	}
-	return binary.BigEndian.Uint64(base)
+	return binutil.BigEndian.Uint64(base)
 }

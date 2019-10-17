@@ -6,6 +6,10 @@ import (
 	"github.com/fletaio/fleta/core/types"
 )
 
+var (
+	BlockGenMessageType = types.DefineHashedType("pof.BlockGenMessage")
+)
+
 // RoundVote is a message for a round vote
 type RoundVote struct {
 	ChainID              uint8
@@ -43,10 +47,37 @@ type RoundVoteAckMessage struct {
 	Signature    common.Signature
 }
 
-// RoundSetupMessage is a message for a round vote
-type RoundSetupMessage struct {
-	MinRoundVoteAck *RoundVoteAck
-	Signature       common.Signature
+// NextRoundVote is a message for a next round vote
+type NextRoundVote struct {
+	ChainID              uint8
+	TimeoutCount         uint32
+	Formulator           common.Address
+	FormulatorPublicHash common.PublicHash
+	Timestamp            uint64
+	IsReply              bool
+}
+
+// NextRoundVoteMessage is a message for a next round vote
+type NextRoundVoteMessage struct {
+	RoundVote *RoundVote
+	Signature common.Signature
+}
+
+// NextRoundVoteAck is a message for a next round vote ack
+type NextRoundVoteAck struct {
+	ChainID              uint8
+	TimeoutCount         uint32
+	Formulator           common.Address
+	FormulatorPublicHash common.PublicHash
+	PublicHash           common.PublicHash
+	Timestamp            uint64
+	IsReply              bool
+}
+
+// NextRoundVoteAckMessage is a message for a next round vote
+type NextRoundVoteAckMessage struct {
+	RoundVoteAck *RoundVoteAck
+	Signature    common.Signature
 }
 
 // BlockReqMessage is a message for a block request

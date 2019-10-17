@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/binutil"
 	"github.com/fletaio/fleta/common/hash"
-	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/core/backend"
 	"github.com/fletaio/fleta/core/pile"
 	"github.com/fletaio/fleta/core/types"
@@ -26,7 +26,6 @@ type Store struct {
 	SeqMapLock sync.Mutex
 	SeqMap     map[common.Address]uint64
 	cache      storecache
-	timer      *time.Timer
 	closeLock  sync.RWMutex
 	isClose    bool
 }
@@ -40,11 +39,9 @@ type storecache struct {
 
 // NewStore returns a Store
 func NewStore(db backend.StoreBackend, cdb *pile.DB, ChainID uint8, name string, version uint16) (*Store, error) {
-	timer := time.NewTimer(5 * time.Minute)
 	st := &Store{
 		db:      db,
 		cdb:     cdb,
-		timer:   timer,
 		chainID: ChainID,
 		name:    name,
 		version: version,
@@ -52,15 +49,13 @@ func NewStore(db backend.StoreBackend, cdb *pile.DB, ChainID uint8, name string,
 	}
 
 	go func() {
-		for range timer.C {
+		for !st.isClose {
 			st.closeLock.RLock()
 			if st.db != nil {
 				st.db.Shrink()
 			}
-			if st.timer != nil {
-				st.timer.Reset(5 * time.Minute)
-			}
 			st.closeLock.RUnlock()
+			time.Sleep(5 * time.Minute)
 		}
 	}()
 
@@ -80,12 +75,8 @@ func (st *Store) Close() {
 	if st.cdb != nil {
 		st.cdb.Close()
 	}
-	if st.timer != nil {
-		st.timer.Stop()
-	}
 	st.cdb = nil
 	st.db = nil
-	st.timer = nil
 }
 
 // ChainID returns the chain id of the target chain
@@ -108,30 +99,22 @@ func (st *Store) TargetHeight() uint32 {
 	return st.Height() + 1
 }
 
-// NewContextWrapper returns the context wrapper of the chain
-func (st *Store) NewContextWrapper(pid uint8) *types.ContextWrapper {
+// NewLoaderWrapper returns the loader wrapper of the chain
+func (st *Store) NewLoaderWrapper(pid uint8) types.LoaderWrapper {
 	return types.NewContextWrapper(pid, types.NewContext(st))
 }
 
 // LastStatus returns the recored target height, prev hash and timestamp
-func (st *Store) LastStatus() (uint32, hash.Hash256, uint64) {
+func (st *Store) LastStatus() (uint32, hash.Hash256) {
 	height := st.Height()
 	h, err := st.Hash(height)
 	if err != nil {
 		panic(err)
 	}
 	if height == 0 {
-		return 0, h, 0
+		return 0, h
 	}
-	bh, err := st.Header(height)
-	if err != nil {
-		if err != ErrStoreClosed {
-			// should have not reabh
-			panic(err)
-		}
-		return 0, hash.Hash256{}, 0
-	}
-	return bh.Height, h, bh.Timestamp
+	return height, h
 }
 
 // LastHash returns the last hash of the chain
@@ -149,10 +132,16 @@ func (st *Store) LastHash() hash.Hash256 {
 
 // LastTimestamp returns the last timestamp of the chain
 func (st *Store) LastTimestamp() uint64 {
+	height := st.Height()
 	if st.Height() == 0 {
 		return 0
 	}
-	bh, err := st.Header(st.Height())
+	if st.cache.cached {
+		if st.cache.height == height {
+			return st.cache.heightBlock.Header.Timestamp
+		}
+	}
+	bh, err := st.Header(height)
 	if err != nil {
 		if err != ErrStoreClosed {
 			// should have not reabh
@@ -319,7 +308,7 @@ func (st *Store) Height() uint32 {
 		if err != nil {
 			return err
 		}
-		height = util.BytesToUint32(value)
+		height = binutil.LittleEndian.Uint32(value)
 		return nil
 	})
 	return height
@@ -338,7 +327,7 @@ func (st *Store) Accounts() ([]types.Account, error) {
 	if err := st.db.View(func(txn backend.StoreReader) error {
 		if err := txn.Iterate(tagAccount, func(key []byte, value []byte) error {
 			if len(value) > 1 {
-				acc, err := fc.Create(util.BytesToUint16(value))
+				acc, err := fc.Create(binutil.LittleEndian.Uint16(value))
 				if err != nil {
 					return err
 				}
@@ -378,7 +367,7 @@ func (st *Store) Seq(addr common.Address) uint64 {
 			if err != nil {
 				return err
 			}
-			seq = util.BytesToUint64(value)
+			seq = binutil.LittleEndian.Uint64(value)
 			return nil
 		}); err != nil {
 			return 0
@@ -407,7 +396,7 @@ func (st *Store) Account(addr common.Address) (types.Account, error) {
 		if len(value) == 1 && value[0] == 0 {
 			return types.ErrDeletedAccount
 		}
-		v, err := fc.Create(util.BytesToUint16(value))
+		v, err := fc.Create(binutil.LittleEndian.Uint16(value))
 		if err != nil {
 			return err
 		}
@@ -770,7 +759,7 @@ func (st *Store) StoreGenesis(genHash hash.Hash256, ctd *types.ContextData) erro
 				if err := txn.Set(toHeightHashKey(0), genHash[:]); err != nil {
 					return err
 				}
-				bsHeight := util.Uint32ToBytes(0)
+				bsHeight := binutil.LittleEndian.Uint32ToBytes(0)
 				if err := txn.Set(toHashHeightKey(genHash), bsHeight); err != nil {
 					return err
 				}
@@ -796,7 +785,7 @@ func (st *Store) StoreGenesis(genHash hash.Hash256, ctd *types.ContextData) erro
 				if err := txn.Set(toHeightHashKey(0), genHash[:]); err != nil {
 					return err
 				}
-				bsHeight := util.Uint32ToBytes(0)
+				bsHeight := binutil.LittleEndian.Uint32ToBytes(0)
 				if err := txn.Set(tagHeight, bsHeight); err != nil {
 					return err
 				}
@@ -849,7 +838,7 @@ func (st *Store) StoreBlock(b *types.Block, ctd *types.ContextData) error {
 				if err := txn.Set(toHeightHashKey(b.Header.Height), DataHash[:]); err != nil {
 					return err
 				}
-				bsHeight := util.Uint32ToBytes(b.Header.Height)
+				bsHeight := binutil.LittleEndian.Uint32ToBytes(b.Header.Height)
 				if err := txn.Set(toHashHeightKey(DataHash), bsHeight); err != nil {
 					return err
 				}
@@ -908,7 +897,7 @@ func (st *Store) StoreBlock(b *types.Block, ctd *types.ContextData) error {
 		}
 		if err := st.db.Update(func(txn backend.StoreWriter) error {
 			{
-				bsHeight := util.Uint32ToBytes(b.Header.Height)
+				bsHeight := binutil.LittleEndian.Uint32ToBytes(b.Header.Height)
 				if err := txn.Set(tagHeight, bsHeight); err != nil {
 					return err
 				}
@@ -953,7 +942,7 @@ func (st *Store) IterBlockAfterContext(fn func(b *types.Block) error) error {
 func applyContextData(txn backend.StoreWriter, ctd *types.ContextData) error {
 	var inErr error
 	ctd.SeqMap.EachAll(func(addr common.Address, value uint64) bool {
-		if err := txn.Set(toAccountSeqKey(addr), util.Uint64ToBytes(value)); err != nil {
+		if err := txn.Set(toAccountSeqKey(addr), binutil.LittleEndian.Uint64ToBytes(value)); err != nil {
 			inErr = err
 			return false
 		}
@@ -970,7 +959,7 @@ func applyContextData(txn backend.StoreWriter, ctd *types.ContextData) error {
 			return false
 		}
 		var buffer bytes.Buffer
-		buffer.Write(util.Uint16ToBytes(t))
+		buffer.Write(binutil.LittleEndian.Uint16ToBytes(t))
 		data, err := encoding.Marshal(acc)
 		if err != nil {
 			inErr = err
@@ -1105,7 +1094,7 @@ func applyContextData(txn backend.StoreWriter, ctd *types.ContextData) error {
 func applyContextDataOld(txn backend.StoreWriter, ctd *types.ContextData) error {
 	var inErr error
 	ctd.SeqMap.EachAll(func(addr common.Address, value uint64) bool {
-		if err := txn.Set(toAccountSeqKey(addr), util.Uint64ToBytes(value)); err != nil {
+		if err := txn.Set(toAccountSeqKey(addr), binutil.LittleEndian.Uint64ToBytes(value)); err != nil {
 			inErr = err
 			return false
 		}
@@ -1122,7 +1111,7 @@ func applyContextDataOld(txn backend.StoreWriter, ctd *types.ContextData) error 
 			return false
 		}
 		var buffer bytes.Buffer
-		buffer.Write(util.Uint16ToBytes(t))
+		buffer.Write(binutil.LittleEndian.Uint16ToBytes(t))
 		data, err := encoding.Marshal(acc)
 		if err != nil {
 			inErr = err

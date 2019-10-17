@@ -1,20 +1,17 @@
 package pof
 
 import (
-	"bytes"
 	crand "crypto/rand"
-	"encoding/binary"
 	"sync"
 	"time"
 
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/binutil"
 	"github.com/fletaio/fleta/common/debug"
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/common/rlog"
-	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/core/chain"
-	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/service/p2p"
 	"github.com/fletaio/fleta/service/p2p/peer"
 	"github.com/gorilla/websocket"
@@ -93,15 +90,12 @@ func (ms *FormulatorNodeMesh) SendTo(ID string, m interface{}) error {
 		return ErrNotExistObserverPeer
 	}
 
-	if err := p.Send(m); err != nil {
-		rlog.Println(err)
-		ms.RemovePeer(p.ID())
-	}
+	p.SendPacket(p2p.MessageToPacket(m))
 	return nil
 }
 
-// BroadcastRaw sends a message to all peers
-func (ms *FormulatorNodeMesh) BroadcastRaw(bs []byte) {
+// BroadcastPacket sends a packet to all peers
+func (ms *FormulatorNodeMesh) BroadcastPacket(bs []byte) {
 	peerMap := map[string]peer.Peer{}
 	ms.Lock()
 	for _, p := range ms.peerMap {
@@ -110,36 +104,8 @@ func (ms *FormulatorNodeMesh) BroadcastRaw(bs []byte) {
 	ms.Unlock()
 
 	for _, p := range peerMap {
-		p.SendRaw(bs)
+		p.SendPacket(bs)
 	}
-}
-
-// BroadcastMessage sends a message to all peers
-func (ms *FormulatorNodeMesh) BroadcastMessage(m interface{}) error {
-	var buffer bytes.Buffer
-	fc := encoding.Factory("message")
-	t, err := fc.TypeOf(m)
-	if err != nil {
-		return err
-	}
-	buffer.Write(util.Uint16ToBytes(t))
-	enc := encoding.NewEncoder(&buffer)
-	if err := enc.Encode(m); err != nil {
-		return err
-	}
-	data := buffer.Bytes()
-
-	peerMap := map[string]peer.Peer{}
-	ms.Lock()
-	for _, p := range ms.peerMap {
-		peerMap[p.ID()] = p
-	}
-	ms.Unlock()
-
-	for _, p := range peerMap {
-		p.SendRaw(data)
-	}
-	return nil
 }
 
 func (ms *FormulatorNodeMesh) client(Address string, TargetPubHash common.PublicHash) error {
@@ -188,11 +154,11 @@ func (ms *FormulatorNodeMesh) handleConnection(p peer.Peer) error {
 	defer ms.fr.OnObserverDisconnected(p)
 
 	for {
-		m, _, err := p.ReadMessageData()
+		bs, err := p.ReadPacket()
 		if err != nil {
 			return err
 		}
-		if err := ms.fr.onRecv(p, m); err != nil {
+		if err := ms.fr.onObserverRecv(p, bs); err != nil {
 			return err
 		}
 	}
@@ -211,7 +177,7 @@ func (ms *FormulatorNodeMesh) recvHandshake(conn *websocket.Conn) error {
 	if ChainID != ms.fr.cs.cn.Provider().ChainID() {
 		return chain.ErrInvalidChainID
 	}
-	timestamp := binary.LittleEndian.Uint64(req[32:])
+	timestamp := binutil.LittleEndian.Uint64(req[32:])
 	diff := time.Duration(uint64(time.Now().UnixNano()) - timestamp)
 	if diff < 0 {
 		diff = -diff
@@ -235,7 +201,7 @@ func (ms *FormulatorNodeMesh) sendHandshake(conn *websocket.Conn) (common.Public
 		return common.PublicHash{}, err
 	}
 	req[0] = ms.fr.cs.cn.Provider().ChainID()
-	binary.LittleEndian.PutUint64(req[32:], uint64(time.Now().UnixNano()))
+	binutil.LittleEndian.PutUint64(req[32:], uint64(time.Now().UnixNano()))
 	copy(req[40:], ms.fr.Config.Formulator[:])
 	if err := conn.WriteMessage(websocket.BinaryMessage, req); err != nil {
 		return common.PublicHash{}, err

@@ -3,7 +3,7 @@ package vault
 import (
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
-	"github.com/fletaio/fleta/common/util"
+	"github.com/fletaio/fleta/common/binutil"
 	"github.com/fletaio/fleta/core/types"
 )
 
@@ -93,12 +93,12 @@ func (p *Vault) AddLockedBalance(ctw *types.ContextWrapper, addr common.Address,
 	if ns := ctw.ProcessData(toLockedBalanceNumberKey(UnlockedHeight, addr)); len(ns) == 0 {
 		var Count uint32
 		if bs := ctw.ProcessData(toLockedBalanceCountKey(UnlockedHeight)); len(bs) > 0 {
-			Count = util.BytesToUint32(bs)
+			Count = binutil.LittleEndian.Uint32(bs)
 		}
-		ctw.SetProcessData(toLockedBalanceNumberKey(UnlockedHeight, addr), util.Uint32ToBytes(Count))
+		ctw.SetProcessData(toLockedBalanceNumberKey(UnlockedHeight, addr), binutil.LittleEndian.Uint32ToBytes(Count))
 		ctw.SetProcessData(toLockedBalanceReverseKey(UnlockedHeight, Count), addr[:])
 		Count++
-		ctw.SetProcessData(toLockedBalanceCountKey(UnlockedHeight), util.Uint32ToBytes(Count))
+		ctw.SetProcessData(toLockedBalanceCountKey(UnlockedHeight), binutil.LittleEndian.Uint32ToBytes(Count))
 	}
 	ctw.SetProcessData(toLockedBalanceKey(UnlockedHeight, addr), p.LockedBalance(ctw, addr, UnlockedHeight).Add(am).Bytes())
 	ctw.SetAccountData(addr, tagLockedBalanceSum, p.TotalLockedBalanceByAddress(ctw, addr).Add(am).Bytes())
@@ -108,7 +108,7 @@ func (p *Vault) AddLockedBalance(ctw *types.ContextWrapper, addr common.Address,
 func (p *Vault) flushLockedBalanceMap(ctw *types.ContextWrapper, UnlockedHeight uint32) (map[common.Address]*amount.Amount, error) {
 	LockedBalanceMap := map[common.Address]*amount.Amount{}
 	if bs := ctw.ProcessData(toLockedBalanceCountKey(UnlockedHeight)); len(bs) > 0 {
-		Count := util.BytesToUint32(bs)
+		Count := binutil.LittleEndian.Uint32(bs)
 		for i := uint32(0); i < Count; i++ {
 			var addr common.Address
 			copy(addr[:], ctw.ProcessData(toLockedBalanceReverseKey(UnlockedHeight, i)))

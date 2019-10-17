@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -62,25 +61,11 @@ func (s *APIServer) Run(BindAddress string) error {
 				}
 				res := s.handleJRPC(&req)
 				if res != nil {
-					errCh := make(chan error)
-					var wg sync.WaitGroup
-					wg.Add(1)
-					go func() {
-						wg.Done()
-						err := conn.WriteJSON(res)
-						errCh <- err
-					}()
-					wg.Wait()
-					deadTimer := time.NewTimer(10 * time.Second)
-					select {
-					case <-deadTimer.C:
-						conn.Close()
-						return <-errCh
-					case err := <-errCh:
-						deadTimer.Stop()
-						if err != nil {
-							return err
-						}
+					if err := conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
+						return err
+					}
+					if err := conn.WriteJSON(res); err != nil {
+						return err
 					}
 				}
 			}

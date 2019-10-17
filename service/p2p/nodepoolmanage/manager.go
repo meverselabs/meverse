@@ -196,9 +196,7 @@ func (pm *nodePoolManage) kickOutPeerStorage() {
 	}
 }
 
-/***
- * implament of mage interface
-**/
+// BanPeerInfo is a banned peer information
 type BanPeerInfo struct {
 	Hash     string
 	Timeout  int64

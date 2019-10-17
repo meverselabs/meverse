@@ -2,11 +2,11 @@ package types
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/hex"
 	"strings"
 
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/binutil"
 	"github.com/petar/GoLLRB/llrb"
 )
 
@@ -75,8 +75,8 @@ func MarshalID(height uint32, index uint16, n uint16) uint64 {
 // TransactionID returns the id of the transaction
 func TransactionID(Height uint32, Index uint16) string {
 	bs := make([]byte, 6)
-	binary.BigEndian.PutUint32(bs, Height)
-	binary.BigEndian.PutUint16(bs[4:], Index)
+	binutil.BigEndian.PutUint32(bs, Height)
+	binutil.BigEndian.PutUint16(bs[4:], Index)
 	return hex.EncodeToString(bs)
 }
 
@@ -89,7 +89,7 @@ func ParseTransactionID(TXID string) (uint32, uint16, error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	Height := binary.BigEndian.Uint32(bs)
-	Index := binary.BigEndian.Uint16(bs[4:])
+	Height := binutil.BigEndian.Uint32(bs)
+	Index := binutil.BigEndian.Uint16(bs[4:])
 	return Height, Index, nil
 }

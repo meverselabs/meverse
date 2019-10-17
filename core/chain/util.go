@@ -2,7 +2,6 @@ package chain
 
 import (
 	"bytes"
-	"sync"
 
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/core/types"
@@ -41,30 +40,17 @@ func buildLevel(hashes []hash.Hash256) ([]hash.Hash256, error) {
 		LvCnt++
 	}
 
-	var wg sync.WaitGroup
-	errs := make(chan error, LvCnt)
 	LvHashes := make([]hash.Hash256, LvCnt)
 	for i := 0; i < LvCnt; i++ {
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
-
-			last := (idx + 1) * hashPerLevel
-			if last > len(hashes) {
-				last = len(hashes)
-			}
-			h, err := hash16(hashes[idx*hashPerLevel : last])
-			if err != nil {
-				errs <- err
-				return
-			}
-			LvHashes[idx] = h
-		}(i)
-	}
-	wg.Wait()
-	if len(errs) > 0 {
-		err := <-errs
-		return nil, err
+		last := (i + 1) * hashPerLevel
+		if last > len(hashes) {
+			last = len(hashes)
+		}
+		h, err := hash16(hashes[i*hashPerLevel : last])
+		if err != nil {
+			return nil, err
+		}
+		LvHashes[i] = h
 	}
 	return LvHashes, nil
 }

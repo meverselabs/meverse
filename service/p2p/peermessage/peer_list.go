@@ -2,9 +2,10 @@ package peermessage
 
 import (
 	"errors"
-	"github.com/fletaio/fleta/common/util"
 	"io"
 	"time"
+
+	"github.com/fletaio/fleta/common/binutil"
 )
 
 //peermessage errors
@@ -34,7 +35,7 @@ func NewConnectInfo(addr string, hash string, t time.Duration) ConnectInfo {
 func (ci *ConnectInfo) WriteTo(w io.Writer) (int64, error) {
 	var wrote int64
 	{
-		n, err := w.Write(util.Uint64ToBytes(uint64(ci.PingTime)))
+		n, err := w.Write(binutil.LittleEndian.Uint64ToBytes(uint64(ci.PingTime)))
 		if err != nil {
 			return wrote, err
 		}
@@ -93,7 +94,7 @@ func (ci *ConnectInfo) ReadFrom(r io.Reader) (int64, error) {
 			return read, err
 		}
 		read += int64(n)
-		v := util.BytesToUint64(bs)
+		v := binutil.LittleEndian.Uint64(bs)
 		ci.PingTime = time.Duration(v)
 	}
 

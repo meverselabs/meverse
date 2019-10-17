@@ -8,8 +8,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/fletaio/fleta/common/binutil"
 	"github.com/fletaio/fleta/common/hash"
-	"github.com/fletaio/fleta/common/util"
 )
 
 // Pile proivdes a part of stack like store
@@ -45,12 +45,12 @@ func NewPile(path string, GenHash hash.Hash256, BaseHeight uint32) (*Pile, error
 			file.Close()
 			return nil, ErrInvalidChunkBeginHeight
 		}
-		copy(meta, util.Uint32ToBytes(BaseHeight))                //HeadHeight (0, 4)
-		copy(meta[4:], util.Uint32ToBytes(BaseHeight))            //HeadHeightCheckA (4, 8)
-		copy(meta[8:], util.Uint32ToBytes(BaseHeight))            //HeadHeightCheckB (8, 12)
-		copy(meta[12:], util.Uint32ToBytes(BaseHeight))           //BeginHeight (12, 16)
-		copy(meta[16:], util.Uint32ToBytes(BaseHeight+ChunkUnit)) //EndHeight (16, 20)
-		copy(meta[20:], GenHash[:])                               //GenesisHash (20, 52)
+		copy(meta, binutil.LittleEndian.Uint32ToBytes(BaseHeight))                //HeadHeight (0, 4)
+		copy(meta[4:], binutil.LittleEndian.Uint32ToBytes(BaseHeight))            //HeadHeightCheckA (4, 8)
+		copy(meta[8:], binutil.LittleEndian.Uint32ToBytes(BaseHeight))            //HeadHeightCheckB (8, 12)
+		copy(meta[12:], binutil.LittleEndian.Uint32ToBytes(BaseHeight))           //BeginHeight (12, 16)
+		copy(meta[16:], binutil.LittleEndian.Uint32ToBytes(BaseHeight+ChunkUnit)) //EndHeight (16, 20)
+		copy(meta[20:], GenHash[:])                                               //GenesisHash (20, 52)
 		if _, err := file.Write(meta); err != nil {
 			file.Close()
 			return nil, err
@@ -82,11 +82,11 @@ func LoadPile(path string) (*Pile, error) {
 		file.Close()
 		return nil, err
 	}
-	HeadHeight := util.BytesToUint32(meta)
-	HeadHeightCheckA := util.BytesToUint32(meta[4:])
-	HeadHeightCheckB := util.BytesToUint32(meta[8:])
-	BeginHeight := util.BytesToUint32(meta[12:])
-	EndHeight := util.BytesToUint32(meta[16:])
+	HeadHeight := binutil.LittleEndian.Uint32(meta)
+	HeadHeightCheckA := binutil.LittleEndian.Uint32(meta[4:])
+	HeadHeightCheckB := binutil.LittleEndian.Uint32(meta[8:])
+	BeginHeight := binutil.LittleEndian.Uint32(meta[12:])
+	EndHeight := binutil.LittleEndian.Uint32(meta[16:])
 	var GenHash hash.Hash256
 	copy(GenHash[:], meta[20:])
 	if BeginHeight%ChunkUnit != 0 {
@@ -102,7 +102,7 @@ func LoadPile(path string) (*Pile, error) {
 			if _, err := file.Seek(0, 0); err != nil {
 				return nil, err
 			}
-			if _, err := file.Write(util.Uint32ToBytes(HeadHeightCheckA)); err != nil {
+			if _, err := file.Write(binutil.LittleEndian.Uint32ToBytes(HeadHeightCheckA)); err != nil {
 				return nil, err
 			}
 			if err := file.Sync(); err != nil {
@@ -113,10 +113,10 @@ func LoadPile(path string) (*Pile, error) {
 			if _, err := file.Seek(4, 0); err != nil {
 				return nil, err
 			}
-			if _, err := file.Write(util.Uint32ToBytes(HeadHeight)); err != nil {
+			if _, err := file.Write(binutil.LittleEndian.Uint32ToBytes(HeadHeight)); err != nil {
 				return nil, err
 			}
-			if _, err := file.Write(util.Uint32ToBytes(HeadHeight)); err != nil {
+			if _, err := file.Write(binutil.LittleEndian.Uint32ToBytes(HeadHeight)); err != nil {
 				return nil, err
 			}
 			if err := file.Sync(); err != nil {
@@ -128,7 +128,7 @@ func LoadPile(path string) (*Pile, error) {
 			if _, err := file.Seek(8, 0); err != nil {
 				return nil, err
 			}
-			if _, err := file.Write(util.Uint32ToBytes(HeadHeight)); err != nil {
+			if _, err := file.Write(binutil.LittleEndian.Uint32ToBytes(HeadHeight)); err != nil {
 				return nil, err
 			}
 			if err := file.Sync(); err != nil {
@@ -153,7 +153,7 @@ func LoadPile(path string) (*Pile, error) {
 				file.Close()
 				return nil, err
 			}
-			Offset = int64(util.BytesToUint64(bs))
+			Offset = int64(binutil.LittleEndian.Uint64(bs))
 		}
 		if fi, err := file.Stat(); err != nil {
 			file.Close()
@@ -204,7 +204,7 @@ func (p *Pile) AppendData(Sync bool, Height uint32, DataHash hash.Hash256, Datas
 		if _, err := p.file.Read(bs); err != nil {
 			return err
 		}
-		Offset = int64(util.BytesToUint64(bs))
+		Offset = int64(binutil.LittleEndian.Uint64(bs))
 	}
 
 	// write data
@@ -230,7 +230,7 @@ func (p *Pile) AppendData(Sync bool, Height uint32, DataHash hash.Hash256, Datas
 		zd := buffer.Bytes()
 		zdatas = append(zdatas, zd)
 
-		if _, err := p.file.Write(util.Uint32ToBytes(uint32(len(zd)))); err != nil {
+		if _, err := p.file.Write(binutil.LittleEndian.Uint32ToBytes(uint32(len(zd)))); err != nil {
 			return err
 		}
 	}
@@ -245,7 +245,7 @@ func (p *Pile) AppendData(Sync bool, Height uint32, DataHash hash.Hash256, Datas
 	if _, err := p.file.Seek(ChunkMetaSize+int64(FromHeight)*8, 0); err != nil {
 		return err
 	}
-	if _, err := p.file.Write(util.Uint64ToBytes(uint64(Offset + totalLen))); err != nil {
+	if _, err := p.file.Write(binutil.LittleEndian.Uint64ToBytes(uint64(Offset + totalLen))); err != nil {
 		return err
 	}
 
@@ -253,7 +253,7 @@ func (p *Pile) AppendData(Sync bool, Height uint32, DataHash hash.Hash256, Datas
 	if _, err := p.file.Seek(0, 0); err != nil {
 		return err
 	}
-	if _, err := p.file.Write(util.Uint32ToBytes(p.HeadHeight + 1)); err != nil {
+	if _, err := p.file.Write(binutil.LittleEndian.Uint32ToBytes(p.HeadHeight + 1)); err != nil {
 		return err
 	}
 	if Sync {
@@ -266,7 +266,7 @@ func (p *Pile) AppendData(Sync bool, Height uint32, DataHash hash.Hash256, Datas
 	if _, err := p.file.Seek(4, 0); err != nil {
 		return err
 	}
-	if _, err := p.file.Write(util.Uint32ToBytes(p.HeadHeight + 1)); err != nil {
+	if _, err := p.file.Write(binutil.LittleEndian.Uint32ToBytes(p.HeadHeight + 1)); err != nil {
 		return err
 	}
 	if Sync {
@@ -279,7 +279,7 @@ func (p *Pile) AppendData(Sync bool, Height uint32, DataHash hash.Hash256, Datas
 	if _, err := p.file.Seek(8, 0); err != nil {
 		return err
 	}
-	if _, err := p.file.Write(util.Uint32ToBytes(p.HeadHeight + 1)); err != nil {
+	if _, err := p.file.Write(binutil.LittleEndian.Uint32ToBytes(p.HeadHeight + 1)); err != nil {
 		return err
 	}
 	if Sync {
@@ -310,7 +310,7 @@ func (p *Pile) GetHash(Height uint32) (hash.Hash256, error) {
 		if _, err := p.file.Read(bs); err != nil {
 			return hash.Hash256{}, err
 		}
-		Offset = int64(util.BytesToUint64(bs))
+		Offset = int64(binutil.LittleEndian.Uint64(bs))
 	}
 	if _, err := p.file.Seek(Offset, 0); err != nil {
 		return hash.Hash256{}, err
@@ -346,7 +346,7 @@ func (p *Pile) GetData(Height uint32, index int) ([]byte, error) {
 		if _, err := p.file.Read(bs); err != nil {
 			return nil, err
 		}
-		Offset = int64(util.BytesToUint64(bs))
+		Offset = int64(binutil.LittleEndian.Uint64(bs))
 	}
 	if _, err := p.file.Seek(Offset+32, 0); err != nil {
 		return nil, err
@@ -364,13 +364,13 @@ func (p *Pile) GetData(Height uint32, index int) ([]byte, error) {
 	}
 	zofs := Offset + 32 + 1 + int64(4*lbs[0])
 	for i := 0; i < index; i++ {
-		zofs += int64(util.BytesToUint32(zlbs[4*i:]))
+		zofs += int64(binutil.LittleEndian.Uint32(zlbs[4*i:]))
 	}
 	if _, err := p.file.Seek(zofs, 0); err != nil {
 		return nil, err
 	}
 
-	zsize := util.BytesToUint32(zlbs[4*index:])
+	zsize := binutil.LittleEndian.Uint32(zlbs[4*index:])
 	zd := make([]byte, zsize)
 	if _, err := p.file.Read(zd); err != nil {
 		return nil, err
@@ -408,7 +408,7 @@ func (p *Pile) GetDatas(Height uint32, from int, count int) ([]byte, error) {
 		if _, err := p.file.Read(bs); err != nil {
 			return nil, err
 		}
-		Offset = int64(util.BytesToUint64(bs))
+		Offset = int64(binutil.LittleEndian.Uint64(bs))
 	}
 	if _, err := p.file.Seek(Offset+32, 0); err != nil {
 		return nil, err
@@ -426,14 +426,14 @@ func (p *Pile) GetDatas(Height uint32, from int, count int) ([]byte, error) {
 	}
 	zofs := Offset + 32 + 1 + int64(4*lbs[0])
 	for i := 0; i < from; i++ {
-		zofs += int64(util.BytesToUint32(zlbs[4*i:]))
+		zofs += int64(binutil.LittleEndian.Uint32(zlbs[4*i:]))
 	}
 	if _, err := p.file.Seek(zofs, 0); err != nil {
 		return nil, err
 	}
 	var buffer bytes.Buffer
 	for i := 0; i < count; i++ {
-		zsize := util.BytesToUint32(zlbs[4*(from+i):])
+		zsize := binutil.LittleEndian.Uint32(zlbs[4*(from+i):])
 		zd := make([]byte, zsize)
 		if _, err := p.file.Read(zd); err != nil {
 			return nil, err

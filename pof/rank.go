@@ -6,8 +6,8 @@ import (
 	"reflect"
 
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/binutil"
 	"github.com/fletaio/fleta/common/hash"
-	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/encoding"
 )
 
@@ -125,17 +125,17 @@ func (rank *Rank) SetHashSpace(hashSpace hash.Hash256) {
 }
 
 func (rank *Rank) update() {
-	rank.score = uint64(rank.phase)<<32 + uint64(util.BytesToUint32(rank.hashSpace[:4]))
+	rank.score = uint64(rank.phase)<<32 + uint64(binutil.LittleEndian.Uint32(rank.hashSpace[:4]))
 }
 
 // Key returns unique key of the rank
 func (rank *Rank) Key() string {
-	bs := util.Uint64ToBytes(rank.score)
+	bs := binutil.LittleEndian.Uint64ToBytes(rank.score)
 	return string(rank.Address[:]) + "," + string(bs)
 }
 
 // String returns the string of the rank using the byte array of rank value
 func (rank *Rank) String() string {
-	bs := util.Uint64ToBytes(rank.score)
+	bs := binutil.LittleEndian.Uint64ToBytes(rank.score)
 	return rank.Address.String() + "," + hex.EncodeToString(bs)
 }

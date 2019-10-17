@@ -9,8 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fletaio/fleta/common/util"
-
+	"github.com/fletaio/fleta/common/binutil"
 	lediscfg "github.com/siddontang/ledisdb/config"
 	"github.com/siddontang/ledisdb/ledis"
 )
@@ -109,8 +108,8 @@ func (lw *LogWriter) Write(bs []byte) (int, error) {
 	}
 
 	var buffer bytes.Buffer
-	buffer.Write(util.Uint64ToBytes(uint64(time.Now().UnixNano())))
-	buffer.Write(util.Uint16ToBytes(uint16(len(bs))))
+	buffer.Write(binutil.LittleEndian.Uint64ToBytes(uint64(time.Now().UnixNano())))
+	buffer.Write(binutil.LittleEndian.Uint16ToBytes(uint16(len(bs))))
 	buffer.Write(bs)
 
 	lw.Lock()

@@ -1,21 +1,18 @@
 package pof
 
 import (
-	"bytes"
 	crand "crypto/rand"
-	"encoding/binary"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/binutil"
 	"github.com/fletaio/fleta/common/debug"
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/common/rlog"
-	"github.com/fletaio/fleta/common/util"
 	"github.com/fletaio/fleta/core/chain"
-	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/service/p2p"
 	"github.com/fletaio/fleta/service/p2p/peer"
 	"github.com/gorilla/websocket"
@@ -70,7 +67,7 @@ func (ms *FormulatorService) RemovePeer(ID string) {
 }
 
 // SendTo sends a message to the formulator
-func (ms *FormulatorService) SendTo(addr common.Address, m interface{}) error {
+func (ms *FormulatorService) SendTo(addr common.Address, bs []byte) error {
 	ms.Lock()
 	p, has := ms.peerMap[string(addr[:])]
 	ms.Unlock()
@@ -78,71 +75,8 @@ func (ms *FormulatorService) SendTo(addr common.Address, m interface{}) error {
 		return ErrNotExistFormulatorPeer
 	}
 
-	if err := p.Send(m); err != nil {
-		rlog.Println(err)
-		ms.RemovePeer(p.ID())
-	}
+	p.SendPacket(bs)
 	return nil
-}
-
-// BroadcastMessage sends a message to all peers
-func (ms *FormulatorService) BroadcastMessage(m interface{}) error {
-	var buffer bytes.Buffer
-	fc := encoding.Factory("message")
-	t, err := fc.TypeOf(m)
-	if err != nil {
-		return err
-	}
-	buffer.Write(util.Uint16ToBytes(t))
-	enc := encoding.NewEncoder(&buffer)
-	if err := enc.Encode(m); err != nil {
-		return err
-	}
-	data := buffer.Bytes()
-
-	peers := []peer.Peer{}
-	ms.Lock()
-	for _, p := range ms.peerMap {
-		peers = append(peers, p)
-	}
-	ms.Unlock()
-
-	for _, p := range peers {
-		p.SendRaw(data)
-	}
-	return nil
-}
-
-// GuessHeightCountMap returns a number of the guess height from all peers
-func (ms *FormulatorService) GuessHeightCountMap() map[uint32]int {
-	CountMap := map[uint32]int{}
-	ms.Lock()
-	for _, p := range ms.peerMap {
-		CountMap[p.GuessHeight()]++
-	}
-	ms.Unlock()
-	return CountMap
-}
-
-// GuessHeight returns the guess height of the fomrulator
-func (ms *FormulatorService) GuessHeight(addr common.Address) (uint32, error) {
-	ms.Lock()
-	p, has := ms.peerMap[string(addr[:])]
-	ms.Unlock()
-	if !has {
-		return 0, ErrNotExistFormulatorPeer
-	}
-	return p.GuessHeight(), nil
-}
-
-// UpdateGuessHeight updates the guess height of the fomrulator
-func (ms *FormulatorService) UpdateGuessHeight(addr common.Address, height uint32) {
-	ms.Lock()
-	p, has := ms.peerMap[string(addr[:])]
-	ms.Unlock()
-	if has {
-		p.UpdateGuessHeight(height)
-	}
 }
 
 func (ms *FormulatorService) server(BindAddress string) error {
@@ -200,20 +134,15 @@ func (ms *FormulatorService) handleConnection(p peer.Peer) error {
 		rlog.Println("Observer", common.NewPublicHash(ms.key.PublicKey()).String(), "Fromulator Connected", p.Name())
 	}
 
-	cp := ms.ob.cs.cn.Provider()
-	height, lastHash, _ := cp.LastStatus()
-	p.Send(&p2p.StatusMessage{
-		Version:  cp.Version(),
-		Height:   height,
-		LastHash: lastHash,
-	})
+	ms.ob.OnFormulatorConnected(p)
+	defer ms.ob.OnFormulatorDisconnected(p)
 
 	for {
-		m, bs, err := p.ReadMessageData()
+		bs, err := p.ReadPacket()
 		if err != nil {
 			return err
 		}
-		if err := ms.ob.onFormulatorRecv(p, m, bs); err != nil {
+		if err := ms.ob.onFormulatorRecv(p, bs); err != nil {
 			return err
 		}
 	}
@@ -232,7 +161,7 @@ func (ms *FormulatorService) recvHandshake(conn *websocket.Conn) (common.Address
 	if ChainID != ms.ob.cs.cn.Provider().ChainID() {
 		return common.Address{}, chain.ErrInvalidChainID
 	}
-	timestamp := binary.LittleEndian.Uint64(req[32:])
+	timestamp := binutil.LittleEndian.Uint64(req[32:])
 	var Formulator common.Address
 	copy(Formulator[:], req[40:])
 	diff := time.Duration(uint64(time.Now().UnixNano()) - timestamp)
@@ -258,7 +187,7 @@ func (ms *FormulatorService) sendHandshake(conn *websocket.Conn) (common.PublicH
 		return common.PublicHash{}, err
 	}
 	req[0] = ms.ob.cs.cn.Provider().ChainID()
-	binary.LittleEndian.PutUint64(req[32:], uint64(time.Now().UnixNano()))
+	binutil.LittleEndian.PutUint64(req[32:], uint64(time.Now().UnixNano()))
 	if err := conn.WriteMessage(websocket.BinaryMessage, req); err != nil {
 		return common.PublicHash{}, err
 	}

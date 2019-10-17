@@ -1,11 +1,14 @@
 package queue
 
 import (
+	"sync"
+
 	"github.com/fletaio/fleta/common/hash"
 )
 
 // LinkedQueue is designed to allow users to remove the item by the key
 type LinkedQueue struct {
+	sync.Mutex
 	Head   *linkedItem
 	Tail   *linkedItem
 	keyMap map[hash.Hash256]*linkedItem
@@ -19,8 +22,23 @@ func NewLinkedQueue() *LinkedQueue {
 	return q
 }
 
+// Size returns the number of items
+func (q *LinkedQueue) Size() int {
+	q.Lock()
+	defer q.Unlock()
+
+	return len(q.keyMap)
+}
+
 // Push inserts the item with the key at the bottom of the queue
-func (q *LinkedQueue) Push(Key hash.Hash256, item interface{}) {
+func (q *LinkedQueue) Push(Key hash.Hash256, item interface{}) bool {
+	q.Lock()
+	defer q.Unlock()
+
+	if _, has := q.keyMap[Key]; has {
+		return false
+	}
+
 	nd := &linkedItem{
 		Key:  Key,
 		Item: item,
@@ -34,10 +52,14 @@ func (q *LinkedQueue) Push(Key hash.Hash256, item interface{}) {
 		q.Tail = nd
 	}
 	q.keyMap[Key] = nd
+	return true
 }
 
 // Pop returns a item at the top of the queue
 func (q *LinkedQueue) Pop() interface{} {
+	q.Lock()
+	defer q.Unlock()
+
 	if q.Head == nil {
 		return nil
 	}
@@ -57,6 +79,9 @@ func (q *LinkedQueue) Pop() interface{} {
 
 // Remove deletes a item by the key
 func (q *LinkedQueue) Remove(Key hash.Hash256) interface{} {
+	q.Lock()
+	defer q.Unlock()
+
 	if q.Head == nil {
 		return nil
 	}

@@ -1,6 +1,7 @@
 package pof
 
 import (
+	"sort"
 	"time"
 
 	"github.com/fletaio/fleta/common"
@@ -9,6 +10,20 @@ import (
 	"github.com/fletaio/fleta/service/p2p"
 )
 
+func (ob *ObserverNode) sendMessage(Priority int, Address common.Address, m interface{}) {
+	ob.sendChan <- &p2p.SendMessageItem{
+		Address: Address,
+		Packet:  p2p.MessageToPacket(m),
+	}
+}
+
+func (ob *ObserverNode) sendMessagePacket(Priority int, Address common.Address, bs []byte) {
+	ob.sendChan <- &p2p.SendMessageItem{
+		Address: Address,
+		Packet:  bs,
+	}
+}
+
 func (ob *ObserverNode) sendRoundVote() error {
 	Top, TimeoutCount, err := ob.cs.rt.TopRankInMap(ob.adjustFormulatorMap())
 	if err != nil {
@@ -16,7 +31,7 @@ func (ob *ObserverNode) sendRoundVote() error {
 	}
 
 	cp := ob.cs.cn.Provider()
-	height, lastHash, _ := cp.LastStatus()
+	height, lastHash := cp.LastStatus()
 	nm := &RoundVoteMessage{
 		RoundVote: &RoundVote{
 			ChainID:              cp.ChainID(),
@@ -29,14 +44,13 @@ func (ob *ObserverNode) sendRoundVote() error {
 			IsReply:              false,
 		},
 	}
-	if gh, err := ob.fs.GuessHeight(Top.Address); err != nil {
-		ob.fs.SendTo(Top.Address, &p2p.StatusMessage{
-			Version:  cp.Version(),
-			Height:   height,
-			LastHash: lastHash,
-		})
-	} else if gh < height {
-		ob.fs.SendTo(Top.Address, &p2p.StatusMessage{
+
+	ob.statusLock.Lock()
+	status, has := ob.statusMap[string(Top.Address[:])]
+	ob.statusLock.Unlock()
+
+	if !has || status.Height < height {
+		ob.sendMessage(1, Top.Address, &p2p.StatusMessage{
 			Version:  cp.Version(),
 			Height:   height,
 			LastHash: lastHash,
@@ -55,7 +69,7 @@ func (ob *ObserverNode) sendRoundVote() error {
 		Message:    nm,
 	})
 
-	ob.ms.BroadcastMessage(nm)
+	ob.ms.BroadcastPacket(p2p.MessageToPacket(nm))
 	return nil
 }
 
@@ -65,7 +79,7 @@ func (ob *ObserverNode) sendRoundVoteTo(TargetPubHash common.PublicHash) error {
 	}
 
 	cp := ob.cs.cn.Provider()
-	height, lastHash, _ := cp.LastStatus()
+	height, lastHash := cp.LastStatus()
 	if ob.round.RoundState == BlockVoteState {
 		MyMsg, has := ob.round.RoundVoteMessageMap[ob.myPublicHash]
 		if !has {
@@ -98,7 +112,7 @@ func (ob *ObserverNode) sendRoundVoteTo(TargetPubHash common.PublicHash) error {
 			nm.Signature = sig
 		}
 
-		ob.ms.SendTo(TargetPubHash, nm)
+		ob.ms.SendTo(TargetPubHash, p2p.MessageToPacket(nm))
 	} else {
 		Top, TimeoutCount, err := ob.cs.rt.TopRankInMap(ob.adjustFormulatorMap())
 		if err != nil {
@@ -124,13 +138,23 @@ func (ob *ObserverNode) sendRoundVoteTo(TargetPubHash common.PublicHash) error {
 			nm.Signature = sig
 		}
 
-		ob.ms.SendTo(TargetPubHash, nm)
+		ob.ms.SendTo(TargetPubHash, p2p.MessageToPacket(nm))
 	}
 	return nil
 }
 
 func (ob *ObserverNode) sendRoundVoteAck() error {
-	MinRoundVote := ob.round.RoundVoteMessageMap[ob.round.MinVotePublicHash].RoundVote
+	votes := []*voteSortItem{}
+	for pubhash, v := range ob.round.RoundVoteMessageMap {
+		votes = append(votes, &voteSortItem{
+			PublicHash: pubhash,
+			Priority:   uint64(v.RoundVote.TimeoutCount),
+		})
+	}
+	sort.Sort(voteSorter(votes))
+
+	MinPublicHash := votes[0].PublicHash
+	MinRoundVote := ob.round.RoundVoteMessageMap[MinPublicHash].RoundVote
 	nm := &RoundVoteAckMessage{
 		RoundVoteAck: &RoundVoteAck{
 			ChainID:              MinRoundVote.ChainID,
@@ -139,7 +163,7 @@ func (ob *ObserverNode) sendRoundVoteAck() error {
 			TimeoutCount:         MinRoundVote.TimeoutCount,
 			Formulator:           MinRoundVote.Formulator,
 			FormulatorPublicHash: MinRoundVote.FormulatorPublicHash,
-			PublicHash:           ob.round.MinVotePublicHash,
+			PublicHash:           MinPublicHash,
 			Timestamp:            uint64(time.Now().UnixNano()),
 			IsReply:              false,
 		},
@@ -155,7 +179,7 @@ func (ob *ObserverNode) sendRoundVoteAck() error {
 		Message:    nm,
 	})
 
-	ob.ms.BroadcastMessage(nm)
+	ob.ms.BroadcastPacket(p2p.MessageToPacket(nm))
 	return nil
 }
 
@@ -183,7 +207,7 @@ func (ob *ObserverNode) sendRoundVoteAckTo(TargetPubHash common.PublicHash) erro
 			},
 		}
 		cp := ob.cs.cn.Provider()
-		height, lastHash, _ := cp.LastStatus()
+		height, lastHash := cp.LastStatus()
 		TargetHeight := height + 1
 		if MyMsg.RoundVoteAck.TargetHeight != TargetHeight {
 			nm.RoundVoteAck.TimeoutCount = 0
@@ -198,7 +222,7 @@ func (ob *ObserverNode) sendRoundVoteAckTo(TargetPubHash common.PublicHash) erro
 			nm.Signature = sig
 		}
 
-		ob.ms.SendTo(TargetPubHash, nm)
+		ob.ms.SendTo(TargetPubHash, p2p.MessageToPacket(nm))
 	} else {
 		MyMsg, has := ob.round.RoundVoteAckMessageMap[ob.myPublicHash]
 		if !has {
@@ -224,32 +248,8 @@ func (ob *ObserverNode) sendRoundVoteAckTo(TargetPubHash common.PublicHash) erro
 			nm.Signature = sig
 		}
 
-		ob.ms.SendTo(TargetPubHash, nm)
+		ob.ms.SendTo(TargetPubHash, p2p.MessageToPacket(nm))
 	}
-	return nil
-}
-
-func (ob *ObserverNode) sendRoundSetup() error {
-	nm := &RoundSetupMessage{
-		MinRoundVoteAck: &RoundVoteAck{
-			ChainID:              ob.round.MinRoundVoteAck.ChainID,
-			LastHash:             ob.round.MinRoundVoteAck.LastHash,
-			TargetHeight:         ob.round.MinRoundVoteAck.TargetHeight,
-			TimeoutCount:         ob.round.MinRoundVoteAck.TimeoutCount,
-			Formulator:           ob.round.MinRoundVoteAck.Formulator,
-			FormulatorPublicHash: ob.round.MinRoundVoteAck.FormulatorPublicHash,
-			PublicHash:           ob.round.MinRoundVoteAck.PublicHash,
-			Timestamp:            uint64(time.Now().UnixNano()),
-			IsReply:              false,
-		},
-	}
-	if sig, err := ob.key.Sign(encoding.Hash(nm.MinRoundVoteAck)); err != nil {
-		return err
-	} else {
-		nm.Signature = sig
-	}
-
-	ob.ms.BroadcastMessage(nm)
 	return nil
 }
 
@@ -283,7 +283,7 @@ func (ob *ObserverNode) sendBlockVote(gen *BlockGenMessage) error {
 		Message:    nm,
 	})
 
-	ob.ms.BroadcastMessage(nm)
+	ob.ms.BroadcastPacket(p2p.MessageToPacket(nm))
 	return nil
 }
 
@@ -291,7 +291,7 @@ func (ob *ObserverNode) sendBlockGenTo(gen *BlockGenMessage, TargetPubHash commo
 	if TargetPubHash == ob.myPublicHash {
 		return nil
 	}
-	ob.ms.SendTo(TargetPubHash, gen)
+	ob.ms.SendTo(TargetPubHash, p2p.MessageToPacket(gen))
 	return nil
 }
 
@@ -324,7 +324,7 @@ func (ob *ObserverNode) sendBlockVoteTo(gen *BlockGenMessage, TargetPubHash comm
 		nm.Signature = sig
 	}
 
-	ob.ms.SendTo(TargetPubHash, nm)
+	ob.ms.SendTo(TargetPubHash, p2p.MessageToPacket(nm))
 	return nil
 }
 
@@ -367,9 +367,9 @@ func (ob *ObserverNode) sendBlockGenRequest(br *BlockRound) error {
 		nm.Signature = sig
 	}
 	if has {
-		ob.ms.SendTo(PublicHash, nm)
+		ob.ms.SendTo(PublicHash, p2p.MessageToPacket(nm))
 	} else {
-		ob.ms.SendAnyone(nm)
+		ob.ms.SendAnyone(p2p.MessageToPacket(nm))
 	}
 	return nil
 }
@@ -380,25 +380,25 @@ func (ob *ObserverNode) sendStatusTo(TargetPubHash common.PublicHash) error {
 	}
 
 	cp := ob.cs.cn.Provider()
-	height, lastHash, _ := cp.LastStatus()
+	height, lastHash := cp.LastStatus()
 	nm := &p2p.StatusMessage{
 		Version:  cp.Version(),
 		Height:   height,
 		LastHash: lastHash,
 	}
-	ob.ms.SendTo(TargetPubHash, nm)
+	ob.ms.SendTo(TargetPubHash, p2p.MessageToPacket(nm))
 	return nil
 }
 
 func (ob *ObserverNode) broadcastStatus() error {
 	cp := ob.cs.cn.Provider()
-	height, lastHash, _ := cp.LastStatus()
+	height, lastHash := cp.LastStatus()
 	nm := &p2p.StatusMessage{
 		Version:  cp.Version(),
 		Height:   height,
 		LastHash: lastHash,
 	}
-	ob.ms.BroadcastMessage(nm)
+	ob.ms.BroadcastPacket(p2p.MessageToPacket(nm))
 	return nil
 }
 
@@ -411,7 +411,7 @@ func (ob *ObserverNode) sendRequestBlockTo(TargetPubHash common.PublicHash, Heig
 		Height: Height,
 		Count:  Count,
 	}
-	ob.ms.SendTo(TargetPubHash, nm)
+	ob.ms.SendTo(TargetPubHash, p2p.MessageToPacket(nm))
 	for i := uint32(0); i < uint32(Count); i++ {
 		ob.requestTimer.Add(Height+i, 2*time.Second, string(TargetPubHash[:]))
 	}

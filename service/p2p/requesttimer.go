@@ -71,40 +71,35 @@ func (rm *RequestTimer) RemovesByValue(value string) {
 
 // Run is the main loop of RequestTimer
 func (rm *RequestTimer) Run() {
-	timer := time.NewTimer(100 * time.Millisecond)
 	for {
-		select {
-		case <-timer.C:
-			expired := []*requestTimerItem{}
-			now := uint64(time.Now().UnixNano())
-			remainMap := map[uint32]*requestTimerItem{}
-			rm.Lock()
-			for h, v := range rm.timerMap {
-				if v.ExpiredAt <= now {
-					expired = append(expired, v)
+		expired := []*requestTimerItem{}
+		now := uint64(time.Now().UnixNano())
+		remainMap := map[uint32]*requestTimerItem{}
+		rm.Lock()
+		for h, v := range rm.timerMap {
+			if v.ExpiredAt <= now {
+				expired = append(expired, v)
 
-					heightMap, has := rm.valueMap[v.Value]
-					if has {
-						delete(heightMap, v.Height)
-					}
-					if len(heightMap) == 0 {
-						delete(rm.valueMap, v.Value)
-					}
-				} else {
-					remainMap[h] = v
+				heightMap, has := rm.valueMap[v.Value]
+				if has {
+					delete(heightMap, v.Height)
 				}
-			}
-			rm.timerMap = remainMap
-			rm.Unlock()
-
-			if rm.handler != nil {
-				for _, v := range expired {
-					rm.handler.OnTimerExpired(v.Height, v.Value)
+				if len(heightMap) == 0 {
+					delete(rm.valueMap, v.Value)
 				}
+			} else {
+				remainMap[h] = v
 			}
-
-			timer.Reset(100 * time.Millisecond)
 		}
+		rm.timerMap = remainMap
+		rm.Unlock()
+
+		if rm.handler != nil {
+			for _, v := range expired {
+				rm.handler.OnTimerExpired(v.Height, v.Value)
+			}
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
 }
 

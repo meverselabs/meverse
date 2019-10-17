@@ -4,8 +4,8 @@ import (
 	"log"
 	"sync"
 
+	"github.com/fletaio/fleta/common/binutil"
 	"github.com/fletaio/fleta/common/hash"
-	"github.com/fletaio/fleta/common/util"
 )
 
 var lock sync.Mutex
@@ -17,7 +17,7 @@ func DefineHashedType(Name string) uint16 {
 	defer lock.Unlock()
 
 	h := hash.DoubleHash([]byte(Name))
-	t := util.BytesToUint16(h[:2])
+	t := binutil.LittleEndian.Uint16(h[:2])
 	old, has := gDefineMap[t]
 	if old == Name {
 		return t

@@ -20,6 +20,7 @@ type DB struct {
 	syncMode     bool
 	hasDirty     bool
 	lastSyncTime time.Time
+	isClosed     bool
 }
 
 // Open creates a DB that includes loaded piles
@@ -68,25 +69,21 @@ func Open(path string) (*DB, error) {
 		copy(db.genHash[:], db.piles[0].GenHash[:])
 	}
 
-	timer := time.NewTimer(time.Second)
 	go func() {
-		for {
-			select {
-			case <-timer.C:
-				db.Lock()
-				if len(db.piles) > 0 {
-					if db.hasDirty {
-						now := time.Now()
-						if now.Sub(db.lastSyncTime) > time.Second {
-							db.piles[len(db.piles)-1].file.Sync()
-							db.lastSyncTime = now
-							db.hasDirty = false
-						}
+		for !db.isClosed {
+			db.Lock()
+			if len(db.piles) > 0 {
+				if db.hasDirty {
+					now := time.Now()
+					if now.Sub(db.lastSyncTime) > time.Second {
+						db.piles[len(db.piles)-1].file.Sync()
+						db.lastSyncTime = now
+						db.hasDirty = false
 					}
 				}
-				db.Unlock()
-				timer.Reset(time.Second)
 			}
+			db.Unlock()
+			time.Sleep(time.Second)
 		}
 	}()
 
@@ -116,6 +113,7 @@ func (db *DB) Close() {
 	db.Lock()
 	defer db.Unlock()
 
+	db.isClosed = true
 	start := time.Now()
 	for _, p := range db.piles {
 		p.Close()

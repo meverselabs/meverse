@@ -1,7 +1,7 @@
 package payment
 
 import (
-	"encoding/binary"
+	"github.com/fletaio/fleta/common/binutil"
 )
 
 // tags
@@ -20,6 +20,6 @@ func toRequestPaymentKey(TXID string) []byte {
 func toTopicKey(topic uint64) []byte {
 	bs := make([]byte, 10)
 	copy(bs, tagTopic)
-	binary.BigEndian.PutUint64(bs[2:], topic)
+	binutil.BigEndian.PutUint64(bs[2:], topic)
 	return bs
 }

@@ -11,7 +11,7 @@ type Provider interface {
 	Name() string
 	Version() uint16
 	Height() uint32
-	LastStatus() (uint32, hash.Hash256, uint64)
+	LastStatus() (uint32, hash.Hash256)
 	LastHash() hash.Hash256
 	LastTimestamp() uint64
 	Hash(height uint32) (hash.Hash256, error)
@@ -19,5 +19,5 @@ type Provider interface {
 	Block(height uint32) (*Block, error)
 	Seq(addr common.Address) uint64
 	Events(From uint32, To uint32) ([]Event, error)
-	NewContextWrapper(pid uint8) *ContextWrapper
+	NewLoaderWrapper(pid uint8) LoaderWrapper
 }

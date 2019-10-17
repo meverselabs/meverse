@@ -2,10 +2,13 @@ package p2p
 
 import (
 	"bytes"
-	"encoding/binary"
+	"compress/gzip"
 	"io"
+	"io/ioutil"
 
-	"github.com/fletaio/fleta/common/util"
+	"github.com/bluele/gcache"
+	"github.com/fletaio/fleta/common/binutil"
+	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
 )
 
@@ -18,7 +21,7 @@ func ReadUint64(r io.Reader) (uint64, int64, error) {
 	} else {
 		read += n
 	}
-	return binary.LittleEndian.Uint64(BNum), int64(read), nil
+	return binutil.LittleEndian.Uint64(BNum), int64(read), nil
 }
 
 // ReadUint32 reads a uint32 number from the reader
@@ -30,7 +33,7 @@ func ReadUint32(r io.Reader) (uint32, int64, error) {
 	} else {
 		read += n
 	}
-	return binary.LittleEndian.Uint32(BNum), int64(read), nil
+	return binutil.LittleEndian.Uint32(BNum), int64(read), nil
 }
 
 // ReadUint16 reads a uint16 number from the reader
@@ -42,7 +45,7 @@ func ReadUint16(r io.Reader) (uint16, int64, error) {
 	} else {
 		read += n
 	}
-	return binary.LittleEndian.Uint16(BNum), int64(read), nil
+	return binutil.LittleEndian.Uint16(BNum), int64(read), nil
 }
 
 // ReadUint8 reads a uint8 number from the reader
@@ -141,18 +144,125 @@ func FillBytes(r io.Reader, bs []byte) (int64, error) {
 	return int64(read), nil
 }
 
-// MessageToBytes returns bytes to the message
-func MessageToBytes(m interface{}) ([]byte, error) {
-	var buffer bytes.Buffer
+// MessageToPacket returns packet of the message
+func MessageToPacket(m interface{}) []byte {
+	if _, is := m.([]byte); is {
+		panic("")
+	}
+
 	fc := encoding.Factory("message")
 	t, err := fc.TypeOf(m)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	buffer.Write(util.Uint16ToBytes(t))
-	enc := encoding.NewEncoder(&buffer)
+	var buffer bytes.Buffer
+	buffer.Write(binutil.LittleEndian.Uint16ToBytes(t))
+	buffer.Write(make([]byte, 4))
+	zw := gzip.NewWriter(&buffer)
+	enc := encoding.NewEncoder(zw)
 	if err := enc.Encode(m); err != nil {
+		panic(err)
+	}
+	zw.Flush()
+	zw.Close()
+
+	bs := buffer.Bytes()
+	binutil.LittleEndian.PutUint32(bs[2:], uint32(len(bs)-6))
+	return bs
+}
+
+func PacketMessageType(bs []byte) uint16 {
+	return binutil.LittleEndian.Uint16(bs[4:])
+}
+
+func PacketToMessage(bs []byte) (interface{}, error) {
+	t := binutil.LittleEndian.Uint16(bs)
+	compressed := true
+
+	var mbs []byte
+	if compressed {
+		zr, err := gzip.NewReader(bytes.NewReader(bs[6:]))
+		if err != nil {
+			return nil, err
+		}
+		defer zr.Close()
+
+		v, err := ioutil.ReadAll(zr)
+		if err != nil {
+			return nil, err
+		}
+		mbs = v
+	} else {
+		mbs = bs[6:]
+	}
+
+	fc := encoding.Factory("message")
+	m, err := fc.Create(t)
+	if err != nil {
 		return nil, err
 	}
-	return buffer.Bytes(), nil
+	if err := encoding.Unmarshal(mbs, &m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func BlockPacketWithCache(msg *RequestMessage, provider types.Provider, batchCache gcache.Cache, singleCache gcache.Cache) ([]byte, error) {
+	Height := provider.Height()
+	var bs []byte
+	if msg.Height%10 == 0 && msg.Count == 10 && msg.Height+uint32(msg.Count) <= Height {
+		value, err := batchCache.Get(msg.Height)
+		if err != nil {
+			list := make([]*types.Block, 0, 10)
+			for i := uint32(0); i < uint32(msg.Count); i++ {
+				if msg.Height+i > Height {
+					break
+				}
+				b, err := provider.Block(msg.Height + i)
+				if err != nil {
+					return nil, err
+				}
+				list = append(list, b)
+			}
+			sm := &BlockMessage{
+				Blocks: list,
+			}
+			bs = MessageToPacket(sm)
+			batchCache.Set(msg.Height, bs)
+		} else {
+			bs = value.([]byte)
+		}
+	} else if msg.Count == 1 {
+		value, err := singleCache.Get(msg.Height)
+		if err != nil {
+			b, err := provider.Block(msg.Height)
+			if err != nil {
+				return nil, err
+			}
+			sm := &BlockMessage{
+				Blocks: []*types.Block{b},
+			}
+			bs = MessageToPacket(sm)
+			singleCache.Set(msg.Height, bs)
+		} else {
+			bs = value.([]byte)
+		}
+	} else {
+		list := make([]*types.Block, 0, 10)
+		for i := uint32(0); i < uint32(msg.Count); i++ {
+			if msg.Height+i > Height {
+				break
+			}
+			b, err := provider.Block(msg.Height + i)
+			if err != nil {
+				return nil, err
+			}
+			list = append(list, b)
+		}
+		sm := &BlockMessage{
+			Blocks: list,
+		}
+		bs = MessageToPacket(sm)
+	}
+	return bs, nil
 }

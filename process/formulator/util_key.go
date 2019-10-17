@@ -1,9 +1,8 @@
 package formulator
 
 import (
-	"encoding/binary"
-
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/binutil"
 )
 
 // tags
@@ -56,7 +55,7 @@ func toStakingAmountNumberKey(StakingAddrss common.Address) []byte {
 func toStakingAmountReverseKey(Num uint32) []byte {
 	bs := make([]byte, 6)
 	copy(bs, tagStakingAmountReverse)
-	binary.BigEndian.PutUint32(bs[2:], Num)
+	binutil.BigEndian.PutUint32(bs[2:], Num)
 	return bs
 }
 
@@ -84,14 +83,14 @@ func toGenCountNumberKey(GenAddrss common.Address) []byte {
 func toGenCountReverseKey(Num uint32) []byte {
 	bs := make([]byte, 6)
 	copy(bs, tagGenCountReverse)
-	binary.BigEndian.PutUint32(bs[2:], Num)
+	binutil.BigEndian.PutUint32(bs[2:], Num)
 	return bs
 }
 
 func toRevokedFormulatorKey(height uint32, addr common.Address) []byte {
 	bs := make([]byte, 6+common.AddressSize)
 	copy(bs, tagRevokedFormulator)
-	binary.BigEndian.PutUint32(bs[2:], height)
+	binutil.BigEndian.PutUint32(bs[2:], height)
 	copy(bs[6:], addr[:])
 	return bs
 }
@@ -99,7 +98,7 @@ func toRevokedFormulatorKey(height uint32, addr common.Address) []byte {
 func toRevokedFormulatorNumberKey(height uint32, addr common.Address) []byte {
 	bs := make([]byte, 6+common.AddressSize)
 	copy(bs, tagRevokedFormulatorNumber)
-	binary.BigEndian.PutUint32(bs[2:], height)
+	binutil.BigEndian.PutUint32(bs[2:], height)
 	copy(bs[6:], addr[:])
 	return bs
 }
@@ -107,22 +106,22 @@ func toRevokedFormulatorNumberKey(height uint32, addr common.Address) []byte {
 func toRevokedFormulatorReverseKey(height uint32, num uint32) []byte {
 	bs := make([]byte, 10)
 	copy(bs, tagRevokedFormulatorReverse)
-	binary.BigEndian.PutUint32(bs[2:], height)
-	binary.BigEndian.PutUint32(bs[6:], num)
+	binutil.BigEndian.PutUint32(bs[2:], height)
+	binutil.BigEndian.PutUint32(bs[6:], num)
 	return bs
 }
 
 func toRevokedFormulatorCountKey(height uint32) []byte {
 	bs := make([]byte, 6)
 	copy(bs, tagRevokedFormulatorCount)
-	binary.BigEndian.PutUint32(bs[2:], height)
+	binutil.BigEndian.PutUint32(bs[2:], height)
 	return bs
 }
 
 func toUnstakingAmountKey(height uint32, addr common.Address) []byte {
 	bs := make([]byte, 6+common.AddressSize)
 	copy(bs, tagUnstakingAmount)
-	binary.BigEndian.PutUint32(bs[2:], height)
+	binutil.BigEndian.PutUint32(bs[2:], height)
 	copy(bs[6:], addr[:])
 	return bs
 }
@@ -130,7 +129,7 @@ func toUnstakingAmountKey(height uint32, addr common.Address) []byte {
 func toUnstakingAmountNumberKey(height uint32, addr common.Address) []byte {
 	bs := make([]byte, 6+common.AddressSize)
 	copy(bs, tagUnstakingAmountNumber)
-	binary.BigEndian.PutUint32(bs[2:], height)
+	binutil.BigEndian.PutUint32(bs[2:], height)
 	copy(bs[6:], addr[:])
 	return bs
 }
@@ -138,14 +137,14 @@ func toUnstakingAmountNumberKey(height uint32, addr common.Address) []byte {
 func toUnstakingAmountReverseKey(height uint32, num uint32) []byte {
 	bs := make([]byte, 10)
 	copy(bs, tagUnstakingAmountReverse)
-	binary.BigEndian.PutUint32(bs[2:], height)
-	binary.BigEndian.PutUint32(bs[6:], num)
+	binutil.BigEndian.PutUint32(bs[2:], height)
+	binutil.BigEndian.PutUint32(bs[6:], num)
 	return bs
 }
 
 func toUnstakingAmountCountKey(height uint32) []byte {
 	bs := make([]byte, 6)
 	copy(bs, tagUnstakingAmountCount)
-	binary.BigEndian.PutUint32(bs[2:], height)
+	binutil.BigEndian.PutUint32(bs[2:], height)
 	return bs
 }

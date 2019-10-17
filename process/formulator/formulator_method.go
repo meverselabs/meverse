@@ -3,14 +3,14 @@ package formulator
 import (
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
-	"github.com/fletaio/fleta/common/util"
+	"github.com/fletaio/fleta/common/binutil"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
 )
 
 func (p *Formulator) getGenCount(lw types.LoaderWrapper, addr common.Address) uint32 {
 	if bs := lw.ProcessData(toGenCountKey(addr)); len(bs) > 0 {
-		return util.BytesToUint32(bs)
+		return binutil.LittleEndian.Uint32(bs)
 	} else {
 		return 0
 	}
@@ -20,20 +20,20 @@ func (p *Formulator) addGenCount(ctw *types.ContextWrapper, addr common.Address)
 	if ns := ctw.ProcessData(toGenCountNumberKey(addr)); len(ns) == 0 {
 		var Count uint32
 		if bs := ctw.ProcessData(tagGenCountCount); len(bs) > 0 {
-			Count = util.BytesToUint32(bs)
+			Count = binutil.LittleEndian.Uint32(bs)
 		}
-		ctw.SetProcessData(toGenCountNumberKey(addr), util.Uint32ToBytes(Count))
+		ctw.SetProcessData(toGenCountNumberKey(addr), binutil.LittleEndian.Uint32ToBytes(Count))
 		ctw.SetProcessData(toGenCountReverseKey(Count), addr[:])
 		Count++
-		ctw.SetProcessData(tagGenCountCount, util.Uint32ToBytes(Count))
+		ctw.SetProcessData(tagGenCountCount, binutil.LittleEndian.Uint32ToBytes(Count))
 	}
-	ctw.SetProcessData(toGenCountKey(addr), util.Uint32ToBytes(p.getGenCount(ctw, addr)+1))
+	ctw.SetProcessData(toGenCountKey(addr), binutil.LittleEndian.Uint32ToBytes(p.getGenCount(ctw, addr)+1))
 }
 
 func (p *Formulator) flushGenCountMap(ctw *types.ContextWrapper) (map[common.Address]uint32, error) {
 	CountMap := map[common.Address]uint32{}
 	if bs := ctw.ProcessData(tagGenCountCount); len(bs) > 0 {
-		Count := util.BytesToUint32(bs)
+		Count := binutil.LittleEndian.Uint32(bs)
 		for i := uint32(0); i < Count; i++ {
 			var addr common.Address
 			copy(addr[:], ctw.ProcessData(toGenCountReverseKey(i)))
@@ -66,12 +66,12 @@ func (p *Formulator) AddStakingAmount(ctw *types.ContextWrapper, HyperAddress co
 	if ns := ctw.AccountData(HyperAddress, toStakingAmountNumberKey(StakingAddress)); len(ns) == 0 {
 		var Count uint32
 		if bs := ctw.AccountData(HyperAddress, tagStakingAmountCount); len(bs) > 0 {
-			Count = util.BytesToUint32(bs)
+			Count = binutil.LittleEndian.Uint32(bs)
 		}
-		ctw.SetAccountData(HyperAddress, toStakingAmountNumberKey(StakingAddress), util.Uint32ToBytes(Count))
+		ctw.SetAccountData(HyperAddress, toStakingAmountNumberKey(StakingAddress), binutil.LittleEndian.Uint32ToBytes(Count))
 		ctw.SetAccountData(HyperAddress, toStakingAmountReverseKey(Count), StakingAddress[:])
 		Count++
-		ctw.SetAccountData(HyperAddress, tagStakingAmountCount, util.Uint32ToBytes(Count))
+		ctw.SetAccountData(HyperAddress, tagStakingAmountCount, binutil.LittleEndian.Uint32ToBytes(Count))
 	}
 	ctw.SetAccountData(HyperAddress, toStakingAmountKey(StakingAddress), p.GetStakingAmount(ctw, HyperAddress, StakingAddress).Add(StakingAmount).Bytes())
 }
@@ -88,14 +88,14 @@ func (p *Formulator) subStakingAmount(ctw *types.ContextWrapper, HyperAddress co
 		if ns := ctw.AccountData(HyperAddress, toStakingAmountNumberKey(StakingAddress)); len(ns) > 0 {
 			var Count uint32
 			if bs := ctw.AccountData(HyperAddress, tagStakingAmountCount); len(bs) > 0 {
-				Count = util.BytesToUint32(bs)
+				Count = binutil.LittleEndian.Uint32(bs)
 			}
-			Number := util.BytesToUint32(ns)
+			Number := binutil.LittleEndian.Uint32(ns)
 			if Number != Count-1 {
 				var swapAddr common.Address
 				copy(swapAddr[:], ctw.AccountData(HyperAddress, toStakingAmountReverseKey(Count-1)))
 				ctw.SetAccountData(HyperAddress, toStakingAmountReverseKey(Number), swapAddr[:])
-				ctw.SetAccountData(HyperAddress, toStakingAmountNumberKey(swapAddr), util.Uint32ToBytes(Number))
+				ctw.SetAccountData(HyperAddress, toStakingAmountNumberKey(swapAddr), binutil.LittleEndian.Uint32ToBytes(Number))
 			}
 			ctw.SetAccountData(HyperAddress, toStakingAmountNumberKey(StakingAddress), nil)
 			ctw.SetAccountData(HyperAddress, toStakingAmountReverseKey(Count-1), nil)
@@ -103,7 +103,7 @@ func (p *Formulator) subStakingAmount(ctw *types.ContextWrapper, HyperAddress co
 			if Count == 0 {
 				ctw.SetAccountData(HyperAddress, tagStakingAmountCount, nil)
 			} else {
-				ctw.SetAccountData(HyperAddress, tagStakingAmountCount, util.Uint32ToBytes(Count))
+				ctw.SetAccountData(HyperAddress, tagStakingAmountCount, binutil.LittleEndian.Uint32ToBytes(Count))
 			}
 		}
 		ctw.SetAccountData(HyperAddress, toStakingAmountKey(StakingAddress), nil)
@@ -119,7 +119,7 @@ func (p *Formulator) GetStakingAmountMap(loader types.Loader, HyperAddress commo
 
 	PowerMap := map[common.Address]*amount.Amount{}
 	if bs := lw.AccountData(HyperAddress, tagStakingAmountCount); len(bs) > 0 {
-		Count := util.BytesToUint32(bs)
+		Count := binutil.LittleEndian.Uint32(bs)
 		for i := uint32(0); i < Count; i++ {
 			var StakingAddress common.Address
 			copy(StakingAddress[:], lw.AccountData(HyperAddress, toStakingAmountReverseKey(i)))
@@ -131,26 +131,26 @@ func (p *Formulator) GetStakingAmountMap(loader types.Loader, HyperAddress commo
 
 func (p *Formulator) getLastPaidHeight(lw types.LoaderWrapper) uint32 {
 	if bs := lw.ProcessData(tagLastPaidHeight); len(bs) > 0 {
-		return util.BytesToUint32(bs)
+		return binutil.LittleEndian.Uint32(bs)
 	} else {
 		return 0
 	}
 }
 
 func (p *Formulator) setLastPaidHeight(ctw *types.ContextWrapper, lastPaidHeight uint32) {
-	ctw.SetProcessData(tagLastPaidHeight, util.Uint32ToBytes(lastPaidHeight))
+	ctw.SetProcessData(tagLastPaidHeight, binutil.LittleEndian.Uint32ToBytes(lastPaidHeight))
 }
 
 func (p *Formulator) getLastStakingPaidHeight(lw types.LoaderWrapper, Address common.Address) uint32 {
 	if bs := lw.AccountData(Address, tagLastStakingPaidHeight); len(bs) > 0 {
-		return util.BytesToUint32(bs)
+		return binutil.LittleEndian.Uint32(bs)
 	} else {
 		return 0
 	}
 }
 
 func (p *Formulator) setLastStakingPaidHeight(ctw *types.ContextWrapper, Address common.Address, lastPaidHeight uint32) {
-	ctw.SetAccountData(Address, tagLastStakingPaidHeight, util.Uint32ToBytes(lastPaidHeight))
+	ctw.SetAccountData(Address, tagLastStakingPaidHeight, binutil.LittleEndian.Uint32ToBytes(lastPaidHeight))
 }
 
 // GetUserAutoStaking returns the user auto staking status of the address
@@ -177,7 +177,7 @@ func (p *Formulator) GetRevokedFormulatorHeight(loader types.Loader, addr common
 	lw := types.NewLoaderWrapper(p.pid, loader)
 
 	if bs := lw.AccountData(addr, tagRevokedHeight); len(bs) > 0 {
-		return util.BytesToUint32(bs), nil
+		return binutil.LittleEndian.Uint32(bs), nil
 	} else {
 		return 0, ErrNotRevoked
 	}
@@ -197,16 +197,16 @@ func (p *Formulator) addRevokedFormulator(ctw *types.ContextWrapper, addr common
 	if bs := ctw.AccountData(addr, tagRevokedHeight); len(bs) > 0 {
 		return ErrRevokedFormulator
 	}
-	ctw.SetAccountData(addr, tagRevokedHeight, util.Uint32ToBytes(RevokeHeight))
+	ctw.SetAccountData(addr, tagRevokedHeight, binutil.LittleEndian.Uint32ToBytes(RevokeHeight))
 	if ns := ctw.ProcessData(toRevokedFormulatorNumberKey(RevokeHeight, addr)); len(ns) == 0 {
 		var Count uint32
 		if bs := ctw.ProcessData(toRevokedFormulatorCountKey(RevokeHeight)); len(bs) > 0 {
-			Count = util.BytesToUint32(bs)
+			Count = binutil.LittleEndian.Uint32(bs)
 		}
-		ctw.SetProcessData(toRevokedFormulatorNumberKey(RevokeHeight, addr), util.Uint32ToBytes(Count))
+		ctw.SetProcessData(toRevokedFormulatorNumberKey(RevokeHeight, addr), binutil.LittleEndian.Uint32ToBytes(Count))
 		ctw.SetProcessData(toRevokedFormulatorReverseKey(RevokeHeight, Count), addr[:])
 		Count++
-		ctw.SetProcessData(toRevokedFormulatorCountKey(RevokeHeight), util.Uint32ToBytes(Count))
+		ctw.SetProcessData(toRevokedFormulatorCountKey(RevokeHeight), binutil.LittleEndian.Uint32ToBytes(Count))
 	}
 	ctw.SetProcessData(toRevokedFormulatorKey(RevokeHeight, addr), Heritor[:])
 	return nil
@@ -225,14 +225,14 @@ func (p *Formulator) removeRevokedFormulator(ctw *types.ContextWrapper, addr com
 	}
 	var Count uint32
 	if bs := ctw.ProcessData(toRevokedFormulatorCountKey(RevokeHeight)); len(bs) > 0 {
-		Count = util.BytesToUint32(bs)
+		Count = binutil.LittleEndian.Uint32(bs)
 	}
-	Number := util.BytesToUint32(ns)
+	Number := binutil.LittleEndian.Uint32(ns)
 	if Number != Count-1 {
 		var swapAddr common.Address
 		copy(swapAddr[:], ctw.ProcessData(toRevokedFormulatorReverseKey(RevokeHeight, Count-1)))
 		ctw.SetProcessData(toRevokedFormulatorReverseKey(RevokeHeight, Number), swapAddr[:])
-		ctw.SetProcessData(toRevokedFormulatorNumberKey(RevokeHeight, swapAddr), util.Uint32ToBytes(Number))
+		ctw.SetProcessData(toRevokedFormulatorNumberKey(RevokeHeight, swapAddr), binutil.LittleEndian.Uint32ToBytes(Number))
 	}
 	ctw.SetProcessData(toRevokedFormulatorNumberKey(RevokeHeight, addr), nil)
 	ctw.SetProcessData(toRevokedFormulatorReverseKey(RevokeHeight, Count-1), nil)
@@ -240,7 +240,7 @@ func (p *Formulator) removeRevokedFormulator(ctw *types.ContextWrapper, addr com
 	if Count == 0 {
 		ctw.SetProcessData(toRevokedFormulatorCountKey(RevokeHeight), nil)
 	} else {
-		ctw.SetProcessData(toRevokedFormulatorCountKey(RevokeHeight), util.Uint32ToBytes(Count))
+		ctw.SetProcessData(toRevokedFormulatorCountKey(RevokeHeight), binutil.LittleEndian.Uint32ToBytes(Count))
 	}
 	return nil
 }
@@ -248,7 +248,7 @@ func (p *Formulator) removeRevokedFormulator(ctw *types.ContextWrapper, addr com
 func (p *Formulator) flushRevokedFormulatorMap(ctw *types.ContextWrapper, RevokeHeight uint32) (*types.AddressAddressMap, error) {
 	RevokedFormulatorMap := types.NewAddressAddressMap()
 	if bs := ctw.ProcessData(toRevokedFormulatorCountKey(RevokeHeight)); len(bs) > 0 {
-		Count := util.BytesToUint32(bs)
+		Count := binutil.LittleEndian.Uint32(bs)
 		for i := uint32(0); i < Count; i++ {
 			var addr common.Address
 			copy(addr[:], ctw.ProcessData(toRevokedFormulatorReverseKey(RevokeHeight, i)))
@@ -300,12 +300,12 @@ func (p *Formulator) addUnstakingAmount(ctw *types.ContextWrapper, HyperAddr com
 	if ns := ctw.ProcessData(toUnstakingAmountNumberKey(UnstakedHeight, addr)); len(ns) == 0 {
 		var Count uint32
 		if bs := ctw.ProcessData(toUnstakingAmountCountKey(UnstakedHeight)); len(bs) > 0 {
-			Count = util.BytesToUint32(bs)
+			Count = binutil.LittleEndian.Uint32(bs)
 		}
-		ctw.SetProcessData(toUnstakingAmountNumberKey(UnstakedHeight, addr), util.Uint32ToBytes(Count))
+		ctw.SetProcessData(toUnstakingAmountNumberKey(UnstakedHeight, addr), binutil.LittleEndian.Uint32ToBytes(Count))
 		ctw.SetProcessData(toUnstakingAmountReverseKey(UnstakedHeight, Count), addr[:])
 		Count++
-		ctw.SetProcessData(toUnstakingAmountCountKey(UnstakedHeight), util.Uint32ToBytes(Count))
+		ctw.SetProcessData(toUnstakingAmountCountKey(UnstakedHeight), binutil.LittleEndian.Uint32ToBytes(Count))
 	}
 	mp, err := p.GetUnstakingAmountMap(ctw, addr, UnstakedHeight)
 	if err != nil {
@@ -363,14 +363,14 @@ func (p *Formulator) removeUnstakingAmount(ctw *types.ContextWrapper, addr commo
 	}
 	var Count uint32
 	if bs := ctw.ProcessData(toUnstakingAmountCountKey(UnstakedHeight)); len(bs) > 0 {
-		Count = util.BytesToUint32(bs)
+		Count = binutil.LittleEndian.Uint32(bs)
 	}
-	Number := util.BytesToUint32(ns)
+	Number := binutil.LittleEndian.Uint32(ns)
 	if Number != Count-1 {
 		var swapAddr common.Address
 		copy(swapAddr[:], ctw.ProcessData(toUnstakingAmountReverseKey(UnstakedHeight, Count-1)))
 		ctw.SetProcessData(toUnstakingAmountReverseKey(UnstakedHeight, Number), swapAddr[:])
-		ctw.SetProcessData(toUnstakingAmountNumberKey(UnstakedHeight, swapAddr), util.Uint32ToBytes(Number))
+		ctw.SetProcessData(toUnstakingAmountNumberKey(UnstakedHeight, swapAddr), binutil.LittleEndian.Uint32ToBytes(Number))
 	}
 	ctw.SetProcessData(toUnstakingAmountNumberKey(UnstakedHeight, addr), nil)
 	ctw.SetProcessData(toUnstakingAmountReverseKey(UnstakedHeight, Count-1), nil)
@@ -378,7 +378,7 @@ func (p *Formulator) removeUnstakingAmount(ctw *types.ContextWrapper, addr commo
 	if Count == 0 {
 		ctw.SetProcessData(toUnstakingAmountCountKey(UnstakedHeight), nil)
 	} else {
-		ctw.SetProcessData(toUnstakingAmountCountKey(UnstakedHeight), util.Uint32ToBytes(Count))
+		ctw.SetProcessData(toUnstakingAmountCountKey(UnstakedHeight), binutil.LittleEndian.Uint32ToBytes(Count))
 	}
 	return nil
 }
@@ -386,7 +386,7 @@ func (p *Formulator) removeUnstakingAmount(ctw *types.ContextWrapper, addr commo
 func (p *Formulator) flushUnstakingAmountMap(ctw *types.ContextWrapper, RevokeHeight uint32) (*types.AddressAddressAmountMap, error) {
 	UnstakingAmountMap := types.NewAddressAddressAmountMap()
 	if bs := ctw.ProcessData(toUnstakingAmountCountKey(RevokeHeight)); len(bs) > 0 {
-		Count := util.BytesToUint32(bs)
+		Count := binutil.LittleEndian.Uint32(bs)
 		for i := uint32(0); i < Count; i++ {
 			var addr common.Address
 			copy(addr[:], ctw.ProcessData(toUnstakingAmountReverseKey(RevokeHeight, i)))
