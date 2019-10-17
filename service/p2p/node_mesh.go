@@ -30,6 +30,7 @@ type NodeMesh struct {
 	chainID         uint8
 	key             key.Key
 	handler         Handler
+	myPublicHash    common.PublicHash
 	nodeSet         map[common.PublicHash]string
 	clientPeerMap   map[string]peer.Peer
 	serverPeerMap   map[string]peer.Peer
@@ -42,11 +43,12 @@ func NewNodeMesh(ChainID uint8, key key.Key, SeedNodeMap map[common.PublicHash]s
 		chainID:       ChainID,
 		key:           key,
 		handler:       handler,
+		myPublicHash:  common.NewPublicHash(key.PublicKey()),
 		nodeSet:       map[common.PublicHash]string{},
 		clientPeerMap: map[string]peer.Peer{},
 		serverPeerMap: map[string]peer.Peer{},
 	}
-	manager, err := nodepoolmanage.NewNodePoolManage(peerStorePath, ms)
+	manager, err := nodepoolmanage.NewNodePoolManage(peerStorePath, ms, ms.myPublicHash)
 	if err != nil {
 		panic(err)
 	}
@@ -61,9 +63,8 @@ func NewNodeMesh(ChainID uint8, key key.Key, SeedNodeMap map[common.PublicHash]s
 // Run starts the node mesh
 func (ms *NodeMesh) Run(BindAddress string) {
 	ms.BindAddress = BindAddress
-	myPublicHash := common.NewPublicHash(ms.key.PublicKey())
 	for PubHash, v := range ms.nodeSet {
-		if PubHash != myPublicHash {
+		if PubHash != ms.myPublicHash {
 			go func(pubhash common.PublicHash, NetAddr string) {
 				time.Sleep(1 * time.Second)
 				for {
@@ -248,6 +249,10 @@ func (ms *NodeMesh) AddPeerList(ips []string, hashs []string) {
 }
 
 func (ms *NodeMesh) client(Address string, TargetPubHash common.PublicHash) error {
+	if TargetPubHash == ms.myPublicHash {
+		return ErrSelfConnection
+	}
+
 	conn, err := net.DialTimeout("tcp", Address, 10*time.Second)
 	if err != nil {
 		return err
@@ -265,6 +270,9 @@ func (ms *NodeMesh) client(Address string, TargetPubHash common.PublicHash) erro
 	if err != nil {
 		rlog.Println("[sendHandshake]", err)
 		return err
+	}
+	if pubhash == ms.myPublicHash {
+		return ErrSelfConnection
 	}
 	if pubhash != TargetPubHash {
 		return common.ErrInvalidPublicHash
@@ -313,6 +321,9 @@ func (ms *NodeMesh) server(BindAddress string) error {
 			pubhash, bindAddress, err := ms.sendHandshake(conn)
 			if err != nil {
 				rlog.Println("[sendHandshake]", err)
+				return
+			}
+			if pubhash == ms.myPublicHash {
 				return
 			}
 			if err := ms.recvHandshake(conn); err != nil {

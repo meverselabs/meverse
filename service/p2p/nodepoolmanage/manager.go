@@ -42,6 +42,7 @@ type nodePoolManage struct {
 	peerStorage        storage.PeerStorage
 	nodeMesh           nodeMesh
 	BanPeerInfos       *ByTime
+	myPublicHash       common.PublicHash
 
 	putPeerListLock sync.Mutex
 }
@@ -55,7 +56,7 @@ const (
 
 //NewNodePoolManage is the peerManager creator.
 //Apply messages necessary for peer management.
-func NewNodePoolManage(StorePath string, nodeMesh nodeMesh) (Manager, error) {
+func NewNodePoolManage(StorePath string, nodeMesh nodeMesh, pubhash common.PublicHash) (Manager, error) {
 	ns, err := newNodeStore(StorePath)
 	if err != nil {
 		return nil, err
@@ -63,6 +64,7 @@ func NewNodePoolManage(StorePath string, nodeMesh nodeMesh) (Manager, error) {
 	pm := &nodePoolManage{
 		nodes:        ns,
 		nodeMesh:     nodeMesh,
+		myPublicHash: pubhash,
 		BanPeerInfos: NewByTime(),
 	}
 	pm.peerStorage = storage.NewPeerStorage(pm.checkClosePeer)
@@ -162,8 +164,9 @@ func (pm *nodePoolManage) appendPeerStorage() {
 		}
 		var ph common.PublicHash
 		copy(ph[:], []byte(p.Hash))
-		pm.nodeMesh.RequestConnect(p.Address, ph)
-
+		if ph != pm.myPublicHash {
+			pm.nodeMesh.RequestConnect(p.Address, ph)
+		}
 		break
 	}
 	if pm.nodeRotateIndex >= pm.nodes.Len()-1 {
