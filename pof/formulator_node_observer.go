@@ -132,7 +132,7 @@ func (fr *FormulatorNode) handleObserverMessage(p peer.Peer, m interface{}, Retr
 		}(msg)
 		return nil
 	case *BlockGenMessage:
-		rlog.Println("Formulator", fr.Config.Formulator.String(), "Recv.BlockGenMessage", msg.Block.Header.Height)
+		//rlog.Println("Formulator", fr.Config.Formulator.String(), "Recv.BlockGenMessage", msg.Block.Header.Height)
 
 		TargetHeight := fr.cs.cn.Provider().Height() + 1
 		if msg.Block.Header.Height < TargetHeight {
@@ -165,7 +165,7 @@ func (fr *FormulatorNode) handleObserverMessage(p peer.Peer, m interface{}, Retr
 		go fr.updateByGenItem()
 		return nil
 	case *BlockObSignMessage:
-		rlog.Println("Formulator", fr.Config.Formulator.String(), "Recv.BlockObSignMessage", msg.TargetHeight)
+		//rlog.Println("Formulator", fr.Config.Formulator.String(), "Recv.BlockObSignMessage", msg.TargetHeight)
 
 		TargetHeight := fr.cs.cn.Provider().Height() + 1
 		if msg.TargetHeight < TargetHeight {
@@ -201,7 +201,7 @@ func (fr *FormulatorNode) handleObserverMessage(p peer.Peer, m interface{}, Retr
 		go fr.updateByGenItem()
 		return nil
 	case *p2p.BlockMessage:
-		log.Println("Recv.Ob.BlockMessage", msg.Blocks[0].Header.Height)
+		//log.Println("Recv.Ob.BlockMessage", msg.Blocks[0].Header.Height)
 		for _, b := range msg.Blocks {
 			if err := fr.addBlock(b); err != nil {
 				if err == chain.ErrFoundForkedBlock {
