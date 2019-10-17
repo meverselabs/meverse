@@ -45,8 +45,9 @@ func NewTCPAsyncPeer(conn net.Conn, ID string, Name string, connectedTime int64)
 			if err := p.conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
 				return
 			}
-			_, err := p.conn.Write(binutil.LittleEndian.Uint32ToBytes(0))
+			_, err := p.conn.Write(binutil.LittleEndian.Uint16ToBytes(p.pingType))
 			if err != nil {
+				p.Unlock()
 				return
 			}
 			if atomic.AddUint64(&p.pingCount, 1) > pingCountLimit {
