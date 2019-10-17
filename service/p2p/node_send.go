@@ -29,7 +29,7 @@ func (nd *Node) broadcastMessage(Priority int, m interface{}) {
 func (nd *Node) limitCastMessage(Priority int, m interface{}) {
 	nd.sendChan <- &SendMessageItem{
 		Packet: MessageToPacket(m),
-		Limit:  3,
+		Limit:  5,
 	}
 }
 
@@ -37,7 +37,7 @@ func (nd *Node) exceptLimitCastMessage(Priority int, Target common.PublicHash, m
 	nd.sendChan <- &SendMessageItem{
 		Target: Target,
 		Packet: MessageToPacket(m),
-		Limit:  3,
+		Limit:  5,
 	}
 }
 
