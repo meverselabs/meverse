@@ -7,9 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fletaio/fleta/common/amount"
-	"github.com/fletaio/fleta/process/vault"
-
 	"github.com/bluele/gcache"
 
 	"github.com/fletaio/fleta/common"
@@ -70,11 +67,6 @@ type FormulatorNode struct {
 	isRunning      bool
 	closeLock      sync.RWMutex
 	isClose        bool
-
-	//TEMP
-	Txs      []types.Transaction
-	Sigs     []common.Signature
-	TxHashes []hash.Hash256
 }
 
 // NewFormulatorNode returns a FormulatorNode
@@ -109,45 +101,7 @@ func NewFormulatorNode(Config *FormulatorConfig, key key.Key, ndkey key.Key, Net
 	fr.txQ.AddGroup(3600 * time.Second)
 	fr.txQ.AddHandler(fr)
 	rlog.SetRLogAddress("fr:" + Config.Formulator.String())
-
-	fr.temp() // TEMP
 	return fr
-}
-
-func (fr *FormulatorNode) temp() {
-	fc := encoding.Factory("transaction")
-	t, err := fc.TypeOf(&vault.Transfer{})
-	if err != nil {
-		panic(err)
-	}
-	key, _ := key.NewMemoryKeyFromString("fd1167aad31c104c9fceb5b8a4ffd3e20a272af82176352d3b6ac236d02bafd4")
-	Txs := []types.Transaction{}
-	Sigs := []common.Signature{}
-	TxHashes := []hash.Hash256{}
-	for i := 0; i < 4; i++ {
-		for _, Addr := range fr.Config.Addrs {
-			tx := &vault.Transfer{
-				Timestamp_: uint64(time.Now().UnixNano()),
-				From_:      Addr,
-				To:         Addr,
-				Amount:     amount.NewCoinAmount(1, 0),
-			}
-			sig, err := key.Sign(chain.HashTransaction(fr.cs.cn.Provider().ChainID(), tx))
-			if err != nil {
-				panic(err)
-			}
-			TxHash := chain.HashTransactionByType(fr.cs.cn.Provider().ChainID(), t, tx)
-
-			Txs = append(Txs, tx)
-			Sigs = append(Sigs, sig)
-			TxHashes = append(TxHashes, TxHash)
-		}
-	}
-	if len(Txs) > 6000 {
-		fr.Txs = Txs[:6000]
-		fr.Sigs = Sigs[:6000]
-		fr.TxHashes = TxHashes[:6000]
-	}
 }
 
 // Close terminates the formulator

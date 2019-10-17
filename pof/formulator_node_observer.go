@@ -10,7 +10,6 @@ import (
 	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
-	"github.com/fletaio/fleta/process/vault"
 	"github.com/fletaio/fleta/service/p2p"
 	"github.com/fletaio/fleta/service/p2p/peer"
 )
@@ -373,13 +372,6 @@ func (fr *FormulatorNode) genBlock(p peer.Peer, msg *BlockReqMessage) error {
 		StartBlockTime = LastTimestamp + uint64(time.Millisecond)
 	}
 
-	fc := encoding.Factory("transaction")
-	t, err := fc.TypeOf(&vault.Transfer{})
-	if err != nil {
-		panic(err)
-	}
-	signer := common.MustParsePublicHash("2RqGkxiHZ4NopN9QxKgw93RuSrxX2NnLjv1q1aFDdV9")
-
 	var lastHeader *types.Header
 	ctx := fr.cs.cn.NewContext()
 	for i := uint32(0); i < RemainBlocks; i++ {
@@ -408,46 +400,35 @@ func (fr *FormulatorNode) genBlock(p peer.Peer, msg *BlockReqMessage) error {
 			return err
 		}
 
-		/*
-				timer := time.NewTimer(200 * time.Millisecond)
+		timer := time.NewTimer(200 * time.Millisecond)
 
-				rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockGenBegin", msg.TargetHeight)
+		rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockGenBegin", msg.TargetHeight)
 
-				fr.txpool.Lock() // Prevent delaying from TxPool.Push
-				Count := 0
-			TxLoop:
-				for {
-					select {
-					case <-timer.C:
-						break TxLoop
-					default:
-						sn := ctx.Snapshot()
-						item := fr.txpool.UnsafePop(ctx)
-						ctx.Revert(sn)
-						if item == nil {
-							break TxLoop
-						}
-						if err := bc.UnsafeAddTx(fr.Config.Formulator, item.TxType, item.TxHash, item.Transaction, item.Signatures, item.Signers); err != nil {
-							rlog.Println("UnsafeAddTx", err)
-							continue
-						}
-						Count++
-						if Count > fr.Config.MaxTransactionsPerBlock {
-							break TxLoop
-						}
-					}
+		fr.txpool.Lock() // Prevent delaying from TxPool.Push
+		Count := 0
+	TxLoop:
+		for {
+			select {
+			case <-timer.C:
+				break TxLoop
+			default:
+				sn := ctx.Snapshot()
+				item := fr.txpool.UnsafePop(ctx)
+				ctx.Revert(sn)
+				if item == nil {
+					break TxLoop
 				}
-				fr.txpool.Unlock() // Prevent delaying from TxPool.Push
-		*/
-
-		for i, tx := range fr.Txs {
-			TxHash := fr.TxHashes[i]
-			sig := fr.Sigs[i]
-			if err := bc.UnsafeAddTx(fr.Config.Formulator, t, TxHash, tx, []common.Signature{sig}, []common.PublicHash{signer}); err != nil {
-				rlog.Println(err)
-				continue
+				if err := bc.UnsafeAddTx(fr.Config.Formulator, item.TxType, item.TxHash, item.Transaction, item.Signatures, item.Signers); err != nil {
+					rlog.Println("UnsafeAddTx", err)
+					continue
+				}
+				Count++
+				if Count > fr.Config.MaxTransactionsPerBlock {
+					break TxLoop
+				}
 			}
 		}
+		fr.txpool.Unlock() // Prevent delaying from TxPool.Push
 
 		b, err := bc.Finalize(Timestamp)
 		if err != nil {

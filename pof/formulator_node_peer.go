@@ -175,24 +175,4 @@ func (fr *FormulatorNode) tryRequestBlocks() {
 			}
 		}
 	}
-
-	/*
-		var TargetPublicHash common.PublicHash
-		copy(TargetPublicHash[:], []byte(selectedPubHash))
-		enableCount := 0
-		for i := Height + 1; i <= Height+10 && i <= LimitHeight; i++ {
-			if !fr.requestTimer.Exist(i) {
-				enableCount++
-			}
-		}
-		if Height%10 == 0 && enableCount == 10 {
-			fr.sendRequestBlockToNode(TargetPublicHash, Height+1, 10)
-		} else {
-			for i := Height + 1; i <= Height+10 && i <= LimitHeight; i++ {
-				if !fr.requestTimer.Exist(i) {
-					fr.sendRequestBlockToNode(TargetPublicHash, i, 1)
-				}
-			}
-		}
-	*/
 }
