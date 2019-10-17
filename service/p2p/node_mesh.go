@@ -280,10 +280,6 @@ func (ms *NodeMesh) client(Address string, TargetPubHash common.PublicHash) erro
 		return ErrSelfConnection
 	}
 	if pubhash != TargetPubHash {
-		ms.nodePoolManager.RemovePeer(string(TargetPubHash[:]))
-		ms.nodePoolManager.RemovePeer(string(pubhash[:]))
-		ms.nodePoolManager.Ban(string(TargetPubHash[:]))
-		ms.nodePoolManager.Ban(string(pubhash[:]))
 		return common.ErrInvalidPublicHash
 	}
 	//duration := time.Since(start)
