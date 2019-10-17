@@ -1,7 +1,6 @@
 package pof
 
 import (
-	"log"
 	"time"
 
 	"github.com/fletaio/fleta/common"
@@ -86,7 +85,7 @@ func (fr *FormulatorNode) broadcastStatus() error {
 }
 
 func (fr *FormulatorNode) sendRequestBlockTo(TargetID string, Height uint32, Count uint8) error {
-	log.Println("sendRequestBlockTo", Height, Count)
+	//log.Println("sendRequestBlockTo", Height, Count)
 
 	nm := &p2p.RequestMessage{
 		Height: Height,
@@ -103,7 +102,7 @@ func (fr *FormulatorNode) sendRequestBlockToNode(TargetPubHash common.PublicHash
 	if TargetPubHash == fr.myPublicHash {
 		return nil
 	}
-	log.Println("sendRequestBlockToNode", TargetPubHash.String(), Height, Count)
+	//log.Println("sendRequestBlockToNode", TargetPubHash.String(), Height, Count)
 
 	nm := &p2p.RequestMessage{
 		Height: Height,

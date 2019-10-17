@@ -321,7 +321,7 @@ func (fr *FormulatorNode) updateByGenItem() {
 			}
 			return
 		}
-		log.Println("updateByGenItem", TargetHeight, item.BlockGen != nil, item.ObSign != nil, item.Context != nil)
+		//log.Println("updateByGenItem", TargetHeight, item.BlockGen != nil, item.ObSign != nil, item.Context != nil)
 
 		b := &types.Block{
 			Header:                item.BlockGen.Block.Header,
