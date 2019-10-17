@@ -253,7 +253,6 @@ func (cn *Chain) ConnectBlock(b *types.Block) error {
 
 	ctx := types.NewContext(cn.store)
 	if err := cn.executeBlockOnContext(b, ctx); err != nil {
-		//if err := cn.executeBlockOnContextWithoutValidate(b, ctx); err != nil {
 		return err
 	}
 	return cn.connectBlockWithContext(b, ctx)
