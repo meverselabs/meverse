@@ -172,11 +172,11 @@ func MessageToPacket(m interface{}) []byte {
 }
 
 func PacketMessageType(bs []byte) uint16 {
-	return binutil.LittleEndian.Uint16(bs[4:])
+	return binutil.LittleEndian.Uint16(bs)
 }
 
 func PacketToMessage(bs []byte) (interface{}, error) {
-	t := binutil.LittleEndian.Uint16(bs)
+	t := PacketMessageType(bs)
 	compressed := true
 
 	var mbs []byte
