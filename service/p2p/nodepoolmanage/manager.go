@@ -2,9 +2,7 @@ package nodepoolmanage
 
 import (
 	"errors"
-	"fmt"
 	"log"
-	"sort"
 	"sync"
 	"time"
 
@@ -24,6 +22,9 @@ type Manager interface {
 	NewNode(addr string, hash string, ping time.Duration) error
 	AddPeerList(ips []string, hashs []string)
 	GetPeerList() (ips []string, hashs []string)
+	RemovePeer(hash string)
+	Ban(hash string)
+	Unban(Hash string)
 }
 
 type nodeMesh interface {
@@ -41,7 +42,7 @@ type nodePoolManage struct {
 	requestRotateIndex int
 	peerStorage        storage.PeerStorage
 	nodeMesh           nodeMesh
-	BanPeerInfos       *ByTime
+	BanPeerInfos       *BanAlways
 	myPublicHash       common.PublicHash
 
 	putPeerListLock sync.Mutex
@@ -65,7 +66,7 @@ func NewNodePoolManage(StorePath string, nodeMesh nodeMesh, pubhash common.Publi
 		nodes:        ns,
 		nodeMesh:     nodeMesh,
 		myPublicHash: pubhash,
-		BanPeerInfos: NewByTime(),
+		BanPeerInfos: NewBanAlways(),
 	}
 	pm.peerStorage = storage.NewPeerStorage(pm.checkClosePeer)
 	go pm.rotatePeer()
@@ -103,6 +104,10 @@ func (pm *nodePoolManage) GetPeerList() ([]string, []string) {
 	})
 
 	return ips, hashs
+}
+
+func (pm *nodePoolManage) RemovePeer(hash string) {
+	pm.nodes.Delete(hash)
 }
 
 func (pm *nodePoolManage) AddPeerList(ips []string, hashs []string) {
@@ -162,9 +167,9 @@ func (pm *nodePoolManage) appendPeerStorage() {
 			pm.addConnectedConn(p)
 			continue
 		}
-		var ph common.PublicHash
-		copy(ph[:], []byte(p.Hash))
-		if ph != pm.myPublicHash {
+		if !pm.BanPeerInfos.IsBan(p.Hash) {
+			var ph common.PublicHash
+			copy(ph[:], []byte(p.Hash))
 			pm.nodeMesh.RequestConnect(p.Address, ph)
 		}
 		break
@@ -199,99 +204,31 @@ func (pm *nodePoolManage) kickOutPeerStorage() {
 	}
 }
 
-// BanPeerInfo is a banned peer information
-type BanPeerInfo struct {
-	Hash     string
-	Timeout  int64
-	OverTime int64
+// BanAlways implements sort.Interface for []BanPeerInfo on the Timeout field.
+type BanAlways struct {
+	Map map[string]bool
 }
 
-func (p BanPeerInfo) String() string {
-	return fmt.Sprintf("%s Ban over %d", p.Hash, p.OverTime)
-}
-
-// ByTime implements sort.Interface for []BanPeerInfo on the Timeout field.
-type ByTime struct {
-	Arr []*BanPeerInfo
-	Map map[string]*BanPeerInfo
-}
-
-func NewByTime() *ByTime {
-	return &ByTime{
-		Arr: []*BanPeerInfo{},
-		Map: map[string]*BanPeerInfo{},
+func NewBanAlways() *BanAlways {
+	return &BanAlways{
+		Map: map[string]bool{},
 	}
 }
 
-func (a *ByTime) Len() int           { return len(a.Arr) }
-func (a *ByTime) Swap(i, j int)      { a.Arr[i], a.Arr[j] = a.Arr[j], a.Arr[i] }
-func (a *ByTime) Less(i, j int) bool { return a.Arr[i].Timeout < a.Arr[j].Timeout }
-
-func (a *ByTime) Add(Hash string, Seconds int64) {
-	b, has := a.Map[Hash]
-	if !has {
-		b = &BanPeerInfo{
-			Hash:     Hash,
-			Timeout:  time.Now().UnixNano() + (int64(time.Second) * Seconds),
-			OverTime: Seconds,
-		}
-		a.Arr = append(a.Arr, b)
-		a.Map[Hash] = b
-	} else {
-		b.Timeout = Seconds
-	}
-	sort.Sort(a)
+func (a *BanAlways) Add(Hash string) {
+	a.Map[Hash] = true
 }
 
-func (a *ByTime) Delete(Hash string) {
-	i := a.Search(Hash)
-	if i < 0 {
-		return
-	}
-
-	b := a.Arr[i]
-	a.Arr = append(a.Arr[:i], a.Arr[i+1:]...)
-	delete(a.Map, b.Hash)
+func (a *BanAlways) Delete(Hash string) {
+	delete(a.Map, Hash)
 }
 
-func (a *ByTime) Search(Hash string) int {
-	b, has := a.Map[Hash]
-	if !has {
-		return -1
-	}
-
-	i, j := 0, len(a.Arr)
-	for i < j {
-		h := int(uint(i+j) >> 1) // avoid overflow when computing h
-		// i ≤ h < j
-		if !(a.Arr[h].Timeout >= b.Timeout) {
-			i = h + 1 // preserves f(i-1) == false
-		} else {
-			j = h // preserves f(j) == true
-		}
-	}
-	// i == j, f(i-1) == false, and f(j) (= f(i)) == true  =>  answer is i.
-	return i
+func (a *BanAlways) IsBan(hash string) bool {
+	return a.Map[hash]
 }
 
-func (a *ByTime) IsBan(netAddr string) bool {
-	now := time.Now().UnixNano()
-	var slicePivot = 0
-	for i, b := range a.Arr {
-		if now < b.Timeout {
-			slicePivot = i
-			break
-		}
-		delete(a.Map, a.Arr[i].Hash)
-	}
-
-	a.Arr = a.Arr[slicePivot:]
-	_, has := a.Map[netAddr]
-	return has
-}
-
-func (pm *nodePoolManage) Ban(hash string, Seconds uint32) {
-	pm.BanPeerInfos.Add(hash, int64(Seconds))
+func (pm *nodePoolManage) Ban(hash string) {
+	pm.BanPeerInfos.Add(hash)
 	pm.nodeMesh.RemovePeer(hash)
 }
 

@@ -110,6 +110,10 @@ func (p *TCPPeer) ReadPacket() ([]byte, error) {
 
 // SendPacket sends packet to the WebsocketPeer
 func (p *TCPPeer) SendPacket(bs []byte) {
+	if p.isClose {
+		return
+	}
+
 	p.Lock()
 	defer p.Unlock()
 

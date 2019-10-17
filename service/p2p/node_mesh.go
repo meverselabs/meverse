@@ -2,6 +2,7 @@ package p2p
 
 import (
 	crand "crypto/rand"
+	"log"
 	"net"
 	"sync"
 	"time"
@@ -53,6 +54,7 @@ func NewNodeMesh(ChainID uint8, key key.Key, SeedNodeMap map[common.PublicHash]s
 		panic(err)
 	}
 	ms.nodePoolManager = manager
+	ms.nodePoolManager.Ban(string(ms.myPublicHash[:]))
 
 	for PubHash, v := range SeedNodeMap {
 		ms.nodeSet[PubHash] = v
@@ -249,7 +251,10 @@ func (ms *NodeMesh) AddPeerList(ips []string, hashs []string) {
 }
 
 func (ms *NodeMesh) client(Address string, TargetPubHash common.PublicHash) error {
+	log.Println("ConnectingTo", Address, TargetPubHash.String())
+
 	if TargetPubHash == ms.myPublicHash {
+		ms.nodePoolManager.Ban(string(TargetPubHash[:]))
 		return ErrSelfConnection
 	}
 
@@ -257,9 +262,7 @@ func (ms *NodeMesh) client(Address string, TargetPubHash common.PublicHash) erro
 	if err != nil {
 		return err
 	}
-	defer func(addr string) {
-		conn.Close()
-	}(Address)
+	defer conn.Close()
 
 	start := time.Now()
 	if err := ms.recvHandshake(conn); err != nil {
@@ -272,9 +275,15 @@ func (ms *NodeMesh) client(Address string, TargetPubHash common.PublicHash) erro
 		return err
 	}
 	if pubhash == ms.myPublicHash {
+		ms.nodePoolManager.Ban(string(TargetPubHash[:]))
+		ms.nodePoolManager.Ban(string(pubhash[:]))
 		return ErrSelfConnection
 	}
 	if pubhash != TargetPubHash {
+		ms.nodePoolManager.RemovePeer(string(TargetPubHash[:]))
+		ms.nodePoolManager.RemovePeer(string(pubhash[:]))
+		ms.nodePoolManager.Ban(string(TargetPubHash[:]))
+		ms.nodePoolManager.Ban(string(pubhash[:]))
 		return common.ErrInvalidPublicHash
 	}
 	//duration := time.Since(start)
@@ -324,6 +333,8 @@ func (ms *NodeMesh) server(BindAddress string) error {
 				return
 			}
 			if pubhash == ms.myPublicHash {
+				ms.nodePoolManager.RemovePeer(string(pubhash[:]))
+				ms.nodePoolManager.Ban(string(pubhash[:]))
 				return
 			}
 			if err := ms.recvHandshake(conn); err != nil {
@@ -340,6 +351,8 @@ func (ms *NodeMesh) server(BindAddress string) error {
 			ID := string(pubhash[:])
 			//ms.nodePoolManager.NewNode(ipAddress, ID, duration)
 			p := NewTCPPeer(conn, ID, pubhash.String(), start.UnixNano())
+
+			log.Println("ConnectedFrom", pubhash.String())
 
 			ms.Lock()
 			old, has := ms.serverPeerMap[ID]

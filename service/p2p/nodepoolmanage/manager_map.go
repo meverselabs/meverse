@@ -151,13 +151,13 @@ func (n *nodeStore) Load(key string) (p peermessage.ConnectInfo, has bool) {
 	return
 }
 
-// // Delete deletes the value for a key.
-// func (n *nodeStore) Delete(key string) {
-// 	n.l.Lock()
-// 	defer n.l.Unlock()
+// Delete deletes the value for a key.
+func (n *nodeStore) Delete(key string) {
+	n.l.Lock()
+	defer n.l.Unlock()
 
-// 	delete(n.m, key)
-// }
+	delete(n.m, key)
+}
 
 // Range calls f sequentially for each key and value present in the map.
 // If f returns false, range stops the iteration.
