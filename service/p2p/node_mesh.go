@@ -3,7 +3,9 @@ package p2p
 import (
 	crand "crypto/rand"
 	"log"
+	"math/rand"
 	"net"
+	"sort"
 	"sync"
 	"time"
 
@@ -27,27 +29,32 @@ type Handler interface {
 // NodeMesh is a mesh for networking between nodes
 type NodeMesh struct {
 	sync.Mutex
-	BindAddress     string
-	chainID         uint8
-	key             key.Key
-	handler         Handler
-	myPublicHash    common.PublicHash
-	nodeSet         map[common.PublicHash]string
-	clientPeerMap   map[string]peer.Peer
-	serverPeerMap   map[string]peer.Peer
-	nodePoolManager nodepoolmanage.Manager
+	BindAddress      string
+	chainID          uint8
+	key              key.Key
+	handler          Handler
+	myPublicHash     common.PublicHash
+	nodeSet          map[common.PublicHash]string
+	peerIDs          []string
+	clientPeerMap    map[string]peer.Peer
+	serverPeerMap    map[string]peer.Peer
+	nodePoolManager  nodepoolmanage.Manager
+	limitCastIndexes []int
+	limitCastHead    int
 }
 
 // NewNodeMesh returns a NodeMesh
 func NewNodeMesh(ChainID uint8, key key.Key, SeedNodeMap map[common.PublicHash]string, handler Handler, peerStorePath string) *NodeMesh {
 	ms := &NodeMesh{
-		chainID:       ChainID,
-		key:           key,
-		handler:       handler,
-		myPublicHash:  common.NewPublicHash(key.PublicKey()),
-		nodeSet:       map[common.PublicHash]string{},
-		clientPeerMap: map[string]peer.Peer{},
-		serverPeerMap: map[string]peer.Peer{},
+		chainID:          ChainID,
+		key:              key,
+		handler:          handler,
+		myPublicHash:     common.NewPublicHash(key.PublicKey()),
+		nodeSet:          map[common.PublicHash]string{},
+		peerIDs:          []string{},
+		clientPeerMap:    map[string]peer.Peer{},
+		serverPeerMap:    map[string]peer.Peer{},
+		limitCastIndexes: rand.Perm(2000),
 	}
 	manager, err := nodepoolmanage.NewNodePoolManage(peerStorePath, ms, ms.myPublicHash)
 	if err != nil {
@@ -124,6 +131,9 @@ func (ms *NodeMesh) RemovePeer(ID string) {
 	if hasServer {
 		delete(ms.serverPeerMap, ID)
 	}
+	if hasClient || hasServer {
+		ms.updatePeerIDs()
+	}
 	ms.Unlock()
 
 	if hasClient {
@@ -134,11 +144,28 @@ func (ms *NodeMesh) RemovePeer(ID string) {
 	}
 }
 
+func (ms *NodeMesh) updatePeerIDs() {
+	peerIDMap := map[string]bool{}
+	for _, p := range ms.clientPeerMap {
+		peerIDMap[p.ID()] = true
+	}
+	for _, p := range ms.serverPeerMap {
+		peerIDMap[p.ID()] = true
+	}
+	peerIDs := []string{}
+	for k := range peerIDMap {
+		peerIDs = append(peerIDs, k)
+	}
+	sort.Strings(peerIDs)
+	ms.peerIDs = peerIDs
+}
+
 func (ms *NodeMesh) removePeerInMap(ID string, peerMap map[string]peer.Peer) {
 	ms.Lock()
 	p, has := ms.clientPeerMap[ID]
 	if has {
 		delete(ms.clientPeerMap, ID)
+		ms.updatePeerIDs()
 	}
 	ms.Unlock()
 
@@ -181,27 +208,35 @@ func (ms *NodeMesh) SendTo(pubhash common.PublicHash, bs []byte) {
 // ExceptCastLimit sends a message within the given number except the peer
 func (ms *NodeMesh) ExceptCastLimit(ID string, bs []byte, Limit int) {
 	peerMap := map[string]peer.Peer{}
+
 	ms.Lock()
 	for _, p := range ms.clientPeerMap {
-		if len(peerMap) >= Limit {
-			break
-		}
 		if p.ID() != ID {
 			peerMap[p.ID()] = p
 		}
 	}
 	for _, p := range ms.serverPeerMap {
-		if len(peerMap) >= Limit {
-			break
-		}
 		if p.ID() != ID {
 			peerMap[p.ID()] = p
 		}
 	}
 	ms.Unlock()
 
-	for _, p := range peerMap {
-		p.SendPacket(bs)
+	if len(peerMap) <= Limit {
+		for _, p := range peerMap {
+			p.SendPacket(bs)
+		}
+	} else {
+		Remain := Limit
+		for len(peerMap) > 0 && Remain > 0 {
+			id := ms.peerIDs[ms.limitCastIndexes[ms.limitCastHead]%len(ms.peerIDs)]
+			ms.limitCastHead = (ms.limitCastHead + 1) % len(ms.limitCastIndexes)
+			if p, has := peerMap[id]; has {
+				p.SendPacket(bs)
+				delete(peerMap, id)
+				Remain--
+			}
+		}
 	}
 }
 
@@ -296,6 +331,9 @@ func (ms *NodeMesh) client(Address string, TargetPubHash common.PublicHash) erro
 	ms.Lock()
 	old, has := ms.clientPeerMap[ID]
 	ms.clientPeerMap[ID] = p
+	if !has {
+		ms.updatePeerIDs()
+	}
 	ms.Unlock()
 	if has {
 		ms.removePeerInMap(old.ID(), ms.clientPeerMap)
@@ -353,6 +391,9 @@ func (ms *NodeMesh) server(BindAddress string) error {
 			ms.Lock()
 			old, has := ms.serverPeerMap[ID]
 			ms.serverPeerMap[ID] = p
+			if !has {
+				ms.updatePeerIDs()
+			}
 			ms.Unlock()
 			if has {
 				ms.removePeerInMap(old.ID(), ms.serverPeerMap)
