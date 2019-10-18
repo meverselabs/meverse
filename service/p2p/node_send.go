@@ -85,7 +85,7 @@ func (nd *Node) sendRequestBlockTo(TargetPubHash common.PublicHash, Height uint3
 	}
 	nd.sendMessage(0, TargetPubHash, nm)
 	for i := uint32(0); i < uint32(Count); i++ {
-		nd.requestTimer.Add(Height+i, 10*time.Second, string(TargetPubHash[:]))
+		nd.requestTimer.Add(Height+i, 2*time.Second, string(TargetPubHash[:]))
 	}
 	return nil
 }
