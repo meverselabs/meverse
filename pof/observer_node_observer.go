@@ -222,6 +222,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 			if MinRoundVoteAck != nil {
 				ob.round.RoundState = BlockWaitState
 				ob.round.MinRoundVoteAck = MinRoundVoteAck
+				ob.round.VoteFailCount = 0
 				RemainBlocks := ob.cs.maxBlocksPerFormulator
 				if MinRoundVoteAck.TimeoutCount == 0 {
 					RemainBlocks = ob.cs.maxBlocksPerFormulator - ob.cs.blocksBySameFormulator
