@@ -109,7 +109,7 @@ func (fr *FormulatorNode) sendRequestBlockToNode(TargetPubHash common.PublicHash
 	}
 	fr.sendMessage(0, TargetPubHash, nm)
 	for i := uint32(0); i < uint32(Count); i++ {
-		fr.requestTimer.Add(Height+i, 10*time.Second, string(TargetPubHash[:]))
+		fr.requestTimer.Add(Height+i, 2*time.Second, string(TargetPubHash[:]))
 	}
 	return nil
 }
