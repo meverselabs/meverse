@@ -98,7 +98,7 @@ func (nd *Node) Close() {
 // OnItemExpired is called when the item is expired
 func (nd *Node) OnItemExpired(Interval time.Duration, Key string, Item interface{}, IsLast bool) {
 	msg := Item.(*TransactionMessage)
-	nd.limitCastMessage(1, msg)
+	nd.broadcastMessage(1, msg)
 	if IsLast {
 		var TxHash hash.Hash256
 		copy(TxHash[:], []byte(Key))
@@ -147,9 +147,9 @@ func (nd *Node) Run(BindAddress string) {
 					if len(item.PeerID) > 0 {
 						var SenderPublicHash common.PublicHash
 						copy(SenderPublicHash[:], []byte(item.PeerID))
-						nd.exceptLimitCastMessage(1, SenderPublicHash, item.Message)
+						nd.exceptCastMessage(1, SenderPublicHash, item.Message)
 					} else {
-						nd.limitCastMessage(1, item.Message)
+						nd.broadcastMessage(1, item.Message)
 					}
 
 					Count++
@@ -191,14 +191,10 @@ func (nd *Node) Run(BindAddress string) {
 				}
 				var EmptyHash common.PublicHash
 				if bytes.Equal(item.Target[:], EmptyHash[:]) {
-					if item.Limit > 0 {
-						nd.ms.ExceptCastLimit("", item.Packet, item.Limit)
-					} else {
-						nd.ms.BroadcastPacket(item.Packet)
-					}
+					nd.ms.BroadcastPacket(item.Packet)
 				} else {
-					if item.Limit > 0 {
-						nd.ms.ExceptCastLimit(string(item.Target[:]), item.Packet, item.Limit)
+					if item.Except {
+						nd.ms.ExceptCast(string(item.Target[:]), item.Packet)
 					} else {
 						nd.ms.SendTo(item.Target, item.Packet)
 					}
@@ -481,8 +477,7 @@ func (nd *Node) addTx(TxHash hash.Hash256, t uint16, tx types.Transaction, sigs 
 	if err != nil {
 		return err
 	}
-	ctx := nd.cn.NewContext()
-	ctw := types.NewContextWrapper(pid, ctx)
+	ctw := nd.cn.Provider().NewLoaderWrapper(pid)
 	if err := tx.Validate(p, ctw, signers); err != nil {
 		return err
 	}

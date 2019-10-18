@@ -173,9 +173,9 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 					if len(item.PeerID) > 0 {
 						var SenderPublicHash common.PublicHash
 						copy(SenderPublicHash[:], []byte(item.PeerID))
-						fr.exceptLimitCastMessage(1, SenderPublicHash, item.Message)
+						fr.exceptCastMessage(1, SenderPublicHash, item.Message)
 					} else {
-						fr.limitCastMessage(1, item.Message)
+						fr.broadcastMessage(1, item.Message)
 					}
 
 					Count++
@@ -217,14 +217,10 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 				}
 				var EmptyHash common.PublicHash
 				if bytes.Equal(item.Target[:], EmptyHash[:]) {
-					if item.Limit > 0 {
-						fr.nm.ExceptCastLimit("", item.Packet, item.Limit)
-					} else {
-						fr.nm.BroadcastPacket(item.Packet)
-					}
+					fr.nm.BroadcastPacket(item.Packet)
 				} else {
-					if item.Limit > 0 {
-						fr.nm.ExceptCastLimit(string(item.Target[:]), item.Packet, item.Limit)
+					if item.Except {
+						fr.nm.ExceptCast(string(item.Target[:]), item.Packet)
 					} else {
 						fr.nm.SendTo(item.Target, item.Packet)
 					}
@@ -373,7 +369,7 @@ func (fr *FormulatorNode) OnTimerExpired(height uint32, value string) {
 // OnItemExpired is called when the item is expired
 func (fr *FormulatorNode) OnItemExpired(Interval time.Duration, Key string, Item interface{}, IsLast bool) {
 	msg := Item.(*p2p.TransactionMessage)
-	fr.limitCastMessage(1, msg)
+	fr.broadcastMessage(1, msg)
 	if IsLast {
 		var TxHash hash.Hash256
 		copy(TxHash[:], []byte(Key))

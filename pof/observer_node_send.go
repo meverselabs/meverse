@@ -11,6 +11,10 @@ import (
 )
 
 func (ob *ObserverNode) sendMessage(Priority int, Address common.Address, m interface{}) {
+	if _, is := m.([]byte); is {
+		panic("")
+	}
+
 	ob.sendChan <- &p2p.SendMessageItem{
 		Address: Address,
 		Packet:  p2p.MessageToPacket(m),

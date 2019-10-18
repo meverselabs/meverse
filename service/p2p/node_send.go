@@ -7,6 +7,10 @@ import (
 )
 
 func (nd *Node) sendMessage(Priority int, Target common.PublicHash, m interface{}) {
+	if _, is := m.([]byte); is {
+		panic("")
+	}
+
 	nd.sendChan <- &SendMessageItem{
 		Target: Target,
 		Packet: MessageToPacket(m),
@@ -21,23 +25,24 @@ func (nd *Node) sendMessagePacket(Priority int, Target common.PublicHash, bs []b
 }
 
 func (nd *Node) broadcastMessage(Priority int, m interface{}) {
+	if _, is := m.([]byte); is {
+		panic("")
+	}
+
 	nd.sendChan <- &SendMessageItem{
 		Packet: MessageToPacket(m),
 	}
 }
 
-func (nd *Node) limitCastMessage(Priority int, m interface{}) {
-	nd.sendChan <- &SendMessageItem{
-		Packet: MessageToPacket(m),
-		Limit:  5,
+func (nd *Node) exceptCastMessage(Priority int, Target common.PublicHash, m interface{}) {
+	if _, is := m.([]byte); is {
+		panic("")
 	}
-}
 
-func (nd *Node) exceptLimitCastMessage(Priority int, Target common.PublicHash, m interface{}) {
 	nd.sendChan <- &SendMessageItem{
 		Target: Target,
 		Packet: MessageToPacket(m),
-		Limit:  5,
+		Except: true,
 	}
 }
 

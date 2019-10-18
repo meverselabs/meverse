@@ -25,24 +25,23 @@ func (fr *FormulatorNode) sendMessagePacket(Priority int, Target common.PublicHa
 	}
 }
 
-func (fr *FormulatorNode) broadcastMessagePacket(Priority int, bs []byte) {
-	fr.sendChan <- &p2p.SendMessageItem{
-		Packet: bs,
-	}
-}
-
-func (fr *FormulatorNode) limitCastMessage(Priority int, m interface{}) {
+func (fr *FormulatorNode) broadcastMessage(Priority int, m interface{}) {
 	if _, is := m.([]byte); is {
 		panic("")
 	}
 
 	fr.sendChan <- &p2p.SendMessageItem{
 		Packet: p2p.MessageToPacket(m),
-		Limit:  5,
 	}
 }
 
-func (fr *FormulatorNode) exceptLimitCastMessage(Priority int, Target common.PublicHash, m interface{}) {
+func (fr *FormulatorNode) broadcastMessagePacket(Priority int, bs []byte) {
+	fr.sendChan <- &p2p.SendMessageItem{
+		Packet: bs,
+	}
+}
+
+func (fr *FormulatorNode) exceptCastMessage(Priority int, Target common.PublicHash, m interface{}) {
 	if _, is := m.([]byte); is {
 		panic("")
 	}
@@ -50,7 +49,7 @@ func (fr *FormulatorNode) exceptLimitCastMessage(Priority int, Target common.Pub
 	fr.sendChan <- &p2p.SendMessageItem{
 		Target: Target,
 		Packet: p2p.MessageToPacket(m),
-		Limit:  5,
+		Except: true,
 	}
 }
 

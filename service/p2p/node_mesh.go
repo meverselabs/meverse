@@ -3,7 +3,6 @@ package p2p
 import (
 	crand "crypto/rand"
 	"log"
-	"math/rand"
 	"net"
 	"sort"
 	"sync"
@@ -29,32 +28,29 @@ type Handler interface {
 // NodeMesh is a mesh for networking between nodes
 type NodeMesh struct {
 	sync.Mutex
-	BindAddress      string
-	chainID          uint8
-	key              key.Key
-	handler          Handler
-	myPublicHash     common.PublicHash
-	nodeSet          map[common.PublicHash]string
-	peerIDs          []string
-	clientPeerMap    map[string]peer.Peer
-	serverPeerMap    map[string]peer.Peer
-	nodePoolManager  nodepoolmanage.Manager
-	limitCastIndexes []int
-	limitCastHead    int
+	BindAddress     string
+	chainID         uint8
+	key             key.Key
+	handler         Handler
+	myPublicHash    common.PublicHash
+	nodeSet         map[common.PublicHash]string
+	peerIDs         []string
+	clientPeerMap   map[string]peer.Peer
+	serverPeerMap   map[string]peer.Peer
+	nodePoolManager nodepoolmanage.Manager
 }
 
 // NewNodeMesh returns a NodeMesh
 func NewNodeMesh(ChainID uint8, key key.Key, SeedNodeMap map[common.PublicHash]string, handler Handler, peerStorePath string) *NodeMesh {
 	ms := &NodeMesh{
-		chainID:          ChainID,
-		key:              key,
-		handler:          handler,
-		myPublicHash:     common.NewPublicHash(key.PublicKey()),
-		nodeSet:          map[common.PublicHash]string{},
-		peerIDs:          []string{},
-		clientPeerMap:    map[string]peer.Peer{},
-		serverPeerMap:    map[string]peer.Peer{},
-		limitCastIndexes: rand.Perm(2000),
+		chainID:       ChainID,
+		key:           key,
+		handler:       handler,
+		myPublicHash:  common.NewPublicHash(key.PublicKey()),
+		nodeSet:       map[common.PublicHash]string{},
+		peerIDs:       []string{},
+		clientPeerMap: map[string]peer.Peer{},
+		serverPeerMap: map[string]peer.Peer{},
 	}
 	manager, err := nodepoolmanage.NewNodePoolManage(peerStorePath, ms, ms.myPublicHash)
 	if err != nil {
@@ -205,8 +201,8 @@ func (ms *NodeMesh) SendTo(pubhash common.PublicHash, bs []byte) {
 	}
 }
 
-// ExceptCastLimit sends a message within the given number except the peer
-func (ms *NodeMesh) ExceptCastLimit(ID string, bs []byte, Limit int) {
+// ExceptCast sends a message except the peer
+func (ms *NodeMesh) ExceptCast(ID string, bs []byte) {
 	peerMap := map[string]peer.Peer{}
 
 	ms.Lock()
@@ -222,21 +218,8 @@ func (ms *NodeMesh) ExceptCastLimit(ID string, bs []byte, Limit int) {
 	}
 	ms.Unlock()
 
-	if len(peerMap) <= Limit {
-		for _, p := range peerMap {
-			p.SendPacket(bs)
-		}
-	} else {
-		Remain := Limit
-		for len(peerMap) > 0 && Remain > 0 {
-			id := ms.peerIDs[ms.limitCastIndexes[ms.limitCastHead]%len(ms.peerIDs)]
-			ms.limitCastHead = (ms.limitCastHead + 1) % len(ms.limitCastIndexes)
-			if p, has := peerMap[id]; has {
-				p.SendPacket(bs)
-				delete(peerMap, id)
-				Remain--
-			}
-		}
+	for _, p := range peerMap {
+		p.SendPacket(bs)
 	}
 }
 
