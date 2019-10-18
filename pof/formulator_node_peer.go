@@ -6,7 +6,6 @@ import (
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/rlog"
 	"github.com/fletaio/fleta/core/chain"
-	"github.com/fletaio/fleta/core/txpool"
 	"github.com/fletaio/fleta/service/p2p"
 	"github.com/fletaio/fleta/service/p2p/peer"
 )
@@ -127,15 +126,30 @@ func (fr *FormulatorNode) handlePeerMessage(ID string, m interface{}) error {
 			fr.statusLock.Unlock()
 		}
 	case *p2p.TransactionMessage:
-		if fr.txWaitQ.Size() > 200000 {
-			return txpool.ErrTransactionPoolOverflowed
+		//log.Println("Recv.TransactionMessage", fr.txWaitQ.Size(), fr.txpool.Size())
+		/*
+			if fr.txWaitQ.Size() > 200000 {
+				return txpool.ErrTransactionPoolOverflowed
+			}
+		*/
+		if len(msg.Types) > 5000 {
+			return p2p.ErrTooManyTrasactionInMessage
 		}
-		TxHash := chain.HashTransactionByType(fr.cs.cn.Provider().ChainID(), msg.TxType, msg.Tx)
-		fr.txWaitQ.Push(TxHash, &p2p.TxMsgItem{
-			TxHash:  TxHash,
-			Message: msg,
-			PeerID:  ID,
-		})
+		ChainID := fr.cs.cn.Provider().ChainID()
+		for i, t := range msg.Types {
+			tx := msg.Txs[i]
+			sigs := msg.Signatures[i]
+			TxHash := chain.HashTransactionByType(ChainID, t, tx)
+			if !fr.txpool.IsExist(TxHash) {
+				fr.txWaitQ.Push(TxHash, &p2p.TxMsgItem{
+					TxHash: TxHash,
+					Type:   t,
+					Tx:     tx,
+					Sigs:   sigs,
+					PeerID: ID,
+				})
+			}
+		}
 		return nil
 	case *p2p.PeerListMessage:
 		fr.nm.AddPeerList(msg.Ips, msg.Hashs)

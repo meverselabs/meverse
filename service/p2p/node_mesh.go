@@ -97,6 +97,13 @@ func (ms *NodeMesh) Run(BindAddress string) {
 	}
 }
 
+func (ms *NodeMesh) HasPeer() bool {
+	ms.Lock()
+	defer ms.Unlock()
+
+	return len(ms.clientPeerMap) > 0 || len(ms.serverPeerMap) > 0
+}
+
 // Peers returns peers of the node mesh
 func (ms *NodeMesh) Peers() []peer.Peer {
 	peerMap := map[string]peer.Peer{}

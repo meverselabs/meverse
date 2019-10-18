@@ -3,6 +3,7 @@ package p2p
 import (
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
+	"github.com/fletaio/fleta/core/types"
 )
 
 // Status represents the status of the peer
@@ -12,10 +13,12 @@ type Status struct {
 
 // TxMsgItem used to store transaction message
 type TxMsgItem struct {
-	TxHash  hash.Hash256
-	Message *TransactionMessage
-	PeerID  string
-	ErrCh   *chan error
+	TxHash hash.Hash256
+	Type   uint16
+	Tx     types.Transaction
+	Sigs   []common.Signature
+	PeerID string
+	ErrCh  *chan error
 }
 
 // RecvMessageItem used to store recv message

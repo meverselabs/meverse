@@ -362,6 +362,9 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error
 				ctw.Revert(sn)
 				return err
 			}
+			if 1 != b.TransactionResults[i] {
+				return ErrInvalidResult
+			}
 		}
 		if Has, err := ctw.HasAccount(b.Header.Generator); err != nil {
 			ctw.Revert(sn)

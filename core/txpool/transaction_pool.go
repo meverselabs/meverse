@@ -63,7 +63,7 @@ func (tp *TransactionPool) Size() int {
 // Push inserts the transaction and signatures of it by base model and sequence
 // An UTXO model based transaction will be handled by FIFO
 // An account model based transaction will be sorted by the sequence value
-func (tp *TransactionPool) Push(ChainID uint8, t uint16, TxHash hash.Hash256, tx types.Transaction, sigs []common.Signature, signers []common.PublicHash) error {
+func (tp *TransactionPool) Push(t uint16, TxHash hash.Hash256, tx types.Transaction, sigs []common.Signature, signers []common.PublicHash) error {
 	tp.Lock()
 	defer tp.Unlock()
 
@@ -72,7 +72,6 @@ func (tp *TransactionPool) Push(ChainID uint8, t uint16, TxHash hash.Hash256, tx
 	}
 
 	item := &PoolItem{
-		ChainID:     ChainID,
 		TxType:      t,
 		TxHash:      TxHash,
 		Transaction: tx,
@@ -81,8 +80,11 @@ func (tp *TransactionPool) Push(ChainID uint8, t uint16, TxHash hash.Hash256, tx
 	}
 	atx, is := tx.(chain.AccountTransaction)
 	if !is {
-		tp.utxoQ.Push(TxHash, item)
-		tp.turnQ.Push(true)
+		if tp.utxoQ.Push(TxHash, item) {
+			tp.turnQ.Push(true)
+		} else {
+			return ErrExistTransaction
+		}
 	} else {
 		addr := atx.From()
 		q, has := tp.bucketMap[addr]
@@ -106,14 +108,15 @@ func (tp *TransactionPool) Remove(TxHash hash.Hash256, t types.Transaction) {
 	tp.Lock()
 	defer tp.Unlock()
 
-	tx, is := t.(chain.AccountTransaction)
-	if !is {
+	if tx, is := t.(chain.AccountTransaction); !is {
 		if tp.utxoQ.Remove(TxHash) != nil {
 			turn := tp.turnQ.Peek()
-			if turn != nil && turn == true {
-				tp.turnQ.Pop()
-			} else {
-				tp.turnOutMap[true]++
+			if turn != nil {
+				if turn == true {
+					tp.turnQ.Pop()
+				} else {
+					tp.turnOutMap[true]++
+				}
 			}
 			delete(tp.txhashMap, TxHash)
 		}
@@ -126,22 +129,26 @@ func (tp *TransactionPool) Remove(TxHash hash.Hash256, t types.Transaction) {
 				}
 				v, _ := q.Peek()
 				item := v.(*PoolItem)
-				if tx.Seq() <= item.Transaction.(chain.AccountTransaction).Seq() {
+				if item.Transaction.(chain.AccountTransaction).Seq() > tx.Seq() {
 					break
 				}
 				q.Pop()
 				delete(tp.txhashMap, item.TxHash)
 				turn := tp.turnQ.Peek()
-				if turn != nil && turn == false {
-					tp.turnQ.Pop()
-				} else {
-					tp.turnOutMap[false]++
+				if turn != nil {
+					if turn == false {
+						tp.turnQ.Pop()
+					} else {
+						tp.turnOutMap[false]++
+					}
 				}
 				number := tp.numberQ.Peek()
-				if number != nil && number == addr {
-					tp.numberQ.Pop()
-				} else {
-					tp.numberOutMap[addr]++
+				if number != nil {
+					if number.(common.Address) == addr {
+						tp.numberQ.Pop()
+					} else {
+						tp.numberOutMap[addr]++
+					}
 				}
 			}
 			if q.Size() == 0 {
@@ -228,10 +235,12 @@ func (tp *TransactionPool) UnsafePop(SeqCache SeqCache) *PoolItem {
 				}
 				if remain > 0 {
 					turn := tp.turnQ.Peek()
-					if turn != nil && turn == false {
-						tp.turnQ.Pop()
-					} else {
-						tp.turnOutMap[false]++
+					if turn != nil {
+						if turn == false {
+							tp.turnQ.Pop()
+						} else {
+							tp.turnOutMap[false]++
+						}
 					}
 					continue
 				} else {
@@ -259,7 +268,6 @@ func (tp *TransactionPool) UnsafePop(SeqCache SeqCache) *PoolItem {
 
 // PoolItem represents the item of the queue
 type PoolItem struct {
-	ChainID     uint8
 	TxType      uint16
 	TxHash      hash.Hash256
 	Transaction types.Transaction

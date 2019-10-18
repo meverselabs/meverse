@@ -132,7 +132,7 @@ func (fr *FormulatorNode) handleObserverMessage(p peer.Peer, m interface{}, Retr
 		}(msg)
 		return nil
 	case *BlockGenMessage:
-		//rlog.Println("Formulator", fr.Config.Formulator.String(), "Recv.BlockGenMessage", msg.Block.Header.Height)
+		rlog.Println("Formulator", fr.Config.Formulator.String(), "Recv.BlockGenMessage", msg.Block.Header.Height)
 
 		TargetHeight := fr.cs.cn.Provider().Height() + 1
 		if msg.Block.Header.Height < TargetHeight {
@@ -141,7 +141,6 @@ func (fr *FormulatorNode) handleObserverMessage(p peer.Peer, m interface{}, Retr
 		if msg.Block.Header.Generator != fr.Config.Formulator {
 			fr.lastReqMessage = nil
 		}
-
 		fr.Lock()
 		defer fr.Unlock()
 
@@ -167,7 +166,7 @@ func (fr *FormulatorNode) handleObserverMessage(p peer.Peer, m interface{}, Retr
 		go fr.updateByGenItem()
 		return nil
 	case *BlockObSignMessage:
-		//rlog.Println("Formulator", fr.Config.Formulator.String(), "Recv.BlockObSignMessage", msg.TargetHeight)
+		rlog.Println("Formulator", fr.Config.Formulator.String(), "Recv.BlockObSignMessage", msg.TargetHeight)
 
 		TargetHeight := fr.cs.cn.Provider().Height() + 1
 		if msg.TargetHeight < TargetHeight {
@@ -203,7 +202,7 @@ func (fr *FormulatorNode) handleObserverMessage(p peer.Peer, m interface{}, Retr
 		go fr.updateByGenItem()
 		return nil
 	case *p2p.BlockMessage:
-		//log.Println("Recv.Ob.BlockMessage", msg.Blocks[0].Header.Height)
+		log.Println("Recv.Ob.BlockMessage", msg.Blocks[0].Header.Height)
 		for _, b := range msg.Blocks {
 			if err := fr.addBlock(b); err != nil {
 				if err == chain.ErrFoundForkedBlock {
@@ -238,11 +237,20 @@ func (fr *FormulatorNode) handleObserverMessage(p peer.Peer, m interface{}, Retr
 		fr.tryRequestNext()
 		return nil
 	case *p2p.TransactionMessage:
-		TxHash := chain.HashTransactionByType(fr.cs.cn.Provider().ChainID(), msg.TxType, msg.Tx)
-		fr.txWaitQ.Push(TxHash, &p2p.TxMsgItem{
-			TxHash:  TxHash,
-			Message: msg,
-		})
+		ChainID := fr.cs.cn.Provider().ChainID()
+		for i, t := range msg.Types {
+			tx := msg.Txs[i]
+			sigs := msg.Signatures[i]
+			TxHash := chain.HashTransactionByType(ChainID, t, tx)
+			if !fr.txpool.IsExist(TxHash) {
+				fr.txWaitQ.Push(TxHash, &p2p.TxMsgItem{
+					TxHash: TxHash,
+					Type:   t,
+					Tx:     tx,
+					Sigs:   sigs,
+				})
+			}
+		}
 		return nil
 	default:
 		panic(p2p.ErrUnknownMessage) //TEMP
@@ -323,7 +331,7 @@ func (fr *FormulatorNode) updateByGenItem() {
 			}
 			return
 		}
-		//log.Println("updateByGenItem", TargetHeight, item.BlockGen != nil, item.ObSign != nil, item.Context != nil)
+		log.Println("updateByGenItem", TargetHeight, item.BlockGen != nil, item.ObSign != nil, item.Context != nil)
 
 		b := &types.Block{
 			Header:                item.BlockGen.Block.Header,

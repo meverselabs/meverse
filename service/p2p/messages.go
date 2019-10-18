@@ -23,52 +23,71 @@ func init() {
 	fc := encoding.Factory("transaction")
 	encoding.Register(TransactionMessage{}, func(enc *encoding.Encoder, rv reflect.Value) error {
 		item := rv.Interface().(TransactionMessage)
-		if err := enc.EncodeUint16(item.TxType); err != nil {
+		Len := len(item.Txs)
+		if err := enc.EncodeArrayLen(Len); err != nil {
 			return err
 		}
-		if err := enc.Encode(item.Tx); err != nil {
-			return err
-		}
-		if err := enc.EncodeArrayLen(len(item.Sigs)); err != nil {
-			return err
-		}
-		for _, sig := range item.Sigs {
-			if err := enc.Encode(sig); err != nil {
+		for i := 0; i < Len; i++ {
+			if err := enc.EncodeUint16(item.Types[i]); err != nil {
 				return err
+			}
+			if err := enc.Encode(item.Txs[i]); err != nil {
+				return err
+			}
+			sigs := item.Signatures[i]
+			if err := enc.EncodeArrayLen(len(sigs)); err != nil {
+				return err
+			}
+			for _, sig := range sigs {
+				if err := enc.Encode(sig); err != nil {
+					return err
+				}
 			}
 		}
 		return nil
 	}, func(dec *encoding.Decoder, rv reflect.Value) error {
 		item := &TransactionMessage{}
 
-		t, err := dec.DecodeUint16()
+		TxLen, err := dec.DecodeArrayLen()
 		if err != nil {
 			return err
 		}
-		item.TxType = t
-
-		tx, err := fc.Create(t)
-		if err != nil {
-			return err
+		if TxLen >= 65535 {
+			return types.ErrInvalidTransactionCount
 		}
-		if err := dec.Decode(&tx); err != nil {
-			return err
-		}
-		item.Tx = tx.(types.Transaction)
-
-		SigLen, err := dec.DecodeArrayLen()
-		if err != nil {
-			return err
-		}
-		sigs := make([]common.Signature, 0, SigLen)
-		for j := 0; j < SigLen; j++ {
-			var sig common.Signature
-			if err := dec.Decode(&sig); err != nil {
+		item.Types = make([]uint16, 0, TxLen)
+		item.Txs = make([]types.Transaction, 0, TxLen)
+		item.Signatures = make([][]common.Signature, 0, TxLen)
+		for i := 0; i < TxLen; i++ {
+			t, err := dec.DecodeUint16()
+			if err != nil {
 				return err
 			}
-			sigs = append(sigs, sig)
+			item.Types = append(item.Types, t)
+
+			tx, err := fc.Create(t)
+			if err != nil {
+				return err
+			}
+			if err := dec.Decode(&tx); err != nil {
+				return err
+			}
+			item.Txs = append(item.Txs, tx.(types.Transaction))
+
+			SigLen, err := dec.DecodeArrayLen()
+			if err != nil {
+				return err
+			}
+			sigs := make([]common.Signature, 0, SigLen)
+			for j := 0; j < SigLen; j++ {
+				var sig common.Signature
+				if err := dec.Decode(&sig); err != nil {
+					return err
+				}
+				sigs = append(sigs, sig)
+			}
+			item.Signatures = append(item.Signatures, sigs)
 		}
-		item.Sigs = sigs
 
 		rv.Set(reflect.ValueOf(item).Elem())
 		return nil
@@ -95,9 +114,9 @@ type BlockMessage struct {
 
 // TransactionMessage is a message for a transaction
 type TransactionMessage struct {
-	TxType uint16
-	Tx     types.Transaction
-	Sigs   []common.Signature
+	Types      []uint16             //MAXLEN : 65535
+	Txs        []types.Transaction  //MAXLEN : 65535
+	Signatures [][]common.Signature //MAXLEN : 65535
 }
 
 // PeerListMessage is a message for a peer list

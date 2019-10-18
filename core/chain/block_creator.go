@@ -116,6 +116,7 @@ func (bc *BlockCreator) UnsafeAddTx(Generator common.Address, t uint16, TxHash h
 			ctw.Revert(sn)
 			return err
 		}
+		Result = 1
 	}
 	if Has, err := ctw.HasAccount(Generator); err != nil {
 		ctw.Revert(sn)

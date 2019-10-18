@@ -36,6 +36,7 @@ type Node struct {
 	txpool       *txpool.TransactionPool
 	txQ          *queue.ExpireQueue
 	txWaitQ      *queue.LinkedQueue
+	txSendQ      *queue.Queue
 	recvChan     chan *RecvMessageItem
 	sendChan     chan *SendMessageItem
 	singleCache  gcache.Cache
@@ -56,6 +57,7 @@ func NewNode(key key.Key, SeedNodeMap map[common.PublicHash]string, cn *chain.Ch
 		txpool:       txpool.NewTransactionPool(),
 		txQ:          queue.NewExpireQueue(),
 		txWaitQ:      queue.NewLinkedQueue(),
+		txSendQ:      queue.NewQueue(),
 		recvChan:     make(chan *RecvMessageItem, 1000),
 		sendChan:     make(chan *SendMessageItem, 1000),
 		singleCache:  gcache.New(500).LRU().Build(),
@@ -97,12 +99,17 @@ func (nd *Node) Close() {
 
 // OnItemExpired is called when the item is expired
 func (nd *Node) OnItemExpired(Interval time.Duration, Key string, Item interface{}, IsLast bool) {
-	msg := Item.(*TransactionMessage)
-	nd.broadcastMessage(1, msg)
+	item := Item.(*TxMsgItem)
+	cp := nd.cn.Provider()
+	if atx, is := item.Tx.(chain.AccountTransaction); is {
+		seq := cp.Seq(atx.From())
+		if atx.Seq() <= seq {
+			return
+		}
+	}
+	nd.txSendQ.Push(item)
 	if IsLast {
-		var TxHash hash.Hash256
-		copy(TxHash[:], []byte(Key))
-		nd.txpool.Remove(TxHash, msg.Tx)
+		nd.txpool.Remove(item.TxHash, item.Tx)
 	}
 }
 
@@ -119,7 +126,7 @@ func (nd *Node) Run(BindAddress string) {
 	go nd.ms.Run(BindAddress)
 	go nd.requestTimer.Run()
 
-	WorkerCount := runtime.NumCPU() - 1
+	WorkerCount := runtime.NumCPU() / 2
 	if WorkerCount < 1 {
 		WorkerCount = 1
 	}
@@ -127,40 +134,65 @@ func (nd *Node) Run(BindAddress string) {
 		go func() {
 			for !nd.isClose {
 				Count := 0
+				ctw := nd.cn.Provider().NewLoaderWrapper(1)
 				for !nd.isClose {
 					v := nd.txWaitQ.Pop()
 					if v == nil {
 						break
-					}
-					item := v.(*TxMsgItem)
-					if err := nd.addTx(item.TxHash, item.Message.TxType, item.Message.Tx, item.Message.Sigs); err != nil {
-						if err != ErrInvalidUTXO && err != txpool.ErrExistTransaction && err != txpool.ErrTooFarSeq && err != txpool.ErrPastSeq {
-							rlog.Println("TransactionError", chain.HashTransactionByType(nd.cn.Provider().ChainID(), item.Message.TxType, item.Message.Tx).String(), err.Error())
-							if len(item.PeerID) > 0 {
-								nd.ms.RemovePeer(item.PeerID)
-							}
-						}
-						break
-					}
-					rlog.Println("TransactionAppended", chain.HashTransactionByType(nd.cn.Provider().ChainID(), item.Message.TxType, item.Message.Tx).String())
-
-					if len(item.PeerID) > 0 {
-						var SenderPublicHash common.PublicHash
-						copy(SenderPublicHash[:], []byte(item.PeerID))
-						nd.exceptCastMessage(1, SenderPublicHash, item.Message)
-					} else {
-						nd.broadcastMessage(1, item.Message)
 					}
 
 					Count++
 					if Count > 500 {
 						break
 					}
+					item := v.(*TxMsgItem)
+					if err := nd.addTx(ctw, item.TxHash, item.Type, item.Tx, item.Sigs); err != nil {
+						if err != ErrInvalidUTXO && err != txpool.ErrExistTransaction && err != txpool.ErrTooFarSeq && err != txpool.ErrPastSeq {
+							rlog.Println("TransactionError", item.TxHash.String(), err.Error())
+							if len(item.PeerID) > 0 {
+								nd.ms.RemovePeer(item.PeerID)
+							}
+						}
+						continue
+					}
+					rlog.Println("TransactionAppended", item.TxHash.String())
+
+					nd.txSendQ.Push(item)
 				}
 				time.Sleep(100 * time.Millisecond)
 			}
 		}()
 	}
+
+	go func() {
+		for !nd.isClose {
+			if nd.ms.HasPeer() {
+				msg := &TransactionMessage{
+					Types:      []uint16{},
+					Txs:        []types.Transaction{},
+					Signatures: [][]common.Signature{},
+				}
+				for {
+					v := nd.txSendQ.Pop()
+					if v == nil {
+						break
+					}
+					m := v.(*TxMsgItem)
+					msg.Types = append(msg.Types, m.Type)
+					msg.Txs = append(msg.Txs, m.Tx)
+					msg.Signatures = append(msg.Signatures, m.Sigs)
+					if len(msg.Types) >= 5000 {
+						break
+					}
+				}
+				if len(msg.Types) > 0 {
+					//log.Println("Send.TransactionMessage", len(msg.Types))
+					nd.broadcastMessage(1, msg)
+				}
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
 
 	for i := 0; i < 2; i++ {
 		go func() {
@@ -382,15 +414,28 @@ func (nd *Node) handlePeerMessage(ID string, m interface{}) error {
 		}
 		return nil
 	case *TransactionMessage:
+		//log.Println("Recv.TransactionMessage", nd.txWaitQ.Size(), nd.txpool.Size())
 		if nd.txWaitQ.Size() > 200000 {
 			return txpool.ErrTransactionPoolOverflowed
 		}
-		TxHash := chain.HashTransactionByType(nd.cn.Provider().ChainID(), msg.TxType, msg.Tx)
-		nd.txWaitQ.Push(TxHash, &TxMsgItem{
-			TxHash:  TxHash,
-			Message: msg,
-			PeerID:  ID,
-		})
+		if len(msg.Types) > 5000 {
+			return ErrTooManyTrasactionInMessage
+		}
+		ChainID := nd.cn.Provider().ChainID()
+		for i, t := range msg.Types {
+			tx := msg.Txs[i]
+			sigs := msg.Signatures[i]
+			TxHash := chain.HashTransactionByType(ChainID, t, tx)
+			if !nd.txpool.IsExist(TxHash) {
+				nd.txWaitQ.Push(TxHash, &TxMsgItem{
+					TxHash: TxHash,
+					Type:   t,
+					Tx:     tx,
+					Sigs:   sigs,
+					PeerID: ID,
+				})
+			}
+		}
 		return nil
 	case *PeerListMessage:
 		nd.ms.AddPeerList(msg.Ips, msg.Hashs)
@@ -436,22 +481,21 @@ func (nd *Node) AddTx(tx types.Transaction, sigs []common.Signature) error {
 		return err
 	}
 	TxHash := chain.HashTransactionByType(nd.cn.Provider().ChainID(), t, tx)
-	nd.txWaitQ.Push(TxHash, &TxMsgItem{
-		TxHash: TxHash,
-		Message: &TransactionMessage{
-			TxType: t,
+	if !nd.txpool.IsExist(TxHash) {
+		nd.txWaitQ.Push(TxHash, &TxMsgItem{
+			TxHash: TxHash,
+			Type:   t,
 			Tx:     tx,
 			Sigs:   sigs,
-		},
-	})
+		})
+	}
 	return nil
 }
 
-func (nd *Node) addTx(TxHash hash.Hash256, t uint16, tx types.Transaction, sigs []common.Signature) error {
+func (nd *Node) addTx(ctw types.LoaderWrapper, TxHash hash.Hash256, t uint16, tx types.Transaction, sigs []common.Signature) error {
 	if nd.txpool.Size() > 65535 {
 		return txpool.ErrTransactionPoolOverflowed
 	}
-
 	cp := nd.cn.Provider()
 	if nd.txpool.IsExist(TxHash) {
 		return txpool.ErrExistTransaction
@@ -477,17 +521,16 @@ func (nd *Node) addTx(TxHash hash.Hash256, t uint16, tx types.Transaction, sigs 
 	if err != nil {
 		return err
 	}
-	ctw := nd.cn.Provider().NewLoaderWrapper(pid)
 	if err := tx.Validate(p, ctw, signers); err != nil {
 		return err
 	}
-	if err := nd.txpool.Push(nd.cn.Provider().ChainID(), t, TxHash, tx, sigs, signers); err != nil {
+	if err := nd.txpool.Push(t, TxHash, tx, sigs, signers); err != nil {
 		return err
 	}
-	nd.txQ.Push(string(TxHash[:]), &TransactionMessage{
-		TxType: t,
-		Tx:     tx,
-		Sigs:   sigs,
+	nd.txQ.Push(string(TxHash[:]), &TxMsgItem{
+		Type: t,
+		Tx:   tx,
+		Sigs: sigs,
 	})
 	return nil
 }
