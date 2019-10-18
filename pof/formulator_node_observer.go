@@ -337,12 +337,14 @@ func (fr *FormulatorNode) updateByGenItem() {
 			if err := fr.cs.ct.ConnectBlockWithContext(b, item.Context); err != nil {
 				log.Println("updateByGenItem.ConnectBlockWithContext", err)
 				delete(fr.lastGenItemMap, b.Header.Height)
+				go fr.tryRequestBlocks()
 				return
 			}
 		} else {
 			if err := fr.cs.cn.ConnectBlock(b); err != nil {
 				log.Println("updateByGenItem.ConnectBlock", err)
 				delete(fr.lastGenItemMap, b.Header.Height)
+				go fr.tryRequestBlocks()
 				return
 			}
 		}
