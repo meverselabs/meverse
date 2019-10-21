@@ -494,6 +494,21 @@ func (nd *Node) AddTx(tx types.Transaction, sigs []common.Signature) error {
 		return err
 	}
 	TxHash := chain.HashTransactionByType(nd.cn.Provider().ChainID(), t, tx)
+	ctw := nd.cn.Provider().NewLoaderWrapper(1)
+	if err := nd.addTx(ctw, TxHash, t, tx, sigs); err != nil {
+		return err
+	}
+	return nil
+}
+
+// PushTx pushes transaction
+func (nd *Node) PushTx(tx types.Transaction, sigs []common.Signature) error {
+	fc := encoding.Factory("transaction")
+	t, err := fc.TypeOf(tx)
+	if err != nil {
+		return err
+	}
+	TxHash := chain.HashTransactionByType(nd.cn.Provider().ChainID(), t, tx)
 	if !nd.txpool.IsExist(TxHash) {
 		nd.txWaitQ.Push(TxHash, &TxMsgItem{
 			TxHash: TxHash,

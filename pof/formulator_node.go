@@ -344,6 +344,21 @@ func (fr *FormulatorNode) AddTx(tx types.Transaction, sigs []common.Signature) e
 		return err
 	}
 	TxHash := chain.HashTransactionByType(fr.cs.cn.Provider().ChainID(), t, tx)
+	ctw := fr.cs.cn.Provider().NewLoaderWrapper(1)
+	if err := fr.addTx(ctw, TxHash, t, tx, sigs); err != nil {
+		return err
+	}
+	return nil
+}
+
+// PushTx pushes transaction
+func (fr *FormulatorNode) PushTx(tx types.Transaction, sigs []common.Signature) error {
+	fc := encoding.Factory("transaction")
+	t, err := fc.TypeOf(tx)
+	if err != nil {
+		return err
+	}
+	TxHash := chain.HashTransactionByType(fr.cs.cn.Provider().ChainID(), t, tx)
 	if !fr.txpool.IsExist(TxHash) {
 		fr.txWaitQ.Push(TxHash, &p2p.TxMsgItem{
 			TxHash: TxHash,
