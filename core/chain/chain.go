@@ -441,7 +441,7 @@ func (cn *Chain) validateHeader(bh *types.Header) error {
 	return nil
 }
 
-func (cn *Chain) validateTransactionSignatures(b *types.Block, sm map[hash.Hash256][]common.PublicHash) ([][]common.PublicHash, error) {
+func (cn *Chain) validateTransactionSignatures(b *types.Block, SigMap map[hash.Hash256][]common.PublicHash) ([][]common.PublicHash, error) {
 	var wg sync.WaitGroup
 	cpuCnt := runtime.NumCPU()
 	if len(b.Transactions) < 1000 {
@@ -471,20 +471,19 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block, sm map[hash.Hash2
 				TxHash := HashTransactionByType(cn.store.chainID, t, tx)
 				TxHashes[sidx+q+1] = TxHash
 				var signers []common.PublicHash
-				if sm != nil {
-					s, has := sm[TxHash]
-					if !has {
-						s = make([]common.PublicHash, 0, len(sigs))
-						for _, sig := range sigs {
-							pubkey, err := common.RecoverPubkey(TxHash, sig)
-							if err != nil {
-								errs <- err
-								return
-							}
-							s = append(s, common.NewPublicHash(pubkey))
+				if SigMap != nil {
+					signers = SigMap[TxHash]
+				}
+				if signers == nil {
+					signers = make([]common.PublicHash, 0, len(sigs))
+					for _, sig := range sigs {
+						pubkey, err := common.RecoverPubkey(TxHash, sig)
+						if err != nil {
+							errs <- err
+							return
 						}
+						signers = append(signers, common.NewPublicHash(pubkey))
 					}
-					signers = s
 				}
 				TxSigners[sidx+q] = signers
 			}

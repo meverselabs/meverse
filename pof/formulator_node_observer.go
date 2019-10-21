@@ -362,8 +362,8 @@ func (fr *FormulatorNode) updateByGenItem() {
 		} else {
 			ChainID := fr.cs.cn.Provider().ChainID()
 			sm := map[hash.Hash256][]common.PublicHash{}
-			for i, tx := range item.BlockGen.Block.Transactions {
-				t := item.BlockGen.Block.TransactionTypes[i]
+			for i, tx := range b.Transactions {
+				t := b.TransactionTypes[i]
 				TxHash := chain.HashTransactionByType(ChainID, t, tx)
 				item := fr.txpool.Get(TxHash)
 				if item != nil {
