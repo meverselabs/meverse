@@ -158,7 +158,7 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 					ob.fs.RemovePeer(item.PeerID)
 					continue
 				}
-				if p, has := ob.fs.peerMap[item.PeerID]; has {
+				if p, has := ob.fs.Peer(item.PeerID); has {
 					if err := ob.handleFormulatorMessage(p, m, item.Packet); err != nil {
 						log.Println("Formulator Error", p.Name(), err)
 						ob.fs.RemovePeer(item.PeerID)

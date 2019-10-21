@@ -66,6 +66,15 @@ func (ms *FormulatorService) RemovePeer(ID string) {
 	}
 }
 
+// Peer returns the peer
+func (ms *FormulatorService) Peer(ID string) (peer.Peer, bool) {
+	ms.Lock()
+	p, has := ms.peerMap[ID]
+	ms.Unlock()
+
+	return p, has
+}
+
 // SendTo sends a message to the formulator
 func (ms *FormulatorService) SendTo(addr common.Address, bs []byte) error {
 	ms.Lock()
