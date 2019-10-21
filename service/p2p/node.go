@@ -126,7 +126,10 @@ func (nd *Node) Run(BindAddress string) {
 	go nd.ms.Run(BindAddress)
 	go nd.requestTimer.Run()
 
-	WorkerCount := runtime.NumCPU() / 2
+	WorkerCount := runtime.NumCPU()/2 + 2
+	if WorkerCount >= runtime.NumCPU() {
+		WorkerCount = runtime.NumCPU() - 1
+	}
 	if WorkerCount < 1 {
 		WorkerCount = 1
 	}
@@ -181,7 +184,7 @@ func (nd *Node) Run(BindAddress string) {
 					msg.Types = append(msg.Types, m.Type)
 					msg.Txs = append(msg.Txs, m.Tx)
 					msg.Signatures = append(msg.Signatures, m.Sigs)
-					if len(msg.Types) >= 5000 {
+					if len(msg.Types) >= 800 {
 						break
 					}
 				}
@@ -250,7 +253,17 @@ func (nd *Node) Run(BindAddress string) {
 		item := nd.blockQ.PopUntil(TargetHeight)
 		for item != nil {
 			b := item.(*types.Block)
-			if err := nd.cn.ConnectBlock(b); err != nil {
+			ChainID := nd.cn.Provider().ChainID()
+			sm := map[hash.Hash256][]common.PublicHash{}
+			for i, tx := range b.Transactions {
+				t := b.TransactionTypes[i]
+				TxHash := chain.HashTransactionByType(ChainID, t, tx)
+				item := nd.txpool.Get(TxHash)
+				if item != nil {
+					sm[TxHash] = item.Signers
+				}
+			}
+			if err := nd.cn.ConnectBlock(b, sm); err != nil {
 				rlog.Println(err)
 				panic(err)
 				break
@@ -418,7 +431,7 @@ func (nd *Node) handlePeerMessage(ID string, m interface{}) error {
 		if nd.txWaitQ.Size() > 200000 {
 			return txpool.ErrTransactionPoolOverflowed
 		}
-		if len(msg.Types) > 5000 {
+		if len(msg.Types) > 800 {
 			return ErrTooManyTrasactionInMessage
 		}
 		ChainID := nd.cn.Provider().ChainID()

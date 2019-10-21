@@ -73,7 +73,7 @@ type FormulatorNode struct {
 // NewFormulatorNode returns a FormulatorNode
 func NewFormulatorNode(Config *FormulatorConfig, key key.Key, ndkey key.Key, NetAddressMap map[common.PublicHash]string, SeedNodeMap map[common.PublicHash]string, cs *Consensus, peerStorePath string) *FormulatorNode {
 	if Config.MaxTransactionsPerBlock == 0 {
-		Config.MaxTransactionsPerBlock = 10000
+		Config.MaxTransactionsPerBlock = 7000
 	}
 	fr := &FormulatorNode{
 		Config:         Config,
@@ -147,7 +147,10 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 	go fr.nm.Run(BindAddress)
 	go fr.requestTimer.Run()
 
-	WorkerCount := runtime.NumCPU() / 2
+	WorkerCount := runtime.NumCPU()/2 + 1
+	if WorkerCount >= runtime.NumCPU() {
+		WorkerCount = runtime.NumCPU() - 1
+	}
 	if WorkerCount < 1 {
 		WorkerCount = 1
 	}
@@ -202,7 +205,7 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 					msg.Types = append(msg.Types, m.Type)
 					msg.Txs = append(msg.Txs, m.Tx)
 					msg.Signatures = append(msg.Signatures, m.Sigs)
-					if len(msg.Types) >= 5000 {
+					if len(msg.Types) >= 800 {
 						break
 					}
 				}
@@ -286,7 +289,17 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 				}
 			}
 			if !isConnected {
-				if err := fr.cs.cn.ConnectBlock(b); err != nil {
+				ChainID := fr.cs.cn.Provider().ChainID()
+				sm := map[hash.Hash256][]common.PublicHash{}
+				for i, tx := range b.Transactions {
+					t := b.TransactionTypes[i]
+					TxHash := chain.HashTransactionByType(ChainID, t, tx)
+					item := fr.txpool.Get(TxHash)
+					if item != nil {
+						sm[TxHash] = item.Signers
+					}
+				}
+				if err := fr.cs.cn.ConnectBlock(b, sm); err != nil {
 					break
 				}
 			}

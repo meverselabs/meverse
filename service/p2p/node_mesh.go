@@ -316,7 +316,7 @@ func (ms *NodeMesh) client(Address string, TargetPubHash common.PublicHash) erro
 
 	ID := string(pubhash[:])
 	//ms.nodePoolManager.NewNode(ipAddress, ID, duration)
-	p := NewTCPPeer(conn, ID, pubhash.String(), start.UnixNano())
+	p := NewTCPAsyncPeer(conn, ID, pubhash.String(), start.UnixNano())
 
 	ms.Lock()
 	old, has := ms.clientPeerMap[ID]
@@ -374,7 +374,7 @@ func (ms *NodeMesh) server(BindAddress string) error {
 
 			ID := string(pubhash[:])
 			//ms.nodePoolManager.NewNode(ipAddress, ID, duration)
-			p := NewTCPPeer(conn, ID, pubhash.String(), start.UnixNano())
+			p := NewTCPAsyncPeer(conn, ID, pubhash.String(), start.UnixNano())
 
 			log.Println("ConnectedFrom", pubhash.String())
 

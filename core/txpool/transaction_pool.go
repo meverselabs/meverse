@@ -20,7 +20,7 @@ type TransactionPool struct {
 	turnQ        *queue.Queue
 	numberQ      *queue.Queue
 	utxoQ        *queue.LinkedQueue
-	txhashMap    map[hash.Hash256]bool
+	txhashMap    map[hash.Hash256]*PoolItem
 	turnOutMap   map[bool]int
 	numberOutMap map[common.Address]int
 	bucketMap    map[common.Address]*queue.SortedQueue
@@ -32,7 +32,7 @@ func NewTransactionPool() *TransactionPool {
 		turnQ:        queue.NewQueue(),
 		numberQ:      queue.NewQueue(),
 		utxoQ:        queue.NewLinkedQueue(),
-		txhashMap:    map[hash.Hash256]bool{},
+		txhashMap:    map[hash.Hash256]*PoolItem{},
 		turnOutMap:   map[bool]int{},
 		numberOutMap: map[common.Address]int{},
 		bucketMap:    map[common.Address]*queue.SortedQueue{},
@@ -45,7 +45,8 @@ func (tp *TransactionPool) IsExist(TxHash hash.Hash256) bool {
 	tp.Lock()
 	defer tp.Unlock()
 
-	return tp.txhashMap[TxHash]
+	_, has := tp.txhashMap[TxHash]
+	return has
 }
 
 // Size returns the size of TxPool
@@ -67,7 +68,7 @@ func (tp *TransactionPool) Push(t uint16, TxHash hash.Hash256, tx types.Transact
 	tp.Lock()
 	defer tp.Unlock()
 
-	if tp.txhashMap[TxHash] {
+	if _, has := tp.txhashMap[TxHash]; has {
 		return ErrExistTransaction
 	}
 
@@ -98,8 +99,16 @@ func (tp *TransactionPool) Push(t uint16, TxHash hash.Hash256, tx types.Transact
 		tp.numberQ.Push(addr)
 		tp.turnQ.Push(false)
 	}
-	tp.txhashMap[TxHash] = true
+	tp.txhashMap[TxHash] = item
 	return nil
+}
+
+// Get returns the pool item of the hash
+func (tp *TransactionPool) Get(TxHash hash.Hash256) *PoolItem {
+	tp.Lock()
+	defer tp.Unlock()
+
+	return tp.txhashMap[TxHash]
 }
 
 // Remove deletes the target transaction from the queue
@@ -303,13 +312,8 @@ func (tp *TransactionPool) Dump() string {
 	}
 	if len(tp.txhashMap) > 0 {
 		buffer.WriteString("txhashMap\n")
-		for k, v := range tp.txhashMap {
-			buffer.WriteString(k.String() + ":")
-			if v {
-				buffer.WriteString("true")
-			} else {
-				buffer.WriteString("false")
-			}
+		for k := range tp.txhashMap {
+			buffer.WriteString(k.String())
 			buffer.WriteString("\n")
 		}
 		buffer.WriteString("\n")

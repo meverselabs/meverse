@@ -202,7 +202,7 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 			item := ob.blockQ.PopUntil(TargetHeight)
 			for item != nil {
 				b := item.(*types.Block)
-				if err := ob.cs.cn.ConnectBlock(b); err != nil {
+				if err := ob.cs.cn.ConnectBlock(b, nil); err != nil {
 					rlog.Println(err)
 					panic(err)
 					break

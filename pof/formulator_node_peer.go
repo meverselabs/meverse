@@ -132,7 +132,7 @@ func (fr *FormulatorNode) handlePeerMessage(ID string, m interface{}) error {
 				return txpool.ErrTransactionPoolOverflowed
 			}
 		*/
-		if len(msg.Types) > 5000 {
+		if len(msg.Types) > 800 {
 			return p2p.ErrTooManyTrasactionInMessage
 		}
 		ChainID := fr.cs.cn.Provider().ChainID()

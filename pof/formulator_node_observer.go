@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/rlog"
 	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/core/types"
@@ -316,7 +317,17 @@ func (fr *FormulatorNode) updateByGenItem() {
 				if ctx == nil {
 					ctx = fr.cs.cn.NewContext()
 				}
-				if err := fr.cs.ct.ExecuteBlockOnContext(item.BlockGen.Block, ctx); err != nil {
+				ChainID := fr.cs.cn.Provider().ChainID()
+				sm := map[hash.Hash256][]common.PublicHash{}
+				for i, tx := range item.BlockGen.Block.Transactions {
+					t := item.BlockGen.Block.TransactionTypes[i]
+					TxHash := chain.HashTransactionByType(ChainID, t, tx)
+					item := fr.txpool.Get(TxHash)
+					if item != nil {
+						sm[TxHash] = item.Signers
+					}
+				}
+				if err := fr.cs.ct.ExecuteBlockOnContext(item.BlockGen.Block, ctx, sm); err != nil {
 					log.Println("updateByGenItem.prevItem.ConnectBlockWithContext", err)
 					return
 				}
@@ -349,7 +360,17 @@ func (fr *FormulatorNode) updateByGenItem() {
 				return
 			}
 		} else {
-			if err := fr.cs.cn.ConnectBlock(b); err != nil {
+			ChainID := fr.cs.cn.Provider().ChainID()
+			sm := map[hash.Hash256][]common.PublicHash{}
+			for i, tx := range item.BlockGen.Block.Transactions {
+				t := item.BlockGen.Block.TransactionTypes[i]
+				TxHash := chain.HashTransactionByType(ChainID, t, tx)
+				item := fr.txpool.Get(TxHash)
+				if item != nil {
+					sm[TxHash] = item.Signers
+				}
+			}
+			if err := fr.cs.cn.ConnectBlock(b, sm); err != nil {
 				log.Println("updateByGenItem.ConnectBlock", err)
 				delete(fr.lastGenItemMap, b.Header.Height)
 				go fr.tryRequestBlocks()

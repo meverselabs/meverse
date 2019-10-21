@@ -398,7 +398,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 		}
 
 		ctx := ob.cs.ct.NewContext()
-		if err := ob.cs.ct.ExecuteBlockOnContext(msg.Block, ctx); err != nil {
+		if err := ob.cs.ct.ExecuteBlockOnContext(msg.Block, ctx, nil); err != nil {
 			rlog.Println(msg.Block.Header.Generator.String(), "if err := ob.cs.ct.ExecuteBlockOnContext(msg.Block, ctx); err != nil {", err)
 			return err
 		}

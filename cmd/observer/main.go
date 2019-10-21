@@ -159,7 +159,7 @@ func main() {
 		if cm.IsClosed() {
 			return chain.ErrStoreClosed
 		}
-		if err := cn.ConnectBlock(b); err != nil {
+		if err := cn.ConnectBlock(b, nil); err != nil {
 			return err
 		}
 		return nil

@@ -234,7 +234,7 @@ func (cn *Chain) NewContext() *types.Context {
 }
 
 // ConnectBlock try to connect block to the chain
-func (cn *Chain) ConnectBlock(b *types.Block) error {
+func (cn *Chain) ConnectBlock(b *types.Block, SigMap map[hash.Hash256][]common.PublicHash) error {
 	cn.closeLock.RLock()
 	defer cn.closeLock.RUnlock()
 	if cn.isClose {
@@ -252,7 +252,7 @@ func (cn *Chain) ConnectBlock(b *types.Block) error {
 	}
 
 	ctx := types.NewContext(cn.store)
-	if err := cn.executeBlockOnContext(b, ctx); err != nil {
+	if err := cn.executeBlockOnContext(b, ctx, SigMap); err != nil {
 		return err
 	}
 	return cn.connectBlockWithContext(b, ctx)
@@ -302,8 +302,8 @@ func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context) err
 	return nil
 }
 
-func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context) error {
-	TxSigners, err := cn.validateTransactionSignatures(b)
+func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context, sm map[hash.Hash256][]common.PublicHash) error {
+	TxSigners, err := cn.validateTransactionSignatures(b, sm)
 	if err != nil {
 		return err
 	}
@@ -441,7 +441,7 @@ func (cn *Chain) validateHeader(bh *types.Header) error {
 	return nil
 }
 
-func (cn *Chain) validateTransactionSignatures(b *types.Block) ([][]common.PublicHash, error) {
+func (cn *Chain) validateTransactionSignatures(b *types.Block, sm map[hash.Hash256][]common.PublicHash) ([][]common.PublicHash, error) {
 	var wg sync.WaitGroup
 	cpuCnt := runtime.NumCPU()
 	if len(b.Transactions) < 1000 {
@@ -470,14 +470,21 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block) ([][]common.Publi
 
 				TxHash := HashTransactionByType(cn.store.chainID, t, tx)
 				TxHashes[sidx+q+1] = TxHash
-				signers := make([]common.PublicHash, 0, len(sigs))
-				for _, sig := range sigs {
-					pubkey, err := common.RecoverPubkey(TxHash, sig)
-					if err != nil {
-						errs <- err
-						return
+				var signers []common.PublicHash
+				if sm != nil {
+					s, has := sm[TxHash]
+					if !has {
+						s = make([]common.PublicHash, 0, len(sigs))
+						for _, sig := range sigs {
+							pubkey, err := common.RecoverPubkey(TxHash, sig)
+							if err != nil {
+								errs <- err
+								return
+							}
+							s = append(s, common.NewPublicHash(pubkey))
+						}
 					}
-					signers = append(signers, common.NewPublicHash(pubkey))
+					signers = s
 				}
 				TxSigners[sidx+q] = signers
 			}

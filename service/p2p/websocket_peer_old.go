@@ -51,7 +51,7 @@ func NewWebsocketPeer(conn *websocket.Conn, ID string, Name string, connectedTim
 			if atomic.AddUint64(&p.pingCount, 1) > pingCountLimit {
 				return
 			}
-			time.Sleep(10 * time.Second)
+			time.Sleep(3 * time.Second)
 		}
 	}()
 	return p
