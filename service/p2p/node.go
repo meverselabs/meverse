@@ -534,6 +534,7 @@ func (nd *Node) addTx(ctw types.LoaderWrapper, TxHash hash.Hash256, t uint16, tx
 	if err != nil {
 		return err
 	}
+	ctw = types.NewLoaderWrapper(pid, ctw)
 	if err := tx.Validate(p, ctw, signers); err != nil {
 		return err
 	}
