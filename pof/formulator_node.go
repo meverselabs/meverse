@@ -348,6 +348,12 @@ func (fr *FormulatorNode) AddTx(tx types.Transaction, sigs []common.Signature) e
 	if err := fr.addTx(ctw, TxHash, t, tx, sigs); err != nil {
 		return err
 	}
+	fr.txSendQ.Push(&p2p.TxMsgItem{
+		TxHash: TxHash,
+		Type:   t,
+		Tx:     tx,
+		Sigs:   sigs,
+	})
 	return nil
 }
 

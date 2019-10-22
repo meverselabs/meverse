@@ -498,6 +498,12 @@ func (nd *Node) AddTx(tx types.Transaction, sigs []common.Signature) error {
 	if err := nd.addTx(ctw, TxHash, t, tx, sigs); err != nil {
 		return err
 	}
+	nd.txSendQ.Push(&TxMsgItem{
+		TxHash: TxHash,
+		Type:   t,
+		Tx:     tx,
+		Sigs:   sigs,
+	})
 	return nil
 }
 
