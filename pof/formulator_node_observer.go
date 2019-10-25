@@ -405,6 +405,8 @@ func (fr *FormulatorNode) genBlock(p peer.Peer, msg *BlockReqMessage) error {
 		StartBlockTime = LastTimestamp + uint64(time.Millisecond)
 	}
 
+	rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockGenBegin", msg.TargetHeight)
+
 	var lastHeader *types.Header
 	ctx := fr.cs.cn.NewContext()
 	for i := uint32(0); i < RemainBlocks; i++ {
@@ -434,8 +436,6 @@ func (fr *FormulatorNode) genBlock(p peer.Peer, msg *BlockReqMessage) error {
 		}
 
 		timer := time.NewTimer(200 * time.Millisecond)
-
-		rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockGenBegin", msg.TargetHeight)
 
 		fr.txpool.Lock() // Prevent delaying from TxPool.Push
 		Count := 0
