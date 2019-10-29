@@ -264,9 +264,12 @@ func (fr *FormulatorNode) tryRequestNext() {
 	defer fr.requestLock.Unlock()
 
 	TargetHeight := fr.cs.cn.Provider().Height() + 1
+	fr.Lock()
 	if item, has := fr.lastGenItemMap[TargetHeight]; has && item.Recv && item.BlockGen != nil {
+		fr.Unlock()
 		return
 	}
+	fr.Unlock()
 
 	if !fr.requestTimer.Exist(TargetHeight) {
 		if fr.blockQ.Find(uint64(TargetHeight)) == nil {
