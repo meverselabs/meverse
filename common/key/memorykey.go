@@ -77,6 +77,13 @@ func NewMemoryKeyFromBytes(pk []byte) (*MemoryKey, error) {
 	return ac, nil
 }
 
+// Clear removes private key bytes data
+func (ac *MemoryKey) Clear() {
+	ac.PrivKey.D.SetBytes([]byte{0})
+	ac.PrivKey.X.SetBytes([]byte{0})
+	ac.PrivKey.Y.SetBytes([]byte{0})
+}
+
 func (ac *MemoryKey) calcPubkey() error {
 	pk := ecrypto.CompressPubkey(&ac.PrivKey.PublicKey)
 	copy(ac.pubkey[:], pk[:])

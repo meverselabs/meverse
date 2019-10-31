@@ -11,4 +11,5 @@ type Key interface {
 	SignWithPassphrase(h hash.Hash256, passphrase []byte) (common.Signature, error)
 	Verify(h hash.Hash256, sig common.Signature) bool
 	PublicKey() common.PublicKey
+	Clear()
 }
