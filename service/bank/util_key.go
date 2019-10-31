@@ -8,16 +8,17 @@ import (
 )
 
 var (
-	tagSecret          = []byte{1, 0}
-	tagPublicHash      = []byte{1, 1}
-	tagNameAddress     = []byte{2, 0}
-	tagAddressName     = []byte{2, 1}
-	tagTransaction     = []byte{3, 0}
-	tagTransactionList = []byte{3, 1}
-	tagTransferList    = []byte{3, 2}
-	tagAccountAddress  = []byte{3, 3}
-	tagAddressKeyHash  = []byte{3, 4}
-	tagUnstaking       = []byte{3, 5}
+	tagSecret           = []byte{1, 0}
+	tagPublicHash       = []byte{1, 1}
+	tagNameAddress      = []byte{2, 0}
+	tagAddressName      = []byte{2, 1}
+	tagTransaction      = []byte{3, 0}
+	tagTransactionList  = []byte{3, 1}
+	tagTransferSendList = []byte{3, 2}
+	tagTransferRecvList = []byte{3, 3}
+	tagAccountAddress   = []byte{4, 1}
+	tagAddressKeyHash   = []byte{4, 2}
+	tagUnstaking        = []byte{5, 1}
 )
 
 func toSecretKey(name string) []byte {
@@ -75,9 +76,15 @@ func fromNameAddress(bs []byte, name string) (common.Address, error) {
 	return addr, nil
 }
 
-func toTransferListKey(addr common.Address) []byte {
+func toTransferSendListKey(addr common.Address) []byte {
 	bs := make([]byte, 2+common.AddressSize)
-	copy(bs, tagTransferList)
+	copy(bs, tagTransferSendList)
+	copy(bs[2:], addr[:])
+	return bs
+}
+func toTransferRecvListKey(addr common.Address) []byte {
+	bs := make([]byte, 2+common.AddressSize)
+	copy(bs, tagTransferRecvList)
 	copy(bs[2:], addr[:])
 	return bs
 }

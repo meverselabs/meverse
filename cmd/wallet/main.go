@@ -187,7 +187,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	bp := bank.NewBank(keyStore)
+	bp := bank.NewBank(keyStore, cfg.StoreRoot+"/bank")
 	cn.MustAddService(bp)
 	if err := cn.Init(); err != nil {
 		panic(err)

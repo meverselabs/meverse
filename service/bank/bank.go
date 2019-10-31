@@ -2,12 +2,14 @@ package bank
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"sync"
 	"time"
 
 	lediscfg "github.com/siddontang/ledisdb/config"
 	"github.com/siddontang/ledisdb/ledis"
 
+	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/service/p2p"
 
 	"github.com/fletaio/fleta/common/amount"
@@ -27,6 +29,7 @@ import (
 type Bank struct {
 	sync.Mutex
 	keyStore  backend.StoreBackend
+	st        *chain.Store
 	cn        types.Provider
 	nd        *p2p.Node
 	db        *ledis.DB
@@ -61,39 +64,9 @@ func (s *Bank) Name() string {
 
 // InitFromStore initializes account datas from the store
 func (s *Bank) InitFromStore(st *chain.Store) error {
-	accs, err := st.Accounts()
-	if err != nil {
-		return err
-	}
-	if err := s.keyStore.Update(func(txn backend.StoreWriter) error {
-		for _, a := range accs {
-			switch acc := a.(type) {
-			case *vault.SingleAccount:
-				bsName, err := txn.Get(toPublicHashKey(acc.KeyHash))
-				if err != nil {
-					continue
-				}
-				if err := txn.Set(toNameAddressKey(string(bsName), acc.Address()), []byte("vault.SingleAccount")); err != nil {
-					return err
-				}
-				if err := txn.Set(toAddressNameKey(acc.Address()), bsName); err != nil {
-					return err
-				}
-			case *formulator.FormulatorAccount:
-				bsName, err := txn.Get(toPublicHashKey(acc.KeyHash))
-				if err != nil {
-					continue
-				}
-				if err := txn.Set(toNameAddressKey(string(bsName), acc.Address()), []byte("formulator.FormulatorAccount")); err != nil {
-					return err
-				}
-				if err := txn.Set(toAddressNameKey(acc.Address()), bsName); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}); err != nil {
+	s.st = st
+
+	if err := s.updateAccountData(); err != nil {
 		return err
 	}
 	return nil
@@ -310,6 +283,156 @@ func (s *Bank) Init(pm types.ProcessManager, cn types.Provider) error {
 			*/
 			return TxHash, nil
 		})
+		as.Set("transactions", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+			if arg.Len() != 3 {
+				return nil, apiserver.ErrInvalidArgument
+			}
+			addrStr, err := arg.String(0)
+			if err != nil {
+				return nil, err
+			}
+			addr, err := common.ParseAddress(addrStr)
+			if err != nil {
+				return nil, err
+			}
+			offset, err := arg.Int(1)
+			if err != nil {
+				return nil, err
+			}
+			count, err := arg.Int(2)
+			if err != nil {
+				return nil, err
+			}
+			txids, txs, results, err := s.getTransactionFromTail(addr, int32(offset), int32(count))
+			if err != nil {
+				return nil, err
+			}
+			fc := encoding.Factory("transaction")
+			txmps := []map[string]interface{}{}
+			for i, tx := range txs {
+				bs, err := tx.MarshalJSON()
+				if err != nil {
+					return nil, err
+				}
+				mp := map[string]interface{}{}
+				if err := json.Unmarshal(bs, &mp); err != nil {
+					return nil, err
+				}
+				t, err := fc.TypeOf(tx)
+				if err != nil {
+					return nil, err
+				}
+				name, err := fc.TypeName(t)
+				if err != nil {
+					return nil, err
+				}
+				mp["type"] = name
+				mp["txid"] = txids[i]
+				mp["result"] = results[i]
+				txmps = append(txmps, mp)
+			}
+			return txmps, nil
+		})
+		as.Set("transferSends", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+			if arg.Len() != 3 {
+				return nil, apiserver.ErrInvalidArgument
+			}
+			addrStr, err := arg.String(0)
+			if err != nil {
+				return nil, err
+			}
+			addr, err := common.ParseAddress(addrStr)
+			if err != nil {
+				return nil, err
+			}
+			offset, err := arg.Int(1)
+			if err != nil {
+				return nil, err
+			}
+			count, err := arg.Int(2)
+			if err != nil {
+				return nil, err
+			}
+			txids, txs, results, err := s.getTransferSendFromTail(addr, int32(offset), int32(count))
+			if err != nil {
+				return nil, err
+			}
+			fc := encoding.Factory("transaction")
+			txmps := []map[string]interface{}{}
+			for i, tx := range txs {
+				bs, err := tx.MarshalJSON()
+				if err != nil {
+					return nil, err
+				}
+				mp := map[string]interface{}{}
+				if err := json.Unmarshal(bs, &mp); err != nil {
+					return nil, err
+				}
+				t, err := fc.TypeOf(tx)
+				if err != nil {
+					return nil, err
+				}
+				name, err := fc.TypeName(t)
+				if err != nil {
+					return nil, err
+				}
+				mp["type"] = name
+				mp["txid"] = txids[i]
+				mp["result"] = results[i]
+				txmps = append(txmps, mp)
+			}
+			return txmps, nil
+		})
+		as.Set("transferRecvs", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+			if arg.Len() != 3 {
+				return nil, apiserver.ErrInvalidArgument
+			}
+			addrStr, err := arg.String(0)
+			if err != nil {
+				return nil, err
+			}
+			addr, err := common.ParseAddress(addrStr)
+			if err != nil {
+				return nil, err
+			}
+			offset, err := arg.Int(1)
+			if err != nil {
+				return nil, err
+			}
+			count, err := arg.Int(2)
+			if err != nil {
+				return nil, err
+			}
+			txids, txs, results, err := s.getTransferRecvFromTail(addr, int32(offset), int32(count))
+			if err != nil {
+				return nil, err
+			}
+			fc := encoding.Factory("transaction")
+			txmps := []map[string]interface{}{}
+			for i, tx := range txs {
+				bs, err := tx.MarshalJSON()
+				if err != nil {
+					return nil, err
+				}
+				mp := map[string]interface{}{}
+				if err := json.Unmarshal(bs, &mp); err != nil {
+					return nil, err
+				}
+				t, err := fc.TypeOf(tx)
+				if err != nil {
+					return nil, err
+				}
+				name, err := fc.TypeName(t)
+				if err != nil {
+					return nil, err
+				}
+				mp["type"] = name
+				mp["txid"] = txids[i]
+				mp["result"] = results[i]
+				txmps = append(txmps, mp)
+			}
+			return txmps, nil
+		})
 	}
 	return nil
 }
@@ -495,6 +618,7 @@ func (s *Bank) ImportKey(name string, bs []byte, Password string) error {
 	}); err != nil {
 		return err
 	}
+	s.updateAccountData()
 	return nil
 }
 
@@ -585,4 +709,43 @@ func (s *Bank) Sign(name string, Password string, MessageHash hash.Hash256) (com
 		return common.Signature{}, err
 	}
 	return sig, nil
+}
+
+func (s *Bank) updateAccountData() error {
+	accs, err := s.st.Accounts()
+	if err != nil {
+		return err
+	}
+	if err := s.keyStore.Update(func(txn backend.StoreWriter) error {
+		for _, a := range accs {
+			switch acc := a.(type) {
+			case *vault.SingleAccount:
+				bsName, err := txn.Get(toPublicHashKey(acc.KeyHash))
+				if err != nil {
+					continue
+				}
+				if err := txn.Set(toNameAddressKey(string(bsName), acc.Address()), []byte("vault.SingleAccount")); err != nil {
+					return err
+				}
+				if err := txn.Set(toAddressNameKey(acc.Address()), bsName); err != nil {
+					return err
+				}
+			case *formulator.FormulatorAccount:
+				bsName, err := txn.Get(toPublicHashKey(acc.KeyHash))
+				if err != nil {
+					continue
+				}
+				if err := txn.Set(toNameAddressKey(string(bsName), acc.Address()), []byte("formulator.FormulatorAccount")); err != nil {
+					return err
+				}
+				if err := txn.Set(toAddressNameKey(acc.Address()), bsName); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	return nil
 }

@@ -47,6 +47,27 @@ func keyCommand(pHostURL *string) *cobra.Command {
 		},
 	})
 	cmd.AddCommand(&cobra.Command{
+		Use:   "import [name] [keyhex] (password)",
+		Short: "imports the key with name",
+		Args:  cobra.MinimumNArgs(2),
+		Run: func(cmd *cobra.Command, args []string) {
+			if strings.Contains(args[0], " ") {
+				fmt.Println("error : name cannot include a white space")
+				return
+			}
+			var Password string
+			if len(args) > 2 {
+				Password = args[2]
+			}
+			_, err := DoRequest((*pHostURL), "bank.importKey", []interface{}{args[0], args[1], Password})
+			if err != nil {
+				fmt.Println("error :", err)
+			} else {
+				fmt.Println("the key is imported")
+			}
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
 		Use:   "delete [name]",
 		Short: "deletes key that has the name",
 		Args:  cobra.MinimumNArgs(1),

@@ -77,11 +77,11 @@ func (s *Bank) WaitTx(TxHash hash.Hash256, wait time.Duration) (string, error) {
 }
 
 func (s *Bank) addTransfer(txid string, tx *vault.Transfer) error {
-	if _, err := s.db.RPush(toTransferListKey(tx.From()), []byte(txid)); err != nil {
+	if _, err := s.db.RPush(toTransferSendListKey(tx.From()), []byte(txid)); err != nil {
 		return err
 	}
 	if tx.From() != tx.To {
-		if _, err := s.db.RPush(toTransferListKey(tx.To), []byte(txid)); err != nil {
+		if _, err := s.db.RPush(toTransferRecvListKey(tx.To), []byte(txid)); err != nil {
 			return err
 		}
 	}
@@ -106,6 +106,9 @@ func (s *Bank) addTransaction(txid string, t uint16, at chain.AccountTransaction
 				return err
 			}
 		}
+	}
+	if _, err := s.db.RPush(toTransactionListKey(at.From()), []byte(txid)); err != nil {
+		return err
 	}
 	data, err := encoding.Marshal(at)
 	if err != nil {
@@ -225,6 +228,92 @@ func (s *Bank) getTransactionFromTail(addr common.Address, offset int32, count i
 
 func (s *Bank) getTransactions(addr common.Address, from int32, to int32, reverse bool) ([]string, []types.Transaction, []uint8, error) {
 	values, err := s.db.LRange(toTransactionListKey(addr), from, to)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	txids := make([]string, len(values))
+	txs := make([]types.Transaction, len(values))
+	results := make([]uint8, len(values))
+	for i, bs := range values {
+		txid := string(bs)
+		tx, result, err := s.getTransaction(txid)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		if reverse {
+			txids[len(values)-1-i] = txid
+			txs[len(values)-1-i] = tx
+			results[len(values)-1-i] = result
+		} else {
+			txids[i] = txid
+			txs[i] = tx
+			results[i] = result
+		}
+	}
+	return txids, txs, results, nil
+}
+
+func (s *Bank) getTransferSendFromTail(addr common.Address, offset int32, count int32) ([]string, []types.Transaction, []uint8, error) {
+	v, err := s.db.LLen(toTransferSendListKey(addr))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	from := int32(v) - count - offset
+	if from < 0 {
+		from = 0
+	}
+	to := int32(v) - offset
+	if to < 0 {
+		to = 0
+	}
+	return s.getTransferSends(addr, from, to, true)
+}
+
+func (s *Bank) getTransferSends(addr common.Address, from int32, to int32, reverse bool) ([]string, []types.Transaction, []uint8, error) {
+	values, err := s.db.LRange(toTransferSendListKey(addr), from, to)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	txids := make([]string, len(values))
+	txs := make([]types.Transaction, len(values))
+	results := make([]uint8, len(values))
+	for i, bs := range values {
+		txid := string(bs)
+		tx, result, err := s.getTransaction(txid)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		if reverse {
+			txids[len(values)-1-i] = txid
+			txs[len(values)-1-i] = tx
+			results[len(values)-1-i] = result
+		} else {
+			txids[i] = txid
+			txs[i] = tx
+			results[i] = result
+		}
+	}
+	return txids, txs, results, nil
+}
+
+func (s *Bank) getTransferRecvFromTail(addr common.Address, offset int32, count int32) ([]string, []types.Transaction, []uint8, error) {
+	v, err := s.db.LLen(toTransferRecvListKey(addr))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	from := int32(v) - count - offset
+	if from < 0 {
+		from = 0
+	}
+	to := int32(v) - offset
+	if to < 0 {
+		to = 0
+	}
+	return s.getTransferRecvs(addr, from, to, true)
+}
+
+func (s *Bank) getTransferRecvs(addr common.Address, from int32, to int32, reverse bool) ([]string, []types.Transaction, []uint8, error) {
+	values, err := s.db.LRange(toTransferRecvListKey(addr), from, to)
 	if err != nil {
 		return nil, nil, nil, err
 	}
