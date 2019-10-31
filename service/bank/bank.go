@@ -272,7 +272,7 @@ func (s *Bank) Init(pm types.ProcessManager, cn types.Provider) error {
 			Seq := s.cn.Seq(from)
 			tx := &vault.Transfer{
 				Timestamp_: uint64(time.Now().UnixNano()),
-				Seq_:       Seq,
+				Seq_:       Seq + 1,
 				From_:      from,
 				To:         to,
 				Amount:     am,
