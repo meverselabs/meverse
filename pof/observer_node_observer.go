@@ -587,6 +587,16 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 				sigs = append(sigs, vt.ObserverSignature)
 			}
 
+			PastTime := uint64(time.Now().UnixNano()) - ob.roundFirstTime
+			ExpectedTime := uint64(msg.BlockVote.Header.Height-ob.roundFirstHeight) * uint64(500*time.Millisecond)
+			if PastTime < ExpectedTime {
+				diff := time.Duration(ExpectedTime - PastTime)
+				if diff > 500*time.Millisecond {
+					diff = 500 * time.Millisecond
+				}
+				time.Sleep(diff)
+			}
+
 			b := &types.Block{
 				Header:                br.BlockGenMessage.Block.Header,
 				TransactionTypes:      br.BlockGenMessage.Block.TransactionTypes,
@@ -657,17 +667,6 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 			}
 			brNext, has := ob.round.BlockRoundMap[NextHeight]
 			if has && Top.Address == ob.round.MinRoundVoteAck.Formulator {
-				PastTime := uint64(time.Now().UnixNano()) - ob.roundFirstTime
-				ExpectedTime := uint64(msg.BlockVote.Header.Height-ob.roundFirstHeight) * uint64(500*time.Millisecond)
-
-				if PastTime < ExpectedTime {
-					diff := time.Duration(ExpectedTime - PastTime)
-					if diff > 500*time.Millisecond {
-						diff = 500 * time.Millisecond
-					}
-					time.Sleep(diff)
-				}
-
 				ob.round.RoundState = BlockWaitState
 				ob.round.VoteFailCount = 0
 				ob.round.TargetHeight++
