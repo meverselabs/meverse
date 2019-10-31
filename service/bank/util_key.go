@@ -4,13 +4,20 @@ import (
 	"bytes"
 
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/binutil"
 )
 
 var (
-	tagSecret      = []byte{1, 0}
-	tagPublicHash  = []byte{1, 1}
-	tagNameAddress = []byte{2, 0}
-	tagAddressName = []byte{2, 1}
+	tagSecret          = []byte{1, 0}
+	tagPublicHash      = []byte{1, 1}
+	tagNameAddress     = []byte{2, 0}
+	tagAddressName     = []byte{2, 1}
+	tagTransaction     = []byte{3, 0}
+	tagTransactionList = []byte{3, 1}
+	tagTransferList    = []byte{3, 2}
+	tagAccountAddress  = []byte{3, 3}
+	tagAddressKeyHash  = []byte{3, 4}
+	tagUnstaking       = []byte{3, 5}
 )
 
 func toSecretKey(name string) []byte {
@@ -66,4 +73,37 @@ func fromNameAddress(bs []byte, name string) (common.Address, error) {
 	var addr common.Address
 	copy(addr[:], bs[2+len(name):])
 	return addr, nil
+}
+
+func toTransferListKey(addr common.Address) []byte {
+	bs := make([]byte, 2+common.AddressSize)
+	copy(bs, tagTransferList)
+	copy(bs[2:], addr[:])
+	return bs
+}
+func toTransactionListKey(addr common.Address) []byte {
+	bs := make([]byte, 2+common.AddressSize)
+	copy(bs, tagTransactionList)
+	copy(bs[2:], addr[:])
+	return bs
+}
+func toAccountKey(pubhash common.PublicHash) []byte {
+	bs := make([]byte, 2+common.PublicHashSize)
+	copy(bs, tagAccountAddress)
+	copy(bs[2:], pubhash[:])
+	return bs
+}
+
+func toUnstakingKey(addr common.Address) []byte {
+	bs := make([]byte, 2+common.AddressSize)
+	copy(bs, tagUnstaking)
+	copy(bs[2:], addr[:])
+	return bs
+}
+func toUnstakingSubKey(haddr common.Address, UnstakedHeight uint32) []byte {
+	bs := make([]byte, 6+common.AddressSize)
+	copy(bs, tagUnstaking)
+	copy(bs[2:], binutil.LittleEndian.Uint32ToBytes(UnstakedHeight))
+	copy(bs[6:], haddr[:])
+	return bs
 }

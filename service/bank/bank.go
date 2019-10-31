@@ -5,6 +5,9 @@ import (
 	"sync"
 	"time"
 
+	lediscfg "github.com/siddontang/ledisdb/config"
+	"github.com/siddontang/ledisdb/ledis"
+
 	"github.com/fletaio/fleta/service/p2p"
 
 	"github.com/fletaio/fleta/common/amount"
@@ -26,13 +29,26 @@ type Bank struct {
 	keyStore  backend.StoreBackend
 	cn        types.Provider
 	nd        *p2p.Node
+	db        *ledis.DB
 	waitTxMap map[hash.Hash256]*chan string
 }
 
 // NewBank returns a Bank
-func NewBank(keyStore backend.StoreBackend) *Bank {
+func NewBank(keyStore backend.StoreBackend, dbpath string) *Bank {
+	cfg := lediscfg.NewConfigDefault()
+	cfg.DataDir = dbpath
+	l, err := ledis.Open(cfg)
+	if err != nil {
+		panic(err)
+	}
+	db, err := l.Select(0)
+	if err != nil {
+		panic(err)
+	}
+
 	s := &Bank{
 		keyStore:  keyStore,
+		db:        db,
 		waitTxMap: map[hash.Hash256]*chan string{},
 	}
 	return s
@@ -305,7 +321,67 @@ func (s *Bank) OnLoadChain(loader types.Loader) error {
 
 // OnBlockConnected called when a block is connected to the chain
 func (s *Bank) OnBlockConnected(b *types.Block, events []types.Event, loader types.Loader) {
+	s.keyStore.View(func(txn backend.StoreReader) error {
+		for i, t := range b.Transactions {
+			TXID := types.TransactionID(b.Header.Height, uint16(i))
+			res := b.TransactionResults[i]
+			if at, is := t.(chain.AccountTransaction); is {
+				if tx, is := t.(*vault.Transfer); is {
+					_, err := txn.Get(toAddressNameKey(tx.From()))
+					if err != nil {
+						_, err := txn.Get(toAddressNameKey(tx.To))
+						if err != nil {
+							continue
+						}
+					}
+				} else {
+					_, err := txn.Get(toAddressNameKey(at.From()))
+					if err != nil {
+						continue
+					}
+				}
 
+				s.addTransaction(TXID, b.TransactionTypes[i], at, res)
+				CreatedAddr := common.NewAddress(b.Header.Height, uint16(i), 0)
+				if res == 1 {
+					switch tx := t.(type) {
+					case *vault.CreateAccount:
+						s.addAccount(CreatedAddr, tx.KeyHash)
+					case *vault.IssueAccount:
+						s.addAccount(CreatedAddr, tx.KeyHash)
+					case *formulator.ChangeOwner:
+						s.removeAccount(tx.From())
+						s.addAccount(tx.From(), tx.KeyHash)
+					case *formulator.CreateAlpha:
+						s.addAccount(CreatedAddr, tx.KeyHash)
+					case *formulator.Transmute:
+						s.addAccount(CreatedAddr, tx.KeyHash)
+					case *formulator.CreateSigma:
+						for i, addr := range tx.AlphaFormulators {
+							if i > 0 {
+								s.removeAccount(addr)
+							}
+						}
+					case *formulator.CreateOmega:
+						for i, addr := range tx.SigmaFormulators {
+							if i > 0 {
+								s.removeAccount(addr)
+							}
+						}
+					case *formulator.CreateHyper:
+						s.addAccount(CreatedAddr, tx.KeyHash)
+					case *formulator.Unstaking:
+						s.addUnstaking(tx.HyperFormulator, tx.From(), b.Header.Height+2592000, tx.Amount)
+					case *formulator.RevertUnstaking:
+						s.removeUnstaking(tx.HyperFormulator, tx.From(), tx.UnstakedHeight, tx.Amount)
+					case *vault.Transfer:
+						s.addTransfer(TXID, tx)
+					}
+				}
+			}
+		}
+		return nil
+	})
 }
 
 // KeyNames returns names of keys from the wallet
