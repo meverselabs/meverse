@@ -29,6 +29,13 @@ func (s *JRPCSub) Set(Method string, h Handler) {
 
 // JRPCRequest is a jrpc request
 type JRPCRequest struct {
+	JSONRPC string        `json:"jsonrpc"`
+	ID      interface{}   `json:"id"`
+	Method  string        `json:"method"`
+	Params  []interface{} `json:"params"`
+}
+
+type jRPCRequest struct {
 	JSONRPC string         `json:"jsonrpc"`
 	ID      interface{}    `json:"id"`
 	Method  string         `json:"method"`

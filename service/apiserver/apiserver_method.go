@@ -26,7 +26,7 @@ func (s *APIServer) Run(BindAddress string) error {
 		dec := json.NewDecoder(c.Request().Body)
 		dec.UseNumber()
 
-		var req JRPCRequest
+		var req jRPCRequest
 		if err := dec.Decode(&req); err != nil {
 			return err
 		}
@@ -55,7 +55,7 @@ func (s *APIServer) Run(BindAddress string) error {
 				dec := json.NewDecoder(bytes.NewReader(data))
 				dec.UseNumber()
 
-				var req JRPCRequest
+				var req jRPCRequest
 				if err := dec.Decode(&req); err != nil {
 					return err
 				}
@@ -87,7 +87,7 @@ func (s *APIServer) JRPC(SubName string) (*JRPCSub, error) {
 	return js, nil //TEMP
 }
 
-func (s *APIServer) handleJRPC(req *JRPCRequest) *JRPCResponse {
+func (s *APIServer) handleJRPC(req *jRPCRequest) *JRPCResponse {
 	ls := strings.SplitN(req.Method, ".", 2)
 	if len(ls) != 2 {
 		res := &JRPCResponse{

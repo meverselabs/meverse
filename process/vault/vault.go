@@ -1,7 +1,6 @@
 package vault
 
 import (
-	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/process/admin"
@@ -69,20 +68,9 @@ func (p *Vault) Init(reg *types.Register, pm types.ProcessManager, cn types.Prov
 		if err != nil {
 			return err
 		}
-		s.Set("getBalance", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
-			if arg.Len() != 1 {
-				return nil, apiserver.ErrInvalidArgument
-			}
-			arg0, err := arg.String(0)
-			if err != nil {
-				return nil, err
-			}
-			addr, err := common.ParseAddress(arg0)
-			if err != nil {
-				return nil, err
-			}
+		s.Set("collectedFee", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 			loader := cn.NewLoaderWrapper(p.ID())
-			return p.Balance(loader, addr), nil
+			return p.CollectedFee(loader), nil
 		})
 	}
 	return nil

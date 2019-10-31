@@ -84,6 +84,20 @@ func (s *Bank) Init(pm types.ProcessManager, cn types.Provider) error {
 			}
 			return names, nil
 		})
+		as.Set("accounts", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+			if arg.Len() != 1 {
+				return nil, apiserver.ErrInvalidArgument
+			}
+			name, err := arg.String(0)
+			if err != nil {
+				return nil, err
+			}
+			addrs, err := s.Accounts(name)
+			if err != nil {
+				return nil, err
+			}
+			return addrs, nil
+		})
 		as.Set("createKey", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 			if arg.Len() != 2 {
 				return nil, apiserver.ErrInvalidArgument
@@ -188,6 +202,7 @@ func (s *Bank) OnLoadChain(loader types.Loader) error {
 
 // OnBlockConnected called when a block is connected to the chain
 func (s *Bank) OnBlockConnected(b *types.Block, events []types.Event, loader types.Loader) {
+	
 }
 
 // KeyNames returns names of keys from the wallet
