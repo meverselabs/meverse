@@ -10,6 +10,7 @@ var (
 	tagSecret      = []byte{1, 0}
 	tagPublicHash  = []byte{1, 1}
 	tagNameAddress = []byte{2, 0}
+	tagAddressName = []byte{2, 1}
 )
 
 func toSecretKey(name string) []byte {
@@ -45,6 +46,13 @@ func toNameAddressPrefix(name string) []byte {
 	bs := make([]byte, 2+len(name))
 	copy(bs, tagNameAddress)
 	copy(bs[2:], []byte(name))
+	return bs
+}
+
+func toAddressNameKey(addr common.Address) []byte {
+	bs := make([]byte, 2+common.AddressSize)
+	copy(bs, tagNameAddress)
+	copy(bs[2:], addr[:])
 	return bs
 }
 

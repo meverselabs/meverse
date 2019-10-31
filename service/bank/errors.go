@@ -4,7 +4,10 @@ import "errors"
 
 // errors
 var (
-	ErrExistKeyName       = errors.New("exist key name")
-	ErrInvalidTag         = errors.New("invalid key tag")
-	ErrInvalidNameAddress = errors.New("invalid name address")
+	ErrExistKeyName           = errors.New("exist key name")
+	ErrInvalidTag             = errors.New("invalid key tag")
+	ErrInvalidNameAddress     = errors.New("invalid name address")
+	ErrInvalidTransactionHash = errors.New("invalid transaction hash")
+	ErrTransactionTimeout     = errors.New("transaction timeout")
+	ErrTransactionFailed      = errors.New("transaction failed")
 )

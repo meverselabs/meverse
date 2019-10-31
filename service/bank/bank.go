@@ -2,6 +2,12 @@ package bank
 
 import (
 	"encoding/hex"
+	"sync"
+	"time"
+
+	"github.com/fletaio/fleta/service/p2p"
+
+	"github.com/fletaio/fleta/common/amount"
 
 	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/process/formulator"
@@ -16,13 +22,18 @@ import (
 )
 
 type Bank struct {
-	keyStore backend.StoreBackend
+	sync.Mutex
+	keyStore  backend.StoreBackend
+	cn        types.Provider
+	nd        *p2p.Node
+	waitTxMap map[hash.Hash256]*chan string
 }
 
 // NewBank returns a Bank
 func NewBank(keyStore backend.StoreBackend) *Bank {
 	s := &Bank{
-		keyStore: keyStore,
+		keyStore:  keyStore,
+		waitTxMap: map[hash.Hash256]*chan string{},
 	}
 	return s
 }
@@ -49,12 +60,18 @@ func (s *Bank) InitFromStore(st *chain.Store) error {
 				if err := txn.Set(toNameAddressKey(string(bsName), acc.Address()), []byte("vault.SingleAccount")); err != nil {
 					return err
 				}
+				if err := txn.Set(toAddressNameKey(acc.Address()), bsName); err != nil {
+					return err
+				}
 			case *formulator.FormulatorAccount:
 				bsName, err := txn.Get(toPublicHashKey(acc.KeyHash))
 				if err != nil {
 					continue
 				}
 				if err := txn.Set(toNameAddressKey(string(bsName), acc.Address()), []byte("formulator.FormulatorAccount")); err != nil {
+					return err
+				}
+				if err := txn.Set(toAddressNameKey(acc.Address()), bsName); err != nil {
 					return err
 				}
 			}
@@ -66,8 +83,14 @@ func (s *Bank) InitFromStore(st *chain.Store) error {
 	return nil
 }
 
+func (s *Bank) SetNode(nd *p2p.Node) {
+	s.nd = nd
+}
+
 // Init called when initialize service
 func (s *Bank) Init(pm types.ProcessManager, cn types.Provider) error {
+	s.cn = cn
+
 	if vs, err := pm.ServiceByName("fleta.apiserver"); err != nil {
 		//ignore when not loaded
 	} else if v, is := vs.(*apiserver.APIServer); !is {
@@ -191,6 +214,86 @@ func (s *Bank) Init(pm types.ProcessManager, cn types.Provider) error {
 			}
 			return nil, nil
 		})
+		as.Set("accountDetail", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+			if arg.Len() != 1 {
+				return nil, apiserver.ErrInvalidArgument
+			}
+			addrStr, err := arg.String(0)
+			if err != nil {
+				return nil, err
+			}
+			addr, err := common.ParseAddress(addrStr)
+			if err != nil {
+				return nil, err
+			}
+			acc, err := s.cn.NewLoaderWrapper(1).Account(addr)
+			if err != nil {
+				return nil, err
+			}
+			return acc, nil
+		})
+		as.Set("send", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+			if arg.Len() != 4 {
+				return nil, apiserver.ErrInvalidArgument
+			}
+			fromStr, err := arg.String(0)
+			if err != nil {
+				return nil, err
+			}
+			from, err := common.ParseAddress(fromStr)
+			if err != nil {
+				return nil, err
+			}
+			toStr, err := arg.String(1)
+			if err != nil {
+				return nil, err
+			}
+			to, err := common.ParseAddress(toStr)
+			if err != nil {
+				return nil, err
+			}
+			amStr, err := arg.String(2)
+			if err != nil {
+				return nil, err
+			}
+			am, err := amount.ParseAmount(amStr)
+			if err != nil {
+				return nil, err
+			}
+			Password, err := arg.String(3)
+			if err != nil {
+				return nil, err
+			}
+
+			name, err := s.NameByAddress(from)
+			if err != nil {
+				return nil, err
+			}
+			Seq := s.cn.Seq(from)
+			tx := &vault.Transfer{
+				Timestamp_: uint64(time.Now().UnixNano()),
+				Seq_:       Seq,
+				From_:      from,
+				To:         to,
+				Amount:     am,
+			}
+			TxHash := chain.HashTransaction(s.cn.ChainID(), tx)
+			sig, err := s.Sign(name, Password, TxHash)
+			if err != nil {
+				return nil, err
+			}
+			if err := s.nd.AddTx(tx, []common.Signature{sig}); err != nil {
+				return nil, err
+			}
+			//TODO : TxHash
+			/*
+				TXID, err := s.WaitTx(TxHash, 10*time.Second)
+				if err != nil {
+					return nil, err
+				}
+			*/
+			return TxHash, nil
+		})
 	}
 	return nil
 }
@@ -202,7 +305,7 @@ func (s *Bank) OnLoadChain(loader types.Loader) error {
 
 // OnBlockConnected called when a block is connected to the chain
 func (s *Bank) OnBlockConnected(b *types.Block, events []types.Event, loader types.Loader) {
-	
+
 }
 
 // KeyNames returns names of keys from the wallet
@@ -241,6 +344,22 @@ func (s *Bank) Accounts(name string) ([]common.Address, error) {
 		return nil, err
 	}
 	return addrs, nil
+}
+
+// NameByAddress returns the name of the address from the wallet
+func (s *Bank) NameByAddress(addr common.Address) (string, error) {
+	var name string
+	if err := s.keyStore.View(func(txn backend.StoreReader) error {
+		bs, err := txn.Get(toAddressNameKey(addr))
+		if err != nil {
+			return err
+		}
+		name = string(bs)
+		return nil
+	}); err != nil {
+		return "", err
+	}
+	return name, nil
 }
 
 // CreateKey creates the private key with password to the wallet
