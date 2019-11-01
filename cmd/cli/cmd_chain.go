@@ -16,7 +16,7 @@ func chainCommand(pHostURL *string) *cobra.Command {
 		Short: "returns the height of the chain",
 		Args:  cobra.MinimumNArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
-			res, err := DoRequest((*pHostURL), "bank.height", []interface{}{args[0]})
+			res, err := DoRequest((*pHostURL), "bank.height", []interface{}{})
 			if err != nil {
 				fmt.Println("error :", err)
 			} else {
