@@ -15,7 +15,7 @@ func txCommand(pHostURL *string) *cobra.Command {
 	}
 	cmd.AddCommand(&cobra.Command{
 		Use:   "get [txid]",
-		Short: "returns transactions of the txid",
+		Short: "returns transaction of the txid",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			res, err := DoRequest((*pHostURL), "bank.transaction", []interface{}{args[0]})

@@ -11,5 +11,6 @@ func main() {
 	rootCmd.AddCommand(keyCommand(&hostURL))
 	rootCmd.AddCommand(accountCommand(&hostURL))
 	rootCmd.AddCommand(txCommand(&hostURL))
+	rootCmd.AddCommand(chainCommand(&hostURL))
 	rootCmd.Execute()
 }

@@ -91,6 +91,9 @@ func (s *Bank) Init(pm types.ProcessManager, cn types.Provider) error {
 		if err != nil {
 			return err
 		}
+		as.Set("height", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+			return s.cn.Height(), nil
+		})
 		as.Set("keyNames", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 			names, err := s.KeyNames()
 			if err != nil {
@@ -285,9 +288,15 @@ func (s *Bank) Init(pm types.ProcessManager, cn types.Provider) error {
 			TxHash := chain.HashTransaction(s.cn.ChainID(), tx)
 			sig, err := s.Sign(name, Password, TxHash)
 			if err != nil {
+				s.Lock()
+				s.seqMap[from] = Seq - 1
+				s.Unlock()
 				return nil, err
 			}
 			if err := s.nd.AddTx(tx, []common.Signature{sig}); err != nil {
+				s.Lock()
+				s.seqMap[from] = Seq - 1
+				s.Unlock()
 				return nil, err
 			}
 			if err := s.addPending(tx); err != nil {
