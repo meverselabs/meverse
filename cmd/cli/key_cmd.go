@@ -68,7 +68,24 @@ func keyCommand(pHostURL *string) *cobra.Command {
 		},
 	})
 	cmd.AddCommand(&cobra.Command{
-		Use:   "delete [name]",
+		Use:   "password [name] [oldpassword] [newpassword]",
+		Short: "changes the password of a key with the name",
+		Args:  cobra.MinimumNArgs(3),
+		Run: func(cmd *cobra.Command, args []string) {
+			if strings.Contains(args[0], " ") {
+				fmt.Println("error : name cannot include a white space")
+				return
+			}
+			_, err := DoRequest((*pHostURL), "bank.changePassword", []interface{}{args[0], args[1], args[2]})
+			if err != nil {
+				fmt.Println("error :", err)
+			} else {
+				fmt.Println("the pasword is changed")
+			}
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "delete [name] (password)",
 		Short: "deletes key that has the name",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -76,7 +93,11 @@ func keyCommand(pHostURL *string) *cobra.Command {
 				fmt.Println("error : name cannot include a white space")
 				return
 			}
-			_, err := DoRequest((*pHostURL), "bank.deleteKey", []interface{}{args[0]})
+			var Password string
+			if len(args) > 1 {
+				Password = args[1]
+			}
+			_, err := DoRequest((*pHostURL), "bank.deleteKey", []interface{}{args[0], Password})
 			if err != nil {
 				fmt.Println("error :", err)
 			} else {

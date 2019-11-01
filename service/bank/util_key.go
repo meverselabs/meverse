@@ -16,6 +16,8 @@ var (
 	tagTransactionList  = []byte{3, 1}
 	tagTransferSendList = []byte{3, 2}
 	tagTransferRecvList = []byte{3, 3}
+	tagPending          = []byte{3, 4}
+	tagPendingAddress   = []byte{3, 5}
 	tagAccountAddress   = []byte{4, 1}
 	tagAddressKeyHash   = []byte{4, 2}
 	tagUnstaking        = []byte{5, 1}
@@ -82,18 +84,28 @@ func toTransferSendListKey(addr common.Address) []byte {
 	copy(bs[2:], addr[:])
 	return bs
 }
+
 func toTransferRecvListKey(addr common.Address) []byte {
 	bs := make([]byte, 2+common.AddressSize)
 	copy(bs, tagTransferRecvList)
 	copy(bs[2:], addr[:])
 	return bs
 }
+
 func toTransactionListKey(addr common.Address) []byte {
 	bs := make([]byte, 2+common.AddressSize)
 	copy(bs, tagTransactionList)
 	copy(bs[2:], addr[:])
 	return bs
 }
+
+func toPendingAddressKey(addr common.Address) []byte {
+	bs := make([]byte, 2+common.AddressSize)
+	copy(bs, tagPendingAddress)
+	copy(bs[2:], addr[:])
+	return bs
+}
+
 func toAccountKey(pubhash common.PublicHash) []byte {
 	bs := make([]byte, 2+common.PublicHashSize)
 	copy(bs, tagAccountAddress)
@@ -107,6 +119,7 @@ func toUnstakingKey(addr common.Address) []byte {
 	copy(bs[2:], addr[:])
 	return bs
 }
+
 func toUnstakingSubKey(haddr common.Address, UnstakedHeight uint32) []byte {
 	bs := make([]byte, 6+common.AddressSize)
 	copy(bs, tagUnstaking)

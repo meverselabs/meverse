@@ -33,6 +33,7 @@ type Bank struct {
 	cn        types.Provider
 	nd        *p2p.Node
 	db        *ledis.DB
+	seqMap    map[common.Address]uint64
 	waitTxMap map[hash.Hash256]*chan string
 }
 
@@ -52,6 +53,7 @@ func NewBank(keyStore backend.StoreBackend, dbpath string) *Bank {
 	s := &Bank{
 		keyStore:  keyStore,
 		db:        db,
+		seqMap:    map[common.Address]uint64{},
 		waitTxMap: map[hash.Hash256]*chan string{},
 	}
 	return s
@@ -170,7 +172,7 @@ func (s *Bank) Init(pm types.ProcessManager, cn types.Provider) error {
 			return nil, nil
 		})
 		as.Set("changePassword", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
-			if arg.Len() != 2 {
+			if arg.Len() != 3 {
 				return nil, apiserver.ErrInvalidArgument
 			}
 			name, err := arg.String(0)
@@ -191,14 +193,18 @@ func (s *Bank) Init(pm types.ProcessManager, cn types.Provider) error {
 			return nil, nil
 		})
 		as.Set("deleteKey", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
-			if arg.Len() != 1 {
+			if arg.Len() != 2 {
 				return nil, apiserver.ErrInvalidArgument
 			}
 			name, err := arg.String(0)
 			if err != nil {
 				return nil, err
 			}
-			if err := s.DeleteKey(name); err != nil {
+			Password, err := arg.String(1)
+			if err != nil {
+				return nil, err
+			}
+			if err := s.DeleteKey(name, Password); err != nil {
 				return nil, err
 			}
 			return nil, nil
@@ -258,10 +264,20 @@ func (s *Bank) Init(pm types.ProcessManager, cn types.Provider) error {
 			if err != nil {
 				return nil, err
 			}
-			Seq := s.cn.Seq(from)
+
+			s.Lock()
+			Seq, has := s.seqMap[from]
+			ChainSeq := s.cn.Seq(from)
+			if !has || Seq < ChainSeq {
+				Seq = ChainSeq
+			}
+			Seq++
+			s.seqMap[from] = Seq
+			s.Unlock()
+
 			tx := &vault.Transfer{
 				Timestamp_: uint64(time.Now().UnixNano()),
-				Seq_:       Seq + 1,
+				Seq_:       Seq,
 				From_:      from,
 				To:         to,
 				Amount:     am,
@@ -274,14 +290,51 @@ func (s *Bank) Init(pm types.ProcessManager, cn types.Provider) error {
 			if err := s.nd.AddTx(tx, []common.Signature{sig}); err != nil {
 				return nil, err
 			}
-			//TODO : TxHash
-			/*
-				TXID, err := s.WaitTx(TxHash, 10*time.Second)
-				if err != nil {
-					return nil, err
-				}
-			*/
+			if err := s.addPending(tx); err != nil {
+				return nil, err
+			}
 			return TxHash, nil
+		})
+		as.Set("transaction", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+			if arg.Len() != 1 {
+				return nil, apiserver.ErrInvalidArgument
+			}
+			txid, err := arg.String(0)
+			if err != nil {
+				return nil, err
+			}
+			height, index, err := types.ParseTransactionID(txid)
+			if err != nil {
+				return nil, err
+			}
+			b, err := s.cn.Block(height)
+			if err != nil {
+				return nil, err
+			}
+			if len(b.Transactions) <= int(index) {
+				return nil, ErrInvalidTXID
+			}
+			t := b.TransactionTypes[index]
+			tx := b.Transactions[index]
+			result := b.TransactionResults[index]
+
+			fc := encoding.Factory("transaction")
+			bs, err := tx.MarshalJSON()
+			if err != nil {
+				return nil, err
+			}
+			mp := map[string]interface{}{}
+			if err := json.Unmarshal(bs, &mp); err != nil {
+				return nil, err
+			}
+			name, err := fc.TypeName(t)
+			if err != nil {
+				return nil, err
+			}
+			mp["type"] = name
+			mp["txid"] = txid
+			mp["result"] = result
+			return mp, nil
 		})
 		as.Set("transactions", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 			if arg.Len() != 3 {
@@ -433,6 +486,47 @@ func (s *Bank) Init(pm types.ProcessManager, cn types.Provider) error {
 			}
 			return txmps, nil
 		})
+		as.Set("pendings", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+			if arg.Len() != 1 {
+				return nil, apiserver.ErrInvalidArgument
+			}
+			addrStr, err := arg.String(0)
+			if err != nil {
+				return nil, err
+			}
+			addr, err := common.ParseAddress(addrStr)
+			if err != nil {
+				return nil, err
+			}
+			txs, err := s.getPendingsByAddress(addr)
+			if err != nil {
+				return nil, err
+			}
+			fc := encoding.Factory("transaction")
+			txmps := []map[string]interface{}{}
+			for _, tx := range txs {
+				bs, err := tx.MarshalJSON()
+				if err != nil {
+					return nil, err
+				}
+				mp := map[string]interface{}{}
+				if err := json.Unmarshal(bs, &mp); err != nil {
+					return nil, err
+				}
+				t, err := fc.TypeOf(tx)
+				if err != nil {
+					return nil, err
+				}
+				name, err := fc.TypeName(t)
+				if err != nil {
+					return nil, err
+				}
+				mp["tx_hash"] = chain.HashTransactionByType(s.cn.ChainID(), t, tx).String()
+				mp["type"] = name
+				txmps = append(txmps, mp)
+			}
+			return txmps, nil
+		})
 	}
 	return nil
 }
@@ -449,6 +543,8 @@ func (s *Bank) OnBlockConnected(b *types.Block, events []types.Event, loader typ
 			TXID := types.TransactionID(b.Header.Height, uint16(i))
 			res := b.TransactionResults[i]
 			if at, is := t.(chain.AccountTransaction); is {
+				s.removePending(at)
+
 				if tx, is := t.(*vault.Transfer); is {
 					_, err := txn.Get(toAddressNameKey(tx.From()))
 					if err != nil {
@@ -668,8 +764,17 @@ func (s *Bank) ChangePassword(name string, oldPassword string, Password string) 
 }
 
 // DeleteKey removes the private key from the wallet
-func (s *Bank) DeleteKey(name string) error {
+func (s *Bank) DeleteKey(name string, Password string) error {
 	if err := s.keyStore.Update(func(txn backend.StoreWriter) error {
+		bs, err := txn.Get(toSecretKey(name))
+		if err != nil {
+			return err
+		}
+		des, err := Decipher(bs, Password)
+		if err != nil {
+			return err
+		}
+		copy(des, make([]byte, len(des)))
 		if err := txn.Delete(toSecretKey(name)); err != nil {
 			return err
 		}

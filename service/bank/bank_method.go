@@ -338,3 +338,79 @@ func (s *Bank) getTransferRecvs(addr common.Address, from int32, to int32, rever
 	}
 	return txids, txs, results, nil
 }
+
+func (s *Bank) addPending(at chain.AccountTransaction) error {
+	TxHash := chain.HashTransaction(s.cn.ChainID(), at.(types.Transaction))
+	if _, err := s.db.HSet(toPendingAddressKey(at.From()), TxHash[:], []byte{1}); err != nil {
+		return err
+	}
+	fc := encoding.Factory("transaction")
+	t, err := fc.TypeOf(at)
+	if err != nil {
+		return err
+	}
+	data, err := encoding.Marshal(at)
+	if err != nil {
+		return err
+	}
+	bs, err := encoding.Marshal(&Transaction{
+		Type: t,
+		Data: data,
+	})
+	if err != nil {
+		return err
+	}
+	if _, err := s.db.HSet(tagPending, TxHash[:], bs); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Bank) getPendingsByAddress(addr common.Address) ([]types.Transaction, error) {
+	pairs, err := s.db.HGetAll(toPendingAddressKey(addr))
+	if err != nil {
+		return nil, err
+	}
+	txs := []types.Transaction{}
+	for _, pair := range pairs {
+		var TxHash hash.Hash256
+		copy(TxHash[:], pair.Field)
+		tx, err := s.getPending(TxHash)
+		if err != nil {
+			return nil, err
+		}
+		txs = append(txs, tx)
+	}
+	return txs, nil
+}
+
+func (s *Bank) getPending(TxHash hash.Hash256) (types.Transaction, error) {
+	bs, err := s.db.HGet(tagPending, TxHash[:])
+	if err != nil {
+		return nil, err
+	}
+	item := &Transaction{}
+	if err := encoding.Unmarshal(bs, &item); err != nil {
+		return nil, err
+	}
+	fc := encoding.Factory("transaction")
+	t, err := fc.Create(item.Type)
+	if err != nil {
+		return nil, err
+	}
+	if err := encoding.Unmarshal(item.Data, &t); err != nil {
+		return nil, err
+	}
+	return t.(types.Transaction), nil
+}
+
+func (s *Bank) removePending(at chain.AccountTransaction) error {
+	TxHash := chain.HashTransaction(s.cn.ChainID(), at.(types.Transaction))
+	if _, err := s.db.HDel(toPendingAddressKey(at.From()), TxHash[:]); err != nil {
+		return err
+	}
+	if _, err := s.db.HDel(tagPending, TxHash[:]); err != nil {
+		return err
+	}
+	return nil
+}

@@ -14,6 +14,42 @@ func txCommand(pHostURL *string) *cobra.Command {
 		Short: "manages accounts and balances",
 	}
 	cmd.AddCommand(&cobra.Command{
+		Use:   "get [txid]",
+		Short: "returns transactions of the txid",
+		Args:  cobra.MinimumNArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			res, err := DoRequest((*pHostURL), "bank.transaction", []interface{}{args[0]})
+			if err != nil {
+				fmt.Println("error :", err)
+			} else {
+				bs, err := json.MarshalIndent(res, "", "\t")
+				if err != nil {
+					fmt.Println("error :", err)
+				} else {
+					fmt.Println(string(bs))
+				}
+			}
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "pendings [address]",
+		Short: "returns pending transactions of the address",
+		Args:  cobra.MinimumNArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			res, err := DoRequest((*pHostURL), "bank.pendings", []interface{}{args[0]})
+			if err != nil {
+				fmt.Println("error :", err)
+			} else {
+				bs, err := json.MarshalIndent(res, "", "\t")
+				if err != nil {
+					fmt.Println("error :", err)
+				} else {
+					fmt.Println(string(bs))
+				}
+			}
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
 		Use:   "list [address] (offset=0) (count=10)",
 		Short: "returns transactions of the address from recents (default: offset=0, count=10)",
 		Args:  cobra.MinimumNArgs(1),
