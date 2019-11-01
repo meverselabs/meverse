@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -20,7 +21,12 @@ func chainCommand(pHostURL *string) *cobra.Command {
 			if err != nil {
 				fmt.Println("error :", err)
 			} else {
-				fmt.Println(res)
+				bs, err := json.MarshalIndent(res, "", "\t")
+				if err != nil {
+					fmt.Println("error :", err)
+				} else {
+					fmt.Println(string(bs))
+				}
 			}
 		},
 	})
