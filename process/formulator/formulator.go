@@ -9,7 +9,7 @@ import (
 	"github.com/fletaio/fleta/process/vault"
 )
 
-// Formulator manages balance of accounts of the chain
+// Formulator serves reward system of the chain
 type Formulator struct {
 	*types.ProcessBase
 	pid   uint8
