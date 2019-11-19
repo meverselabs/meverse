@@ -19,6 +19,7 @@ var (
 	ErrInvalidFormulatorAddress                = errors.New("invalid formulator address")
 	ErrInvalidFormulatorCount                  = errors.New("invalid formulator count")
 	ErrInsufficientFormulatorBlocks            = errors.New("insufficient formulator blocks")
+	ErrInsufficientFormulatorRewardCount       = errors.New("insufficient formulator reward count")
 	ErrCriticalStakingAmount                   = errors.New("critical staking amount")
 	ErrInsufficientStakingAmount               = errors.New("insufficient staking amount")
 	ErrInvalidRewardPolicy                     = errors.New("invalid reward policy")

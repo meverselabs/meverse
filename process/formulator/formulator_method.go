@@ -475,3 +475,120 @@ func (p *Formulator) GetTransmutePolicy(loader types.Loader) (*TransmutePolicy, 
 	}
 	return policy, nil
 }
+
+// GetRewardCount returns the reward count of the formulator
+func (p *Formulator) GetRewardCount(loader types.Loader, addr common.Address) (uint32, error) {
+	lw := types.NewLoaderWrapper(p.pid, loader)
+
+	a, err := lw.Account(addr)
+	if err != nil {
+		return 0, err
+	}
+	acc, is := a.(*FormulatorAccount)
+	if !is {
+		return 0, ErrInvalidFormulatorAddress
+	}
+
+	Begin := acc.UpdatedHeight / 172800
+	if acc.UpdatedHeight%172800 != 0 {
+		Begin++
+	}
+	End := lw.TargetHeight() / 172800
+
+	var RewardCount uint32
+	for h := Begin; h <= End; h++ {
+		evs, err := p.cn.Events(h*172800, h*172800)
+		if err != nil {
+			return 0, err
+		}
+		for _, v := range evs {
+			switch ev := v.(type) {
+			case *RewardEvent:
+				if cnt, has := ev.GenBlockMap.Get(addr); has {
+					if cnt > 0 {
+						RewardCount++
+					}
+				}
+			}
+		}
+	}
+	return RewardCount, nil
+}
+
+// IsRewardBaseUpgrade returns reward base upgrade on/off
+func (p *Formulator) IsRewardBaseUpgrade(loader types.Loader) bool {
+	lw := types.NewLoaderWrapper(p.pid, loader)
+
+	bs := lw.ProcessData(tagRewardBaseUpgrade)
+	return len(bs) > 0 && bs[0] == 1
+}
+
+func (p *Formulator) setRewardBaseUpgrade(ctw *types.ContextWrapper, Enable bool) {
+	if Enable {
+		ctw.SetProcessData(tagRewardBaseUpgrade, []byte{1})
+	} else {
+		ctw.SetProcessData(tagRewardBaseUpgrade, nil)
+	}
+}
+
+func (p *Formulator) revokeFormulator(ctw *types.ContextWrapper, FormulatorAddr common.Address, Heritor common.Address) error {
+	acc, err := ctw.Account(FormulatorAddr)
+	if err != nil {
+		return err
+	}
+	frAcc, is := acc.(*FormulatorAccount)
+	if !is {
+		return types.ErrInvalidAccountType
+	}
+	if has, err := ctw.HasAccount(Heritor); err != nil {
+		if err == types.ErrDeletedAccount {
+		} else {
+			return err
+		}
+	} else if !has {
+	} else {
+		if err := p.vault.AddBalance(ctw, Heritor, frAcc.Amount); err != nil {
+			return err
+		}
+		if err := p.vault.AddBalance(ctw, Heritor, p.vault.Balance(ctw, FormulatorAddr)); err != nil {
+			return err
+		}
+		if err := p.vault.RemoveBalance(ctw, FormulatorAddr); err != nil {
+			return err
+		}
+	}
+	if frAcc.FormulatorType == HyperFormulatorType {
+		StakingAmountMap, err := p.GetStakingAmountMap(ctw, FormulatorAddr)
+		if err != nil {
+			return err
+		}
+		for addr, StakingAmount := range StakingAmountMap {
+			if StakingAmount.IsZero() {
+				return ErrInvalidStakingAddress
+			}
+			if frAcc.StakingAmount.Less(StakingAmount) {
+				return ErrCriticalStakingAmount
+			}
+			frAcc.StakingAmount = frAcc.StakingAmount.Sub(StakingAmount)
+
+			if err := p.vault.AddBalance(ctw, addr, StakingAmount); err != nil {
+				return err
+			}
+		}
+		if !frAcc.StakingAmount.IsZero() {
+			return ErrCriticalStakingAmount
+		}
+	}
+	if err := ctw.DeleteAccount(frAcc); err != nil {
+		return err
+	}
+	ev := &RevokedEvent{
+		Height_:    ctw.TargetHeight(),
+		Index_:     65535,
+		Formulator: FormulatorAddr,
+	}
+	if err := ctw.EmitEvent(ev); err != nil {
+		return err
+	}
+	return nil
+}

@@ -442,57 +442,59 @@ func (cn *Chain) validateHeader(bh *types.Header) error {
 }
 
 func (cn *Chain) validateTransactionSignatures(b *types.Block, SigMap map[hash.Hash256][]common.PublicHash) ([][]common.PublicHash, error) {
-	var wg sync.WaitGroup
-	cpuCnt := runtime.NumCPU()
-	if len(b.Transactions) < 1000 {
-		cpuCnt = 1
-	}
-	txUnit := len(b.Transactions) / cpuCnt
 	TxHashes := make([]hash.Hash256, len(b.Transactions)+1)
-	TxSigners := make([][]common.PublicHash, len(b.Transactions))
 	TxHashes[0] = b.Header.PrevHash
-	if len(b.Transactions)%cpuCnt != 0 {
-		txUnit++
-	}
-	errs := make(chan error, cpuCnt)
-	defer close(errs)
-	for i := 0; i < cpuCnt; i++ {
-		lastCnt := (i + 1) * txUnit
-		if lastCnt > len(b.Transactions) {
-			lastCnt = len(b.Transactions)
+	TxSigners := make([][]common.PublicHash, len(b.Transactions))
+	if len(b.Transactions) > 0 {
+		var wg sync.WaitGroup
+		cpuCnt := runtime.NumCPU()
+		if len(b.Transactions) < 1000 {
+			cpuCnt = 1
 		}
-		wg.Add(1)
-		go func(sidx int, txs []types.Transaction) {
-			defer wg.Done()
-			for q, tx := range txs {
-				t := b.TransactionTypes[sidx+q]
-				sigs := b.TransactionSignatures[sidx+q]
-
-				TxHash := HashTransactionByType(cn.store.chainID, t, tx)
-				TxHashes[sidx+q+1] = TxHash
-				var signers []common.PublicHash
-				if SigMap != nil {
-					signers = SigMap[TxHash]
-				}
-				if signers == nil {
-					signers = make([]common.PublicHash, 0, len(sigs))
-					for _, sig := range sigs {
-						pubkey, err := common.RecoverPubkey(TxHash, sig)
-						if err != nil {
-							errs <- err
-							return
-						}
-						signers = append(signers, common.NewPublicHash(pubkey))
-					}
-				}
-				TxSigners[sidx+q] = signers
+		txUnit := len(b.Transactions) / cpuCnt
+		if len(b.Transactions)%cpuCnt != 0 {
+			txUnit++
+		}
+		errs := make(chan error, cpuCnt)
+		defer close(errs)
+		for i := 0; i < cpuCnt; i++ {
+			lastCnt := (i + 1) * txUnit
+			if lastCnt > len(b.Transactions) {
+				lastCnt = len(b.Transactions)
 			}
-		}(i*txUnit, b.Transactions[i*txUnit:lastCnt])
-	}
-	wg.Wait()
-	if len(errs) > 0 {
-		err := <-errs
-		return nil, err
+			wg.Add(1)
+			go func(sidx int, txs []types.Transaction) {
+				defer wg.Done()
+				for q, tx := range txs {
+					t := b.TransactionTypes[sidx+q]
+					sigs := b.TransactionSignatures[sidx+q]
+
+					TxHash := HashTransactionByType(cn.store.chainID, t, tx)
+					TxHashes[sidx+q+1] = TxHash
+					var signers []common.PublicHash
+					if SigMap != nil {
+						signers = SigMap[TxHash]
+					}
+					if signers == nil {
+						signers = make([]common.PublicHash, 0, len(sigs))
+						for _, sig := range sigs {
+							pubkey, err := common.RecoverPubkey(TxHash, sig)
+							if err != nil {
+								errs <- err
+								return
+							}
+							signers = append(signers, common.NewPublicHash(pubkey))
+						}
+					}
+					TxSigners[sidx+q] = signers
+				}
+			}(i*txUnit, b.Transactions[i*txUnit:lastCnt])
+		}
+		wg.Wait()
+		if len(errs) > 0 {
+			err := <-errs
+			return nil, err
+		}
 	}
 	if h, err := BuildLevelRoot(TxHashes); err != nil {
 		return nil, err

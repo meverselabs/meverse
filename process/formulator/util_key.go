@@ -36,6 +36,7 @@ var (
 	tagUnstakingAmountNumber    = []byte{6, 1}
 	tagUnstakingAmountReverse   = []byte{6, 2}
 	tagUnstakingAmountCount     = []byte{6, 3}
+	tagRewardBaseUpgrade        = []byte{7, 0}
 )
 
 func toStakingAmountKey(StakingAddrss common.Address) []byte {

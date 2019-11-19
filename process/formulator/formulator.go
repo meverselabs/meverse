@@ -78,6 +78,7 @@ func (p *Formulator) Init(reg *types.Register, pm types.ProcessManager, cn types
 	reg.RegisterTransaction(13, &Transmute{})
 	reg.RegisterTransaction(14, &UpdateRewardPolicy{})
 	reg.RegisterTransaction(15, &UpdateTransmutePolicy{})
+	reg.RegisterTransaction(16, &UpdateRewardBaseUpgrade{})
 	reg.RegisterEvent(1, &RewardEvent{})
 	reg.RegisterEvent(2, &RevokedEvent{})
 	reg.RegisterEvent(3, &UnstakedEvent{})
@@ -490,74 +491,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 	}
 	var inErr error
 	RevokedMap.EachAll(func(FormulatorAddr common.Address, Heritor common.Address) bool {
-		acc, err := ctw.Account(FormulatorAddr)
-		if err != nil {
-			inErr = err
-			return false
-		}
-		frAcc, is := acc.(*FormulatorAccount)
-		if !is {
-			inErr = types.ErrInvalidAccountType
-			return false
-		}
-		if has, err := ctw.HasAccount(Heritor); err != nil {
-			if err == types.ErrDeletedAccount {
-			} else {
-				inErr = err
-				return false
-			}
-		} else if !has {
-		} else {
-			if err := p.vault.AddBalance(ctw, Heritor, frAcc.Amount); err != nil {
-				inErr = err
-				return false
-			}
-			if err := p.vault.AddBalance(ctw, Heritor, p.vault.Balance(ctw, FormulatorAddr)); err != nil {
-				inErr = err
-				return false
-			}
-			if err := p.vault.RemoveBalance(ctw, FormulatorAddr); err != nil {
-				inErr = err
-				return false
-			}
-		}
-		if frAcc.FormulatorType == HyperFormulatorType {
-			StakingAmountMap, err := p.GetStakingAmountMap(ctw, FormulatorAddr)
-			if err != nil {
-				inErr = err
-				return false
-			}
-			for addr, StakingAmount := range StakingAmountMap {
-				if StakingAmount.IsZero() {
-					inErr = ErrInvalidStakingAddress
-					return false
-				}
-				if frAcc.StakingAmount.Less(StakingAmount) {
-					inErr = ErrCriticalStakingAmount
-					return false
-				}
-				frAcc.StakingAmount = frAcc.StakingAmount.Sub(StakingAmount)
-
-				if err := p.vault.AddBalance(ctw, addr, StakingAmount); err != nil {
-					inErr = err
-					return false
-				}
-			}
-			if !frAcc.StakingAmount.IsZero() {
-				inErr = ErrCriticalStakingAmount
-				return false
-			}
-		}
-		if err := ctw.DeleteAccount(frAcc); err != nil {
-			inErr = err
-			return false
-		}
-		ev := &RevokedEvent{
-			Height_:    ctw.TargetHeight(),
-			Index_:     65535,
-			Formulator: FormulatorAddr,
-		}
-		if err := ctw.EmitEvent(ev); err != nil {
+		if err := p.revokeFormulator(ctw, FormulatorAddr, Heritor); err != nil {
 			inErr = err
 			return false
 		}

@@ -103,7 +103,7 @@ func (bc *BlockCreator) UnsafeAddTx(Generator common.Address, t uint16, TxHash h
 	if at, is := tx.(AccountTransaction); is {
 		if at.Seq() != ctw.Seq(at.From())+1 {
 			ctw.Revert(sn)
-			return err
+			return types.ErrInvalidSequence
 		}
 		ctw.AddSeq(at.From())
 		if err := tx.Execute(p, ctw, uint16(len(bc.b.Transactions))); err != nil {

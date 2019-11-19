@@ -78,6 +78,15 @@ func (tx *CreateOmega) Validate(p types.Process, loader types.LoaderWrapper, sig
 		if err := frAcc.Validate(loader, []common.PublicHash{signers[i]}); err != nil {
 			return err
 		}
+		if sp.IsRewardBaseUpgrade(loader) {
+			Count, err := sp.GetRewardCount(loader, From)
+			if err != nil {
+				return err
+			}
+			if Count*172800+frAcc.PreHeight < policy.OmegaRequiredSigmaBlocks {
+				return ErrInsufficientFormulatorRewardCount
+			}
+		}
 	}
 
 	if err := sp.vault.CheckFeePayable(loader, tx); err != nil {
