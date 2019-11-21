@@ -48,6 +48,12 @@ func (tx *TokenLeave) Validate(p types.Process, loader types.LoaderWrapper, sign
 	if tx.Amount.Less(amount.COIN.DivC(10)) {
 		return types.ErrDustAmount
 	}
+	/*
+		// WARNING : THIS CODE CAN MAKE PROBLEM WITH CHAIN DATA THAT NOT BE PATCHED
+		if _, _, err := types.ParseTransactionID(tx.CoinTXID); err != nil {
+			return err
+		}
+	*/
 	if tx.Seq() <= loader.Seq(tx.From()) {
 		return types.ErrInvalidSequence
 	}

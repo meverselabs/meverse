@@ -339,6 +339,15 @@ func (p *Formulator) subUnstakingAmount(ctw *types.ContextWrapper, HyperAddr com
 	if sum.Less(am) {
 		return ErrMinustUnstakingAmount
 	}
+	/*
+		// WARNING : THIS CODE CAN MAKE PROBLEM WITH CHAIN DATA THAT NOT BE PATCHED
+		sum = sum.Sub(am)
+		if sum.IsZero() {
+			mp.Delete(HyperAddr)
+		} else {
+			mp.Put(HyperAddr, sum)
+		}
+	*/
 	if sum.IsZero() {
 		mp.Delete(HyperAddr)
 	} else {
