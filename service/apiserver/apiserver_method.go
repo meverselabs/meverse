@@ -18,8 +18,15 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+type ReqData struct {
+	req   *jRPCRequest
+	resCh *chan *JRPCResponse
+}
+
 // Run starts web service of the apiserver
 func (s *APIServer) Run(BindAddress string) error {
+	reqCh := make(chan *ReqData)
+
 	s.e.Use(middleware.CORSWithConfig(middleware.DefaultCORSConfig))
 	s.e.POST("/api/endpoints/http", func(c echo.Context) error {
 		defer c.Request().Body.Close()
@@ -30,7 +37,15 @@ func (s *APIServer) Run(BindAddress string) error {
 		if err := dec.Decode(&req); err != nil {
 			return err
 		}
-		res := s.handleJRPC(&req)
+		resCh := make(chan *JRPCResponse)
+		reqCh <- &ReqData{
+			req:   &req,
+			resCh: &resCh,
+		}
+		/*
+			res := s.handleJRPC(&req)
+		*/
+		res := <-resCh
 		if res == nil {
 			return c.NoContent(http.StatusOK)
 		} else {
@@ -59,7 +74,15 @@ func (s *APIServer) Run(BindAddress string) error {
 				if err := dec.Decode(&req); err != nil {
 					return err
 				}
-				res := s.handleJRPC(&req)
+				resCh := make(chan *JRPCResponse)
+				reqCh <- &ReqData{
+					req:   &req,
+					resCh: &resCh,
+				}
+				/*
+					res := s.handleJRPC(&req)
+				*/
+				res := <-resCh
 				if res != nil {
 					if err := conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
 						return err
@@ -71,6 +94,14 @@ func (s *APIServer) Run(BindAddress string) error {
 			}
 		}
 	})
+	for i := 0; i < 50; i++ {
+		go func() {
+			for r := range reqCh {
+				res := s.handleJRPC(r.req)
+				(*r.resCh) <- res
+			}
+		}()
+	}
 	return s.e.Start(BindAddress)
 }
 
