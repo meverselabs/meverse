@@ -498,15 +498,20 @@ func (p *Formulator) GetRewardCount(loader types.Loader, addr common.Address) (u
 		return 0, ErrInvalidFormulatorAddress
 	}
 
-	Begin := acc.UpdatedHeight / 172800
-	if acc.UpdatedHeight%172800 != 0 {
+	policy, err := p.GetRewardPolicy(lw)
+	if err != nil {
+		return 0, err
+	}
+
+	Begin := acc.UpdatedHeight / policy.PayRewardEveryBlocks
+	if acc.UpdatedHeight%policy.PayRewardEveryBlocks != 0 {
 		Begin++
 	}
-	End := lw.TargetHeight() / 172800
+	End := lw.TargetHeight() / policy.PayRewardEveryBlocks
 
 	var RewardCount uint32
 	for h := Begin; h <= End; h++ {
-		evs, err := p.cn.Events(h*172800, h*172800)
+		evs, err := p.cn.Events(h*policy.PayRewardEveryBlocks, h*policy.PayRewardEveryBlocks)
 		if err != nil {
 			return 0, err
 		}

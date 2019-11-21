@@ -60,6 +60,11 @@ func (tx *CreateOmega) Validate(p types.Process, loader types.LoaderWrapper, sig
 		return ErrInvalidFormulatorCount
 	}
 
+	rewardPolicy, err := sp.GetRewardPolicy(loader)
+	if err != nil {
+		return err
+	}
+
 	for i, From := range tx.SigmaFormulators {
 		acc, err := loader.Account(From)
 		if err != nil {
@@ -83,7 +88,7 @@ func (tx *CreateOmega) Validate(p types.Process, loader types.LoaderWrapper, sig
 			if err != nil {
 				return err
 			}
-			if Count*172800+frAcc.PreHeight < policy.OmegaRequiredSigmaBlocks {
+			if Count*rewardPolicy.PayRewardEveryBlocks+frAcc.PreHeight < policy.OmegaRequiredSigmaBlocks {
 				return ErrInsufficientFormulatorRewardCount
 			}
 		}

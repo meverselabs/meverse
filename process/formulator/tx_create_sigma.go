@@ -60,6 +60,11 @@ func (tx *CreateSigma) Validate(p types.Process, loader types.LoaderWrapper, sig
 		return ErrInvalidFormulatorCount
 	}
 
+	rewardPolicy, err := sp.GetRewardPolicy(loader)
+	if err != nil {
+		return err
+	}
+
 	for i, From := range tx.AlphaFormulators {
 		acc, err := loader.Account(From)
 		if err != nil {
@@ -83,7 +88,7 @@ func (tx *CreateSigma) Validate(p types.Process, loader types.LoaderWrapper, sig
 			if err != nil {
 				return err
 			}
-			if Count*172800+frAcc.PreHeight < policy.SigmaRequiredAlphaBlocks {
+			if Count*rewardPolicy.PayRewardEveryBlocks+frAcc.PreHeight < policy.SigmaRequiredAlphaBlocks {
 				return ErrInsufficientFormulatorRewardCount
 			}
 		}
