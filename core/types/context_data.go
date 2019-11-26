@@ -183,8 +183,9 @@ func (ctd *ContextData) CreateAccount(acc Account) error {
 	if acc.Address().Height() != ctd.loader.TargetHeight() {
 		return ErrInvalidAddressHeight
 	}
-	if acc.Address() == common.NewAddress(0, 0, 0) {
-		return ErrNotAllowedZeroAddressAccount
+	var emptyAddr common.Address
+	if acc.Address() == emptyAddr {
+		return ErrNotAllowedEmptyAddressAccount
 	}
 	if _, err := common.ParseAddress(acc.Name()); err == nil {
 		return ErrNotAllowedAddressAccountName

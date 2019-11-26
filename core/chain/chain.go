@@ -415,7 +415,8 @@ func (cn *Chain) validateHeader(bh *types.Header) error {
 	if bh.Timestamp <= provider.LastTimestamp() {
 		return ErrInvalidTimestamp
 	}
-	if bh.Generator == common.NewAddress(0, 0, 0) {
+	var emptyAddr common.Address
+	if bh.Generator == emptyAddr {
 		return ErrInvalidGenerator
 	}
 
