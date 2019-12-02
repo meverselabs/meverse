@@ -35,6 +35,7 @@ type NodeMesh struct {
 	myPublicHash    common.PublicHash
 	nodeSet         map[common.PublicHash]string
 	peerIDs         []string
+	badPointMap     map[string]int
 	clientPeerMap   map[string]peer.Peer
 	serverPeerMap   map[string]peer.Peer
 	nodePoolManager nodepoolmanage.Manager
@@ -49,6 +50,7 @@ func NewNodeMesh(ChainID uint8, key key.Key, SeedNodeMap map[common.PublicHash]s
 		myPublicHash:  common.NewPublicHash(key.PublicKey()),
 		nodeSet:       map[common.PublicHash]string{},
 		peerIDs:       []string{},
+		badPointMap:   map[string]int{},
 		clientPeerMap: map[string]peer.Peer{},
 		serverPeerMap: map[string]peer.Peer{},
 	}
@@ -92,6 +94,20 @@ func (ms *NodeMesh) Run(BindAddress string) {
 			}(PubHash, v)
 		}
 	}
+	go func() {
+		for {
+			time.Sleep(10 * time.Second)
+			ms.Lock()
+			for ID, point := range ms.badPointMap {
+				if point <= 1 {
+					delete(ms.badPointMap, ID)
+				} else {
+					ms.badPointMap[ID] = point - 1
+				}
+			}
+			ms.Unlock()
+		}
+	}()
 	if err := ms.server(BindAddress); err != nil {
 		panic(err)
 	}
@@ -123,6 +139,17 @@ func (ms *NodeMesh) Peers() []peer.Peer {
 	return peers
 }
 
+// AddBadPoint adds bad points to to the peer
+func (ms *NodeMesh) AddBadPoint(ID string, Point int) {
+	ms.Lock()
+	ms.badPointMap[ID] += Point
+	ms.Unlock()
+
+	if ms.badPointMap[ID] >= 100 {
+		ms.RemovePeer(ID)
+	}
+}
+
 // RemovePeer removes peers from the mesh
 func (ms *NodeMesh) RemovePeer(ID string) {
 	ms.Lock()
@@ -136,6 +163,7 @@ func (ms *NodeMesh) RemovePeer(ID string) {
 	}
 	if hasClient || hasServer {
 		ms.updatePeerIDs()
+		delete(ms.badPointMap, ID)
 	}
 	ms.Unlock()
 

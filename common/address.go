@@ -2,6 +2,7 @@ package common
 
 import (
 	"bytes"
+	"strings"
 
 	"github.com/fletaio/fleta/common/binutil"
 	"github.com/mr-tron/base58/base58"
@@ -57,7 +58,22 @@ func (addr Address) String() string {
 	}
 	bs[0] = checksum
 
-	return base58.Encode(bs)
+	base := addr[6:8]
+	if base[0] == 0 && base[1] == 0 {
+		return base58.Encode(bs)
+	} else {
+		tbs := addr[8:]
+		for i := 0; i < len(tbs); i += 2 {
+			tbs[i] = tbs[i] ^ base[0]
+			tbs[i+1] = tbs[i+1] ^ base[1]
+		}
+		for i := 0; i < len(tbs); i++ {
+			if tbs[i] == 0 {
+				return string(tbs[:i]) + "_" + base58.Encode(bs[:9])
+			}
+		}
+		return string(tbs) + "_" + base58.Encode(bs[:9])
+	}
 }
 
 // Clone returns the clonend value of it
@@ -93,16 +109,45 @@ func (addr Address) Nonce() uint64 {
 
 // ParseAddress parse the address from the string
 func ParseAddress(str string) (Address, error) {
+	ls := strings.SplitN(str, "_", 2)
+	var symbol string
+	if len(ls) > 1 {
+		symbol = ls[0]
+		if len(str) < len(symbol) {
+			return Address{}, ErrInvalidAddressFormat
+		}
+		str = str[len(symbol)+1:]
+	}
 	bs, err := base58.Decode(str)
 	if err != nil {
 		return Address{}, err
 	}
-	if len(bs) != 7 && len(bs) != 15 {
-		return Address{}, ErrInvalidAddressFormat
+	var base []byte
+	if len(symbol) > 0 {
+		if len(bs) != 9 {
+			return Address{}, ErrInvalidAddressFormat
+		}
+		base = bs[7:]
+	} else {
+		if len(bs) != 7 {
+			return Address{}, ErrInvalidAddressFormat
+		}
 	}
 	cs := bs[0]
 	var addr Address
 	copy(addr[:], bs[1:])
+	if len(symbol) > 0 {
+		copy(addr[6:], base)
+		tbs := make([]byte, 6)
+		if base[0] != 0 || base[1] != 0 {
+			copy(tbs, []byte(symbol))
+		}
+		for i := 0; i < len(tbs); i += 2 {
+			tbs[i] = tbs[i] ^ base[0]
+			tbs[i+1] = tbs[i+1] ^ base[1]
+		}
+		copy(addr[8:], tbs)
+	}
 	if cs != addr.Checksum() {
 		return Address{}, ErrInvalidAddressCheckSum
 	}
@@ -116,31 +161,4 @@ func MustParseAddress(str string) Address {
 		panic(err)
 	}
 	return addr
-}
-
-// TickerUsageToMagicNumber convert a name and a usage to the magic number
-func TickerUsageToMagicNumber(Ticker string, Usage string) uint64 {
-	base := []byte{95, 65, 69, 84, 122, 64, 11, 43}
-	Salt := "PoweredByFLETABlockchain"
-	ls := Ticker + " " + Usage + " " + Salt
-	cnt := len(ls) / 8
-	if len(ls)%8 != 0 {
-		cnt++
-	}
-	for i := 0; i < cnt; i++ {
-		from := i * 8
-		to := (i + 1) * 8
-		if to > len(ls) {
-			to = len(ls)
-		}
-		str := ls[from:to]
-		for j := 0; j < 8; j++ {
-			v := byte(0)
-			if j < len(str) {
-				v = byte(str[j])
-			}
-			base[j] = base[j] ^ v
-		}
-	}
-	return binutil.BigEndian.Uint64(base)
 }

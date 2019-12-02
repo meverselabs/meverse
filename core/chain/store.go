@@ -18,16 +18,18 @@ import (
 // All updates are executed in one transaction with FileSync option
 type Store struct {
 	sync.Mutex
-	db         backend.StoreBackend
-	cdb        *pile.DB
-	chainID    uint8
-	name       string
-	version    uint16
-	SeqMapLock sync.Mutex
-	SeqMap     map[common.Address]uint64
-	cache      storecache
-	closeLock  sync.RWMutex
-	isClose    bool
+	db          backend.StoreBackend
+	cdb         *pile.DB
+	chainID     uint8
+	symbol      string
+	usage       string
+	magicNumber uint64
+	version     uint16
+	SeqMapLock  sync.Mutex
+	SeqMap      map[common.Address]uint64
+	cache       storecache
+	closeLock   sync.RWMutex
+	isClose     bool
 }
 
 type storecache struct {
@@ -38,15 +40,17 @@ type storecache struct {
 }
 
 // NewStore returns a Store
-func NewStore(db backend.StoreBackend, cdb *pile.DB, ChainID uint8, name string, version uint16) (*Store, error) {
+func NewStore(db backend.StoreBackend, cdb *pile.DB, ChainID uint8, symbol string, usage string, version uint16) (*Store, error) {
 	st := &Store{
 		db:      db,
 		cdb:     cdb,
 		chainID: ChainID,
-		name:    name,
+		symbol:  symbol,
+		usage:   usage,
 		version: version,
 		SeqMap:  map[common.Address]uint64{},
 	}
+	st.setupMagicNumber()
 
 	go func() {
 		for !st.isClose {
@@ -86,7 +90,17 @@ func (st *Store) ChainID() uint8 {
 
 // Name returns the name of the target chain
 func (st *Store) Name() string {
-	return st.name
+	return st.symbol + " " + st.usage
+}
+
+// Symbol returns the symbol of the target chain
+func (st *Store) Symbol() string {
+	return st.symbol
+}
+
+// Usage returns the usage of the target chain
+func (st *Store) Usage() string {
+	return st.usage
 }
 
 // Version returns the version of the target chain
@@ -102,6 +116,60 @@ func (st *Store) TargetHeight() uint32 {
 // NewLoaderWrapper returns the loader wrapper of the chain
 func (st *Store) NewLoaderWrapper(pid uint8) types.LoaderWrapper {
 	return types.NewContextWrapper(pid, types.NewContext(st))
+}
+
+// NewAddress returns the new address with the magic number of the chain
+func (st *Store) NewAddress(height uint32, index uint16) common.Address {
+	return common.NewAddress(height, index, st.magicNumber)
+}
+
+func (st *Store) setupMagicNumber() {
+	if len(st.symbol) < 3 {
+		panic("too short symbol")
+	} else if len(st.symbol) > 5 {
+		panic("too long symbol")
+	} else if !isCapitalAndNumber(st.symbol) {
+		panic("only capital alphabet and number can be used as symbol")
+	}
+	if len(st.usage) < 4 {
+		panic("too short usage")
+	} else if len(st.usage) > 16 {
+		panic("too long usage")
+	} else if !isAlphabetAndNumber(st.usage) {
+		panic("only alphabet and number can be used as symbol")
+	}
+	base := []byte{222, 127}
+	Salt := "PoweredByFLETABlockchain"
+	ls := hash.Hash([]byte(st.symbol + "@" + st.usage + "@" + Salt))
+	unit := 2
+	cnt := len(ls) / unit
+	if len(ls)%unit != 0 {
+		cnt++
+	}
+	for i := 0; i < cnt; i++ {
+		from := i * unit
+		to := (i + 1) * unit
+		if to > len(ls) {
+			to = len(ls)
+		}
+		str := ls[from:to]
+		for j := 0; j < unit; j++ {
+			v := byte(0)
+			if j < len(str) {
+				v = byte(str[j])
+			}
+			base[j] = base[j] ^ v
+		}
+	}
+	tbs := make([]byte, 6)
+	if base[0] != 0 || base[1] != 0 {
+		copy(tbs, []byte(st.symbol))
+	}
+	for i := 0; i < len(tbs); i += 2 {
+		tbs[i] = tbs[i] ^ base[0]
+		tbs[i+1] = tbs[i+1] ^ base[1]
+	}
+	st.magicNumber = binutil.BigEndian.Uint64(append(base, tbs...))
 }
 
 // LastStatus returns the recored target height, prev hash and timestamp

@@ -48,6 +48,7 @@ func (p *Vault) Init(reg *types.Register, pm types.ProcessManager, cn types.Prov
 	reg.RegisterAccount(2, &MultiAccount{})
 	reg.RegisterTransaction(1, &Transfer{})
 	reg.RegisterTransaction(2, &Burn{})
+	reg.RegisterTransaction(3, &TransferWithTag{})
 	reg.RegisterTransaction(4, &CreateAccount{})
 	reg.RegisterTransaction(5, &CreateMultiAccount{})
 	reg.RegisterTransaction(9, &IssueAccount{})

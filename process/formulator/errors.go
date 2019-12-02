@@ -23,6 +23,7 @@ var (
 	ErrCriticalStakingAmount                   = errors.New("critical staking amount")
 	ErrInsufficientStakingAmount               = errors.New("insufficient staking amount")
 	ErrInvalidRewardPolicy                     = errors.New("invalid reward policy")
+	ErrInvalidHyperPolicy                      = errors.New("invalid hyper policy")
 	ErrInvalidValidatorPolicy                  = errors.New("invalid validator policy")
 	ErrNotHyperFormulator                      = errors.New("not hyper formulator")
 	ErrNotRevoked                              = errors.New("not revoked")
@@ -34,4 +35,5 @@ var (
 	ErrInvalidTransmuteAmount                  = errors.New("invalid transmute amount")
 	ErrInvalidTransmuteHeight                  = errors.New("invalid transmute height")
 	ErrNotExistTransmutePolicy                 = errors.New("not exist transmute policy")
+	ErrNoOverAmount                            = errors.New("no over amount")
 )
