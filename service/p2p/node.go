@@ -268,7 +268,9 @@ func (nd *Node) Run(BindAddress string) {
 				panic(err)
 				break
 			}
-			rlog.Println("Node", nd.myPublicHash.String(), nd.cn.Provider().Height(), "BlockConnected", b.Header.Generator.String(), b.Header.Height)
+			if nd.cn.Provider().Height()%100 == 0 {
+				rlog.Println("Node", nd.myPublicHash.String(), nd.cn.Provider().Height(), "BlockConnected", b.Header.Generator.String(), b.Header.Height)
+			}
 			TargetHeight++
 			Count++
 			if Count > 10 {
@@ -632,4 +634,14 @@ func (nd *Node) cleanPool(b *types.Block) {
 		nd.txpool.Remove(TxHash, tx)
 		nd.txQ.Remove(string(TxHash[:]))
 	}
+}
+
+// TxPoolList returned tx list from txpool
+func (nd *Node) TxPoolList() []*txpool.PoolItem {
+	return nd.txpool.List()
+}
+
+// GetTxFromTXPool returned tx from txpool
+func (nd *Node) GetTxFromTXPool(TxHash hash.Hash256) *txpool.PoolItem {
+	return nd.txpool.Get(TxHash)
 }
