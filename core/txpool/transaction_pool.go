@@ -284,6 +284,25 @@ type PoolItem struct {
 	Signers     []common.PublicHash
 }
 
+// List return txpool list
+func (tp *TransactionPool) List() []*PoolItem {
+	tp.Lock()
+	defer tp.Unlock()
+
+	pis := []*PoolItem{}
+
+	for _, item := range tp.txhashMap {
+		pis = append(pis, &PoolItem{
+			TxType:      item.TxType,
+			TxHash:      item.TxHash,
+			Transaction: item.Transaction,
+			Signatures:  item.Signatures,
+			Signers:     item.Signers,
+		})
+	}
+	return pis
+}
+
 // Dump do dump
 func (tp *TransactionPool) Dump() string {
 	tp.Lock()
