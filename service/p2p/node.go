@@ -268,6 +268,7 @@ func (nd *Node) Run(BindAddress string) {
 				panic(err)
 				break
 			}
+			nd.cleanPool(b)
 			if nd.cn.Provider().Height()%100 == 0 {
 				rlog.Println("Node", nd.myPublicHash.String(), nd.cn.Provider().Height(), "BlockConnected", b.Header.Generator.String(), b.Header.Height)
 			}
