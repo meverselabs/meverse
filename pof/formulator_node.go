@@ -174,7 +174,7 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 						if err != p2p.ErrInvalidUTXO && err != txpool.ErrExistTransaction && err != txpool.ErrTooFarSeq && err != txpool.ErrPastSeq {
 							rlog.Println("TransactionError", item.TxHash.String(), err.Error())
 							if len(item.PeerID) > 0 {
-								fr.nm.RemovePeer(item.PeerID)
+								fr.nm.AddBadPoint(item.PeerID, 1)
 							}
 						}
 						continue

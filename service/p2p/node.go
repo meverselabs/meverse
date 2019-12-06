@@ -153,7 +153,7 @@ func (nd *Node) Run(BindAddress string) {
 						if err != ErrInvalidUTXO && err != txpool.ErrExistTransaction && err != txpool.ErrTooFarSeq && err != txpool.ErrPastSeq {
 							rlog.Println("TransactionError", item.TxHash.String(), err.Error())
 							if len(item.PeerID) > 0 {
-								nd.ms.RemovePeer(item.PeerID)
+								nd.ms.AddBadPoint(item.PeerID, 1)
 							}
 						}
 						continue

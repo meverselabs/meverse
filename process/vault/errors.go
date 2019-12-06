@@ -15,4 +15,5 @@ var (
 	ErrInsufficientBalance              = errors.New("insufficient balance")
 	ErrNotExistFeeOfTransaction         = errors.New("not exist fee of transaction")
 	ErrPolicyShouldBeSetupInApplication = errors.New("policy should be setup in application")
+	ErrInvalidTagSize                   = errors.New("invalid tag size")
 )

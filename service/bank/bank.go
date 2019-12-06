@@ -570,7 +570,7 @@ func (s *Bank) OnBlockConnected(b *types.Block, events []types.Event, loader typ
 				}
 
 				s.addTransaction(TXID, b.TransactionTypes[i], at, res)
-				CreatedAddr := common.NewAddress(b.Header.Height, uint16(i), 0)
+				CreatedAddr := s.st.NewAddress(b.Header.Height, uint16(i))
 				if res == 1 {
 					switch tx := t.(type) {
 					case *vault.CreateAccount:

@@ -93,7 +93,7 @@ func (tx *CreateMultiAccount) Execute(p types.Process, ctw *types.ContextWrapper
 		}
 
 		acc := &MultiAccount{
-			Address_:  common.NewAddress(ctw.TargetHeight(), index, 0),
+			Address_:  sp.cn.NewAddress(ctw.TargetHeight(), index),
 			Name_:     tx.Name,
 			Required:  tx.Requried,
 			KeyHashes: tx.KeyHashes,

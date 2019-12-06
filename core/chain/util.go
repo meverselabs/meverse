@@ -108,3 +108,23 @@ func HashTransactionByType(ChainID uint8, t uint16, tx types.Transaction) hash.H
 	}
 	return hash.Hash(buffer.Bytes())
 }
+
+func isCapitalAndNumber(Name string) bool {
+	for i := 0; i < len(Name); i++ {
+		c := Name[i]
+		if (c < '0' || '9' < c) && (c < 'A' || 'Z' < c) {
+			return false
+		}
+	}
+	return true
+}
+
+func isAlphabetAndNumber(Name string) bool {
+	for i := 0; i < len(Name); i++ {
+		c := Name[i]
+		if (c < '0' || '9' < c) && (c < 'a' || 'z' < c) && (c < 'A' || 'Z' < c) {
+			return false
+		}
+	}
+	return true
+}

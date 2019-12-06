@@ -1,4 +1,4 @@
-package vault
+package formulator
 
 import (
 	"bytes"
@@ -6,49 +6,46 @@ import (
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/core/types"
+	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/process/admin"
 )
 
-// IssueAccount is used to make a account
-type IssueAccount struct {
+// UpdateHyperPolicy is used to update reward policy
+type UpdateHyperPolicy struct {
 	Timestamp_ uint64
 	Seq_       uint64
 	From_      common.Address
-	Name       string
-	KeyHash    common.PublicHash
+	Policy     *HyperPolicy
 }
 
 // Timestamp returns the timestamp of the transaction
-func (tx *IssueAccount) Timestamp() uint64 {
+func (tx *UpdateHyperPolicy) Timestamp() uint64 {
 	return tx.Timestamp_
 }
 
 // Seq returns the sequence of the transaction
-func (tx *IssueAccount) Seq() uint64 {
+func (tx *UpdateHyperPolicy) Seq() uint64 {
 	return tx.Seq_
 }
 
 // From returns the from address of the transaction
-func (tx *IssueAccount) From() common.Address {
+func (tx *UpdateHyperPolicy) From() common.Address {
 	return tx.From_
 }
 
 // Validate validates signatures of the transaction
-func (tx *IssueAccount) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
-	sp := p.(*Vault)
+func (tx *UpdateHyperPolicy) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
+	sp := p.(*Formulator)
 
 	if tx.From() != sp.admin.AdminAddress(loader, p.Name()) {
 		return admin.ErrUnauthorizedTransaction
 	}
+	if tx.Policy == nil {
+		return ErrInvalidHyperPolicy
+	}
 
 	if tx.Seq() <= loader.Seq(tx.From()) {
 		return types.ErrInvalidSequence
-	}
-
-	if has, err := loader.HasAccountName(tx.Name); err != nil {
-		return err
-	} else if has {
-		return types.ErrExistAccountName
 	}
 
 	fromAcc, err := loader.Account(tx.From())
@@ -62,22 +59,17 @@ func (tx *IssueAccount) Validate(p types.Process, loader types.LoaderWrapper, si
 }
 
 // Execute updates the context by the transaction
-func (tx *IssueAccount) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
-	sp := p.(*Vault)
-
-	acc := &SingleAccount{
-		Address_: sp.cn.NewAddress(ctw.TargetHeight(), index),
-		Name_:    tx.Name,
-		KeyHash:  tx.KeyHash,
-	}
-	if err := ctw.CreateAccount(acc); err != nil {
+func (tx *UpdateHyperPolicy) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
+	if bs, err := encoding.Marshal(tx.Policy); err != nil {
 		return err
+	} else {
+		ctw.SetProcessData(tagHyperPolicy, bs)
 	}
 	return nil
 }
 
 // MarshalJSON is a marshaler function
-func (tx *IssueAccount) MarshalJSON() ([]byte, error) {
+func (tx *UpdateHyperPolicy) MarshalJSON() ([]byte, error) {
 	var buffer bytes.Buffer
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
@@ -101,15 +93,8 @@ func (tx *IssueAccount) MarshalJSON() ([]byte, error) {
 		buffer.Write(bs)
 	}
 	buffer.WriteString(`,`)
-	buffer.WriteString(`"name":`)
-	if bs, err := json.Marshal(tx.Name); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"key_hash":`)
-	if bs, err := tx.KeyHash.MarshalJSON(); err != nil {
+	buffer.WriteString(`"policy":`)
+	if bs, err := tx.Policy.MarshalJSON(); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)
