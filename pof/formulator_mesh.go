@@ -37,16 +37,19 @@ func NewFormulatorNodeMesh(key key.Key, NetAddressMap map[common.PublicHash]stri
 
 // Run starts the formulator mesh
 func (ms *FormulatorNodeMesh) Run() {
+	myPubHash := common.NewPublicHash(ms.key.PublicKey())
 	for PubHash, v := range ms.netAddressMap {
 		go func(pubhash common.PublicHash, NetAddr string) {
 			time.Sleep(1 * time.Second)
 			for {
-				ms.Lock()
-				_, has := ms.peerMap[string(pubhash[:])]
-				ms.Unlock()
-				if !has {
-					if err := ms.client(NetAddr, pubhash); err != nil {
-						rlog.Println("[client]", err, NetAddr)
+				if ms.fr.cs.rt.IsFormulator(ms.fr.Config.Formulator, myPubHash) {
+					ms.Lock()
+					_, has := ms.peerMap[string(pubhash[:])]
+					ms.Unlock()
+					if !has {
+						if err := ms.client(NetAddr, pubhash); err != nil {
+							rlog.Println("[client]", err, NetAddr)
+						}
 					}
 				}
 				time.Sleep(1 * time.Second)
