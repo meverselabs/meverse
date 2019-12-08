@@ -229,6 +229,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 				if frAcc.IsRevoked {
 					continue
 				}
+				frAcc.RewardCount++
 				switch frAcc.FormulatorType {
 				case AlphaFormulatorType:
 					am := frAcc.Amount.MulC(int64(GenCount)).MulC(int64(policy.AlphaEfficiency1000)).DivC(1000)

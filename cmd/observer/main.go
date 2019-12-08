@@ -38,7 +38,6 @@ type Config struct {
 	FormulatorPort int
 	APIPort        int
 	StoreRoot      string
-	BackendVersion int
 	RLogHost       string
 	RLogPath       string
 	UseRLog        bool
@@ -95,32 +94,20 @@ func main() {
 
 	MaxBlocksPerFormulator := uint32(10)
 	ChainID := uint8(0x01)
-	Name := "FLEAT Mainnet"
+	Symbol := "FLETA"
+	Usage := "Mainnet"
 	Version := uint16(0x0001)
 
-	var back backend.StoreBackend
-	var cdb *pile.DB
-	switch cfg.BackendVersion {
-	case 0:
-		contextDB, err := backend.Create("badger", cfg.StoreRoot)
-		if err != nil {
-			panic(err)
-		}
-		back = contextDB
-	case 1:
-		contextDB, err := backend.Create("buntdb", cfg.StoreRoot+"/context")
-		if err != nil {
-			panic(err)
-		}
-		chainDB, err := pile.Open(cfg.StoreRoot + "/chain")
-		if err != nil {
-			panic(err)
-		}
-		chainDB.SetSyncMode(true)
-		back = contextDB
-		cdb = chainDB
+	back, err := backend.Create("buntdb", cfg.StoreRoot+"/context")
+	if err != nil {
+		panic(err)
 	}
-	st, err := chain.NewStore(back, cdb, ChainID, Name, Version)
+	cdb, err := pile.Open(cfg.StoreRoot + "/chain")
+	if err != nil {
+		panic(err)
+	}
+	cdb.SetSyncMode(true)
+	st, err := chain.NewStore(back, cdb, ChainID, Symbol, Usage, Version)
 	if err != nil {
 		panic(err)
 	}

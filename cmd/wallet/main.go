@@ -35,16 +35,15 @@ import (
 
 // Config is a configuration for the cmd
 type Config struct {
-	SeedNodeMap    map[string]string
-	NodeKeyHex     string
-	ObserverKeys   []string
-	Port           int
-	APIPort        int
-	StoreRoot      string
-	BackendVersion int
-	RLogHost       string
-	RLogPath       string
-	UseRLog        bool
+	SeedNodeMap  map[string]string
+	NodeKeyHex   string
+	ObserverKeys []string
+	Port         int
+	APIPort      int
+	StoreRoot    string
+	RLogHost     string
+	RLogPath     string
+	UseRLog      bool
 }
 
 func main() {
@@ -112,11 +111,6 @@ func main() {
 		SeedNodeMap[pubhash] = netAddr
 	}
 
-	MaxBlocksPerFormulator := uint32(10)
-	ChainID := uint8(0x01)
-	Name := "FLEAT Mainnet"
-	Version := uint16(0x0001)
-
 	cm := closer.NewManager()
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc,
@@ -130,29 +124,22 @@ func main() {
 	}()
 	defer cm.CloseAll()
 
-	var back backend.StoreBackend
-	var cdb *pile.DB
-	switch cfg.BackendVersion {
-	case 0:
-		contextDB, err := backend.Create("badger", cfg.StoreRoot)
-		if err != nil {
-			panic(err)
-		}
-		back = contextDB
-	case 1:
-		contextDB, err := backend.Create("buntdb", cfg.StoreRoot+"/context")
-		if err != nil {
-			panic(err)
-		}
-		chainDB, err := pile.Open(cfg.StoreRoot + "/chain")
-		if err != nil {
-			panic(err)
-		}
-		chainDB.SetSyncMode(true)
-		back = contextDB
-		cdb = chainDB
+	MaxBlocksPerFormulator := uint32(10)
+	ChainID := uint8(0x01)
+	Symbol := "FLETA"
+	Usage := "Mainnet"
+	Version := uint16(0x0001)
+
+	back, err := backend.Create("buntdb", cfg.StoreRoot+"/context")
+	if err != nil {
+		panic(err)
 	}
-	st, err := chain.NewStore(back, cdb, ChainID, Name, Version)
+	cdb, err := pile.Open(cfg.StoreRoot + "/chain")
+	if err != nil {
+		panic(err)
+	}
+	cdb.SetSyncMode(true)
+	st, err := chain.NewStore(back, cdb, ChainID, Symbol, Usage, Version)
 	if err != nil {
 		panic(err)
 	}

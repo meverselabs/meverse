@@ -51,7 +51,7 @@ func (app *FletaApp) Init(reg *types.Register, pm types.ProcessManager, cn types
 // InitGenesis initializes genesis data
 func (app *FletaApp) InitGenesis(ctw *types.ContextWrapper) error {
 	rewardPolicy := &formulator.RewardPolicy{
-		RewardPerBlock:        amount.NewCoinAmount(0, 951293759512937600), // 0.03%
+		RewardPerBlock:        amount.NewCoinAmount(0, 951293759512937600), // 3%
 		PayRewardEveryBlocks:  172800,                                      // 1 day
 		AlphaEfficiency1000:   1000,                                        // 100%
 		SigmaEfficiency1000:   1150,                                        // 115%
@@ -217,6 +217,7 @@ func addAlphaFormulator(sp *vault.Vault, ctw *types.ContextWrapper, alphaPolicy 
 		Amount:         alphaPolicy.AlphaCreationAmount,
 		PreHeight:      PreHeight,
 		UpdatedHeight:  0,
+		RewardCount:    0,
 	}
 	if err := ctw.CreateAccount(acc); err != nil {
 		panic(err)
@@ -233,6 +234,7 @@ func addSigmaFormulator(sp *vault.Vault, ctw *types.ContextWrapper, sigmaPolicy 
 		Amount:         alphaPolicy.AlphaCreationAmount.MulC(int64(sigmaPolicy.SigmaRequiredAlphaCount)),
 		PreHeight:      0,
 		UpdatedHeight:  0,
+		RewardCount:    0,
 	}
 	if err := ctw.CreateAccount(acc); err != nil {
 		panic(err)
@@ -249,6 +251,7 @@ func addHyperFormulator(sp *vault.Vault, ctw *types.ContextWrapper, hyperPolicy 
 		Amount:         hyperPolicy.HyperCreationAmount,
 		PreHeight:      0,
 		UpdatedHeight:  0,
+		RewardCount:    0,
 		StakingAmount:  amount.NewCoinAmount(0, 0),
 		Policy: &formulator.ValidatorPolicy{
 			CommissionRatio1000: Commission1000,

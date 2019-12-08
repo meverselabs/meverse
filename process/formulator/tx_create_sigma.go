@@ -84,11 +84,7 @@ func (tx *CreateSigma) Validate(p types.Process, loader types.LoaderWrapper, sig
 			return err
 		}
 		if sp.IsRewardBaseUpgrade(loader) {
-			Count, err := sp.GetRewardCount(loader, From)
-			if err != nil {
-				return err
-			}
-			if Count*rewardPolicy.PayRewardEveryBlocks+frAcc.PreHeight < policy.SigmaRequiredAlphaBlocks {
+			if frAcc.RewardCount*rewardPolicy.PayRewardEveryBlocks+frAcc.PreHeight < policy.SigmaRequiredAlphaBlocks {
 				return ErrInsufficientFormulatorRewardCount
 			}
 		}
@@ -135,6 +131,7 @@ func (tx *CreateSigma) Execute(p types.Process, ctw *types.ContextWrapper, index
 		frAcc.FormulatorType = SigmaFormulatorType
 		frAcc.PreHeight = 0
 		frAcc.UpdatedHeight = ctw.TargetHeight()
+		frAcc.RewardCount = 0
 		return nil
 	})
 }

@@ -339,19 +339,11 @@ func (p *Formulator) subUnstakingAmount(ctw *types.ContextWrapper, HyperAddr com
 	if sum.Less(am) {
 		return ErrMinustUnstakingAmount
 	}
-	/*
-		// WARNING : THIS CODE CAN MAKE PROBLEM WITH CHAIN DATA THAT NOT BE PATCHED
-		sum = sum.Sub(am)
-		if sum.IsZero() {
-			mp.Delete(HyperAddr)
-		} else {
-			mp.Put(HyperAddr, sum)
-		}
-	*/
+	sum = sum.Sub(am)
 	if sum.IsZero() {
 		mp.Delete(HyperAddr)
 	} else {
-		mp.Put(HyperAddr, sum.Sub(am))
+		mp.Put(HyperAddr, sum)
 	}
 	if mp.Len() > 0 {
 		data, err := encoding.Marshal(mp)
@@ -483,50 +475,6 @@ func (p *Formulator) GetTransmutePolicy(loader types.Loader) (*TransmutePolicy, 
 		return nil, err
 	}
 	return policy, nil
-}
-
-// GetRewardCount returns the reward count of the formulator
-func (p *Formulator) GetRewardCount(loader types.Loader, addr common.Address) (uint32, error) {
-	lw := types.NewLoaderWrapper(p.pid, loader)
-
-	a, err := lw.Account(addr)
-	if err != nil {
-		return 0, err
-	}
-	acc, is := a.(*FormulatorAccount)
-	if !is {
-		return 0, ErrInvalidFormulatorAddress
-	}
-
-	policy, err := p.GetRewardPolicy(lw)
-	if err != nil {
-		return 0, err
-	}
-
-	Begin := acc.UpdatedHeight / policy.PayRewardEveryBlocks
-	if acc.UpdatedHeight%policy.PayRewardEveryBlocks != 0 {
-		Begin++
-	}
-	End := lw.TargetHeight() / policy.PayRewardEveryBlocks
-
-	var RewardCount uint32
-	for h := Begin; h <= End; h++ {
-		evs, err := p.cn.Events(h*policy.PayRewardEveryBlocks, h*policy.PayRewardEveryBlocks)
-		if err != nil {
-			return 0, err
-		}
-		for _, v := range evs {
-			switch ev := v.(type) {
-			case *RewardEvent:
-				if cnt, has := ev.GenBlockMap.Get(addr); has {
-					if cnt > 0 {
-						RewardCount++
-					}
-				}
-			}
-		}
-	}
-	return RewardCount, nil
 }
 
 // IsRewardBaseUpgrade returns reward base upgrade on/off

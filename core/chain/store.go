@@ -138,7 +138,7 @@ func (st *Store) setupMagicNumber() {
 	} else if !isAlphabetAndNumber(st.usage) {
 		panic("only alphabet and number can be used as symbol")
 	}
-	base := []byte{222, 127}
+	base := []byte{243, 133}
 	Salt := "PoweredByFLETABlockchain"
 	ls := hash.Hash([]byte(st.symbol + "@" + st.usage + "@" + Salt))
 	unit := 2
@@ -234,30 +234,15 @@ func (st *Store) Hash(height uint32) (hash.Hash256, error) {
 		}
 	}
 
-	if st.cdb == nil { // old version
-		var h hash.Hash256
-		if err := st.db.View(func(txn backend.StoreReader) error {
-			value, err := txn.Get(toHeightHashKey(height))
-			if err != nil {
-				return err
-			}
-			copy(h[:], value)
-			return nil
-		}); err != nil {
+	h, err := st.cdb.GetHash(height)
+	if err != nil {
+		if err == pile.ErrInvalidHeight {
+			return hash.Hash256{}, backend.ErrNotExistKey
+		} else {
 			return hash.Hash256{}, err
 		}
-		return h, nil
-	} else {
-		h, err := st.cdb.GetHash(height)
-		if err != nil {
-			if err == pile.ErrInvalidHeight {
-				return hash.Hash256{}, backend.ErrNotExistKey
-			} else {
-				return hash.Hash256{}, err
-			}
-		}
-		return h, nil
 	}
+	return h, nil
 }
 
 // Header returns the header of the data by height
@@ -277,36 +262,19 @@ func (st *Store) Header(height uint32) (*types.Header, error) {
 		}
 	}
 
-	if st.cdb == nil { // old version
-		var bh types.Header
-		if err := st.db.View(func(txn backend.StoreReader) error {
-			value, err := txn.Get(toHeightHeaderKey(height))
-			if err != nil {
-				return err
-			}
-			if err := encoding.Unmarshal(value, &bh); err != nil {
-				return err
-			}
-			return nil
-		}); err != nil {
+	value, err := st.cdb.GetData(height, 0)
+	if err != nil {
+		if err == pile.ErrInvalidHeight {
+			return nil, backend.ErrNotExistKey
+		} else {
 			return nil, err
 		}
-		return &bh, nil
-	} else {
-		value, err := st.cdb.GetData(height, 0)
-		if err != nil {
-			if err == pile.ErrInvalidHeight {
-				return nil, backend.ErrNotExistKey
-			} else {
-				return nil, err
-			}
-		}
-		var bh types.Header
-		if err := encoding.Unmarshal(value, &bh); err != nil {
-			return nil, err
-		}
-		return &bh, nil
 	}
+	var bh types.Header
+	if err := encoding.Unmarshal(value, &bh); err != nil {
+		return nil, err
+	}
+	return &bh, nil
 }
 
 // Block returns the block by height
@@ -326,36 +294,19 @@ func (st *Store) Block(height uint32) (*types.Block, error) {
 		}
 	}
 
-	if st.cdb == nil { // old version
-		var b types.Block
-		if err := st.db.View(func(txn backend.StoreReader) error {
-			value, err := txn.Get(toHeightBlockKey(height))
-			if err != nil {
-				return err
-			}
-			if err := encoding.Unmarshal(value, &b); err != nil {
-				return err
-			}
-			return nil
-		}); err != nil {
+	value, err := st.cdb.GetDatas(height, 0, 2)
+	if err != nil {
+		if err == pile.ErrInvalidHeight {
+			return nil, backend.ErrNotExistKey
+		} else {
 			return nil, err
 		}
-		return &b, nil
-	} else {
-		value, err := st.cdb.GetDatas(height, 0, 2)
-		if err != nil {
-			if err == pile.ErrInvalidHeight {
-				return nil, backend.ErrNotExistKey
-			} else {
-				return nil, err
-			}
-		}
-		var b types.Block
-		if err := encoding.Unmarshal(value, &b); err != nil {
-			return nil, err
-		}
-		return &b, nil
 	}
+	var b types.Block
+	if err := encoding.Unmarshal(value, &b); err != nil {
+		return nil, err
+	}
+	return &b, nil
 }
 
 // Height returns the current height of the target chain
@@ -738,76 +689,37 @@ func (st *Store) Events(From uint32, To uint32) ([]types.Event, error) {
 	}
 
 	fc := encoding.Factory("event")
-	if st.cdb == nil { // old version
-		list := []types.Event{}
-		if err := st.db.View(func(txn backend.StoreReader) error {
-			for i := From; i <= To; i++ {
-				value, err := txn.Get(toEventKey(i))
-				if err != nil {
-					if err == backend.ErrNotExistKey {
-						continue
-					} else {
-						return err
-					}
-				}
-				dec := encoding.NewDecoder(bytes.NewReader(value))
-				EvLen, err := dec.DecodeArrayLen()
-				if err != nil {
-					return err
-				}
-				for i := 0; i < EvLen; i++ {
-					t, err := dec.DecodeUint16()
-					if err != nil {
-						return err
-					}
-					ev, err := fc.Create(t)
-					if err != nil {
-						return err
-					}
-					if err := dec.Decode(&ev); err != nil {
-						return err
-					}
-					list = append(list, ev.(types.Event))
-				}
+	list := []types.Event{}
+	for i := From; i <= To; i++ {
+		value, err := st.cdb.GetData(i, 2)
+		if err != nil {
+			if err == pile.ErrInvalidHeight || err == pile.ErrInvalidDataIndex {
+				continue
+			} else {
+				return nil, err
 			}
-			return nil
-		}); err != nil {
+		}
+		dec := encoding.NewDecoder(bytes.NewReader(value))
+		EvLen, err := dec.DecodeArrayLen()
+		if err != nil {
 			return nil, err
 		}
-		return list, nil
-	} else {
-		list := []types.Event{}
-		for i := From; i <= To; i++ {
-			value, err := st.cdb.GetData(i, 2)
-			if err != nil {
-				if err == pile.ErrInvalidHeight || err == pile.ErrInvalidDataIndex {
-					continue
-				} else {
-					return nil, err
-				}
-			}
-			dec := encoding.NewDecoder(bytes.NewReader(value))
-			EvLen, err := dec.DecodeArrayLen()
+		for j := 0; j < EvLen; j++ {
+			t, err := dec.DecodeUint16()
 			if err != nil {
 				return nil, err
 			}
-			for j := 0; j < EvLen; j++ {
-				t, err := dec.DecodeUint16()
-				if err != nil {
-					return nil, err
-				}
-				ev, err := fc.Create(t)
-				if err != nil {
-					return nil, err
-				}
-				if err := dec.Decode(&ev); err != nil {
-					return nil, err
-				}
-				list = append(list, ev.(types.Event))
+			ev, err := fc.Create(t)
+			if err != nil {
+				return nil, err
 			}
+			if err := dec.Decode(&ev); err != nil {
+				return nil, err
+			}
+			list = append(list, ev.(types.Event))
 		}
-		return list, nil
 	}
+	return list, nil
 }
 
 // StoreGenesis stores the genesis data
@@ -821,50 +733,27 @@ func (st *Store) StoreGenesis(genHash hash.Hash256, ctd *types.ContextData) erro
 	if st.Height() > 0 {
 		return ErrAlreadyGenesised
 	}
-	if st.cdb == nil { // old version
-		if err := st.db.Update(func(txn backend.StoreWriter) error {
-			{
-				if err := txn.Set(toHeightHashKey(0), genHash[:]); err != nil {
-					return err
-				}
-				bsHeight := binutil.LittleEndian.Uint32ToBytes(0)
-				if err := txn.Set(toHashHeightKey(genHash), bsHeight); err != nil {
-					return err
-				}
-				if err := txn.Set(tagHeight, bsHeight); err != nil {
-					return err
-				}
-			}
-			if err := applyContextData(txn, ctd); err != nil {
-				return err
-			}
-			return nil
-		}); err != nil {
+	if err := st.cdb.Init(genHash); err != nil {
+		if err != pile.ErrAlreadyInitialized {
 			return err
 		}
-	} else {
-		if err := st.cdb.Init(genHash); err != nil {
-			if err != pile.ErrAlreadyInitialized {
+	}
+	if err := st.db.Update(func(txn backend.StoreWriter) error {
+		{
+			if err := txn.Set(toHeightHashKey(0), genHash[:]); err != nil {
+				return err
+			}
+			bsHeight := binutil.LittleEndian.Uint32ToBytes(0)
+			if err := txn.Set(tagHeight, bsHeight); err != nil {
 				return err
 			}
 		}
-		if err := st.db.Update(func(txn backend.StoreWriter) error {
-			{
-				if err := txn.Set(toHeightHashKey(0), genHash[:]); err != nil {
-					return err
-				}
-				bsHeight := binutil.LittleEndian.Uint32ToBytes(0)
-				if err := txn.Set(tagHeight, bsHeight); err != nil {
-					return err
-				}
-			}
-			if err := applyContextData(txn, ctd); err != nil {
-				return err
-			}
-			return nil
-		}); err != nil {
+		if err := applyContextData(txn, ctd); err != nil {
 			return err
 		}
+		return nil
+	}); err != nil {
+		return err
 	}
 	st.cache.height = 0
 	st.cache.heightHash = genHash
@@ -882,101 +771,60 @@ func (st *Store) StoreBlock(b *types.Block, ctd *types.ContextData) error {
 	}
 
 	DataHash := encoding.Hash(b.Header)
-	if st.cdb == nil { // old version
-		if err := st.db.Update(func(txn backend.StoreWriter) error {
-			{
-				data, err := encoding.Marshal(b)
-				if err != nil {
-					return err
-				}
-				if err := txn.Set(toHeightBlockKey(b.Header.Height), data); err != nil {
-					return err
-				}
-			}
-			{
-				data, err := encoding.Marshal(b.Header)
-				if err != nil {
-					return err
-				}
-				if err := txn.Set(toHeightHeaderKey(b.Header.Height), data); err != nil {
-					return err
-				}
-			}
-			{
-				if err := txn.Set(toHeightHashKey(b.Header.Height), DataHash[:]); err != nil {
-					return err
-				}
-				bsHeight := binutil.LittleEndian.Uint32ToBytes(b.Header.Height)
-				if err := txn.Set(toHashHeightKey(DataHash), bsHeight); err != nil {
-					return err
-				}
-				if err := txn.Set(tagHeight, bsHeight); err != nil {
-					return err
-				}
-			}
-			if err := applyContextDataOld(txn, ctd); err != nil {
-				return err
-			}
-			return nil
-		}); err != nil {
+	Datas := [][]byte{}
+	{
+		data, err := encoding.Marshal(b.Header)
+		if err != nil {
 			return err
 		}
-	} else {
-		Datas := [][]byte{}
-		{
-			data, err := encoding.Marshal(b.Header)
+		Datas = append(Datas, data)
+	}
+	{
+		data, err := encoding.Marshal(b)
+		if err != nil {
+			return err
+		}
+		Datas = append(Datas, data[len(Datas[0]):]) // cut header data
+	}
+	if len(ctd.Events) > 0 {
+		var buffer bytes.Buffer
+		efc := encoding.Factory("event")
+		enc := encoding.NewEncoder(&buffer)
+		if err := enc.EncodeArrayLen(len(ctd.Events)); err != nil {
+			return err
+		}
+		for _, ev := range ctd.Events {
+			t, err := efc.TypeOf(ev)
 			if err != nil {
 				return err
 			}
-			Datas = append(Datas, data)
-		}
-		{
-			data, err := encoding.Marshal(b)
-			if err != nil {
+			if err := enc.EncodeUint16(t); err != nil {
 				return err
 			}
-			Datas = append(Datas, data[len(Datas[0]):]) // cut header data
-		}
-		if len(ctd.Events) > 0 {
-			var buffer bytes.Buffer
-			efc := encoding.Factory("event")
-			enc := encoding.NewEncoder(&buffer)
-			if err := enc.EncodeArrayLen(len(ctd.Events)); err != nil {
-				return err
-			}
-			for _, ev := range ctd.Events {
-				t, err := efc.TypeOf(ev)
-				if err != nil {
-					return err
-				}
-				if err := enc.EncodeUint16(t); err != nil {
-					return err
-				}
-				if err := enc.Encode(ev); err != nil {
-					return err
-				}
-			}
-			Datas = append(Datas, buffer.Bytes())
-		}
-		if err := st.cdb.AppendData(b.Header.Height, DataHash, Datas); err != nil {
-			if err != pile.ErrInvalidAppendHeight {
+			if err := enc.Encode(ev); err != nil {
 				return err
 			}
 		}
-		if err := st.db.Update(func(txn backend.StoreWriter) error {
-			{
-				bsHeight := binutil.LittleEndian.Uint32ToBytes(b.Header.Height)
-				if err := txn.Set(tagHeight, bsHeight); err != nil {
-					return err
-				}
-			}
-			if err := applyContextData(txn, ctd); err != nil {
-				return err
-			}
-			return nil
-		}); err != nil {
+		Datas = append(Datas, buffer.Bytes())
+	}
+	if err := st.cdb.AppendData(b.Header.Height, DataHash, Datas); err != nil {
+		if err != pile.ErrInvalidAppendHeight {
 			return err
 		}
+	}
+	if err := st.db.Update(func(txn backend.StoreWriter) error {
+		{
+			bsHeight := binutil.LittleEndian.Uint32ToBytes(b.Header.Height)
+			if err := txn.Set(tagHeight, bsHeight); err != nil {
+				return err
+			}
+		}
+		if err := applyContextData(txn, ctd); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 	st.SeqMapLock.Lock()
 	ctd.SeqMap.EachAll(func(addr common.Address, value uint64) bool {

@@ -247,9 +247,11 @@ func (cn *Chain) ConnectBlock(b *types.Block, SigMap map[hash.Hash256][]common.P
 	if err := cn.validateHeader(&b.Header); err != nil {
 		return err
 	}
-	if err := cn.consensus.ValidateSignature(&b.Header, b.Signatures); err != nil {
-		return err
-	}
+	/*
+		if err := cn.consensus.ValidateSignature(&b.Header, b.Signatures); err != nil {
+			return err
+		}
+	*/
 
 	ctx := types.NewContext(cn.store)
 	if err := cn.executeBlockOnContext(b, ctx, SigMap); err != nil {

@@ -162,7 +162,7 @@ func (tx *Transmute) Execute(p types.Process, ctw *types.ContextWrapper, index u
 	}
 
 	acc := &FormulatorAccount{
-		Address_:       common.NewAddress(ctw.TargetHeight(), index, 0),
+		Address_:       sp.cn.NewAddress(ctw.TargetHeight(), index),
 		Name_:          tx.Name,
 		FormulatorType: AlphaFormulatorType,
 		KeyHash:        tx.KeyHash,
@@ -170,6 +170,7 @@ func (tx *Transmute) Execute(p types.Process, ctw *types.ContextWrapper, index u
 		Amount:         policy.AlphaCreationAmount,
 		PreHeight:      0,
 		UpdatedHeight:  ctw.TargetHeight(),
+		RewardCount:    0,
 	}
 	if err := ctw.CreateAccount(acc); err != nil {
 		return err

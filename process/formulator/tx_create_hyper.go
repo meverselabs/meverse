@@ -85,7 +85,7 @@ func (tx *CreateHyper) Execute(p types.Process, ctw *types.ContextWrapper, index
 	}
 
 	acc := &FormulatorAccount{
-		Address_:       common.NewAddress(ctw.TargetHeight(), index, 0),
+		Address_:       sp.cn.NewAddress(ctw.TargetHeight(), index),
 		Name_:          tx.Name,
 		FormulatorType: HyperFormulatorType,
 		KeyHash:        tx.KeyHash,
@@ -93,6 +93,7 @@ func (tx *CreateHyper) Execute(p types.Process, ctw *types.ContextWrapper, index
 		Amount:         policy.HyperCreationAmount,
 		PreHeight:      0,
 		UpdatedHeight:  ctw.TargetHeight(),
+		RewardCount:    0,
 		StakingAmount:  amount.NewCoinAmount(0, 0),
 		Policy:         tx.Policy,
 	}

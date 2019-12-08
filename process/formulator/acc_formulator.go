@@ -32,6 +32,7 @@ type FormulatorAccount struct {
 	IsRevoked      bool
 	PreHeight      uint32
 	UpdatedHeight  uint32
+	RewardCount    uint32
 	StakingAmount  *amount.Amount
 	Policy         *ValidatorPolicy
 }
@@ -73,6 +74,7 @@ func (acc *FormulatorAccount) Clone() types.Account {
 		IsRevoked:      acc.IsRevoked,
 		PreHeight:      acc.PreHeight,
 		UpdatedHeight:  acc.UpdatedHeight,
+		RewardCount:    acc.RewardCount,
 	}
 	if acc.FormulatorType == HyperFormulatorType {
 		c.StakingAmount = acc.StakingAmount.Clone()
@@ -154,6 +156,13 @@ func (acc *FormulatorAccount) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"updated_height":`)
 	if bs, err := json.Marshal(acc.UpdatedHeight); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"reward_count":`)
+	if bs, err := json.Marshal(acc.RewardCount); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)
