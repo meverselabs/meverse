@@ -33,8 +33,9 @@ func (tx *Burn) From() common.Address {
 }
 
 // Fee returns the fee of the transaction
-func (tx *Burn) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
+func (tx *Burn) Fee(p types.Process, loader types.LoaderWrapper) *amount.Amount {
+	sp := p.(*Vault)
+	return sp.GetDefaultFee(loader)
 }
 
 // Validate validates signatures of the transaction
@@ -53,7 +54,7 @@ func (tx *Burn) Validate(p types.Process, loader types.LoaderWrapper, signers []
 		return err
 	}
 
-	if err := sp.CheckFeePayableWith(loader, tx, tx.Amount); err != nil {
+	if err := sp.CheckFeePayableWith(p, loader, tx, tx.Amount); err != nil {
 		return err
 	}
 	return nil
@@ -63,7 +64,7 @@ func (tx *Burn) Validate(p types.Process, loader types.LoaderWrapper, signers []
 func (tx *Burn) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Vault)
 
-	return sp.WithFee(ctw, tx, func() error {
+	return sp.WithFee(p, ctw, tx, func() error {
 		if err := sp.SubBalance(ctw, tx.From(), tx.Amount); err != nil {
 			return err
 		}

@@ -35,8 +35,9 @@ func (tx *TokenOut) From() common.Address {
 }
 
 // Fee returns the fee of the transaction
-func (tx *TokenOut) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
+func (tx *TokenOut) Fee(p types.Process, loader types.LoaderWrapper) *amount.Amount {
+	sp := p.(*Gateway)
+	return sp.vault.GetDefaultFee(loader)
 }
 
 // Validate validates signatures of the transaction
@@ -70,7 +71,7 @@ func (tx *TokenOut) Validate(p types.Process, loader types.LoaderWrapper, signer
 		return err
 	}
 
-	if err := sp.vault.CheckFeePayableWith(loader, tx, tx.Amount.Add(policy.WithdrawFee)); err != nil {
+	if err := sp.vault.CheckFeePayableWith(p, loader, tx, tx.Amount.Add(policy.WithdrawFee)); err != nil {
 		return err
 	}
 	return nil
@@ -80,7 +81,7 @@ func (tx *TokenOut) Validate(p types.Process, loader types.LoaderWrapper, signer
 func (tx *TokenOut) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Gateway)
 
-	return sp.vault.WithFee(ctw, tx, func() error {
+	return sp.vault.WithFee(p, ctw, tx, func() error {
 		policy := &Policy{}
 		if err := encoding.Unmarshal(ctw.ProcessData(tagPolicy), &policy); err != nil {
 			return err

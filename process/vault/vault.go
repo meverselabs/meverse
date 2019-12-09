@@ -2,6 +2,7 @@ package vault
 
 import (
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/amount"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/process/admin"
@@ -102,6 +103,14 @@ func (p *Vault) InitPolicy(ctw *types.ContextWrapper, policy *Policy) error {
 	} else {
 		ctw.SetProcessData(tagPolicy, bs)
 	}
+	return nil
+}
+
+// SetDefaultFee updates default fee
+func (p *Vault) SetDefaultFee(ctw *types.ContextWrapper, defaultFee *amount.Amount) error {
+	ctw = types.SwitchContextWrapper(p.pid, ctw)
+
+	ctw.SetProcessData(tagDefaultFee, defaultFee.Bytes())
 	return nil
 }
 

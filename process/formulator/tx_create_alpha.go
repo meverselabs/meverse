@@ -36,8 +36,9 @@ func (tx *CreateAlpha) From() common.Address {
 }
 
 // Fee returns the fee of the transaction
-func (tx *CreateAlpha) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
+func (tx *CreateAlpha) Fee(p types.Process, loader types.LoaderWrapper) *amount.Amount {
+	sp := p.(*Formulator)
+	return sp.vault.GetDefaultFee(loader)
 }
 
 // Validate validates signatures of the transaction
@@ -73,7 +74,7 @@ func (tx *CreateAlpha) Validate(p types.Process, loader types.LoaderWrapper, sig
 	if loader.TargetHeight() < policy.AlphaCreationLimitHeight {
 		return ErrAlphaCreationLimited
 	}
-	if err := sp.vault.CheckFeePayableWith(loader, tx, policy.AlphaCreationAmount); err != nil {
+	if err := sp.vault.CheckFeePayableWith(p, loader, tx, policy.AlphaCreationAmount); err != nil {
 		return err
 	}
 	return nil
@@ -83,7 +84,7 @@ func (tx *CreateAlpha) Validate(p types.Process, loader types.LoaderWrapper, sig
 func (tx *CreateAlpha) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	return sp.vault.WithFee(ctw, tx, func() error {
+	return sp.vault.WithFee(p, ctw, tx, func() error {
 		policy := &AlphaPolicy{}
 		if err := encoding.Unmarshal(ctw.ProcessData(tagAlphaPolicy), &policy); err != nil {
 			return err

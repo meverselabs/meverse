@@ -35,8 +35,9 @@ func (tx *CreateMultiAccount) From() common.Address {
 }
 
 // Fee returns the fee of the transaction
-func (tx *CreateMultiAccount) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
+func (tx *CreateMultiAccount) Fee(p types.Process, loader types.LoaderWrapper) *amount.Amount {
+	sp := p.(*Vault)
+	return sp.GetDefaultFee(loader)
 }
 
 // Validate validates signatures of the transaction
@@ -73,7 +74,7 @@ func (tx *CreateMultiAccount) Validate(p types.Process, loader types.LoaderWrapp
 	}
 
 	CreationCost := amount.COIN.MulC(10)
-	if err := sp.CheckFeePayableWith(loader, tx, CreationCost); err != nil {
+	if err := sp.CheckFeePayableWith(p, loader, tx, CreationCost); err != nil {
 		return err
 	}
 	return nil
@@ -83,7 +84,7 @@ func (tx *CreateMultiAccount) Validate(p types.Process, loader types.LoaderWrapp
 func (tx *CreateMultiAccount) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Vault)
 
-	return sp.WithFee(ctw, tx, func() error {
+	return sp.WithFee(p, ctw, tx, func() error {
 		CreationCost := amount.COIN.MulC(10)
 		if err := sp.SubBalance(ctw, tx.From(), CreationCost); err != nil {
 			return err

@@ -35,8 +35,9 @@ func (tx *Unstaking) From() common.Address {
 }
 
 // Fee returns the fee of the transaction
-func (tx *Unstaking) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
+func (tx *Unstaking) Fee(p types.Process, loader types.LoaderWrapper) *amount.Amount {
+	sp := p.(*Formulator)
+	return sp.vault.GetDefaultFee(loader)
 }
 
 // Validate validates signatures of the transaction
@@ -100,8 +101,8 @@ func (tx *Unstaking) Execute(p types.Process, ctw *types.ContextWrapper, index u
 		return err
 	}
 
-	if err := sp.vault.CheckFeePayable(ctw, tx); err != nil {
-		Fee := tx.Fee(ctw)
+	if err := sp.vault.CheckFeePayable(p, ctw, tx); err != nil {
+		Fee := tx.Fee(p, ctw)
 		if err := sp.vault.AddCollectedFee(ctw, Fee); err != nil {
 			return err
 		}
@@ -110,7 +111,7 @@ func (tx *Unstaking) Execute(p types.Process, ctw *types.ContextWrapper, index u
 		}
 		return nil
 	} else {
-		return sp.vault.WithFee(ctw, tx, func() error {
+		return sp.vault.WithFee(p, ctw, tx, func() error {
 			if err := sp.addUnstakingAmount(ctw, tx.HyperFormulator, tx.From(), ctw.TargetHeight()+policy.StakingUnlockRequiredBlocks, tx.Amount); err != nil {
 				return err
 			}

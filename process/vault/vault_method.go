@@ -124,12 +124,12 @@ func (p *Vault) flushLockedBalanceMap(ctw *types.ContextWrapper, UnlockedHeight 
 }
 
 // CheckFeePayable returns tx fee can be paid or not
-func (p *Vault) CheckFeePayable(loader types.Loader, tx FeeTransaction) error {
-	return p.CheckFeePayableWith(loader, tx, nil)
+func (p *Vault) CheckFeePayable(tp types.Process, loader types.Loader, tx FeeTransaction) error {
+	return p.CheckFeePayableWith(tp, loader, tx, nil)
 }
 
 // CheckFeePayableWith returns tx fee and amount can be paid or not
-func (p *Vault) CheckFeePayableWith(loader types.Loader, tx FeeTransaction, am *amount.Amount) error {
+func (p *Vault) CheckFeePayableWith(tp types.Process, loader types.Loader, tx FeeTransaction, am *amount.Amount) error {
 	lw := types.NewLoaderWrapper(p.pid, loader)
 
 	if has, err := lw.HasAccount(tx.From()); err != nil {
@@ -138,7 +138,7 @@ func (p *Vault) CheckFeePayableWith(loader types.Loader, tx FeeTransaction, am *
 		return types.ErrNotExistAccount
 	}
 
-	fee := tx.Fee(lw)
+	fee := tx.Fee(tp, lw)
 	if am != nil {
 		am = am.Add(fee)
 	} else {
@@ -153,10 +153,10 @@ func (p *Vault) CheckFeePayableWith(loader types.Loader, tx FeeTransaction, am *
 }
 
 // WithFee processes function after withdraw fee
-func (p *Vault) WithFee(ctw *types.ContextWrapper, tx FeeTransaction, fn func() error) error {
+func (p *Vault) WithFee(tp types.Process, ctw *types.ContextWrapper, tx FeeTransaction, fn func() error) error {
 	ctw = types.SwitchContextWrapper(p.pid, ctw)
 
-	fee := tx.Fee(ctw)
+	fee := tx.Fee(tp, ctw)
 	if err := p.SubBalance(ctw, tx.From(), fee); err != nil {
 		return err
 	}
@@ -214,4 +214,15 @@ func (p *Vault) SubCollectedFee(ctw *types.ContextWrapper, am *amount.Amount) er
 		ctw.SetProcessData(tagCollectedFee, total.Bytes())
 	}
 	return nil
+}
+
+// GetDefaultFee returns a default fee of the chain
+func (p *Vault) GetDefaultFee(loader types.LoaderWrapper) *amount.Amount {
+	lw := types.NewLoaderWrapper(p.pid, loader)
+
+	bs := lw.ProcessData(tagDefaultFee)
+	if len(bs) == 0 {
+		return amount.COIN.DivC(10)
+	}
+	return amount.NewAmountFromBytes(bs)
 }

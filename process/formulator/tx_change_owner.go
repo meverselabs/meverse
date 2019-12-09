@@ -34,8 +34,9 @@ func (tx *ChangeOwner) From() common.Address {
 }
 
 // Fee returns the fee of the transaction
-func (tx *ChangeOwner) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
+func (tx *ChangeOwner) Fee(p types.Process, loader types.LoaderWrapper) *amount.Amount {
+	sp := p.(*Formulator)
+	return sp.vault.GetDefaultFee(loader)
 }
 
 // Validate validates signatures of the transaction
@@ -58,7 +59,7 @@ func (tx *ChangeOwner) Validate(p types.Process, loader types.LoaderWrapper, sig
 		return err
 	}
 
-	if err := sp.vault.CheckFeePayable(loader, tx); err != nil {
+	if err := sp.vault.CheckFeePayable(p, loader, tx); err != nil {
 		return err
 	}
 	return nil
@@ -68,7 +69,7 @@ func (tx *ChangeOwner) Validate(p types.Process, loader types.LoaderWrapper, sig
 func (tx *ChangeOwner) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	return sp.vault.WithFee(ctw, tx, func() error {
+	return sp.vault.WithFee(p, ctw, tx, func() error {
 		acc, err := ctw.Account(tx.From())
 		if err != nil {
 			return err

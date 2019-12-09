@@ -34,8 +34,9 @@ func (tx *Staking) From() common.Address {
 }
 
 // Fee returns the fee of the transaction
-func (tx *Staking) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
+func (tx *Staking) Fee(p types.Process, loader types.LoaderWrapper) *amount.Amount {
+	sp := p.(*Formulator)
+	return sp.vault.GetDefaultFee(loader)
 }
 
 // Validate validates signatures of the transaction
@@ -80,7 +81,7 @@ func (tx *Staking) Validate(p types.Process, loader types.LoaderWrapper, signers
 		return err
 	}
 
-	if err := sp.vault.CheckFeePayableWith(loader, tx, tx.Amount); err != nil {
+	if err := sp.vault.CheckFeePayableWith(p, loader, tx, tx.Amount); err != nil {
 		return err
 	}
 	return nil
@@ -90,7 +91,7 @@ func (tx *Staking) Validate(p types.Process, loader types.LoaderWrapper, signers
 func (tx *Staking) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	return sp.vault.WithFee(ctw, tx, func() error {
+	return sp.vault.WithFee(p, ctw, tx, func() error {
 		acc, err := ctw.Account(tx.HyperFormulator)
 		if err != nil {
 			return err

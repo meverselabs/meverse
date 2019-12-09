@@ -35,8 +35,9 @@ func (tx *RevertUnstaking) From() common.Address {
 }
 
 // Fee returns the fee of the transaction
-func (tx *RevertUnstaking) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
+func (tx *RevertUnstaking) Fee(p types.Process, loader types.LoaderWrapper) *amount.Amount {
+	sp := p.(*Formulator)
+	return sp.vault.GetDefaultFee(loader)
 }
 
 // Validate validates signatures of the transaction
@@ -94,8 +95,8 @@ func (tx *RevertUnstaking) Execute(p types.Process, ctw *types.ContextWrapper, i
 		return err
 	}
 
-	if err := sp.vault.CheckFeePayable(ctw, tx); err != nil {
-		Fee := tx.Fee(ctw)
+	if err := sp.vault.CheckFeePayable(p, ctw, tx); err != nil {
+		Fee := tx.Fee(p, ctw)
 		if err := sp.vault.AddCollectedFee(ctw, Fee); err != nil {
 			return err
 		}
@@ -103,7 +104,7 @@ func (tx *RevertUnstaking) Execute(p types.Process, ctw *types.ContextWrapper, i
 		frAcc.StakingAmount = frAcc.StakingAmount.Add(tx.Amount.Sub(Fee))
 		return nil
 	} else {
-		return sp.vault.WithFee(ctw, tx, func() error {
+		return sp.vault.WithFee(p, ctw, tx, func() error {
 			sp.AddStakingAmount(ctw, tx.HyperFormulator, tx.From(), tx.Amount)
 			frAcc.StakingAmount = frAcc.StakingAmount.Add(tx.Amount)
 			return nil

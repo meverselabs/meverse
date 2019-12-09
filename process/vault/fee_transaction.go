@@ -8,5 +8,5 @@ import (
 
 type FeeTransaction interface {
 	From() common.Address
-	Fee(lw types.LoaderWrapper) *amount.Amount
+	Fee(p types.Process, lw types.LoaderWrapper) *amount.Amount
 }

@@ -36,8 +36,9 @@ func (tx *CreateAccount) From() common.Address {
 }
 
 // Fee returns the fee of the transaction
-func (tx *CreateAccount) Fee(loader types.LoaderWrapper) *amount.Amount {
-	return amount.COIN.DivC(10)
+func (tx *CreateAccount) Fee(p types.Process, loader types.LoaderWrapper) *amount.Amount {
+	sp := p.(*Vault)
+	return sp.GetDefaultFee(loader)
 }
 
 // Validate validates signatures of the transaction
@@ -71,7 +72,7 @@ func (tx *CreateAccount) Validate(p types.Process, loader types.LoaderWrapper, s
 		return err
 	}
 
-	if err := sp.CheckFeePayableWith(loader, tx, policy.AccountCreationAmount); err != nil {
+	if err := sp.CheckFeePayableWith(p, loader, tx, policy.AccountCreationAmount); err != nil {
 		return err
 	}
 	return nil
@@ -81,7 +82,7 @@ func (tx *CreateAccount) Validate(p types.Process, loader types.LoaderWrapper, s
 func (tx *CreateAccount) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Vault)
 
-	return sp.WithFee(ctw, tx, func() error {
+	return sp.WithFee(p, ctw, tx, func() error {
 		policy := &Policy{}
 		if err := encoding.Unmarshal(ctw.ProcessData(tagPolicy), &policy); err != nil {
 			return err
