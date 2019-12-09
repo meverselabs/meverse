@@ -16,4 +16,5 @@ var (
 	ErrNotExistFeeOfTransaction         = errors.New("not exist fee of transaction")
 	ErrPolicyShouldBeSetupInApplication = errors.New("policy should be setup in application")
 	ErrInvalidTagSize                   = errors.New("invalid tag size")
+	ErrInvalidDefaultFee                = errors.New("invalid default fee")
 )
