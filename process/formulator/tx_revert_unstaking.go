@@ -78,10 +78,6 @@ func (tx *RevertUnstaking) Validate(p types.Process, loader types.LoaderWrapper,
 	if am.Less(tx.Amount) {
 		return ErrMinustUnstakingAmount
 	}
-
-	if err := sp.vault.CheckFeePayable(loader, tx); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -89,21 +85,30 @@ func (tx *RevertUnstaking) Validate(p types.Process, loader types.LoaderWrapper,
 func (tx *RevertUnstaking) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	return sp.vault.WithFee(ctw, tx, func() error {
-		acc, err := ctw.Account(tx.HyperFormulator)
-		if err != nil {
+	acc, err := ctw.Account(tx.HyperFormulator)
+	if err != nil {
+		return err
+	}
+	frAcc := acc.(*FormulatorAccount)
+	if err := sp.subUnstakingAmount(ctw, tx.HyperFormulator, tx.From(), tx.UnstakedHeight, tx.Amount); err != nil {
+		return err
+	}
+
+	if err := sp.vault.CheckFeePayable(ctw, tx); err != nil {
+		Fee := tx.Fee(ctw)
+		if err := sp.vault.AddCollectedFee(ctw, Fee); err != nil {
 			return err
 		}
-		frAcc := acc.(*FormulatorAccount)
-
-		if err := sp.subUnstakingAmount(ctw, tx.HyperFormulator, tx.From(), tx.UnstakedHeight, tx.Amount); err != nil {
-			return err
-		}
-
-		sp.AddStakingAmount(ctw, tx.HyperFormulator, tx.From(), tx.Amount)
-		frAcc.StakingAmount = frAcc.StakingAmount.Add(tx.Amount)
+		sp.AddStakingAmount(ctw, tx.HyperFormulator, tx.From(), tx.Amount.Sub(Fee))
+		frAcc.StakingAmount = frAcc.StakingAmount.Add(tx.Amount.Sub(Fee))
 		return nil
-	})
+	} else {
+		return sp.vault.WithFee(ctw, tx, func() error {
+			sp.AddStakingAmount(ctw, tx.HyperFormulator, tx.From(), tx.Amount)
+			frAcc.StakingAmount = frAcc.StakingAmount.Add(tx.Amount)
+			return nil
+		})
+	}
 }
 
 // MarshalJSON is a marshaler function

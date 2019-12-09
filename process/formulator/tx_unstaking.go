@@ -78,10 +78,6 @@ func (tx *Unstaking) Validate(p types.Process, loader types.LoaderWrapper, signe
 	if frAcc.StakingAmount.Less(tx.Amount) {
 		return ErrInsufficientStakingAmount
 	}
-
-	if err := sp.vault.CheckFeePayable(loader, tx); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -89,27 +85,38 @@ func (tx *Unstaking) Validate(p types.Process, loader types.LoaderWrapper, signe
 func (tx *Unstaking) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Formulator)
 
-	return sp.vault.WithFee(ctw, tx, func() error {
-		acc, err := ctw.Account(tx.HyperFormulator)
-		if err != nil {
-			return err
-		}
-		frAcc := acc.(*FormulatorAccount)
+	acc, err := ctw.Account(tx.HyperFormulator)
+	if err != nil {
+		return err
+	}
+	frAcc := acc.(*FormulatorAccount)
+	if err := sp.subStakingAmount(ctw, tx.HyperFormulator, tx.From(), tx.Amount); err != nil {
+		return err
+	}
+	frAcc.StakingAmount = frAcc.StakingAmount.Sub(tx.Amount)
 
-		if err := sp.subStakingAmount(ctw, tx.HyperFormulator, tx.From(), tx.Amount); err != nil {
-			return err
-		}
-		frAcc.StakingAmount = frAcc.StakingAmount.Sub(tx.Amount)
+	policy := &HyperPolicy{}
+	if err := encoding.Unmarshal(ctw.ProcessData(tagHyperPolicy), &policy); err != nil {
+		return err
+	}
 
-		policy := &HyperPolicy{}
-		if err := encoding.Unmarshal(ctw.ProcessData(tagHyperPolicy), &policy); err != nil {
+	if err := sp.vault.CheckFeePayable(ctw, tx); err != nil {
+		Fee := tx.Fee(ctw)
+		if err := sp.vault.AddCollectedFee(ctw, Fee); err != nil {
 			return err
 		}
-		if err := sp.addUnstakingAmount(ctw, tx.HyperFormulator, tx.From(), ctw.TargetHeight()+policy.StakingUnlockRequiredBlocks, tx.Amount); err != nil {
+		if err := sp.addUnstakingAmount(ctw, tx.HyperFormulator, tx.From(), ctw.TargetHeight()+policy.StakingUnlockRequiredBlocks, tx.Amount.Sub(Fee)); err != nil {
 			return err
 		}
 		return nil
-	})
+	} else {
+		return sp.vault.WithFee(ctw, tx, func() error {
+			if err := sp.addUnstakingAmount(ctw, tx.HyperFormulator, tx.From(), ctw.TargetHeight()+policy.StakingUnlockRequiredBlocks, tx.Amount); err != nil {
+				return err
+			}
+			return nil
+		})
+	}
 }
 
 // MarshalJSON is a marshaler function

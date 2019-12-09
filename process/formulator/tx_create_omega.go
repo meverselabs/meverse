@@ -56,6 +56,9 @@ func (tx *CreateOmega) Validate(p types.Process, loader types.LoaderWrapper, sig
 	if err := encoding.Unmarshal(loader.ProcessData(tagOmegaPolicy), &policy); err != nil {
 		return err
 	}
+	if policy.OmegaRequiredSigmaCount == 0 {
+		return ErrOmegaCreationNotAllowed
+	}
 	if len(tx.SigmaFormulators) != int(policy.OmegaRequiredSigmaCount) {
 		return ErrInvalidFormulatorCount
 	}

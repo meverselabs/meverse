@@ -56,6 +56,9 @@ func (tx *CreateSigma) Validate(p types.Process, loader types.LoaderWrapper, sig
 	if err := encoding.Unmarshal(loader.ProcessData(tagSigmaPolicy), &policy); err != nil {
 		return err
 	}
+	if policy.SigmaRequiredAlphaCount == 0 {
+		return ErrSigmaCreationNotAllowed
+	}
 	if len(tx.AlphaFormulators) != int(policy.SigmaRequiredAlphaCount) {
 		return ErrInvalidFormulatorCount
 	}
