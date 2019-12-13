@@ -82,6 +82,7 @@ func (p *Formulator) Init(reg *types.Register, pm types.ProcessManager, cn types
 	reg.RegisterTransaction(17, &RevokeAdmin{})
 	reg.RegisterTransaction(18, &UpdateHyperPolicy{})
 	reg.RegisterTransaction(19, &WithdrawOverAmount{})
+	reg.RegisterTransaction(20, &ChangeStaking{})
 	reg.RegisterEvent(1, &RewardEvent{})
 	reg.RegisterEvent(2, &RevokedEvent{})
 	reg.RegisterEvent(3, &UnstakedEvent{})
