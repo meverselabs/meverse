@@ -57,7 +57,9 @@ func (tx *CreateHyper) Validate(p types.Process, loader types.LoaderWrapper, sig
 	}
 
 	if has, err := loader.HasAccountName(tx.Name); err != nil {
-		return err
+		if err != types.ErrDeletedAccount {
+			return err
+		}
 	} else if has {
 		return types.ErrExistAccountName
 	}
