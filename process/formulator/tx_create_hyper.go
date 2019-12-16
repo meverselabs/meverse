@@ -97,7 +97,7 @@ func (tx *CreateHyper) Execute(p types.Process, ctw *types.ContextWrapper, index
 		StakingAmount:  amount.NewCoinAmount(0, 0),
 		Policy:         tx.Policy,
 	}
-	if err := ctw.CreateAccount(acc); err != nil {
+	if err := ctw.CreateAccountIgnoreDelete(acc); err != nil {
 		return err
 	}
 	return nil

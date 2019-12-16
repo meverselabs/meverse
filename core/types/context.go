@@ -132,6 +132,12 @@ func (ctx *Context) CreateAccount(acc Account) error {
 	return ctx.Top().CreateAccount(acc)
 }
 
+// CreateAccountIgnoreDelete inserts the account even account has deleted name
+func (ctx *Context) CreateAccountIgnoreDelete(acc Account) error {
+	ctx.isLatestHash = false
+	return ctx.Top().CreateAccountIgnoreDelete(acc)
+}
+
 // DeleteAccount deletes the account from the top snapshot
 func (ctx *Context) DeleteAccount(acc Account) error {
 	ctx.isLatestHash = false

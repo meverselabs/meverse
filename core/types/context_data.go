@@ -209,6 +209,41 @@ func (ctd *ContextData) CreateAccount(acc Account) error {
 	return nil
 }
 
+// CreateAccountIgnoreDelete inserts the account even account has deleted name
+func (ctd *ContextData) CreateAccountIgnoreDelete(acc Account) error {
+	if acc.Address().Height() != ctd.loader.TargetHeight() {
+		return ErrInvalidAddressHeight
+	}
+	var emptyAddr common.Address
+	if acc.Address() == emptyAddr {
+		return ErrNotAllowedEmptyAddressAccount
+	}
+	if _, err := common.ParseAddress(acc.Name()); err == nil {
+		return ErrNotAllowedAddressAccountName
+	}
+	if has, err := ctd.HasAccount(acc.Address()); err != nil {
+		if err != ErrNotExistAccount {
+			if err != ErrDeletedAccount {
+				return err
+			}
+		}
+	} else if has {
+		return ErrExistAccount
+	}
+	if has, err := ctd.HasAccountName(acc.Name()); err != nil {
+		if err != ErrNotExistAccount {
+			if err != ErrDeletedAccount {
+				return err
+			}
+		}
+	} else if has {
+		return ErrExistAccountName
+	}
+	ctd.AccountMap.Put(acc.Address(), acc)
+	ctd.AccountNameMap.Put(acc.Name(), acc.Address())
+	return nil
+}
+
 // DeleteAccount deletes the account
 func (ctd *ContextData) DeleteAccount(acc Account) error {
 	if _, err := ctd.Account(acc.Address()); err != nil {

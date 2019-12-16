@@ -122,6 +122,11 @@ func (ctw *ContextWrapper) CreateAccount(acc Account) error {
 	return ctw.ctx.CreateAccount(acc)
 }
 
+// CreateAccountIgnoreDelete inserts the account even account has deleted name
+func (ctw *ContextWrapper) CreateAccountIgnoreDelete(acc Account) error {
+	return ctw.ctx.CreateAccountIgnoreDelete(acc)
+}
+
 // DeleteAccount deletes the account from the top snapshot
 func (ctw *ContextWrapper) DeleteAccount(acc Account) error {
 	return ctw.ctx.DeleteAccount(acc)
