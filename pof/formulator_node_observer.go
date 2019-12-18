@@ -129,6 +129,15 @@ func (fr *FormulatorNode) handleObserverMessage(p peer.Peer, m interface{}, Retr
 			fr.Lock()
 			defer fr.Unlock()
 
+			TargetHeight := fr.cs.cn.Provider().Height() + 1
+			if msg.TargetHeight < TargetHeight {
+				return nil
+			}
+			if fr.lastReqMessage != nil {
+				if req.TargetHeight < fr.lastReqMessage.TargetHeight {
+					return nil
+				}
+			}
 			return fr.genBlock(p, req)
 		}(msg)
 		return nil
