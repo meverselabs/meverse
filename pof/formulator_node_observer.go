@@ -139,12 +139,12 @@ func (fr *FormulatorNode) handleObserverMessage(p peer.Peer, m interface{}, Retr
 		if msg.Block.Header.Height < TargetHeight {
 			return nil
 		}
-		if msg.Block.Header.Generator != fr.Config.Formulator {
-			fr.lastReqMessage = nil
-		}
 		fr.Lock()
 		defer fr.Unlock()
 
+		if msg.Block.Header.Generator != fr.Config.Formulator {
+			fr.lastReqMessage = nil
+		}
 		item, has := fr.lastGenItemMap[msg.Block.Header.Height]
 		if has {
 			if item.ObSign != nil {
