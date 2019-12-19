@@ -60,9 +60,6 @@ func (fr *FormulatorNode) handleObserverMessage(p peer.Peer, m interface{}, Retr
 	case *BlockReqMessage:
 		rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockReqMessage", msg.TargetHeight)
 
-		fr.Lock()
-		defer fr.Unlock()
-
 		TargetHeight := fr.cs.cn.Provider().Height() + 1
 		if msg.TargetHeight < TargetHeight {
 			return nil
@@ -73,6 +70,10 @@ func (fr *FormulatorNode) handleObserverMessage(p peer.Peer, m interface{}, Retr
 			}
 			fr.lastReqMessage = nil
 		}
+
+		fr.Lock()
+		defer fr.Unlock()
+
 		if fr.lastReqMessage != nil {
 			if msg.TargetHeight <= fr.lastReqMessage.TargetHeight {
 				return nil
@@ -148,12 +149,12 @@ func (fr *FormulatorNode) handleObserverMessage(p peer.Peer, m interface{}, Retr
 		if msg.Block.Header.Height < TargetHeight {
 			return nil
 		}
-		fr.Lock()
-		defer fr.Unlock()
-
 		if msg.Block.Header.Generator != fr.Config.Formulator {
 			fr.lastReqMessage = nil
 		}
+		fr.Lock()
+		defer fr.Unlock()
+
 		item, has := fr.lastGenItemMap[msg.Block.Header.Height]
 		if has {
 			if item.ObSign != nil {
