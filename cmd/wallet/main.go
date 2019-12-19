@@ -18,7 +18,6 @@ import (
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/common/rlog"
 	"github.com/fletaio/fleta/core/backend"
-	_ "github.com/fletaio/fleta/core/backend/badger_driver"
 	_ "github.com/fletaio/fleta/core/backend/buntdb_driver"
 	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/core/pile"
