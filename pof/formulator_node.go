@@ -47,6 +47,7 @@ type FormulatorNode struct {
 	frPublicHash   common.PublicHash
 	statusLock     sync.Mutex
 	genLock        sync.Mutex
+	lastReqLock    sync.Mutex
 	lastGenItemMap map[uint32]*genItem
 	lastReqMessage *BlockReqMessage
 	lastGenHeight  uint32
@@ -304,6 +305,8 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 			}
 			fr.cleanPool(b)
 			rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Transactions))
+
+			fr.lastReqLock.Lock()
 			if fr.lastReqMessage != nil {
 				if b.Header.Height <= fr.lastReqMessage.TargetHeight+fr.cs.maxBlocksPerFormulator {
 					if b.Header.Generator != fr.Config.Formulator {
@@ -311,6 +314,8 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 					}
 				}
 			}
+			fr.lastReqLock.Unlock()
+
 			delete(fr.lastGenItemMap, b.Header.Height)
 			TargetHeight++
 			Count++

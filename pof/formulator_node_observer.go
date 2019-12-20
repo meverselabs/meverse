@@ -68,17 +68,22 @@ func (fr *FormulatorNode) handleObserverMessage(p peer.Peer, m interface{}, Retr
 			if time.Now().UnixNano() < fr.lastGenTime+int64(30*time.Second) {
 				return nil
 			}
+			fr.lastReqLock.Lock()
 			fr.lastReqMessage = nil
+			fr.lastReqLock.Unlock()
 		}
+		fr.lastReqLock.Lock()
+		if fr.lastReqMessage != nil {
+			if msg.TargetHeight <= fr.lastReqMessage.TargetHeight {
+				fr.lastReqLock.Unlock()
+				return nil
+			}
+		}
+		fr.lastReqLock.Unlock()
 
 		fr.Lock()
 		defer fr.Unlock()
 
-		if fr.lastReqMessage != nil {
-			if msg.TargetHeight <= fr.lastReqMessage.TargetHeight {
-				return nil
-			}
-		}
 		if msg.TargetHeight > TargetHeight {
 			if msg.TargetHeight > TargetHeight+10 {
 				return nil
@@ -121,9 +126,11 @@ func (fr *FormulatorNode) handleObserverMessage(p peer.Peer, m interface{}, Retr
 		if msg.Formulator != Top.Address {
 			return ErrInvalidRequest
 		}
+		fr.lastReqLock.Lock()
 		fr.lastReqMessage = msg
+		fr.lastReqLock.Unlock()
 
-		go func(req *BlockReqMessage) error {
+		go func(ID string, req *BlockReqMessage) error {
 			fr.genLock.Lock()
 			defer fr.genLock.Unlock()
 
@@ -134,13 +141,18 @@ func (fr *FormulatorNode) handleObserverMessage(p peer.Peer, m interface{}, Retr
 			if req.TargetHeight < TargetHeight {
 				return nil
 			}
+
+			fr.lastReqLock.Lock()
 			if fr.lastReqMessage != nil {
 				if req.TargetHeight < fr.lastReqMessage.TargetHeight {
+					fr.lastReqLock.Unlock()
 					return nil
 				}
 			}
-			return fr.genBlock(p, req)
-		}(msg)
+			fr.lastReqLock.Unlock()
+
+			return fr.genBlock(ID, req)
+		}(p.ID(), msg)
 		return nil
 	case *BlockGenMessage:
 		rlog.Println("Formulator", fr.Config.Formulator.String(), "Recv.BlockGenMessage", msg.Block.Header.Height)
@@ -150,7 +162,9 @@ func (fr *FormulatorNode) handleObserverMessage(p peer.Peer, m interface{}, Retr
 			return nil
 		}
 		if msg.Block.Header.Generator != fr.Config.Formulator {
+			fr.lastReqLock.Lock()
 			fr.lastReqMessage = nil
+			fr.lastReqLock.Unlock()
 		}
 		fr.Lock()
 		defer fr.Unlock()
@@ -400,7 +414,7 @@ func (fr *FormulatorNode) updateByGenItem() {
 	}
 }
 
-func (fr *FormulatorNode) genBlock(p peer.Peer, msg *BlockReqMessage) error {
+func (fr *FormulatorNode) genBlock(ID string, msg *BlockReqMessage) error {
 	cp := fr.cs.cn.Provider()
 
 	RemainBlocks := fr.cs.maxBlocksPerFormulator
@@ -491,7 +505,7 @@ func (fr *FormulatorNode) genBlock(p peer.Peer, msg *BlockReqMessage) error {
 		} else {
 			sm.GeneratorSignature = sig
 		}
-		p.SendPacket(p2p.MessageToPacket(sm))
+		fr.ms.SendTo(ID, sm)
 
 		rlog.Println("Formulator", fr.Config.Formulator.String(), "Send.BlockGenMessage", sm.Block.Header.Height, len(sm.Block.Transactions))
 
@@ -512,6 +526,8 @@ func (fr *FormulatorNode) genBlock(p peer.Peer, msg *BlockReqMessage) error {
 		if ExpectedTime > PastTime {
 			IsEnd := false
 			fr.Unlock()
+
+			fr.lastReqLock.Lock()
 			if fr.lastReqMessage == nil {
 				IsEnd = true
 			}
@@ -521,6 +537,8 @@ func (fr *FormulatorNode) genBlock(p peer.Peer, msg *BlockReqMessage) error {
 					IsEnd = true
 				}
 			}
+			fr.lastReqLock.Unlock()
+
 			fr.Lock()
 			if IsEnd {
 				return nil
@@ -528,9 +546,13 @@ func (fr *FormulatorNode) genBlock(p peer.Peer, msg *BlockReqMessage) error {
 		} else {
 			IsEnd := false
 			fr.Unlock()
+
+			fr.lastReqLock.Lock()
 			if fr.lastReqMessage == nil {
 				IsEnd = true
 			}
+			fr.lastReqLock.Unlock()
+
 			fr.Lock()
 			if IsEnd {
 				return nil
