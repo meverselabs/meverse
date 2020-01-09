@@ -150,7 +150,7 @@ func (nd *Node) Run(BindAddress string) {
 					}
 					item := v.(*TxMsgItem)
 					if err := nd.addTx(ctw, item.TxHash, item.Type, item.Tx, item.Sigs); err != nil {
-						if err != ErrInvalidUTXO && err != txpool.ErrExistTransaction && err != txpool.ErrTooFarSeq && err != txpool.ErrPastSeq {
+						if err != ErrInvalidUTXO && err != txpool.ErrExistTransaction && err != txpool.ErrExistTransactionSeq && err != txpool.ErrTooFarSeq && err != txpool.ErrPastSeq {
 							rlog.Println("TransactionError", item.TxHash.String(), err.Error())
 							if len(item.PeerID) > 0 {
 								nd.ms.AddBadPoint(item.PeerID, 1)

@@ -171,7 +171,7 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 					}
 					item := v.(*p2p.TxMsgItem)
 					if err := fr.addTx(ctw, item.TxHash, item.Type, item.Tx, item.Sigs); err != nil {
-						if err != p2p.ErrInvalidUTXO && err != txpool.ErrExistTransaction && err != txpool.ErrTooFarSeq && err != txpool.ErrPastSeq {
+						if err != p2p.ErrInvalidUTXO && err != txpool.ErrExistTransaction && err != txpool.ErrExistTransactionSeq && err != txpool.ErrTooFarSeq && err != txpool.ErrPastSeq {
 							rlog.Println("TransactionError", item.TxHash.String(), err.Error())
 							if len(item.PeerID) > 0 {
 								fr.nm.AddBadPoint(item.PeerID, 1)
