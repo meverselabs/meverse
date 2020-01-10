@@ -371,12 +371,6 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 			return ErrInvalidVote
 		}
 		bh := encoding.Hash(msg.Block.Header)
-		if br.BlockGenMessageWait != nil {
-			if bh != encoding.Hash(br.BlockGenMessageWait.Block.Header) {
-				rlog.Println(msg.Block.Header.Generator.String(), "if bh != encoding.Hash(br.BlockGenMessageWait.Block.Header) {")
-				return ErrFoundForkedBlockGen
-			}
-		}
 		if pubkey, err := common.RecoverPubkey(bh, msg.GeneratorSignature); err != nil {
 			return err
 		} else if Signer := common.NewPublicHash(pubkey); Signer != Top.PublicHash {

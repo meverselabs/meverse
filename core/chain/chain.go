@@ -449,8 +449,9 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block, SigMap map[hash.H
 	if len(b.Transactions) > 0 {
 		var wg sync.WaitGroup
 		cpuCnt := runtime.NumCPU()
-		if len(b.Transactions) < 1000 {
-			cpuCnt = 1
+		cpuLimit := (len(b.Transactions) / 500) + 1
+		if cpuCnt > cpuLimit {
+			cpuCnt = cpuLimit
 		}
 		txUnit := len(b.Transactions) / cpuCnt
 		if len(b.Transactions)%cpuCnt != 0 {
