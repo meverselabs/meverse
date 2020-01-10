@@ -268,7 +268,7 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 				}
 				if IsFailable {
 					ob.round.VoteFailCount++
-					if ob.round.VoteFailCount > 20 {
+					if ob.round.VoteFailCount > 30 {
 						if ob.round.MinRoundVoteAck != nil {
 							addr := ob.round.MinRoundVoteAck.Formulator
 							if _, has := ob.ignoreMap[addr]; has {
