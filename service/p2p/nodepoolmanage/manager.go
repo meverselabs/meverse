@@ -2,7 +2,6 @@ package nodepoolmanage
 
 import (
 	"errors"
-	"log"
 	"sync"
 	"time"
 
@@ -136,7 +135,7 @@ func (pm *nodePoolManage) rotatePeer() {
 		if pm.nodes.Len() < 4 {
 			pm.reqPeerList()
 		}
-		log.Println("peermanager nodes len", pm.nodes.Len())
+		// log.Println("peermanager nodes len", pm.nodes.Len())
 		pm.appendPeerStorage()
 	}
 }
