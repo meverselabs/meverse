@@ -14,7 +14,6 @@ import (
 // ResponsePayment is a ResponsePayment
 type ResponsePayment struct {
 	Timestamp_ uint64
-	Seq_       uint64
 	From_      common.Address
 	TXID       string
 	Amount     *amount.Amount
@@ -24,11 +23,6 @@ type ResponsePayment struct {
 // Timestamp returns the timestamp of the transaction
 func (tx *ResponsePayment) Timestamp() uint64 {
 	return tx.Timestamp_
-}
-
-// Seq returns the sequence of the transaction
-func (tx *ResponsePayment) Seq() uint64 {
-	return tx.Seq_
 }
 
 // From returns the from address of the transaction
@@ -42,9 +36,6 @@ func (tx *ResponsePayment) Validate(p types.Process, loader types.LoaderWrapper,
 
 	if tx.Amount.Less(amount.COIN.DivC(10)) {
 		return types.ErrDustAmount
-	}
-	if tx.Seq() <= loader.Seq(tx.From()) {
-		return types.ErrInvalidSequence
 	}
 
 	adminAddr := sp.admin.AdminAddress(loader, p.Name())
@@ -110,13 +101,6 @@ func (tx *ResponsePayment) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
 	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"seq":`)
-	if bs, err := json.Marshal(tx.Seq_); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

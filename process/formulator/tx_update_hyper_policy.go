@@ -13,7 +13,6 @@ import (
 // UpdateHyperPolicy is used to update reward policy
 type UpdateHyperPolicy struct {
 	Timestamp_ uint64
-	Seq_       uint64
 	From_      common.Address
 	Policy     *HyperPolicy
 }
@@ -21,11 +20,6 @@ type UpdateHyperPolicy struct {
 // Timestamp returns the timestamp of the transaction
 func (tx *UpdateHyperPolicy) Timestamp() uint64 {
 	return tx.Timestamp_
-}
-
-// Seq returns the sequence of the transaction
-func (tx *UpdateHyperPolicy) Seq() uint64 {
-	return tx.Seq_
 }
 
 // From returns the from address of the transaction
@@ -42,10 +36,6 @@ func (tx *UpdateHyperPolicy) Validate(p types.Process, loader types.LoaderWrappe
 	}
 	if tx.Policy == nil {
 		return ErrInvalidHyperPolicy
-	}
-
-	if tx.Seq() <= loader.Seq(tx.From()) {
-		return types.ErrInvalidSequence
 	}
 
 	fromAcc, err := loader.Account(tx.From())
@@ -74,13 +64,6 @@ func (tx *UpdateHyperPolicy) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
 	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"seq":`)
-	if bs, err := json.Marshal(tx.Seq_); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

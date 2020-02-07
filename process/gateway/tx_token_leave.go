@@ -14,7 +14,6 @@ import (
 // TokenLeave is a TokenLeave
 type TokenLeave struct {
 	Timestamp_ uint64
-	Seq_       uint64
 	From_      common.Address
 	CoinTXID   string
 	CoinFrom   common.Address
@@ -26,11 +25,6 @@ type TokenLeave struct {
 // Timestamp returns the timestamp of the transaction
 func (tx *TokenLeave) Timestamp() uint64 {
 	return tx.Timestamp_
-}
-
-// Seq returns the sequence of the transaction
-func (tx *TokenLeave) Seq() uint64 {
-	return tx.Seq_
 }
 
 // From returns the from address of the transaction
@@ -50,9 +44,6 @@ func (tx *TokenLeave) Validate(p types.Process, loader types.LoaderWrapper, sign
 	}
 	if _, _, err := types.ParseTransactionID(tx.CoinTXID); err != nil {
 		return err
-	}
-	if tx.Seq() <= loader.Seq(tx.From()) {
-		return types.ErrInvalidSequence
 	}
 
 	if sp.HasOutTXID(loader, tx.CoinTXID) {
@@ -82,13 +73,6 @@ func (tx *TokenLeave) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
 	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"seq":`)
-	if bs, err := json.Marshal(tx.Seq_); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

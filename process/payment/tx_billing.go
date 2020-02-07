@@ -13,7 +13,6 @@ import (
 // Billing is a Billing
 type Billing struct {
 	Timestamp_ uint64
-	Seq_       uint64
 	From_      common.Address
 	Topic      uint64
 	To         common.Address
@@ -24,11 +23,6 @@ type Billing struct {
 // Timestamp returns the timestamp of the transaction
 func (tx *Billing) Timestamp() uint64 {
 	return tx.Timestamp_
-}
-
-// Seq returns the sequence of the transaction
-func (tx *Billing) Seq() uint64 {
-	return tx.Seq_
 }
 
 // From returns the from address of the transaction
@@ -45,9 +39,6 @@ func (tx *Billing) Validate(p types.Process, loader types.LoaderWrapper, signers
 	}
 	if len(tx.Content) > 255 {
 		return ErrExceedContentSize
-	}
-	if tx.Seq() <= loader.Seq(tx.From()) {
-		return types.ErrInvalidSequence
 	}
 
 	if _, err := sp.GetTopicName(loader, tx.Topic); err != nil {
@@ -97,13 +88,6 @@ func (tx *Billing) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
 	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"seq":`)
-	if bs, err := json.Marshal(tx.Seq_); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

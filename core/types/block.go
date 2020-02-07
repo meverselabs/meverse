@@ -21,9 +21,6 @@ func init() {
 		if len(item.TransactionTypes) != len(item.TransactionSignatures) {
 			return ErrInvalidTransactionCount
 		}
-		if len(item.TransactionTypes) != len(item.TransactionResults) {
-			return ErrInvalidTransactionCount
-		}
 
 		if err := enc.Encode(item.Header); err != nil {
 			return err
@@ -47,9 +44,6 @@ func init() {
 				if err := enc.Encode(sig); err != nil {
 					return err
 				}
-			}
-			if err := enc.EncodeUint8(item.TransactionResults[i]); err != nil {
-				return err
 			}
 		}
 		if err := enc.EncodeArrayLen(len(item.Signatures)); err != nil {
@@ -76,7 +70,6 @@ func init() {
 		item.TransactionTypes = make([]uint16, 0, TxLen)
 		item.Transactions = make([]Transaction, 0, TxLen)
 		item.TransactionSignatures = make([][]common.Signature, 0, TxLen)
-		item.TransactionResults = make([]uint8, 0, TxLen)
 		for i := 0; i < TxLen; i++ {
 			t, err := dec.DecodeUint16()
 			if err != nil {
@@ -106,12 +99,6 @@ func init() {
 				sigs = append(sigs, sig)
 			}
 			item.TransactionSignatures = append(item.TransactionSignatures, sigs)
-
-			r, err := dec.DecodeUint8()
-			if err != nil {
-				return err
-			}
-			item.TransactionResults = append(item.TransactionResults, r)
 		}
 		SigLen, err := dec.DecodeArrayLen()
 		if err != nil {
@@ -136,6 +123,5 @@ type Block struct {
 	TransactionTypes      []uint16             //MAXLEN : 65535
 	Transactions          []Transaction        //MAXLEN : 65535
 	TransactionSignatures [][]common.Signature //MAXLEN : 65535
-	TransactionResults    []uint8              //MAXLEN : 65535
 	Signatures            []common.Signature   //MAXLEN : 255
 }

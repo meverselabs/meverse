@@ -69,6 +69,9 @@ func (q *LinkedQueue) Pop() interface{} {
 		q.Tail = nil
 	} else {
 		q.Head = nd.Next
+		if q.Head != nil {
+			q.Head.Prev = nil
+		}
 		nd.Next.Prev = nil
 	}
 	nd.Prev = nil
@@ -97,9 +100,15 @@ func (q *LinkedQueue) Remove(Key hash.Hash256) interface{} {
 	}
 	if nd == q.Head {
 		q.Head = nd.Next
+		if q.Head != nil {
+			q.Head.Prev = nil
+		}
 	}
 	if nd == q.Tail {
 		q.Tail = nd.Prev
+		if q.Tail != nil {
+			q.Tail.Next = nil
+		}
 	}
 	nd.Prev = nil
 	nd.Next = nil
@@ -111,4 +120,16 @@ type linkedItem struct {
 	Key  hash.Hash256
 	Item interface{}
 	Next *linkedItem
+}
+
+// Iter iterates queue items
+func (q *LinkedQueue) Iter(fn func(keyMap hash.Hash256, v interface{})) {
+	q.Lock()
+	defer q.Unlock()
+
+	cur := q.Head
+	for cur != nil {
+		fn(cur.Key, cur.Item)
+		cur = cur.Next
+	}
 }

@@ -11,7 +11,6 @@ import (
 // UpdateValidatorPolicy is used to update validator policy of the hyper formulator
 type UpdateValidatorPolicy struct {
 	Timestamp_ uint64
-	Seq_       uint64
 	From_      common.Address
 	Policy     *ValidatorPolicy
 }
@@ -19,11 +18,6 @@ type UpdateValidatorPolicy struct {
 // Timestamp returns the timestamp of the transaction
 func (tx *UpdateValidatorPolicy) Timestamp() uint64 {
 	return tx.Timestamp_
-}
-
-// Seq returns the sequence of the transaction
-func (tx *UpdateValidatorPolicy) Seq() uint64 {
-	return tx.Seq_
 }
 
 // From returns the from address of the transaction
@@ -44,10 +38,6 @@ func (tx *UpdateValidatorPolicy) Validate(p types.Process, loader types.LoaderWr
 	}
 	if tx.Policy.PayOutInterval > 30 {
 		return ErrInvalidValidatorPolicy
-	}
-
-	if tx.Seq() <= loader.Seq(tx.From()) {
-		return types.ErrInvalidSequence
 	}
 
 	acc, err := loader.Account(tx.From())
@@ -84,13 +74,6 @@ func (tx *UpdateValidatorPolicy) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
 	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"seq":`)
-	if bs, err := json.Marshal(tx.Seq_); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

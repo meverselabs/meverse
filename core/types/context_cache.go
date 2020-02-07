@@ -7,24 +7,24 @@ import (
 
 type contextCache struct {
 	ctx            *Context
-	SeqMap         map[common.Address]uint64
 	AccountMap     map[common.Address]Account
 	AccountNameMap map[string]common.Address
 	AccountDataMap map[string][]byte
 	ProcessDataMap map[string][]byte
 	UTXOMap        map[uint64]*UTXO
+	TimeSlotMap    map[uint32]map[string]bool
 }
 
 // NewContextCache is used for generating genesis state
 func newContextCache(ctx *Context) *contextCache {
 	return &contextCache{
 		ctx:            ctx,
-		SeqMap:         map[common.Address]uint64{},
 		AccountMap:     map[common.Address]Account{},
 		AccountNameMap: map[string]common.Address{},
 		AccountDataMap: map[string][]byte{},
 		ProcessDataMap: map[string][]byte{},
 		UTXOMap:        map[uint64]*UTXO{},
+		TimeSlotMap:    map[uint32]map[string]bool{},
 	}
 }
 
@@ -61,17 +61,6 @@ func (cc *contextCache) LastHash() hash.Hash256 {
 // LastTimestamp returns the last timestamp of the chain
 func (cc *contextCache) LastTimestamp() uint64 {
 	return cc.ctx.LastTimestamp()
-}
-
-// Seq returns the sequence of the account
-func (cc *contextCache) Seq(addr common.Address) uint64 {
-	if seq, has := cc.SeqMap[addr]; has {
-		return seq
-	} else {
-		seq := cc.ctx.loader.Seq(addr)
-		cc.SeqMap[addr] = seq
-		return seq
-	}
 }
 
 // Account returns the account instance of the address
@@ -165,4 +154,20 @@ func (cc *contextCache) ProcessData(pid uint8, name []byte) []byte {
 		cc.ProcessDataMap[key] = value
 		return value
 	}
+}
+
+// IsUsedTimeSlot returns timeslot is used or not
+func (cc *contextCache) IsUsedTimeSlot(slot uint32, key string) bool {
+	mp, has := cc.TimeSlotMap[slot]
+	if !has {
+		mp = map[string]bool{}
+		cc.TimeSlotMap[slot] = mp
+	} else if _, has := mp[key]; has {
+		return true
+	}
+	if has := cc.ctx.loader.IsUsedTimeSlot(slot, key); has {
+		mp[key] = true
+		return true
+	}
+	return false
 }

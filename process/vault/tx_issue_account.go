@@ -12,7 +12,6 @@ import (
 // IssueAccount is used to make a account
 type IssueAccount struct {
 	Timestamp_ uint64
-	Seq_       uint64
 	From_      common.Address
 	Name       string
 	KeyHash    common.PublicHash
@@ -21,11 +20,6 @@ type IssueAccount struct {
 // Timestamp returns the timestamp of the transaction
 func (tx *IssueAccount) Timestamp() uint64 {
 	return tx.Timestamp_
-}
-
-// Seq returns the sequence of the transaction
-func (tx *IssueAccount) Seq() uint64 {
-	return tx.Seq_
 }
 
 // From returns the from address of the transaction
@@ -39,10 +33,6 @@ func (tx *IssueAccount) Validate(p types.Process, loader types.LoaderWrapper, si
 
 	if tx.From() != sp.admin.AdminAddress(loader, p.Name()) {
 		return admin.ErrUnauthorizedTransaction
-	}
-
-	if tx.Seq() <= loader.Seq(tx.From()) {
-		return types.ErrInvalidSequence
 	}
 
 	if has, err := loader.HasAccountName(tx.Name); err != nil {
@@ -82,13 +72,6 @@ func (tx *IssueAccount) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
 	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"seq":`)
-	if bs, err := json.Marshal(tx.Seq_); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

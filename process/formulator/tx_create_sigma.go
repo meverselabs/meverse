@@ -13,7 +13,6 @@ import (
 // CreateSigma is used to make sigma formulator account
 type CreateSigma struct {
 	Timestamp_       uint64
-	Seq_             uint64
 	From_            common.Address
 	AlphaFormulators []common.Address
 }
@@ -21,11 +20,6 @@ type CreateSigma struct {
 // Timestamp returns the timestamp of the transaction
 func (tx *CreateSigma) Timestamp() uint64 {
 	return tx.Timestamp_
-}
-
-// Seq returns the sequence of the transaction
-func (tx *CreateSigma) Seq() uint64 {
-	return tx.Seq_
 }
 
 // From returns the from address of the transaction
@@ -45,9 +39,6 @@ func (tx *CreateSigma) Validate(p types.Process, loader types.LoaderWrapper, sig
 
 	if tx.From() != tx.AlphaFormulators[0] {
 		return ErrInvalidFormulatorAddress
-	}
-	if tx.Seq() <= loader.Seq(tx.AlphaFormulators[0]) {
-		return types.ErrInvalidSequence
 	}
 	if len(tx.AlphaFormulators) != len(signers) {
 		return types.ErrInvalidSignerCount
@@ -146,13 +137,6 @@ func (tx *CreateSigma) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
 	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"seq":`)
-	if bs, err := json.Marshal(tx.Seq_); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

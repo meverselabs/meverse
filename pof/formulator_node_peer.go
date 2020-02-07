@@ -6,6 +6,7 @@ import (
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/rlog"
 	"github.com/fletaio/fleta/core/chain"
+	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/service/p2p"
 	"github.com/fletaio/fleta/service/p2p/peer"
 )
@@ -136,8 +137,17 @@ func (fr *FormulatorNode) handlePeerMessage(ID string, m interface{}) error {
 			return p2p.ErrTooManyTrasactionInMessage
 		}
 		ChainID := fr.cs.cn.Provider().ChainID()
+		currentSlot := types.ToTimeSlot(fr.cs.cn.Provider().LastTimestamp())
 		for i, t := range msg.Types {
 			tx := msg.Txs[i]
+			slot := types.ToTimeSlot(tx.Timestamp())
+			if currentSlot > 0 {
+				if slot < currentSlot-1 {
+					continue
+				} else if slot > currentSlot+10 {
+					continue
+				}
+			}
 			sigs := msg.Signatures[i]
 			TxHash := chain.HashTransactionByType(ChainID, t, tx)
 			if !fr.txpool.IsExist(TxHash) {
