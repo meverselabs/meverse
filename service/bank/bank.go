@@ -33,6 +33,7 @@ type Bank struct {
 	cn        types.Provider
 	nd        *p2p.Node
 	db        *ledis.DB
+	seqMap    map[common.Address]uint64
 	waitTxMap map[hash.Hash256]*chan string
 }
 
@@ -52,6 +53,7 @@ func NewBank(keyStore backend.StoreBackend, dbpath string) *Bank {
 	s := &Bank{
 		keyStore:  keyStore,
 		db:        db,
+		seqMap:    map[common.Address]uint64{},
 		waitTxMap: map[hash.Hash256]*chan string{},
 	}
 	return s
@@ -266,8 +268,19 @@ func (s *Bank) Init(pm types.ProcessManager, cn types.Provider) error {
 				return nil, err
 			}
 
+			s.Lock()
+			Seq, has := s.seqMap[from]
+			ChainSeq := s.cn.Seq(from)
+			if !has || Seq < ChainSeq {
+				Seq = ChainSeq
+			}
+			Seq++
+			s.seqMap[from] = Seq
+			s.Unlock()
+
 			tx := &vault.Transfer{
 				Timestamp_: uint64(time.Now().UnixNano()),
+				Seq_:       Seq,
 				From_:      from,
 				To:         to,
 				Amount:     am,
@@ -275,9 +288,15 @@ func (s *Bank) Init(pm types.ProcessManager, cn types.Provider) error {
 			TxHash := chain.HashTransaction(s.cn.ChainID(), tx)
 			sig, err := s.Sign(name, Password, TxHash)
 			if err != nil {
+				s.Lock()
+				s.seqMap[from] = Seq - 1
+				s.Unlock()
 				return nil, err
 			}
 			if err := s.nd.AddTx(tx, []common.Signature{sig}); err != nil {
+				s.Lock()
+				s.seqMap[from] = Seq - 1
+				s.Unlock()
 				return nil, err
 			}
 			if err := s.addPending(tx); err != nil {

@@ -18,7 +18,7 @@ type BlockCreator struct {
 }
 
 // NewBlockCreator returns a BlockCreator
-func NewBlockCreator(cn *Chain, ctx *types.Context, Generator common.Address, ConsensusData []byte, Timestamp uint64) *BlockCreator {
+func NewBlockCreator(cn *Chain, ctx *types.Context, Generator common.Address, ConsensusData []byte) *BlockCreator {
 	bc := &BlockCreator{
 		cn:       cn,
 		ctx:      ctx,
@@ -31,12 +31,12 @@ func NewBlockCreator(cn *Chain, ctx *types.Context, Generator common.Address, Co
 				PrevHash:      ctx.LastHash(),
 				Generator:     Generator,
 				ConsensusData: ConsensusData,
-				Timestamp:     Timestamp,
 			},
 			TransactionTypes:      []uint16{},
 			Transactions:          []types.Transaction{},
 			TransactionSignatures: [][]common.Signature{},
 			Signatures:            []common.Signature{},
+			TransactionResults:    []uint8{},
 		},
 		txFactory: encoding.Factory("transaction"),
 	}
@@ -93,25 +93,30 @@ func (bc *BlockCreator) UnsafeAddTx(Generator common.Address, t uint16, TxHash h
 	}
 	ctw := types.NewContextWrapper(pid, bc.ctx)
 
-	currentSlot := types.ToTimeSlot(bc.b.Header.Timestamp)
-	slot := types.ToTimeSlot(tx.Timestamp())
-	if slot < currentSlot-1 {
-		return types.ErrInvalidTransactionTimeSlot
-	} else if slot > currentSlot {
-		return types.ErrInvalidTransactionTimeSlot
-	}
+	Result := uint8(0)
 
 	sn := ctw.Snapshot()
-	if err := bc.ctx.UseTimeSlot(slot, string(TxHash[:])); err != nil {
-		return err
-	}
 	if err := tx.Validate(p, ctw, signers); err != nil {
 		ctw.Revert(sn)
 		return err
 	}
-	if err := tx.Execute(p, ctw, uint16(len(bc.b.Transactions))); err != nil {
-		ctw.Revert(sn)
-		return err
+	if at, is := tx.(AccountTransaction); is {
+		if at.Seq() != ctw.Seq(at.From())+1 {
+			ctw.Revert(sn)
+			return types.ErrInvalidSequence
+		}
+		ctw.AddSeq(at.From())
+		if err := tx.Execute(p, ctw, uint16(len(bc.b.Transactions))); err != nil {
+			Result = 0
+		} else {
+			Result = 1
+		}
+	} else {
+		if err := tx.Execute(p, ctw, uint16(len(bc.b.Transactions))); err != nil {
+			ctw.Revert(sn)
+			return err
+		}
+		Result = 1
 	}
 	if Has, err := ctw.HasAccount(Generator); err != nil {
 		ctw.Revert(sn)
@@ -129,12 +134,13 @@ func (bc *BlockCreator) UnsafeAddTx(Generator common.Address, t uint16, TxHash h
 	bc.b.TransactionTypes = append(bc.b.TransactionTypes, t)
 	bc.b.Transactions = append(bc.b.Transactions, tx)
 	bc.b.TransactionSignatures = append(bc.b.TransactionSignatures, sigs)
+	bc.b.TransactionResults = append(bc.b.TransactionResults, Result)
 	bc.txHashes = append(bc.txHashes, TxHash)
 	return nil
 }
 
 // Finalize generates block that has transactions adds by AddTx
-func (bc *BlockCreator) Finalize() (*types.Block, error) {
+func (bc *BlockCreator) Finalize(Timestamp uint64) (*types.Block, error) {
 	IDMap := map[int]uint8{}
 	for id, idx := range bc.cn.processIndexMap {
 		IDMap[idx] = id
@@ -164,6 +170,7 @@ func (bc *BlockCreator) Finalize() (*types.Block, error) {
 		return nil, ErrDirtyContext
 	}
 
+	bc.b.Header.Timestamp = Timestamp
 	bc.b.Header.ContextHash = bc.ctx.Hash()
 
 	return bc.b, nil

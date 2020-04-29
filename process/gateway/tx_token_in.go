@@ -14,6 +14,7 @@ import (
 // TokenIn is a TokenIn
 type TokenIn struct {
 	Timestamp_  uint64
+	Seq_        uint64
 	From_       common.Address
 	ERC20TXID   hash.Hash256
 	ERC20From   ERC20Address
@@ -24,6 +25,11 @@ type TokenIn struct {
 // Timestamp returns the timestamp of the transaction
 func (tx *TokenIn) Timestamp() uint64 {
 	return tx.Timestamp_
+}
+
+// Seq returns the sequence of the transaction
+func (tx *TokenIn) Seq() uint64 {
+	return tx.Seq_
 }
 
 // From returns the from address of the transaction
@@ -45,6 +51,9 @@ func (tx *TokenIn) Validate(p types.Process, loader types.LoaderWrapper, signers
 		if am.Less(amount.COIN.DivC(10)) {
 			return types.ErrDustAmount
 		}
+	}
+	if tx.Seq() <= loader.Seq(tx.From()) {
+		return types.ErrInvalidSequence
 	}
 
 	if sp.HasERC20TXID(loader, tx.ERC20TXID) {
@@ -93,6 +102,13 @@ func (tx *TokenIn) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
 	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"seq":`)
+	if bs, err := json.Marshal(tx.Seq_); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

@@ -12,6 +12,7 @@ import (
 // Burn is a Burn
 type Burn struct {
 	Timestamp_ uint64
+	Seq_       uint64
 	From_      common.Address
 	Amount     *amount.Amount
 }
@@ -19,6 +20,11 @@ type Burn struct {
 // Timestamp returns the timestamp of the transaction
 func (tx *Burn) Timestamp() uint64 {
 	return tx.Timestamp_
+}
+
+// Seq returns the sequence of the transaction
+func (tx *Burn) Seq() uint64 {
+	return tx.Seq_
 }
 
 // From returns the from address of the transaction
@@ -35,6 +41,10 @@ func (tx *Burn) Fee(p types.Process, loader types.LoaderWrapper) *amount.Amount 
 // Validate validates signatures of the transaction
 func (tx *Burn) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	sp := p.(*Vault)
+
+	if tx.Seq() <= loader.Seq(tx.From()) {
+		return types.ErrInvalidSequence
+	}
 
 	fromAcc, err := loader.Account(tx.From())
 	if err != nil {
@@ -68,6 +78,13 @@ func (tx *Burn) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
 	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"seq":`)
+	if bs, err := json.Marshal(tx.Seq_); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

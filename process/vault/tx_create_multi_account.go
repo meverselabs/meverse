@@ -12,6 +12,7 @@ import (
 // CreateMultiAccount is used to make multi account
 type CreateMultiAccount struct {
 	Timestamp_ uint64
+	Seq_       uint64
 	From_      common.Address
 	Name       string
 	Requried   uint8
@@ -21,6 +22,11 @@ type CreateMultiAccount struct {
 // Timestamp returns the timestamp of the transaction
 func (tx *CreateMultiAccount) Timestamp() uint64 {
 	return tx.Timestamp_
+}
+
+// Seq returns the sequence of the transaction
+func (tx *CreateMultiAccount) Seq() uint64 {
+	return tx.Seq_
 }
 
 // From returns the from address of the transaction
@@ -53,6 +59,10 @@ func (tx *CreateMultiAccount) Validate(p types.Process, loader types.LoaderWrapp
 	}
 	if len(keyHashMap) != len(tx.KeyHashes) {
 		return ErrInvalidMultiKeyHashCount
+	}
+
+	if tx.Seq() <= loader.Seq(tx.From()) {
+		return types.ErrInvalidSequence
 	}
 
 	fromAcc, err := loader.Account(tx.From())
@@ -102,6 +112,13 @@ func (tx *CreateMultiAccount) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
 	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"seq":`)
+	if bs, err := json.Marshal(tx.Seq_); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

@@ -11,13 +11,13 @@ type Loader interface {
 	Name() string
 	Version() uint16
 	TargetHeight() uint32
+	Seq(addr common.Address) uint64
 	Account(addr common.Address) (Account, error)
 	AddressByName(Name string) (common.Address, error)
 	HasAccount(addr common.Address) (bool, error)
 	HasAccountName(Name string) (bool, error)
 	HasUTXO(id uint64) (bool, error)
 	UTXO(id uint64) (*UTXO, error)
-	IsUsedTimeSlot(slot uint32, key string) bool
 }
 
 type internalLoader interface {
@@ -71,6 +71,11 @@ func (st *emptyLoader) LastTimestamp() uint64 {
 	return 0
 }
 
+// Seq returns 0
+func (st *emptyLoader) Seq(addr common.Address) uint64 {
+	return 0
+}
+
 // Account returns ErrNotExistAccount
 func (st *emptyLoader) Account(addr common.Address) (Account, error) {
 	return nil, ErrNotExistAccount
@@ -109,9 +114,4 @@ func (st *emptyLoader) UTXO(id uint64) (*UTXO, error) {
 // ProcessData returns nil
 func (st *emptyLoader) ProcessData(pid uint8, name []byte) []byte {
 	return nil
-}
-
-// IsUsedTimeSlot returns false
-func (st *emptyLoader) IsUsedTimeSlot(slot uint32, key string) bool {
-	return false
 }

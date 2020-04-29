@@ -376,6 +376,7 @@ func (fr *FormulatorNode) updateByGenItem() {
 			TransactionTypes:      item.BlockGen.Block.TransactionTypes,
 			Transactions:          item.BlockGen.Block.Transactions,
 			TransactionSignatures: item.BlockGen.Block.TransactionSignatures,
+			TransactionResults:    item.BlockGen.Block.TransactionResults,
 			Signatures:            append([]common.Signature{item.BlockGen.GeneratorSignature}, item.ObSign.ObserverSignatures...),
 		}
 		if item.Context != nil {
@@ -408,15 +409,6 @@ func (fr *FormulatorNode) updateByGenItem() {
 		rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Transactions))
 		delete(fr.lastGenItemMap, b.Header.Height)
 
-		txs := fr.txpool.Clean(types.ToTimeSlot(b.Header.Timestamp))
-		if len(txs) > 0 {
-			svcs := fr.cs.cn.Services()
-			for _, s := range svcs {
-				s.OnTransactionInPoolExpired(txs)
-			}
-			rlog.Println("Transaction EXPIRED", len(txs))
-		}
-
 		TargetHeight++
 		item = fr.lastGenItemMap[TargetHeight]
 	}
@@ -440,9 +432,8 @@ func (fr *FormulatorNode) genBlock(ID string, msg *BlockReqMessage) error {
 		StartBlockTime = LastTimestamp + uint64(time.Millisecond)
 	}
 
-	rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockGenBegin", msg.TargetHeight, fr.txpool.Size())
+	rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockGenBegin", msg.TargetHeight)
 
-	MaxTxPerBlock := fr.Config.MaxTransactionsPerBlock
 	var lastHeader *types.Header
 	ctx := fr.cs.cn.NewContext()
 	for i := uint32(0); i < RemainBlocks; i++ {
@@ -466,7 +457,7 @@ func (fr *FormulatorNode) genBlock(ID string, msg *BlockReqMessage) error {
 		if err := enc.EncodeUint32(TimeoutCount); err != nil {
 			return err
 		}
-		bc := chain.NewBlockCreator(fr.cs.cn, ctx, msg.Formulator, buffer.Bytes(), Timestamp)
+		bc := chain.NewBlockCreator(fr.cs.cn, ctx, msg.Formulator, buffer.Bytes())
 		if err := bc.Init(); err != nil {
 			return err
 		}
@@ -475,7 +466,6 @@ func (fr *FormulatorNode) genBlock(ID string, msg *BlockReqMessage) error {
 
 		fr.txpool.Lock() // Prevent delaying from TxPool.Push
 		Count := 0
-		currentSlot := types.ToTimeSlot(Timestamp)
 	TxLoop:
 		for {
 			select {
@@ -483,7 +473,7 @@ func (fr *FormulatorNode) genBlock(ID string, msg *BlockReqMessage) error {
 				break TxLoop
 			default:
 				sn := ctx.Snapshot()
-				item := fr.txpool.UnsafePop(currentSlot)
+				item := fr.txpool.UnsafePop(ctx)
 				ctx.Revert(sn)
 				if item == nil {
 					break TxLoop
@@ -493,14 +483,14 @@ func (fr *FormulatorNode) genBlock(ID string, msg *BlockReqMessage) error {
 					continue
 				}
 				Count++
-				if Count > MaxTxPerBlock {
+				if Count > fr.Config.MaxTransactionsPerBlock {
 					break TxLoop
 				}
 			}
 		}
 		fr.txpool.Unlock() // Prevent delaying from TxPool.Push
 
-		b, err := bc.Finalize()
+		b, err := bc.Finalize(Timestamp)
 		if err != nil {
 			return err
 		}

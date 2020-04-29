@@ -596,6 +596,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 				TransactionTypes:      br.BlockGenMessage.Block.TransactionTypes,
 				Transactions:          br.BlockGenMessage.Block.Transactions,
 				TransactionSignatures: br.BlockGenMessage.Block.TransactionSignatures,
+				TransactionResults:    br.BlockGenMessage.Block.TransactionResults,
 				Signatures:            append([]common.Signature{br.BlockGenMessage.GeneratorSignature}, sigs...),
 			}
 			if err := ob.cs.ct.ConnectBlockWithContext(b, br.Context); err != nil {
@@ -650,7 +651,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicHash common.PublicHash
 				}
 			}
 			if debug.DEBUG {
-				rlog.Println(cp.Height(), "BlockConnected", b.Header.Generator.String(), ob.round.RoundState, msg.BlockVote.Header.Height, (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond), len(b.Transactions))
+				rlog.Println(cp.Height(), "BlockConnected", b.Header.Generator.String(), ob.round.RoundState, msg.BlockVote.Header.Height, (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
 			}
 
 			NextHeight := ob.round.TargetHeight + 1

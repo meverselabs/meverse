@@ -13,6 +13,7 @@ import (
 // Revoke is used to remove formulator account and get back staked coin
 type Revoke struct {
 	Timestamp_ uint64
+	Seq_       uint64
 	From_      common.Address
 	Heritor    common.Address
 }
@@ -20,6 +21,11 @@ type Revoke struct {
 // Timestamp returns the timestamp of the transaction
 func (tx *Revoke) Timestamp() uint64 {
 	return tx.Timestamp_
+}
+
+// Seq returns the sequence of the transaction
+func (tx *Revoke) Seq() uint64 {
+	return tx.Seq_
 }
 
 // From returns the from address of the transaction
@@ -39,6 +45,9 @@ func (tx *Revoke) Validate(p types.Process, loader types.LoaderWrapper, signers 
 
 	if tx.From() == tx.Heritor {
 		return ErrInvalidHeritor
+	}
+	if tx.Seq() <= loader.Seq(tx.From()) {
+		return types.ErrInvalidSequence
 	}
 
 	if has, err := loader.HasAccount(tx.Heritor); err != nil {
@@ -126,6 +135,13 @@ func (tx *Revoke) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
 	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"seq":`)
+	if bs, err := json.Marshal(tx.Seq_); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

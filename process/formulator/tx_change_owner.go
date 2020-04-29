@@ -12,6 +12,7 @@ import (
 // ChangeOwner is used to remove formulator account and get back staked coin
 type ChangeOwner struct {
 	Timestamp_ uint64
+	Seq_       uint64
 	From_      common.Address
 	KeyHash    common.PublicHash
 	GenHash    common.PublicHash
@@ -20,6 +21,11 @@ type ChangeOwner struct {
 // Timestamp returns the timestamp of the transaction
 func (tx *ChangeOwner) Timestamp() uint64 {
 	return tx.Timestamp_
+}
+
+// Seq returns the sequence of the transaction
+func (tx *ChangeOwner) Seq() uint64 {
+	return tx.Seq_
 }
 
 // From returns the from address of the transaction
@@ -36,6 +42,10 @@ func (tx *ChangeOwner) Fee(p types.Process, loader types.LoaderWrapper) *amount.
 // Validate validates signatures of the transaction
 func (tx *ChangeOwner) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	sp := p.(*Formulator)
+
+	if tx.Seq() <= loader.Seq(tx.From()) {
+		return types.ErrInvalidSequence
+	}
 
 	acc, err := loader.Account(tx.From())
 	if err != nil {
@@ -77,6 +87,13 @@ func (tx *ChangeOwner) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
 	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"seq":`)
+	if bs, err := json.Marshal(tx.Seq_); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

@@ -18,18 +18,18 @@ import (
 // All updates are executed in one transaction with FileSync option
 type Store struct {
 	sync.Mutex
-	db           backend.StoreBackend
-	cdb          *pile.DB
-	chainID      uint8
-	symbol       string
-	usage        string
-	magicNumber  uint64
-	version      uint16
-	cache        storecache
-	closeLock    sync.RWMutex
-	isClose      bool
-	timeSlotMap  map[uint32]map[string]bool
-	timeSlotLock sync.Mutex
+	db          backend.StoreBackend
+	cdb         *pile.DB
+	chainID     uint8
+	symbol      string
+	usage       string
+	magicNumber uint64
+	version     uint16
+	SeqMapLock  sync.Mutex
+	SeqMap      map[common.Address]uint64
+	cache       storecache
+	closeLock   sync.RWMutex
+	isClose     bool
 }
 
 type storecache struct {
@@ -42,13 +42,13 @@ type storecache struct {
 // NewStore returns a Store
 func NewStore(db backend.StoreBackend, cdb *pile.DB, ChainID uint8, symbol string, usage string, version uint16) (*Store, error) {
 	st := &Store{
-		db:          db,
-		cdb:         cdb,
-		chainID:     ChainID,
-		symbol:      symbol,
-		usage:       usage,
-		version:     version,
-		timeSlotMap: map[uint32]map[string]bool{},
+		db:      db,
+		cdb:     cdb,
+		chainID: ChainID,
+		symbol:  symbol,
+		usage:   usage,
+		version: version,
+		SeqMap:  map[common.Address]uint64{},
 	}
 	st.setupMagicNumber()
 
@@ -364,6 +364,36 @@ func (st *Store) Accounts() ([]types.Account, error) {
 		return nil, err
 	}
 	return list, nil
+}
+
+// Seq returns the sequence of the transaction
+func (st *Store) Seq(addr common.Address) uint64 {
+	st.closeLock.RLock()
+	defer st.closeLock.RUnlock()
+	if st.isClose {
+		return 0
+	}
+
+	st.SeqMapLock.Lock()
+	defer st.SeqMapLock.Unlock()
+
+	if seq, has := st.SeqMap[addr]; has {
+		return seq
+	} else {
+		var seq uint64
+		if err := st.db.View(func(txn backend.StoreReader) error {
+			value, err := txn.Get(toAccountSeqKey(addr))
+			if err != nil {
+				return err
+			}
+			seq = binutil.LittleEndian.Uint64(value)
+			return nil
+		}); err != nil {
+			return 0
+		}
+		st.SeqMap[addr] = seq
+		return seq
+	}
 }
 
 // Account returns the account instance of the address from the store
@@ -692,18 +722,6 @@ func (st *Store) Events(From uint32, To uint32) ([]types.Event, error) {
 	return list, nil
 }
 
-// IsUsedTimeSlot returns timeslot is used or not
-func (st *Store) IsUsedTimeSlot(slot uint32, key string) bool {
-	st.timeSlotLock.Lock()
-	defer st.timeSlotLock.Unlock()
-
-	tm, has := st.timeSlotMap[slot]
-	if !has {
-		return false
-	}
-	return tm[key]
-}
-
 // StoreGenesis stores the genesis data
 func (st *Store) StoreGenesis(genHash hash.Hash256, ctd *types.ContextData) error {
 	st.closeLock.RLock()
@@ -711,9 +729,6 @@ func (st *Store) StoreGenesis(genHash hash.Hash256, ctd *types.ContextData) erro
 	if st.isClose {
 		return ErrStoreClosed
 	}
-
-	st.Lock()
-	defer st.Unlock()
 
 	if st.Height() > 0 {
 		return ErrAlreadyGenesised
@@ -754,9 +769,6 @@ func (st *Store) StoreBlock(b *types.Block, ctd *types.ContextData) error {
 	if st.isClose {
 		return ErrStoreClosed
 	}
-
-	st.Lock()
-	defer st.Unlock()
 
 	DataHash := encoding.Hash(b.Header)
 	Datas := [][]byte{}
@@ -814,32 +826,12 @@ func (st *Store) StoreBlock(b *types.Block, ctd *types.ContextData) error {
 	}); err != nil {
 		return err
 	}
-
-	st.timeSlotLock.Lock()
-	ctd.TimeSlotMap.EachAll(func(key uint32, mp *types.StringBoolMap) bool {
-		smp, has := st.timeSlotMap[key]
-		if !has {
-			smp = map[string]bool{}
-			st.timeSlotMap[key] = smp
-		}
-		mp.EachAll(func(key string, value bool) bool {
-			smp[key] = true
-			return true
-		})
+	st.SeqMapLock.Lock()
+	ctd.SeqMap.EachAll(func(addr common.Address, value uint64) bool {
+		st.SeqMap[addr] = value
 		return true
 	})
-	currentSlot := types.ToTimeSlot(b.Header.Timestamp)
-	deleteSlots := []uint32{}
-	for slot := range st.timeSlotMap {
-		if slot < currentSlot-1 {
-			deleteSlots = append(deleteSlots, slot)
-		}
-	}
-	for _, v := range deleteSlots {
-		delete(st.timeSlotMap, v)
-	}
-	st.timeSlotLock.Unlock()
-
+	st.SeqMapLock.Unlock()
 	st.cache.height = b.Header.Height
 	st.cache.heightHash = DataHash
 	st.cache.heightBlock = b
@@ -852,7 +844,7 @@ func (st *Store) IterBlockAfterContext(fn func(b *types.Block) error) error {
 		b, err := st.Block(h)
 		if err != nil {
 			if err == backend.ErrNotExistKey {
-				break
+				return nil
 			} else {
 				return err
 			}
@@ -861,11 +853,20 @@ func (st *Store) IterBlockAfterContext(fn func(b *types.Block) error) error {
 			return err
 		}
 	}
-	return nil
 }
 
 func applyContextData(txn backend.StoreWriter, ctd *types.ContextData) error {
 	var inErr error
+	ctd.SeqMap.EachAll(func(addr common.Address, value uint64) bool {
+		if err := txn.Set(toAccountSeqKey(addr), binutil.LittleEndian.Uint64ToBytes(value)); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
 	afc := encoding.Factory("account")
 	ctd.AccountMap.EachAll(func(addr common.Address, acc types.Account) bool {
 		t, err := afc.TypeOf(acc)
@@ -1006,39 +1007,180 @@ func applyContextData(txn backend.StoreWriter, ctd *types.ContextData) error {
 	return nil
 }
 
-func (st *Store) InitTimeSlot() error {
-	Height := st.Height()
-	if Height > 0 {
-		st.timeSlotLock.Lock()
-		bh, err := st.Header(Height)
+func applyContextDataOld(txn backend.StoreWriter, ctd *types.ContextData) error {
+	var inErr error
+	ctd.SeqMap.EachAll(func(addr common.Address, value uint64) bool {
+		if err := txn.Set(toAccountSeqKey(addr), binutil.LittleEndian.Uint64ToBytes(value)); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
+	afc := encoding.Factory("account")
+	ctd.AccountMap.EachAll(func(addr common.Address, acc types.Account) bool {
+		t, err := afc.TypeOf(acc)
 		if err != nil {
+			inErr = err
+			return false
+		}
+		var buffer bytes.Buffer
+		buffer.Write(binutil.LittleEndian.Uint16ToBytes(t))
+		data, err := encoding.Marshal(acc)
+		if err != nil {
+			inErr = err
+			return false
+		}
+		buffer.Write(data)
+		if err := txn.Set(toAccountKey(addr), buffer.Bytes()); err != nil {
+			inErr = err
+			return false
+		}
+		if err := txn.Set(toAccountNameKey(acc.Name()), addr[:]); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
+	ctd.AccountDataMap.EachAll(func(key string, value []byte) bool {
+		if err := txn.Set(toAccountDataKey(key), value); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
+	ctd.DeletedAccountMap.EachAll(func(addr common.Address, acc types.Account) bool {
+		if err := txn.Set(toAccountKey(addr), []byte{0}); err != nil {
+			inErr = err
+			return false
+		}
+		prefix := toAccountDataKey(string(addr[:]))
+		Deletes := [][]byte{}
+		if err := txn.Iterate(prefix, func(key []byte, value []byte) error {
+			Deletes = append(Deletes, key)
+			return nil
+		}); err != nil {
+			inErr = err
+			return false
+		}
+		for _, v := range Deletes {
+			if err := txn.Delete(v); err != nil {
+				inErr = err
+				return false
+			}
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
+	ctd.DeletedAccountDataMap.EachAll(func(key string, value bool) bool {
+		if err := txn.Delete(toAccountDataKey(key)); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
+	ctd.UTXOMap.EachAll(func(id uint64, utxo *types.UTXO) bool {
+		if utxo.TxIn.ID() != id {
+			inErr = ErrInvalidTxInKey
+			return false
+		}
+		data, err := encoding.Marshal(utxo.TxOut)
+		if err != nil {
+			inErr = err
+			return false
+		}
+		if err := txn.Set(toUTXOKey(id), data); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
+	ctd.CreatedUTXOMap.EachAll(func(id uint64, vout *types.TxOut) bool {
+		data, err := encoding.Marshal(vout)
+		if err != nil {
+			inErr = err
+			return false
+		}
+		if err := txn.Set(toUTXOKey(id), data); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
+	ctd.DeletedUTXOMap.EachAll(func(id uint64, utxo *types.UTXO) bool {
+		if err := txn.Delete(toUTXOKey(id)); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
+
+	if len(ctd.Events) > 0 {
+		efc := encoding.Factory("event")
+
+		var buffer bytes.Buffer
+		enc := encoding.NewEncoder(&buffer)
+		if err := enc.EncodeArrayLen(len(ctd.Events)); err != nil {
 			return err
 		}
-		lastSlot := types.ToTimeSlot(bh.Timestamp)
-		for h := Height; h >= 1; h-- {
-			b, err := st.Block(h)
+		for _, ev := range ctd.Events {
+			t, err := efc.TypeOf(ev)
 			if err != nil {
 				return err
 			}
-			currentSlot := types.ToTimeSlot(b.Header.Timestamp)
-			if currentSlot < lastSlot-1 {
-				break
+			if err := enc.EncodeUint16(t); err != nil {
+				return err
 			}
-			for i, tx := range b.Transactions {
-				slot := types.ToTimeSlot(tx.Timestamp())
-				if slot >= currentSlot-1 {
-					mp, has := st.timeSlotMap[slot]
-					if !has {
-						mp = map[string]bool{}
-						st.timeSlotMap[slot] = mp
-					}
-					t := b.TransactionTypes[i]
-					TxHash := HashTransactionByType(st.chainID, t, tx)
-					mp[string(TxHash[:])] = true
-				}
+			if err := enc.Encode(ev); err != nil {
+				return err
 			}
 		}
-		st.timeSlotLock.Unlock()
+		if err := txn.Set(toEventKey(ctd.Events[0].Height()), buffer.Bytes()); err != nil {
+			return err
+		}
+	}
+
+	ctd.ProcessDataMap.EachAll(func(key string, value []byte) bool {
+		if err := txn.Set(toProcessDataKey(key), value); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
+	}
+	ctd.DeletedProcessDataMap.EachAll(func(key string, value bool) bool {
+		if err := txn.Delete(toProcessDataKey(key)); err != nil {
+			inErr = err
+			return false
+		}
+		return true
+	})
+	if inErr != nil {
+		return inErr
 	}
 	return nil
 }

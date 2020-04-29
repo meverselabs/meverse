@@ -12,6 +12,7 @@ import (
 // UpdateRewardBaseUpgrade is used to update reward policy
 type UpdateRewardBaseUpgrade struct {
 	Timestamp_ uint64
+	Seq_       uint64
 	From_      common.Address
 	Enable     bool
 }
@@ -19,6 +20,11 @@ type UpdateRewardBaseUpgrade struct {
 // Timestamp returns the timestamp of the transaction
 func (tx *UpdateRewardBaseUpgrade) Timestamp() uint64 {
 	return tx.Timestamp_
+}
+
+// Seq returns the sequence of the transaction
+func (tx *UpdateRewardBaseUpgrade) Seq() uint64 {
+	return tx.Seq_
 }
 
 // From returns the from address of the transaction
@@ -32,6 +38,10 @@ func (tx *UpdateRewardBaseUpgrade) Validate(p types.Process, loader types.Loader
 
 	if tx.From() != sp.admin.AdminAddress(loader, p.Name()) {
 		return admin.ErrUnauthorizedTransaction
+	}
+
+	if tx.Seq() <= loader.Seq(tx.From()) {
+		return types.ErrInvalidSequence
 	}
 
 	fromAcc, err := loader.Account(tx.From())
@@ -58,6 +68,13 @@ func (tx *UpdateRewardBaseUpgrade) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
 	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"seq":`)
+	if bs, err := json.Marshal(tx.Seq_); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

@@ -208,7 +208,7 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 					break
 				}
 				if debug.DEBUG {
-					rlog.Println(cp.Height(), "BlockConnectedQ", b.Header.Generator.String(), ob.round.RoundState, b.Header.Height, (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond), len(b.Transactions))
+					rlog.Println(cp.Height(), "BlockConnectedQ", b.Header.Generator.String(), ob.round.RoundState, b.Header.Height, (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
 				}
 				TargetHeight++
 				Count++

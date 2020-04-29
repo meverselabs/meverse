@@ -12,6 +12,7 @@ import (
 // UpdateUserAutoStaking is used to update autostaking setup of the account at the hyper formulator
 type UpdateUserAutoStaking struct {
 	Timestamp_      uint64
+	Seq_            uint64
 	From_           common.Address
 	HyperFormulator common.Address
 	AutoStaking     bool
@@ -20,6 +21,11 @@ type UpdateUserAutoStaking struct {
 // Timestamp returns the timestamp of the transaction
 func (tx *UpdateUserAutoStaking) Timestamp() uint64 {
 	return tx.Timestamp_
+}
+
+// Seq returns the sequence of the transaction
+func (tx *UpdateUserAutoStaking) Seq() uint64 {
+	return tx.Seq_
 }
 
 // From returns the from address of the transaction
@@ -36,6 +42,10 @@ func (tx *UpdateUserAutoStaking) Fee(p types.Process, loader types.LoaderWrapper
 // Validate validates signatures of the transaction
 func (tx *UpdateUserAutoStaking) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	sp := p.(*Formulator)
+
+	if tx.Seq() <= loader.Seq(tx.From()) {
+		return types.ErrInvalidSequence
+	}
 
 	acc, err := loader.Account(tx.HyperFormulator)
 	if err != nil {
@@ -84,6 +94,13 @@ func (tx *UpdateUserAutoStaking) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
 	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"seq":`)
+	if bs, err := json.Marshal(tx.Seq_); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)
