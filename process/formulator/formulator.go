@@ -496,7 +496,8 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 	}
 	var inErr error
 	RevokedMap.EachAll(func(FormulatorAddr common.Address, Heritor common.Address) bool {
-		if err := p.revokeFormulator(ctw, FormulatorAddr, Heritor); err != nil {
+		if _, err := ctw.HasAccount(FormulatorAddr); err == types.ErrDeletedAccount {
+		} else if err := p.revokeFormulator(ctw, FormulatorAddr, Heritor); err != nil {
 			inErr = err
 			return false
 		}
