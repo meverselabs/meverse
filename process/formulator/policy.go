@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 
+	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
 )
 
@@ -277,6 +278,33 @@ func (pc *TransmutePolicy) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"transmute_enable_height_to":`)
 	if bs, err := json.Marshal(pc.TransmuteEnableHeightTo); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`}`)
+	return buffer.Bytes(), nil
+}
+
+// MiningFeePolicy defines a mining fee policy
+type MiningFeePolicy struct {
+	MiningFeeAddress common.Address
+	MiningFee1000    uint32
+}
+
+// MarshalJSON is a marshaler function
+func (pc *MiningFeePolicy) MarshalJSON() ([]byte, error) {
+	var buffer bytes.Buffer
+	buffer.WriteString(`{`)
+	buffer.WriteString(`"mining_fee_address":`)
+	if bs, err := pc.MiningFeeAddress.MarshalJSON(); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"mining_fee_1000":`)
+	if bs, err := json.Marshal(pc.MiningFee1000); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

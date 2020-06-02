@@ -17,6 +17,7 @@ var (
 	tagOmegaPolicy              = []byte{2, 3}
 	tagHyperPolicy              = []byte{2, 4}
 	tagTransmutePolicy          = []byte{2, 5}
+	tagMiningFeePolicy          = []byte{2, 6}
 	tagGenCount                 = []byte{3, 0}
 	tagGenCountNumber           = []byte{3, 1}
 	tagGenCountReverse          = []byte{3, 2}

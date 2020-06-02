@@ -35,6 +35,7 @@ var (
 	ErrInvalidTransmuteAmount                  = errors.New("invalid transmute amount")
 	ErrInvalidTransmuteHeight                  = errors.New("invalid transmute height")
 	ErrNotExistTransmutePolicy                 = errors.New("not exist transmute policy")
+	ErrNotExistMiningFeePolicy                 = errors.New("not exist mining fee policy")
 	ErrNoOverAmount                            = errors.New("no over amount")
 	ErrSigmaCreationNotAllowed                 = errors.New("sigma creation not allowed")
 	ErrOmegaCreationNotAllowed                 = errors.New("omega creation not allowed")

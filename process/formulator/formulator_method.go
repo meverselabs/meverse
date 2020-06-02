@@ -477,6 +477,22 @@ func (p *Formulator) GetTransmutePolicy(loader types.Loader) (*TransmutePolicy, 
 	return policy, nil
 }
 
+// GetMiningFeePolicy returns the transmute policy
+func (p *Formulator) GetMiningFeePolicy(loader types.Loader) (*MiningFeePolicy, error) {
+	lw := types.NewLoaderWrapper(p.pid, loader)
+
+	bs := lw.ProcessData(tagMiningFeePolicy)
+	if len(bs) == 0 {
+		return nil, ErrNotExistMiningFeePolicy
+	}
+
+	policy := &MiningFeePolicy{}
+	if err := encoding.Unmarshal(bs, &policy); err != nil {
+		return nil, err
+	}
+	return policy, nil
+}
+
 // IsRewardBaseUpgrade returns reward base upgrade on/off
 func (p *Formulator) IsRewardBaseUpgrade(loader types.Loader) bool {
 	lw := types.NewLoaderWrapper(p.pid, loader)
@@ -553,4 +569,30 @@ func (p *Formulator) revokeFormulator(ctw *types.ContextWrapper, FormulatorAddr 
 		return err
 	}
 	return nil
+}
+
+func (p *Formulator) processFormulatorMiningReward(ctw *types.ContextWrapper, ev *RewardEvent, RewardAddress common.Address, RewardAmount *amount.Amount) error {
+	miningFeePolicy, err := p.GetMiningFeePolicy(ctw)
+	if err != nil {
+		if err != ErrNotExistMiningFeePolicy {
+			return err
+		}
+		if err := p.vault.AddBalance(ctw, RewardAddress, RewardAmount); err != nil {
+			return err
+		}
+		ev.AddReward(RewardAddress, RewardAmount)
+		return nil
+	} else {
+		fee := RewardAmount.MulC(int64(miningFeePolicy.MiningFee1000)).DivC(1000)
+		if err := p.vault.AddBalance(ctw, miningFeePolicy.MiningFeeAddress, fee); err != nil {
+			return err
+		}
+		ev.AddReward(miningFeePolicy.MiningFeeAddress, fee)
+		processedAmount := RewardAmount.Sub(fee)
+		if err := p.vault.AddBalance(ctw, RewardAddress, processedAmount); err != nil {
+			return err
+		}
+		ev.AddReward(RewardAddress, processedAmount)
+		return nil
+	}
 }

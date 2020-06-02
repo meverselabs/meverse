@@ -83,6 +83,7 @@ func (p *Formulator) Init(reg *types.Register, pm types.ProcessManager, cn types
 	reg.RegisterTransaction(18, &UpdateHyperPolicy{})
 	reg.RegisterTransaction(19, &WithdrawOverAmount{})
 	reg.RegisterTransaction(20, &ChangeStaking{})
+	reg.RegisterTransaction(21, &UpdateMiningFeePolicy{})
 	reg.RegisterEvent(1, &RewardEvent{})
 	reg.RegisterEvent(2, &RevokedEvent{})
 	reg.RegisterEvent(3, &UnstakedEvent{})
@@ -373,10 +374,24 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 			for RewardAddress, RewardPower := range RewardPowerMap {
 				RewardAmount := RewardPower.Mul(Ratio).Div(amount.COIN)
 				if !RewardAmount.IsZero() {
-					if err := p.vault.AddBalance(ctw, RewardAddress, RewardAmount); err != nil {
+					acc, err := ctw.Account(RewardAddress)
+					if err != nil {
 						return err
 					}
-					ev.AddReward(RewardAddress, RewardAmount)
+					frAcc, is := acc.(*FormulatorAccount)
+					if !is {
+						return types.ErrInvalidAccountType
+					}
+					if frAcc.FormulatorType == HyperFormulatorType {
+						if err := p.vault.AddBalance(ctw, RewardAddress, RewardAmount); err != nil {
+							return err
+						}
+						ev.AddReward(RewardAddress, RewardAmount)
+					} else {
+						if err := p.processFormulatorMiningReward(ctw, ev, RewardAddress, RewardAmount); err != nil {
+							return err
+						}
+					}
 				}
 			}
 			for GenAddress, StakingRewardPower := range StakingRewardPowerMap {
