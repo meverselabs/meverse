@@ -13,13 +13,14 @@ import (
 
 // TokenIn is a TokenIn
 type TokenIn struct {
-	Timestamp_  uint64
-	Seq_        uint64
-	From_       common.Address
-	ERC20TXID   hash.Hash256
-	ERC20From   ERC20Address
-	ToAddresses []common.Address
-	Amounts     []*amount.Amount
+	Timestamp_    uint64
+	Seq_          uint64
+	From_         common.Address
+	TokenPlatform string
+	TokenTXID     hash.Hash256
+	TokenFrom     TokenAddress
+	ToAddresses   []common.Address
+	Amounts       []*amount.Amount
 }
 
 // Timestamp returns the timestamp of the transaction
@@ -56,8 +57,8 @@ func (tx *TokenIn) Validate(p types.Process, loader types.LoaderWrapper, signers
 		return types.ErrInvalidSequence
 	}
 
-	if sp.HasERC20TXID(loader, tx.ERC20TXID) {
-		return ErrProcessedERC20TXID
+	if sp.HasTokenTXID(loader, tx.TokenPlatform, tx.TokenTXID) {
+		return ErrProcessedTokenTXID
 	}
 
 	for _, To := range tx.ToAddresses {
@@ -91,7 +92,7 @@ func (tx *TokenIn) Execute(p types.Process, ctw *types.ContextWrapper, index uin
 		}
 	}
 
-	sp.setERC20TXID(ctw, tx.ERC20TXID)
+	sp.setTokenTXID(ctw, tx.TokenPlatform, tx.TokenTXID)
 
 	return nil
 }
@@ -121,15 +122,15 @@ func (tx *TokenIn) MarshalJSON() ([]byte, error) {
 		buffer.Write(bs)
 	}
 	buffer.WriteString(`,`)
-	buffer.WriteString(`"erc20_txid":`)
-	if bs, err := tx.ERC20TXID.MarshalJSON(); err != nil {
+	buffer.WriteString(`"token_txid":`)
+	if bs, err := tx.TokenTXID.MarshalJSON(); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)
 	}
 	buffer.WriteString(`,`)
-	buffer.WriteString(`"erc20_from":`)
-	if bs, err := tx.ERC20From.MarshalJSON(); err != nil {
+	buffer.WriteString(`"token_from":`)
+	if bs, err := tx.TokenFrom.MarshalJSON(); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

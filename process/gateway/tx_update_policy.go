@@ -6,16 +6,16 @@ import (
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/core/types"
-	"github.com/fletaio/fleta/encoding"
 	"github.com/fletaio/fleta/process/admin"
 )
 
 // UpdatePolicy is used to update gateway policy
 type UpdatePolicy struct {
-	Timestamp_ uint64
-	Seq_       uint64
-	From_      common.Address
-	Policy     *Policy
+	Timestamp_    uint64
+	Seq_          uint64
+	From_         common.Address
+	TokenPlatform string
+	Policy        *Policy
 }
 
 // Timestamp returns the timestamp of the transaction
@@ -60,10 +60,10 @@ func (tx *UpdatePolicy) Validate(p types.Process, loader types.LoaderWrapper, si
 
 // Execute updates the context by the transaction
 func (tx *UpdatePolicy) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
-	if bs, err := encoding.Marshal(tx.Policy); err != nil {
+	sp := p.(*Gateway)
+
+	if err := sp.setPolicy(ctw, tx.TokenPlatform, tx.Policy); err != nil {
 		return err
-	} else {
-		ctw.SetProcessData(tagPolicy, bs)
 	}
 	return nil
 }

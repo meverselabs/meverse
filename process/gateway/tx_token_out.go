@@ -7,16 +7,16 @@ import (
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/amount"
 	"github.com/fletaio/fleta/core/types"
-	"github.com/fletaio/fleta/encoding"
 )
 
 // TokenOut is a TokenOut
 type TokenOut struct {
-	Timestamp_ uint64
-	Seq_       uint64
-	From_      common.Address
-	ERC20To    ERC20Address
-	Amount     *amount.Amount
+	Timestamp_    uint64
+	Seq_          uint64
+	From_         common.Address
+	TokenPlatform string
+	TokenTo       TokenAddress
+	Amount        *amount.Amount
 }
 
 // Timestamp returns the timestamp of the transaction
@@ -66,11 +66,10 @@ func (tx *TokenOut) Validate(p types.Process, loader types.LoaderWrapper, signer
 		return err
 	}
 
-	policy := &Policy{}
-	if err := encoding.Unmarshal(loader.ProcessData(tagPolicy), &policy); err != nil {
+	policy, err := sp.GetPolicy(loader, tx.TokenPlatform)
+	if err != nil {
 		return err
 	}
-
 	if err := sp.vault.CheckFeePayableWith(p, loader, tx, tx.Amount.Add(policy.WithdrawFee)); err != nil {
 		return err
 	}
@@ -82,8 +81,8 @@ func (tx *TokenOut) Execute(p types.Process, ctw *types.ContextWrapper, index ui
 	sp := p.(*Gateway)
 
 	return sp.vault.WithFee(p, ctw, tx, func() error {
-		policy := &Policy{}
-		if err := encoding.Unmarshal(ctw.ProcessData(tagPolicy), &policy); err != nil {
+		policy, err := sp.GetPolicy(ctw, tx.TokenPlatform)
+		if err != nil {
 			return err
 		}
 		if err := sp.vault.SubBalance(ctw, tx.From(), policy.WithdrawFee); err != nil {
@@ -128,8 +127,8 @@ func (tx *TokenOut) MarshalJSON() ([]byte, error) {
 		buffer.Write(bs)
 	}
 	buffer.WriteString(`,`)
-	buffer.WriteString(`"erc20_to":`)
-	if bs, err := tx.ERC20To.MarshalJSON(); err != nil {
+	buffer.WriteString(`"token_to":`)
+	if bs, err := tx.TokenTo.MarshalJSON(); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

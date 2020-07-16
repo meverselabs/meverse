@@ -5,26 +5,26 @@ import (
 	"strings"
 )
 
-// ERC20AddressSize is 20 bytes
-const ERC20AddressSize = 20
+// TokenAddressSize is 20 bytes
+const TokenAddressSize = 20
 
-// ERC20Address is the [ERC20AddressSize]byte with methods
-type ERC20Address [ERC20AddressSize]byte
+// TokenAddress is the [TokenAddressSize]byte with methods
+type TokenAddress [TokenAddressSize]byte
 
 // MarshalJSON is a marshaler function
-func (addr ERC20Address) MarshalJSON() ([]byte, error) {
+func (addr TokenAddress) MarshalJSON() ([]byte, error) {
 	return []byte(`"` + addr.String() + `"`), nil
 }
 
 // UnmarshalJSON is a unmarshaler function
-func (addr *ERC20Address) UnmarshalJSON(bs []byte) error {
+func (addr *TokenAddress) UnmarshalJSON(bs []byte) error {
 	if len(bs) < 3 {
-		return ErrInvalidERC20AddressFormat
+		return ErrInvalidTokenAddressFormat
 	}
 	if bs[0] != '"' || bs[len(bs)-1] != '"' {
-		return ErrInvalidERC20AddressFormat
+		return ErrInvalidTokenAddressFormat
 	}
-	v, err := ParseERC20Address(string(bs[1 : len(bs)-1]))
+	v, err := ParseTokenAddress(string(bs[1 : len(bs)-1]))
 	if err != nil {
 		return err
 	}
@@ -32,34 +32,34 @@ func (addr *ERC20Address) UnmarshalJSON(bs []byte) error {
 	return nil
 }
 
-// String returns a base58 value of the ERC20 address
-func (addr ERC20Address) String() string {
+// String returns a base58 value of the Token address
+func (addr TokenAddress) String() string {
 	return "0x" + hex.EncodeToString(addr[:])
 }
 
-// ParseERC20Address parse the ERC20 address from the string
-func ParseERC20Address(str string) (ERC20Address, error) {
+// ParseTokenAddress parse the Token address from the string
+func ParseTokenAddress(str string) (TokenAddress, error) {
 	if !strings.HasPrefix(str, "0x") {
-		return ERC20Address{}, ErrInvalidERC20AddressFormat
+		return TokenAddress{}, ErrInvalidTokenAddressFormat
 	}
-	if len(str) != ERC20AddressSize*2+2 {
-		return ERC20Address{}, ErrInvalidERC20AddressFormat
+	if len(str) != TokenAddressSize*2+2 {
+		return TokenAddress{}, ErrInvalidTokenAddressFormat
 	}
 	bs, err := hex.DecodeString(str[2:])
 	if err != nil {
-		return ERC20Address{}, err
+		return TokenAddress{}, err
 	}
-	if len(bs) != ERC20AddressSize {
-		return ERC20Address{}, ErrInvalidERC20AddressFormat
+	if len(bs) != TokenAddressSize {
+		return TokenAddress{}, ErrInvalidTokenAddressFormat
 	}
-	var addr ERC20Address
+	var addr TokenAddress
 	copy(addr[:], bs)
 	return addr, nil
 }
 
-// MustParseERC20Address panic when error occurred
-func MustParseERC20Address(str string) ERC20Address {
-	addr, err := ParseERC20Address(str)
+// MustParseTokenAddress panic when error occurred
+func MustParseTokenAddress(str string) TokenAddress {
+	addr, err := ParseTokenAddress(str)
 	if err != nil {
 		panic(err)
 	}

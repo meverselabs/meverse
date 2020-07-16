@@ -6,21 +6,29 @@ import (
 
 // tags
 var (
-	tagERC20TXID = []byte{1, 0}
-	tagOutTXID   = []byte{1, 1}
-	tagPolicy    = []byte{2, 0}
+	tagTokenTXID   = []byte{1, 0}
+	tagOutCoinTXID = []byte{1, 1}
+	tagPolicy      = []byte{2, 0}
 )
 
-func toERC20TXIDKey(h hash.Hash256) []byte {
-	bs := make([]byte, 2+hash.Hash256Size)
-	copy(bs, tagERC20TXID)
+func toTokenTXIDKey(TokenPlatform string, h hash.Hash256) []byte {
+	bs := make([]byte, 2+hash.Hash256Size+len(TokenPlatform))
+	copy(bs, tagTokenTXID)
 	copy(bs[2:], h[:])
+	copy(bs[2+hash.Hash256Size:], []byte(TokenPlatform))
 	return bs
 }
 
-func toOutTXIDKey(TXID string) []byte {
+func toOutCoinTXIDKey(TXID string) []byte {
 	bs := make([]byte, 2+len(TXID))
-	copy(bs, tagOutTXID)
+	copy(bs, tagOutCoinTXID)
 	copy(bs[2:], []byte(TXID))
+	return bs
+}
+
+func toPolicyKey(TokenPlatform string) []byte {
+	bs := make([]byte, 2+len(TokenPlatform))
+	copy(bs, tagPolicy)
+	copy(bs[2:], []byte(TokenPlatform))
 	return bs
 }
