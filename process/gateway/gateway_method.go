@@ -3,6 +3,7 @@ package gateway
 import (
 	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/core/types"
+	"github.com/fletaio/fleta/encoding"
 )
 
 // HasERC20TXID returns the erc20 txid has processed or not
@@ -33,4 +34,15 @@ func (p *Gateway) HasOutTXID(loader types.Loader, CoinTXID string) bool {
 
 func (p *Gateway) setOutTXID(ctw *types.ContextWrapper, CoinTXID string) {
 	ctw.SetProcessData(toOutTXIDKey(CoinTXID), []byte{1})
+}
+
+// GetGatewayPolicy returns the gateway policy
+func (p *Gateway) GetGatewayPolicy(loader types.Loader) (*Policy, error) {
+	lw := types.NewLoaderWrapper(p.pid, loader)
+
+	policy := &Policy{}
+	if err := encoding.Unmarshal(lw.ProcessData(tagPolicy), &policy); err != nil {
+		return nil, err
+	}
+	return policy, nil
 }
