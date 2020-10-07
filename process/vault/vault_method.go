@@ -221,5 +221,8 @@ func (p *Vault) GetDefaultFee(loader types.LoaderWrapper) *amount.Amount {
 	lw := types.NewLoaderWrapper(p.pid, loader)
 
 	bs := lw.ProcessData(tagDefaultFee)
+	if len(bs) == 0 {
+		return amount.COIN.DivC(10)
+	}
 	return amount.NewAmountFromBytes(bs)
 }
