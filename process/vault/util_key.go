@@ -16,6 +16,7 @@ var (
 	tagCollectedFee         = []byte{3, 1}
 	tagPolicy               = []byte{4, 0}
 	tagDefaultFee           = []byte{4, 1}
+	tagDefaultFeeIsZero     = []byte{4, 2}
 )
 
 func toLockedBalanceKey(height uint32, addr common.Address) []byte {

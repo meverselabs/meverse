@@ -41,7 +41,9 @@ func (tx *UpdateDefaultFee) Validate(p types.Process, loader types.LoaderWrapper
 		return ErrInvalidDefaultFee
 	}
 	if tx.DefaultFee.Less(amount.COIN.DivC(100000000)) {
-		return ErrInvalidDefaultFee
+		if !tx.DefaultFee.IsZero() {
+			return ErrInvalidDefaultFee
+		}
 	}
 	if tx.From() != sp.admin.AdminAddress(loader, p.Name()) {
 		return admin.ErrUnauthorizedTransaction
@@ -63,6 +65,12 @@ func (tx *UpdateDefaultFee) Validate(p types.Process, loader types.LoaderWrapper
 // Execute updates the context by the transaction
 func (tx *UpdateDefaultFee) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	ctw.SetProcessData(tagDefaultFee, tx.DefaultFee.Bytes())
+	if tx.DefaultFee.IsZero() {
+		ctw.SetProcessData(tagDefaultFeeIsZero, []byte{1})
+	} else {
+		ctw.SetProcessData(tagDefaultFeeIsZero, []byte{})
+	}
+
 	return nil
 }
 

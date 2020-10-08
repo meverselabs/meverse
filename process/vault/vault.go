@@ -113,6 +113,12 @@ func (p *Vault) SetDefaultFee(ctw *types.ContextWrapper, defaultFee *amount.Amou
 	ctw = types.SwitchContextWrapper(p.pid, ctw)
 
 	ctw.SetProcessData(tagDefaultFee, defaultFee.Bytes())
+	if defaultFee.IsZero() {
+		ctw.SetProcessData(tagDefaultFeeIsZero, []byte{1})
+	} else {
+		ctw.SetProcessData(tagDefaultFeeIsZero, []byte{})
+	}
+
 	return nil
 }
 
