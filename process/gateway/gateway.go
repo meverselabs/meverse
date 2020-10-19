@@ -1,19 +1,16 @@
 package gateway
 
 import (
+	"github.com/fletaio/fleta/common/binutil"
+	"github.com/fletaio/fleta/common/encoding"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/process/admin"
-	"github.com/fletaio/fleta/process/vault"
 )
 
 // Gateway manages balance of accounts of the chain
 type Gateway struct {
 	*types.ProcessBase
-	pid   uint8
-	pm    types.ProcessManager
-	cn    types.Provider
-	vault *vault.Vault
-	admin *admin.Admin
+	pid uint8
 }
 
 // NewGateway returns a Gateway
@@ -34,66 +31,42 @@ func (p *Gateway) Name() string {
 	return "fleta.gateway"
 }
 
-// Version returns the version of the process
-func (p *Gateway) Version() string {
-	return "0.0.1"
-}
-
-// Init initializes the process
-func (p *Gateway) Init(reg *types.Register, pm types.ProcessManager, cn types.Provider) error {
-	p.pm = pm
-	p.cn = cn
-
-	if vp, err := pm.ProcessByName("fleta.vault"); err != nil {
-		return err
-	} else if v, is := vp.(*vault.Vault); !is {
-		return types.ErrInvalidProcess
-	} else {
-		p.vault = v
-	}
-	if vp, err := pm.ProcessByName("fleta.admin"); err != nil {
-		return err
-	} else if v, is := vp.(*admin.Admin); !is {
-		return types.ErrInvalidProcess
-	} else {
-		p.admin = v
-	}
-
-	reg.RegisterTransaction(1, &TokenIn{})
-	reg.RegisterTransaction(2, &TokenOut{})
-	reg.RegisterTransaction(3, &TokenLeave{})
-	reg.RegisterTransaction(4, &UpdatePolicy{})
-	reg.RegisterTransaction(5, &AddPlatform{})
-	return nil
+// RequireProcessNames returns process names that used in the transaction
+func (p *Gateway) RequireProcessNames() []string {
+	return []string{"fleta.admin"}
 }
 
 // InitPolicy called at OnInitGenesis of an application
-func (p *Gateway) InitPolicy(ctw *types.ContextWrapper, Platform string, policy *Policy) error {
-	ctw = types.SwitchContextWrapper(p.pid, ctw)
+func (p *Gateway) InitPolicy(ctx types.Context, Platform string, policy *Policy) error {
+	ctw := ctx.ProcessContext(p.pid)
 
-	return p.AddPlatform(ctw, Platform, policy)
-}
-
-// OnLoadChain called when the chain loaded
-func (p *Gateway) OnLoadChain(loader types.LoaderWrapper) error {
-	p.admin.AdminAddress(loader, p.Name())
-	if bs := loader.ProcessData(tagPolicy); len(bs) == 0 {
-		return ErrPolicyShouldBeSetupInApplication
+	if bs, err := encoding.Marshal(policy); err != nil {
+		return err
+	} else {
+		ctw.SetProcessData(toPlatformKey(Platform), []byte{1})
+		cnt := p.getPlatformCount(ctw)
+		ctw.SetProcessData(toPlatformIndexKey(cnt), []byte(Platform))
+		cnt++
+		ctw.SetProcessData(tagPlatformCount, binutil.LittleEndian.Uint32ToBytes(cnt))
+		ctw.SetProcessData(toPolicyKey(Platform), bs)
 	}
 	return nil
 }
 
-// BeforeExecuteTransactions called before processes transactions of the block
-func (p *Gateway) BeforeExecuteTransactions(ctw *types.ContextWrapper) error {
+// OnLoadChain called when the chain loaded
+func (p *Gateway) OnLoadChain(ps []types.Process, cv types.ProcessContextView) error {
+	ap := ps[0].(*admin.Admin)
+	ap.AdminAddress(cv, p.Name())
+	Platforms := p.Platforms(cv)
+	for _, v := range Platforms {
+		if bs := cv.ProcessData(toPolicyKey(v)); len(bs) == 0 {
+			return ErrPolicyShouldBeSetupInApplication
+		}
+	}
 	return nil
 }
 
 // AfterExecuteTransactions called after processes transactions of the block
-func (p *Gateway) AfterExecuteTransactions(b *types.Block, ctw *types.ContextWrapper) error {
-	return nil
-}
-
-// OnSaveData called when the context of the block saved
-func (p *Gateway) OnSaveData(b *types.Block, ctw *types.ContextWrapper) error {
+func (p *Gateway) AfterExecuteTransactions(ps []types.Process, b *types.Block, ctw types.ProcessContext) error {
 	return nil
 }
