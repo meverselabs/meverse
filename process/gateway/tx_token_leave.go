@@ -16,6 +16,7 @@ type TokenLeave struct {
 	Timestamp_ uint64
 	Seq_       uint64
 	From_      common.Address
+	Platform   string
 	CoinTXID   string
 	CoinFrom   common.Address
 	ERC20TXID  hash.Hash256
@@ -55,7 +56,9 @@ func (tx *TokenLeave) Validate(p types.Process, loader types.LoaderWrapper, sign
 		return types.ErrInvalidSequence
 	}
 
-	if sp.HasOutTXID(loader, tx.CoinTXID) {
+	if is, err := sp.IsProcessedOutTXID(loader, tx.Platform, tx.CoinTXID); err != nil {
+		return err
+	} else if is {
 		return ErrProcessedOutTXID
 	}
 
@@ -72,7 +75,9 @@ func (tx *TokenLeave) Validate(p types.Process, loader types.LoaderWrapper, sign
 // Execute updates the context by the transaction
 func (tx *TokenLeave) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Gateway)
-	sp.setOutTXID(ctw, tx.CoinTXID)
+	if err := sp.SetOutTXIDProcessed(ctw, tx.Platform, tx.CoinTXID); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -96,6 +101,13 @@ func (tx *TokenLeave) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"from":`)
 	if bs, err := tx.From_.MarshalJSON(); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"platform":`)
+	if bs, err := json.Marshal(tx.Platform); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

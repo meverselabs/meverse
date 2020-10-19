@@ -121,6 +121,7 @@ func (app *FletaApp) InitGenesis(ctw *types.ContextWrapper) error {
 		return types.ErrNotExistProcess
 	} else {
 		if err := fp.InitPolicy(ctw,
+			"ethereum",
 			&gateway.Policy{
 				WithdrawFee: amount.NewCoinAmount(30, 0),
 			},

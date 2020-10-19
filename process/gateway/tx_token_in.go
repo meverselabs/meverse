@@ -16,6 +16,7 @@ type TokenIn struct {
 	Timestamp_  uint64
 	Seq_        uint64
 	From_       common.Address
+	Platform    string
 	ERC20TXID   hash.Hash256
 	ERC20From   ERC20Address
 	ToAddresses []common.Address
@@ -56,7 +57,9 @@ func (tx *TokenIn) Validate(p types.Process, loader types.LoaderWrapper, signers
 		return types.ErrInvalidSequence
 	}
 
-	if sp.HasERC20TXID(loader, tx.ERC20TXID) {
+	if is, err := sp.IsProcessedERC20TXID(loader, tx.Platform, tx.ERC20TXID); err != nil {
+		return err
+	} else if is {
 		return ErrProcessedERC20TXID
 	}
 
@@ -90,9 +93,9 @@ func (tx *TokenIn) Execute(p types.Process, ctw *types.ContextWrapper, index uin
 			return err
 		}
 	}
-
-	sp.setERC20TXID(ctw, tx.ERC20TXID)
-
+	if err := sp.SetERC20TXIDProcessed(ctw, tx.Platform, tx.ERC20TXID); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -116,6 +119,13 @@ func (tx *TokenIn) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`,`)
 	buffer.WriteString(`"from":`)
 	if bs, err := tx.From_.MarshalJSON(); err != nil {
+		return nil, err
+	} else {
+		buffer.Write(bs)
+	}
+	buffer.WriteString(`,`)
+	buffer.WriteString(`"platform":`)
+	if bs, err := json.Marshal(tx.Platform); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

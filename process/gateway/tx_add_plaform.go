@@ -9,8 +9,8 @@ import (
 	"github.com/fletaio/fleta/process/admin"
 )
 
-// UpdatePolicy is used to update gateway policy
-type UpdatePolicy struct {
+// AddPlatform is used to update gateway policy
+type AddPlatform struct {
 	Timestamp_ uint64
 	Seq_       uint64
 	From_      common.Address
@@ -19,22 +19,22 @@ type UpdatePolicy struct {
 }
 
 // Timestamp returns the timestamp of the transaction
-func (tx *UpdatePolicy) Timestamp() uint64 {
+func (tx *AddPlatform) Timestamp() uint64 {
 	return tx.Timestamp_
 }
 
 // Seq returns the sequence of the transaction
-func (tx *UpdatePolicy) Seq() uint64 {
+func (tx *AddPlatform) Seq() uint64 {
 	return tx.Seq_
 }
 
 // From returns the from address of the transaction
-func (tx *UpdatePolicy) From() common.Address {
+func (tx *AddPlatform) From() common.Address {
 	return tx.From_
 }
 
 // Validate validates signatures of the transaction
-func (tx *UpdatePolicy) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
+func (tx *AddPlatform) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	sp := p.(*Gateway)
 
 	if tx.From() != sp.admin.AdminAddress(loader, p.Name()) {
@@ -59,17 +59,17 @@ func (tx *UpdatePolicy) Validate(p types.Process, loader types.LoaderWrapper, si
 }
 
 // Execute updates the context by the transaction
-func (tx *UpdatePolicy) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
+func (tx *AddPlatform) Execute(p types.Process, ctw *types.ContextWrapper, index uint16) error {
 	sp := p.(*Gateway)
 
-	if err := sp.SetPolicy(ctw, tx.Platform, tx.Policy); err != nil {
+	if err := sp.AddPlatform(ctw, tx.Platform, tx.Policy); err != nil {
 		return err
 	}
 	return nil
 }
 
 // MarshalJSON is a marshaler function
-func (tx *UpdatePolicy) MarshalJSON() ([]byte, error) {
+func (tx *AddPlatform) MarshalJSON() ([]byte, error) {
 	var buffer bytes.Buffer
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)

@@ -14,4 +14,6 @@ var (
 	ErrProcessedERC20TXID               = errors.New("processed erc20 txid")
 	ErrProcessedOutTXID                 = errors.New("processed out txid")
 	ErrPolicyShouldBeSetupInApplication = errors.New("policy should be setup in application")
+	ErrNotSupportedPlatform             = errors.New("not supported platform")
+	ErrAlreadySupportedPlatform         = errors.New("already supported platform")
 )
