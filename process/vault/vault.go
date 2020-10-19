@@ -55,6 +55,7 @@ func (p *Vault) Init(reg *types.Register, pm types.ProcessManager, cn types.Prov
 	reg.RegisterTransaction(9, &IssueAccount{})
 	reg.RegisterTransaction(10, &UpdatePolicy{})
 	reg.RegisterTransaction(11, &ChangeSingleKey{})
+	reg.RegisterTransaction(12, &UpdateDefaultFee{})
 
 	if vp, err := pm.ProcessByName("fleta.admin"); err != nil {
 		return err
@@ -112,6 +113,12 @@ func (p *Vault) SetDefaultFee(ctw *types.ContextWrapper, defaultFee *amount.Amou
 	ctw = types.SwitchContextWrapper(p.pid, ctw)
 
 	ctw.SetProcessData(tagDefaultFee, defaultFee.Bytes())
+	if defaultFee.IsZero() {
+		ctw.SetProcessData(tagDefaultFeeIsZero, []byte{1})
+	} else {
+		ctw.SetProcessData(tagDefaultFeeIsZero, []byte{})
+	}
+
 	return nil
 }
 
