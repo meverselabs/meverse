@@ -492,3 +492,8 @@ func (fr *FormulatorNode) cleanPool(b *types.Block) {
 		fr.txQ.Remove(string(TxHash[:]))
 	}
 }
+
+// GetTxFromTXPool returned tx from txpool
+func (fr *FormulatorNode) GetTxFromTXPool(TxHash hash.Hash256) *txpool.PoolItem {
+	return fr.txpool.Get(TxHash)
+}
