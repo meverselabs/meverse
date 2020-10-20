@@ -132,14 +132,3 @@ func (p *Gateway) getPlatformName(lw types.LoaderWrapper, index uint32) string {
 	bs := lw.ProcessData(toPlatformIndexKey(index))
 	return string(bs)
 }
-
-// GetGatewayPolicy returns the gateway policy
-func (p *Gateway) GetGatewayPolicy(loader types.Loader) (*Policy, error) {
-	lw := types.NewLoaderWrapper(p.pid, loader)
-
-	policy := &Policy{}
-	if err := encoding.Unmarshal(lw.ProcessData(tagPolicy), &policy); err != nil {
-		return nil, err
-	}
-	return policy, nil
-}

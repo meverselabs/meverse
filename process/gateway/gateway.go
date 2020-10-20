@@ -65,6 +65,7 @@ func (p *Gateway) Init(reg *types.Register, pm types.ProcessManager, cn types.Pr
 	reg.RegisterTransaction(2, &TokenOut{})
 	reg.RegisterTransaction(3, &TokenLeave{})
 	reg.RegisterTransaction(4, &UpdatePolicy{})
+	reg.RegisterTransaction(5, &AddPlatform{})
 	return nil
 }
 
