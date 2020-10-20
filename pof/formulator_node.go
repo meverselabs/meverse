@@ -493,6 +493,11 @@ func (fr *FormulatorNode) cleanPool(b *types.Block) {
 	}
 }
 
+// TxPoolList returned tx list from txpool
+func (fr *FormulatorNode) TxPoolList() []*txpool.PoolItem {
+	return fr.txpool.List()
+}
+
 // GetTxFromTXPool returned tx from txpool
 func (fr *FormulatorNode) GetTxFromTXPool(TxHash hash.Hash256) *txpool.PoolItem {
 	return fr.txpool.Get(TxHash)
