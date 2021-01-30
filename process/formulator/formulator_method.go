@@ -544,17 +544,9 @@ func (p *Formulator) revokeFormulator(ctw *types.ContextWrapper, FormulatorAddr 
 			if StakingAmount.IsZero() {
 				return ErrInvalidStakingAddress
 			}
-			if frAcc.StakingAmount.Less(StakingAmount) {
-				return ErrCriticalStakingAmount
-			}
-			frAcc.StakingAmount = frAcc.StakingAmount.Sub(StakingAmount)
-
 			if err := p.vault.AddBalance(ctw, addr, StakingAmount); err != nil {
 				return err
 			}
-		}
-		if !frAcc.StakingAmount.IsZero() {
-			return ErrCriticalStakingAmount
 		}
 	}
 	if err := ctw.DeleteAccount(frAcc); err != nil {
