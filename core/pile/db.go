@@ -32,7 +32,7 @@ func Open(path string, initHash hash.Hash256, InitHeight uint32, InitTimestamp u
 
 	start := time.Now()
 	var MinHeight uint32
-	var MaxHeight uint32
+	MaxHeight := InitHeight
 	pileMap := map[uint32]*Pile{}
 	if err := filepath.Walk(path, func(p string, fi os.FileInfo, err error) error {
 		if !fi.IsDir() {
@@ -41,8 +41,8 @@ func Open(path string, initHash hash.Hash256, InitHeight uint32, InitTimestamp u
 				if err != nil {
 					return err
 				}
-				if len(pileMap) == 0 || MinHeight > p.HeadHeight {
-					MinHeight = p.HeadHeight
+				if len(pileMap) == 0 || MinHeight > p.BeginHeight {
+					MinHeight = p.BeginHeight
 				}
 				if len(pileMap) == 0 || MaxHeight < p.HeadHeight {
 					MaxHeight = p.HeadHeight
@@ -54,12 +54,8 @@ func Open(path string, initHash hash.Hash256, InitHeight uint32, InitTimestamp u
 	}); err != nil {
 		return nil, err
 	}
-	if len(pileMap) == 0 {
+	if MinHeight < InitHeight {
 		MinHeight = InitHeight
-		MaxHeight = InitHeight
-	}
-	if MinHeight != InitHeight {
-		return nil, ErrInvalidInitHeigth
 	}
 
 	Count := (MaxHeight-MinHeight)/ChunkUnit + 1
