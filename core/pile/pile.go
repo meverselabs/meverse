@@ -31,6 +31,11 @@ func NewPile(path string, GenHash hash.Hash256, InitHash hash.Hash256, InitHeigh
 		return nil, err
 	}
 
+	HeadHeight := BaseHeight
+	if BaseHeight < InitHeight {
+		HeadHeight = InitHeight
+	}
+
 	if fi, err := file.Stat(); err != nil {
 		file.Close()
 		return nil, err
@@ -47,10 +52,6 @@ func NewPile(path string, GenHash hash.Hash256, InitHash hash.Hash256, InitHeigh
 		if BaseHeight%ChunkUnit != 0 {
 			file.Close()
 			return nil, ErrInvalidChunkBeginHeight
-		}
-		HeadHeight := BaseHeight
-		if BaseHeight < InitHeight {
-			HeadHeight = InitHeight
 		}
 		copy(meta, binutil.LittleEndian.Uint32ToBytes(HeadHeight))                //HeadHeight (0, 4)
 		copy(meta[4:], binutil.LittleEndian.Uint32ToBytes(HeadHeight))            //HeadHeightCheckA (4, 8)
@@ -69,7 +70,7 @@ func NewPile(path string, GenHash hash.Hash256, InitHash hash.Hash256, InitHeigh
 
 	p := &Pile{
 		file:        file,
-		HeadHeight:  BaseHeight,
+		HeadHeight:  HeadHeight,
 		BeginHeight: BaseHeight,
 		GenHash:     GenHash,
 		InitHash:    InitHash,
