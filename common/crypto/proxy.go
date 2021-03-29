@@ -4,7 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 
-	ecrypto "github.com/fletaio/fleta_v1/common/crypto/ethereum/crypto"
+	ecrypto "github.com/fletaio/fleta/common/crypto/ethereum/crypto"
 )
 
 // Ecrecover returns the uncompressed public key that created the given signature.
