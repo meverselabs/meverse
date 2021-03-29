@@ -61,8 +61,9 @@ func Open(path string, initHash hash.Hash256, InitHeight uint32, InitTimestamp u
 	Count := (MaxHeight-MinHeight)/ChunkUnit + 1
 	piles := make([]*Pile, 0, Count)
 	if (MaxHeight - MinHeight) > 0 {
+		BaseIdx := MinHeight / ChunkUnit
 		for i := uint32(0); i < Count; i++ {
-			if p, has := pileMap[i*ChunkUnit]; !has {
+			if p, has := pileMap[(BaseIdx+i)*ChunkUnit]; !has {
 				return nil, ErrMissingPile
 			} else {
 				piles = append(piles, p)
