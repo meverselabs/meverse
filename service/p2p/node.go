@@ -182,7 +182,6 @@ func (nd *Node) Run(BindAddress string) {
 					if err := nd.addTx(ctw, item.TxHash, item.Type, item.Tx, item.Sigs); err != nil {
 						if err != ErrInvalidUTXO && err != txpool.ErrExistTransaction && err != txpool.ErrTransactionPoolOverflowed && err != types.ErrUsedTimeSlot && err != types.ErrInvalidTransactionTimeSlot {
 							rlog.Println("TransactionError", item.TxHash.String(), err.Error())
-							panic(err) //TEMP
 
 							if len(item.PeerID) > 0 {
 								nd.ms.AddBadPoint(item.PeerID, 1)

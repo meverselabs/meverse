@@ -500,7 +500,6 @@ func (fr *FormulatorNode) genBlock(ID string, msg *BlockReqMessage) error {
 				}
 				if err := bc.UnsafeAddTx(fr.Config.Formulator, item.TxType, item.TxHash, item.Transaction, item.Signatures, item.Signers); err != nil {
 					rlog.Println("UnsafeAddTx", err)
-					panic(err) //TEMP
 					continue
 				}
 				Count++

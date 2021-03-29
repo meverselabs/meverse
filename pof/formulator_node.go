@@ -198,7 +198,6 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 					if err := fr.addTx(ctw, item.TxHash, item.Type, item.Tx, item.Sigs); err != nil {
 						if err != p2p.ErrInvalidUTXO && err != txpool.ErrExistTransaction && err != txpool.ErrTransactionPoolOverflowed && err != types.ErrUsedTimeSlot && err != types.ErrInvalidTransactionTimeSlot {
 							rlog.Println("TransactionError", item.TxHash.String(), err.Error())
-							panic(err) //TEMP
 
 							if len(item.PeerID) > 0 {
 								fr.nm.AddBadPoint(item.PeerID, 1)
