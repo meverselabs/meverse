@@ -7,6 +7,7 @@ import (
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/hash"
+	"github.com/fletaio/fleta/core/pile"
 	"github.com/fletaio/fleta/core/types"
 )
 
@@ -45,7 +46,7 @@ func NewChain(consensus Consensus, app types.Application, store *Store) *Chain {
 }
 
 // Init initializes the chain
-func (cn *Chain) Init() error {
+func (cn *Chain) Init(initHash hash.Hash256, initHeight uint32, initTimestamp uint64) error {
 	cn.Lock()
 	defer cn.Unlock()
 
@@ -86,17 +87,34 @@ func (cn *Chain) Init() error {
 	top := genesisContext.Top()
 
 	GenesisHash := hash.Hashes(hash.Hash([]byte(cn.store.Name())), hash.Hash([]byte{cn.store.ChainID()}), genesisContext.Hash())
-	if cn.store.Height() > 0 {
+	if initHeight == 0 {
+		initHash = GenesisHash
+	}
+	Height := cn.store.Height()
+	if Height > initHeight {
 		if h, err := cn.store.Hash(0); err != nil {
 			return err
 		} else {
 			if GenesisHash != h {
-				return ErrInvalidGenesisHash
+				return pile.ErrInvalidGenesisHash
+			}
+		}
+		if h, err := cn.store.Hash(initHeight); err != nil {
+			return err
+		} else {
+			if initHash != h {
+				return pile.ErrInvalidInitialHash
 			}
 		}
 	} else {
-		if err := cn.store.StoreGenesis(GenesisHash, top); err != nil {
-			return err
+		if initHeight > 0 {
+			if err := cn.store.StoreInit(GenesisHash, initHash, initHeight, initTimestamp); err != nil {
+				return err
+			}
+		} else {
+			if err := cn.store.StoreGenesis(GenesisHash, top); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -423,7 +441,7 @@ func (cn *Chain) validateHeader(bh *types.Header) error {
 	if bh.Height != height+1 {
 		return ErrInvalidHeight
 	}
-	if bh.Height == 1 {
+	if bh.Height == cn.store.InitHeight()+1 {
 		if bh.Version <= 0 {
 			return ErrInvalidVersion
 		}

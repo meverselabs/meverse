@@ -179,9 +179,6 @@ func (st *Store) LastStatus() (uint32, hash.Hash256) {
 	if err != nil {
 		panic(err)
 	}
-	if height == 0 {
-		return 0, h
-	}
 	return height, h
 }
 
@@ -201,8 +198,8 @@ func (st *Store) LastHash() hash.Hash256 {
 // LastTimestamp returns the last timestamp of the chain
 func (st *Store) LastTimestamp() uint64 {
 	height := st.Height()
-	if st.Height() == 0 {
-		return 0
+	if height == st.InitHeight() {
+		return st.InitTimestamp()
 	}
 	if st.cache.cached {
 		if st.cache.height == height {
@@ -253,7 +250,7 @@ func (st *Store) Header(height uint32) (*types.Header, error) {
 		return nil, ErrStoreClosed
 	}
 
-	if height < 1 {
+	if height <= st.InitHeight() {
 		return nil, backend.ErrNotExistKey
 	}
 	if st.cache.cached {
@@ -285,7 +282,7 @@ func (st *Store) Block(height uint32) (*types.Block, error) {
 		return nil, ErrStoreClosed
 	}
 
-	if height < 1 {
+	if height <= st.InitHeight() {
 		return nil, backend.ErrNotExistKey
 	}
 	if st.cache.cached {
@@ -331,6 +328,28 @@ func (st *Store) Height() uint32 {
 		return nil
 	})
 	return height
+}
+
+// InitHeight returns the initial height of the target chain
+func (st *Store) InitHeight() uint32 {
+	st.closeLock.RLock()
+	defer st.closeLock.RUnlock()
+	if st.isClose {
+		return 0
+	}
+
+	return st.cdb.InitHeight()
+}
+
+// InitTimestamp returns the initial timestamp of the target chain
+func (st *Store) InitTimestamp() uint64 {
+	st.closeLock.RLock()
+	defer st.closeLock.RUnlock()
+	if st.isClose {
+		return 0
+	}
+
+	return st.cdb.InitTimestamp()
 }
 
 // Accounts returns all accounts in the store
@@ -733,20 +752,18 @@ func (st *Store) StoreGenesis(genHash hash.Hash256, ctd *types.ContextData) erro
 	if st.Height() > 0 {
 		return ErrAlreadyGenesised
 	}
-	if err := st.cdb.Init(genHash); err != nil {
+	if err := st.cdb.Init(genHash, genHash, 0, 0); err != nil {
 		if err != pile.ErrAlreadyInitialized {
 			return err
 		}
 	}
 	if err := st.db.Update(func(txn backend.StoreWriter) error {
-		{
-			if err := txn.Set(toHeightHashKey(0), genHash[:]); err != nil {
-				return err
-			}
-			bsHeight := binutil.LittleEndian.Uint32ToBytes(0)
-			if err := txn.Set(tagHeight, bsHeight); err != nil {
-				return err
-			}
+		if err := txn.Set(toHeightHashKey(0), genHash[:]); err != nil {
+			return err
+		}
+		bsHeight := binutil.LittleEndian.Uint32ToBytes(0)
+		if err := txn.Set(tagHeight, bsHeight); err != nil {
+			return err
 		}
 		if err := applyContextData(txn, ctd); err != nil {
 			return err
@@ -757,6 +774,49 @@ func (st *Store) StoreGenesis(genHash hash.Hash256, ctd *types.ContextData) erro
 	}
 	st.cache.height = 0
 	st.cache.heightHash = genHash
+	st.cache.heightBlock = nil
+	st.cache.cached = true
+	return nil
+}
+
+// StoreInit stores the init data
+func (st *Store) StoreInit(genHash hash.Hash256, initHash hash.Hash256, initHeight uint32, initTimestamp uint64) error {
+	st.closeLock.RLock()
+	defer st.closeLock.RUnlock()
+	if st.isClose {
+		return ErrStoreClosed
+	}
+
+	if st.Height() > initHeight {
+		return ErrAlreadyInitialzed
+	}
+	if err := st.cdb.Init(genHash, initHash, initHeight, initTimestamp); err != nil {
+		if err != pile.ErrAlreadyInitialized {
+			return err
+		}
+	}
+	if err := st.db.View(func(txn backend.StoreReader) error {
+		bsHash, err := txn.Get(toHeightHashKey(0))
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(bsHash, genHash[:]) {
+			return pile.ErrInvalidGenesisHash
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	if err := st.db.Update(func(txn backend.StoreWriter) error {
+		if err := txn.Set(toHeightHashKey(initHeight), initHash[:]); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	st.cache.height = initHeight
+	st.cache.heightHash = initHash
 	st.cache.heightBlock = nil
 	st.cache.cached = true
 	return nil

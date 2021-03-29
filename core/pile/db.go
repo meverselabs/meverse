@@ -14,20 +14,24 @@ import (
 // DB provides stack like value store using piles
 type DB struct {
 	sync.Mutex
-	path         string
-	piles        []*Pile
-	genHash      hash.Hash256
-	syncMode     bool
-	hasDirty     bool
-	lastSyncTime time.Time
-	isClosed     bool
+	path          string
+	piles         []*Pile
+	genHash       hash.Hash256
+	initHash      hash.Hash256
+	initHeight    uint32
+	initTimestamp uint64
+	syncMode      bool
+	hasDirty      bool
+	lastSyncTime  time.Time
+	isClosed      bool
 }
 
 // Open creates a DB that includes loaded piles
-func Open(path string) (*DB, error) {
+func Open(path string, initHash hash.Hash256, InitHeight uint32, InitTimestamp uint64) (*DB, error) {
 	os.MkdirAll(path, os.ModePerm)
 
 	start := time.Now()
+	var MinHeight uint32
 	var MaxHeight uint32
 	pileMap := map[uint32]*Pile{}
 	if err := filepath.Walk(path, func(p string, fi os.FileInfo, err error) error {
@@ -37,20 +41,30 @@ func Open(path string) (*DB, error) {
 				if err != nil {
 					return err
 				}
-				pileMap[p.BeginHeight] = p
-				if MaxHeight < p.HeadHeight {
+				if len(pileMap) == 0 || MinHeight > p.HeadHeight {
+					MinHeight = p.HeadHeight
+				}
+				if len(pileMap) == 0 || MaxHeight < p.HeadHeight {
 					MaxHeight = p.HeadHeight
 				}
+				pileMap[p.BeginHeight] = p
 			}
 		}
 		return nil
 	}); err != nil {
 		return nil, err
 	}
+	if len(pileMap) == 0 {
+		MinHeight = InitHeight
+		MaxHeight = InitHeight
+	}
+	if MinHeight != InitHeight {
+		return nil, ErrInvalidInitHeigth
+	}
 
-	Count := MaxHeight/ChunkUnit + 1
+	Count := (MaxHeight-MinHeight)/ChunkUnit + 1
 	piles := make([]*Pile, 0, Count)
-	if MaxHeight > 0 {
+	if (MaxHeight - MinHeight) > 0 {
 		for i := uint32(0); i < Count; i++ {
 			if p, has := pileMap[i*ChunkUnit]; !has {
 				return nil, ErrMissingPile
@@ -61,12 +75,17 @@ func Open(path string) (*DB, error) {
 	}
 	log.Println("PileDB is opened in", time.Now().Sub(start))
 	db := &DB{
-		path:         path,
-		piles:        piles,
-		lastSyncTime: time.Now(),
+		path:          path,
+		piles:         piles,
+		lastSyncTime:  time.Now(),
+		initHash:      initHash,
+		initHeight:    InitHeight,
+		initTimestamp: InitTimestamp,
 	}
 	if len(piles) > 0 {
 		copy(db.genHash[:], db.piles[0].GenHash[:])
+		copy(db.initHash[:], db.piles[0].InitHash[:])
+		db.initTimestamp = db.piles[0].InitTimestamp
 	}
 
 	go func() {
@@ -91,7 +110,7 @@ func Open(path string) (*DB, error) {
 }
 
 // Init initialize database when not initialized
-func (db *DB) Init(genHash hash.Hash256) error {
+func (db *DB) Init(genHash hash.Hash256, initHash hash.Hash256, initHeight uint32, initTimestamp uint64) error {
 	db.Lock()
 	defer db.Unlock()
 
@@ -99,12 +118,15 @@ func (db *DB) Init(genHash hash.Hash256) error {
 		return ErrAlreadyInitialized
 	}
 
-	p, err := NewPile(filepath.Join(db.path, "chain_"+strconv.Itoa(len(db.piles)+1)+".pile"), genHash, 0)
+	p, err := NewPile(filepath.Join(db.path, "chain_"+strconv.Itoa(len(db.piles)+1)+".pile"), genHash, initHash, initHeight, initTimestamp, (initHeight/ChunkUnit)*ChunkUnit)
 	if err != nil {
 		return err
 	}
 	db.piles = append(db.piles, p)
 	db.genHash = genHash
+	db.initHash = initHash
+	db.initHeight = initHeight
+	db.initTimestamp = initTimestamp
 	return nil
 }
 
@@ -120,6 +142,16 @@ func (db *DB) Close() {
 	}
 	log.Println("PileDB is closed in", time.Now().Sub(start))
 	db.piles = []*Pile{}
+}
+
+// InitHeight returns init height
+func (db *DB) InitHeight() uint32 {
+	return db.initHeight
+}
+
+// InitTimestamp returns init timestamp
+func (db *DB) InitTimestamp() uint64 {
+	return db.initTimestamp
 }
 
 // SetSyncMode changes sync mode(sync every second when disabled)
@@ -147,7 +179,7 @@ func (db *DB) AppendData(Height uint32, DataHash hash.Hash256, Datas [][]byte) e
 		if len(db.piles) > 0 {
 			db.piles[len(db.piles)-1].file.Sync()
 		}
-		v, err := NewPile(filepath.Join(db.path, "chain_"+strconv.Itoa(len(db.piles)+1)+".pile"), db.genHash, p.BeginHeight+ChunkUnit)
+		v, err := NewPile(filepath.Join(db.path, "chain_"+strconv.Itoa(len(db.piles)+1)+".pile"), db.genHash, db.initHash, db.initHeight, db.initTimestamp, p.BeginHeight+ChunkUnit)
 		if err != nil {
 			return err
 		}
@@ -186,8 +218,18 @@ func (db *DB) GetHash(Height uint32) (hash.Hash256, error) {
 			return hash.Hash256{}, ErrInvalidHeight
 		}
 	}
+	if Height < db.initHeight {
+		return hash.Hash256{}, ErrUnderInitHeight
+	}
+	if Height == db.initHeight {
+		if len(db.piles) > 0 {
+			return db.piles[0].InitHash, nil
+		} else {
+			return hash.Hash256{}, ErrInvalidHeight
+		}
+	}
 
-	idx := (Height - 1) / ChunkUnit
+	idx := (Height - db.initHeight - 1) / ChunkUnit
 	if len(db.piles) <= int(idx) {
 		return hash.Hash256{}, ErrInvalidHeight
 	}
@@ -205,8 +247,8 @@ func (db *DB) GetData(Height uint32, index int) ([]byte, error) {
 	db.Lock()
 	defer db.Unlock()
 
-	if Height == 0 {
-		return nil, ErrInvalidHeight
+	if Height <= db.initHeight {
+		return nil, ErrUnderInitHeight
 	}
 
 	idx := (Height - 1) / ChunkUnit
@@ -227,8 +269,8 @@ func (db *DB) GetDatas(Height uint32, from int, count int) ([]byte, error) {
 	db.Lock()
 	defer db.Unlock()
 
-	if Height == 0 {
-		return nil, ErrInvalidHeight
+	if Height <= db.initHeight {
+		return nil, ErrUnderInitHeight
 	}
 
 	idx := (Height - 1) / ChunkUnit

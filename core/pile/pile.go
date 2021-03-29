@@ -15,14 +15,17 @@ import (
 // Pile proivdes a part of stack like store
 type Pile struct {
 	sync.Mutex
-	file        *os.File
-	HeadHeight  uint32
-	BeginHeight uint32
-	GenHash     hash.Hash256
+	file          *os.File
+	HeadHeight    uint32
+	BeginHeight   uint32
+	InitHeight    uint32
+	GenHash       hash.Hash256
+	InitHash      hash.Hash256
+	InitTimestamp uint64
 }
 
 // NewPile returns a Pile
-func NewPile(path string, GenHash hash.Hash256, BaseHeight uint32) (*Pile, error) {
+func NewPile(path string, GenHash hash.Hash256, InitHash hash.Hash256, InitHeight uint32, InitTimestamp uint64, BaseHeight uint32) (*Pile, error) {
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
 		return nil, err
@@ -45,12 +48,19 @@ func NewPile(path string, GenHash hash.Hash256, BaseHeight uint32) (*Pile, error
 			file.Close()
 			return nil, ErrInvalidChunkBeginHeight
 		}
-		copy(meta, binutil.LittleEndian.Uint32ToBytes(BaseHeight))                //HeadHeight (0, 4)
-		copy(meta[4:], binutil.LittleEndian.Uint32ToBytes(BaseHeight))            //HeadHeightCheckA (4, 8)
-		copy(meta[8:], binutil.LittleEndian.Uint32ToBytes(BaseHeight))            //HeadHeightCheckB (8, 12)
+		HeadHeight := BaseHeight
+		if BaseHeight < InitHeight {
+			HeadHeight = InitHeight
+		}
+		copy(meta, binutil.LittleEndian.Uint32ToBytes(HeadHeight))                //HeadHeight (0, 4)
+		copy(meta[4:], binutil.LittleEndian.Uint32ToBytes(HeadHeight))            //HeadHeightCheckA (4, 8)
+		copy(meta[8:], binutil.LittleEndian.Uint32ToBytes(HeadHeight))            //HeadHeightCheckB (8, 12)
 		copy(meta[12:], binutil.LittleEndian.Uint32ToBytes(BaseHeight))           //BeginHeight (12, 16)
 		copy(meta[16:], binutil.LittleEndian.Uint32ToBytes(BaseHeight+ChunkUnit)) //EndHeight (16, 20)
 		copy(meta[20:], GenHash[:])                                               //GenesisHash (20, 52)
+		copy(meta[52:], InitHash[:])                                              //InitialHash (52, 84)
+		copy(meta[84:], binutil.LittleEndian.Uint32ToBytes(InitHeight))           //BeginHeight (84, 88)
+		copy(meta[88:], binutil.LittleEndian.Uint64ToBytes(InitTimestamp))        //EndHeight (88, 96)
 		if _, err := file.Write(meta); err != nil {
 			file.Close()
 			return nil, err
@@ -62,6 +72,7 @@ func NewPile(path string, GenHash hash.Hash256, BaseHeight uint32) (*Pile, error
 		HeadHeight:  BaseHeight,
 		BeginHeight: BaseHeight,
 		GenHash:     GenHash,
+		InitHash:    InitHash,
 	}
 	return p, nil
 }
@@ -89,6 +100,10 @@ func LoadPile(path string) (*Pile, error) {
 	EndHeight := binutil.LittleEndian.Uint32(meta[16:])
 	var GenHash hash.Hash256
 	copy(GenHash[:], meta[20:])
+	var InitHash hash.Hash256
+	copy(InitHash[:], meta[52:])
+	InitHeight := binutil.LittleEndian.Uint32(meta[84:])
+	InitTimestamp := binutil.LittleEndian.Uint64(meta[88:])
 	if BeginHeight%ChunkUnit != 0 {
 		file.Close()
 		return nil, ErrInvalidChunkBeginHeight
@@ -163,10 +178,13 @@ func LoadPile(path string) (*Pile, error) {
 		}
 	}
 	p := &Pile{
-		file:        file,
-		HeadHeight:  HeadHeight,
-		BeginHeight: BeginHeight,
-		GenHash:     GenHash,
+		file:          file,
+		HeadHeight:    HeadHeight,
+		BeginHeight:   BeginHeight,
+		GenHash:       GenHash,
+		InitHash:      InitHash,
+		InitHeight:    InitHeight,
+		InitTimestamp: InitTimestamp,
 	}
 	return p, nil
 }
