@@ -170,6 +170,9 @@ func LoadPile(path string) (*Pile, error) {
 				return nil, err
 			}
 			Offset = int64(binutil.LittleEndian.Uint64(bs))
+			if Offset < ChunkHeaderSize {
+				Offset = ChunkHeaderSize
+			}
 		}
 		if fi, err := file.Stat(); err != nil {
 			file.Close()
@@ -224,6 +227,9 @@ func (p *Pile) AppendData(Sync bool, Height uint32, DataHash hash.Hash256, Datas
 			return err
 		}
 		Offset = int64(binutil.LittleEndian.Uint64(bs))
+		if Offset < ChunkHeaderSize {
+			Offset = ChunkHeaderSize
+		}
 	}
 
 	// write data
@@ -330,6 +336,9 @@ func (p *Pile) GetHash(Height uint32) (hash.Hash256, error) {
 			return hash.Hash256{}, err
 		}
 		Offset = int64(binutil.LittleEndian.Uint64(bs))
+		if Offset < ChunkHeaderSize {
+			Offset = ChunkHeaderSize
+		}
 	}
 	if _, err := p.file.Seek(Offset, 0); err != nil {
 		return hash.Hash256{}, err
@@ -366,6 +375,9 @@ func (p *Pile) GetData(Height uint32, index int) ([]byte, error) {
 			return nil, err
 		}
 		Offset = int64(binutil.LittleEndian.Uint64(bs))
+		if Offset < ChunkHeaderSize {
+			Offset = ChunkHeaderSize
+		}
 	}
 	if _, err := p.file.Seek(Offset+32, 0); err != nil {
 		return nil, err
@@ -428,6 +440,9 @@ func (p *Pile) GetDatas(Height uint32, from int, count int) ([]byte, error) {
 			return nil, err
 		}
 		Offset = int64(binutil.LittleEndian.Uint64(bs))
+		if Offset < ChunkHeaderSize {
+			Offset = ChunkHeaderSize
+		}
 	}
 	if _, err := p.file.Seek(Offset+32, 0); err != nil {
 		return nil, err
