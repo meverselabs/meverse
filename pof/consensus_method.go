@@ -106,3 +106,16 @@ func (cs *Consensus) buildSaveData() ([]byte, error) {
 	}
 	return buffer.Bytes(), nil
 }
+
+func (cs *Consensus) RankTable() *RankTable {
+	return cs.rt
+}
+
+func (cs *Consensus) EncodeConsensusData(TimeoutCount uint32) ([]byte, error) {
+	var buffer bytes.Buffer
+	enc := encoding.NewEncoder(&buffer)
+	if err := enc.EncodeUint32(TimeoutCount); err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
+}

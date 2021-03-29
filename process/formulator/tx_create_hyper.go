@@ -14,7 +14,6 @@ import (
 // CreateHyper is used to make hyper formulator account
 type CreateHyper struct {
 	Timestamp_ uint64
-	Seq_       uint64
 	From_      common.Address
 	Name       string
 	KeyHash    common.PublicHash
@@ -27,12 +26,6 @@ func (tx *CreateHyper) Timestamp() uint64 {
 	return tx.Timestamp_
 }
 
-// Seq returns the sequence of the transaction
-func (tx *CreateHyper) Seq() uint64 {
-	return tx.Seq_
-}
-
-// From returns the from address of the transaction
 func (tx *CreateHyper) From() common.Address {
 	return tx.From_
 }
@@ -50,10 +43,6 @@ func (tx *CreateHyper) Validate(p types.Process, loader types.LoaderWrapper, sig
 	}
 	if tx.Policy.CommissionRatio1000 > 1000 {
 		return ErrInvalidValidatorPolicy
-	}
-
-	if tx.Seq() <= loader.Seq(tx.From()) {
-		return types.ErrInvalidSequence
 	}
 
 	if has, err := loader.HasAccountName(tx.Name); err != nil {
@@ -111,13 +100,6 @@ func (tx *CreateHyper) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
 	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"seq":`)
-	if bs, err := json.Marshal(tx.Seq_); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

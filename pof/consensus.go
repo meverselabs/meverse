@@ -47,16 +47,15 @@ func (cs *Consensus) Init(cn *chain.Chain, ct chain.Committer) error {
 	} else if v, is := vs.(*apiserver.APIServer); !is {
 		//ignore when not loaded
 	} else {
-		s, err := v.JRPC("consensus")
+		js, err := v.JRPC("consensus")
 		if err != nil {
 			return err
 		}
-		s.Set("getRanks", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+		js.Set("getRanks", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 			list := cs.rt.Candidates()
 			return list, nil
 		})
 	}
-
 	return nil
 }
 

@@ -9,15 +9,18 @@ import (
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/debug"
+	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/common/queue"
 	"github.com/fletaio/fleta/common/rlog"
 	"github.com/fletaio/fleta/core/chain"
 	"github.com/fletaio/fleta/core/types"
 	"github.com/fletaio/fleta/encoding"
-	"github.com/fletaio/fleta/service/apiserver"
 	"github.com/fletaio/fleta/service/p2p"
 )
+
+// BlockTime defines the block generation interval
+const BlockTime = 500 * time.Millisecond
 
 type messageItem struct {
 	PublicHash common.PublicHash
@@ -46,6 +49,7 @@ type ObserverNode struct {
 	sendChan         chan *p2p.SendMessageItem
 	singleCache      gcache.Cache
 	batchCache       gcache.Cache
+	sigCache         gcache.Cache
 	isRunning        bool
 	closeLock        sync.RWMutex
 	isClose          bool
@@ -68,6 +72,7 @@ func NewObserverNode(key key.Key, NetAddressMap map[common.PublicHash]string, cs
 		sendChan:     make(chan *p2p.SendMessageItem, 1000),
 		singleCache:  gcache.New(500).LRU().Build(),
 		batchCache:   gcache.New(500).LRU().Build(),
+		sigCache:     gcache.New(100000).LRU().Build(),
 	}
 	ob.ms = NewObserverNodeMesh(key, NetAddressMap, ob)
 	ob.fs = NewFormulatorService(ob)
@@ -92,31 +97,6 @@ func (ob *ObserverNode) Init() error {
 	fc.Register(types.DefineHashedType("p2p.StatusMessage"), &p2p.StatusMessage{})
 	fc.Register(types.DefineHashedType("p2p.BlockMessage"), &p2p.BlockMessage{})
 	fc.Register(types.DefineHashedType("p2p.RequestMessage"), &p2p.RequestMessage{})
-
-	if s, err := ob.cs.cn.ServiceByName("fleta.apiserver"); err != nil {
-	} else if as, is := s.(*apiserver.APIServer); !is {
-	} else {
-		js, err := as.JRPC("observer")
-		if err != nil {
-			return err
-		}
-		js.Set("formulatorMap", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
-			m := ob.fs.FormulatorMap()
-			nm := map[string]bool{}
-			for k, v := range m {
-				nm[k.String()] = v
-			}
-			return nm, nil
-		})
-		js.Set("adjustFormulatorMap", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
-			m := ob.adjustFormulatorMap()
-			nm := map[string]bool{}
-			for k, v := range m {
-				nm[k.String()] = v
-			}
-			return nm, nil
-		})
-	}
 	return nil
 }
 
@@ -130,6 +110,13 @@ func (ob *ObserverNode) Close() {
 
 	ob.isClose = true
 	ob.cs.cn.Close()
+}
+
+func (ob *ObserverNode) ResetRound() { //TEMP
+	ob.Lock()
+	defer ob.Unlock()
+
+	ob.resetVoteRound(true)
 }
 
 // Run starts the pof consensus on the observer
@@ -202,13 +189,23 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 			item := ob.blockQ.PopUntil(TargetHeight)
 			for item != nil {
 				b := item.(*types.Block)
-				if err := ob.cs.cn.ConnectBlock(b, nil); err != nil {
+				ChainID := ob.cs.cn.Provider().ChainID()
+				sm := map[hash.Hash256][]common.PublicHash{}
+				for i, tx := range b.Transactions {
+					t := b.TransactionTypes[i]
+					TxHash := chain.HashTransactionByType(ChainID, t, tx)
+					if v, err := ob.sigCache.Get(TxHash); err != nil {
+					} else if v != nil {
+						sm[TxHash] = []common.PublicHash{v.(common.PublicHash)} //TEMP
+					}
+				}
+				if err := ob.cs.cn.ConnectBlock(b, sm); err != nil {
 					rlog.Println(err)
 					panic(err)
 					break
 				}
 				if debug.DEBUG {
-					rlog.Println(cp.Height(), "BlockConnectedQ", b.Header.Generator.String(), ob.round.RoundState, b.Header.Height, (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
+					rlog.Println(cp.Height(), "BlockConnectedQ", b.Header.Generator.String(), ob.round.RoundState, b.Header.Height, (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond), len(b.Transactions))
 				}
 				TargetHeight++
 				Count++
@@ -268,15 +265,17 @@ func (ob *ObserverNode) Run(BindObserver string, BindFormulator string) {
 				}
 				if IsFailable {
 					ob.round.VoteFailCount++
-					if ob.round.VoteFailCount > 30 {
+					if ob.round.VoteFailCount > 20 {
 						if ob.round.MinRoundVoteAck != nil {
-							addr := ob.round.MinRoundVoteAck.Formulator
-							if _, has := ob.ignoreMap[addr]; has {
-								ob.fs.RemovePeer(string(addr[:]))
-								ob.ignoreMap[addr] = time.Now().UnixNano() + int64(120*time.Second)
-							} else {
-								ob.ignoreMap[addr] = time.Now().UnixNano() + int64(30*time.Second)
-							}
+							/*
+								addr := ob.round.MinRoundVoteAck.Formulator
+								if _, has := ob.ignoreMap[addr]; has {
+									ob.fs.RemovePeer(string(addr[:]))
+									ob.ignoreMap[addr] = time.Now().UnixNano() + int64(120*time.Second)
+								} else {
+									ob.ignoreMap[addr] = time.Now().UnixNano() + int64(30*time.Second)
+								}
+							*/
 							if debug.DEBUG {
 								rlog.Println(cp.Height(), "Failure", ob.round.MinRoundVoteAck.Formulator.String(), ob.round.RoundState, len(ob.adjustFormulatorMap()), ob.fs.PeerCount(), (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
 							}
@@ -342,12 +341,14 @@ func (ob *ObserverNode) addBlock(b *types.Block) error {
 
 func (ob *ObserverNode) adjustFormulatorMap() map[common.Address]bool {
 	FormulatorMap := ob.fs.FormulatorMap()
-	now := time.Now().UnixNano()
-	for addr := range FormulatorMap {
-		if now < ob.ignoreMap[addr] {
-			delete(FormulatorMap, addr)
+	/*
+		now := time.Now().UnixNano()
+		for addr := range FormulatorMap {
+			if now < ob.ignoreMap[addr] {
+				delete(FormulatorMap, addr)
+			}
 		}
-	}
+	*/
 	return FormulatorMap
 }
 

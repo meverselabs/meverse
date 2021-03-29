@@ -43,6 +43,14 @@ type jRPCRequest struct {
 	Params  []*json.Number `json:"params"`
 }
 
+// jRPCRequest2 is a jrpc request
+type jRPCRequest2 struct {
+	JSONRPC string        `json:"jsonrpc"`
+	ID      interface{}   `json:"id"`
+	Method  string        `json:"method"`
+	Params  []interface{} `json:"params"`
+}
+
 // JRPCResponse is a jrpc response
 type JRPCResponse struct {
 	JSONRPC string      `json:"jsonrpc"`

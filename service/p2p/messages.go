@@ -52,7 +52,7 @@ func init() {
 		if err != nil {
 			return err
 		}
-		if TxLen >= 65535 {
+		if TxLen >= types.MaxTransactionPerBlock {
 			return types.ErrInvalidTransactionCount
 		}
 		item.Types = make([]uint16, 0, TxLen)
@@ -114,9 +114,9 @@ type BlockMessage struct {
 
 // TransactionMessage is a message for a transaction
 type TransactionMessage struct {
-	Types      []uint16             //MAXLEN : 65535
-	Txs        []types.Transaction  //MAXLEN : 65535
-	Signatures [][]common.Signature //MAXLEN : 65535
+	Types      []uint16             //MAXLEN : types.MaxTransactionPerBlock
+	Txs        []types.Transaction  //MAXLEN : types.MaxTransactionPerBlock
+	Signatures [][]common.Signature //MAXLEN : types.MaxTransactionPerBlock
 }
 
 // PeerListMessage is a message for a peer list

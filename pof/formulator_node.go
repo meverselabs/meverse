@@ -65,6 +65,7 @@ type FormulatorNode struct {
 	sendChan       chan *p2p.SendMessageItem
 	singleCache    gcache.Cache
 	batchCache     gcache.Cache
+	sigCache       gcache.Cache
 	isRunning      bool
 	closeLock      sync.RWMutex
 	isClose        bool
@@ -95,6 +96,7 @@ func NewFormulatorNode(Config *FormulatorConfig, key key.Key, ndkey key.Key, Net
 		sendChan:       make(chan *p2p.SendMessageItem, 1000),
 		singleCache:    gcache.New(500).LRU().Build(),
 		batchCache:     gcache.New(500).LRU().Build(),
+		sigCache:       gcache.New(100000).LRU().Build(),
 	}
 	fr.ms = NewFormulatorNodeMesh(key, NetAddressMap, fr)
 	fr.nm = p2p.NewNodeMesh(fr.cs.cn.Provider().ChainID(), ndkey, SeedNodeMap, fr, peerStorePath)
@@ -104,18 +106,6 @@ func NewFormulatorNode(Config *FormulatorConfig, key key.Key, ndkey key.Key, Net
 	fr.txQ.AddHandler(fr)
 	rlog.SetRLogAddress("fr:" + Config.Formulator.String())
 	return fr
-}
-
-// Close terminates the formulator
-func (fr *FormulatorNode) Close() {
-	fr.closeLock.Lock()
-	defer fr.closeLock.Unlock()
-
-	fr.Lock()
-	defer fr.Unlock()
-
-	fr.isClose = true
-	fr.cs.cn.Close()
 }
 
 // Init initializes formulator
@@ -131,6 +121,18 @@ func (fr *FormulatorNode) Init() error {
 	fc.Register(types.DefineHashedType("p2p.PeerListMessage"), &p2p.PeerListMessage{})
 	fc.Register(types.DefineHashedType("p2p.RequestPeerListMessage"), &p2p.RequestPeerListMessage{})
 	return nil
+}
+
+// Close terminates the formulator
+func (fr *FormulatorNode) Close() {
+	fr.closeLock.Lock()
+	defer fr.closeLock.Unlock()
+
+	fr.Lock()
+	defer fr.Unlock()
+
+	fr.isClose = true
+	fr.cs.cn.Close()
 }
 
 // Run runs the formulator
@@ -168,25 +170,36 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 			WorkerCount = 1
 		}
 	}
+
 	for i := 0; i < WorkerCount; i++ {
 		go func() {
 			for !fr.isClose {
 				Count := 0
 				ctw := fr.cs.cn.Provider().NewLoaderWrapper(1)
+				currentSlot := types.ToTimeSlot(fr.cs.cn.Provider().LastTimestamp())
 				for !fr.isClose {
 					v := fr.txWaitQ.Pop()
 					if v == nil {
 						break
 					}
 
-					Count++
-					if Count > 500 {
-						break
-					}
 					item := v.(*p2p.TxMsgItem)
+					slot := types.ToTimeSlot(item.Tx.Timestamp())
+					if currentSlot > 0 {
+						if slot < currentSlot-1 {
+							continue
+						} else if slot > currentSlot+10 {
+							continue
+						}
+					}
+					if ctw.IsUsedTimeSlot(slot, string(item.TxHash[:])) {
+						continue
+					}
 					if err := fr.addTx(ctw, item.TxHash, item.Type, item.Tx, item.Sigs); err != nil {
-						if err != p2p.ErrInvalidUTXO && err != txpool.ErrExistTransaction && err != txpool.ErrExistTransactionSeq && err != txpool.ErrTooFarSeq && err != txpool.ErrPastSeq {
+						if err != p2p.ErrInvalidUTXO && err != txpool.ErrExistTransaction && err != txpool.ErrTransactionPoolOverflowed && err != types.ErrUsedTimeSlot && err != types.ErrInvalidTransactionTimeSlot {
 							rlog.Println("TransactionError", item.TxHash.String(), err.Error())
+							panic(err) //TEMP
+
 							if len(item.PeerID) > 0 {
 								fr.nm.AddBadPoint(item.PeerID, 1)
 							}
@@ -196,6 +209,11 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 					//rlog.Println("TransactionAppended", item.TxHash.String(), Count)
 
 					fr.txSendQ.Push(item)
+
+					Count++
+					if Count > 500 {
+						break
+					}
 				}
 				time.Sleep(100 * time.Millisecond)
 			}
@@ -210,12 +228,21 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 					Txs:        []types.Transaction{},
 					Signatures: [][]common.Signature{},
 				}
+				currentSlot := types.ToTimeSlot(fr.cs.cn.Provider().LastTimestamp())
 				for {
 					v := fr.txSendQ.Pop()
 					if v == nil {
 						break
 					}
 					m := v.(*p2p.TxMsgItem)
+					slot := types.ToTimeSlot(m.Tx.Timestamp())
+					if currentSlot > 0 {
+						if slot < currentSlot-1 {
+							continue
+						} else if slot > currentSlot+10 {
+							continue
+						}
+					}
 					msg.Types = append(msg.Types, m.Type)
 					msg.Txs = append(msg.Txs, m.Tx)
 					msg.Signatures = append(msg.Signatures, m.Sigs)
@@ -311,6 +338,11 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 					item := fr.txpool.Get(TxHash)
 					if item != nil {
 						sm[TxHash] = item.Signers
+					} else {
+						if v, err := fr.sigCache.Get(TxHash); err != nil {
+						} else if v != nil {
+							sm[TxHash] = []common.PublicHash{v.(common.PublicHash)} //TEMP
+						}
 					}
 				}
 				if err := fr.cs.cn.ConnectBlock(b, sm); err != nil {
@@ -319,6 +351,15 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 			}
 			fr.cleanPool(b)
 			rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Transactions))
+
+			txs := fr.txpool.Clean(types.ToTimeSlot(b.Header.Timestamp))
+			if len(txs) > 0 {
+				svcs := fr.cs.cn.Services()
+				for _, s := range svcs {
+					s.OnTransactionInPoolExpired(txs)
+				}
+				rlog.Println("Transaction EXPIRED", len(txs))
+			}
 
 			fr.lastReqLock.Lock()
 			if fr.lastReqMessage != nil {
@@ -346,16 +387,28 @@ func (fr *FormulatorNode) Run(BindAddress string) {
 			fr.tryRequestBlocks()
 		}
 
-		if hasItem {
-			time.Sleep(50 * time.Millisecond)
-		} else {
-			time.Sleep(200 * time.Millisecond)
+		if Count < 10 {
+			if hasItem {
+				time.Sleep(50 * time.Millisecond)
+			} else {
+				time.Sleep(200 * time.Millisecond)
+			}
 		}
 	}
 }
 
-// AddTx adds tx to txpool that only have valid signatures
+// AddTx adds tx to txpool
 func (fr *FormulatorNode) AddTx(tx types.Transaction, sigs []common.Signature) error {
+	currentSlot := types.ToTimeSlot(fr.cs.cn.Provider().LastTimestamp())
+	slot := types.ToTimeSlot(tx.Timestamp())
+	if currentSlot > 0 {
+		if slot < currentSlot-1 {
+			return types.ErrInvalidTransactionTimeSlot
+		} else if slot > currentSlot+10 {
+			return types.ErrInvalidTransactionTimeSlot
+		}
+	}
+
 	fc := encoding.Factory("transaction")
 	t, err := fc.TypeOf(tx)
 	if err != nil {
@@ -363,6 +416,10 @@ func (fr *FormulatorNode) AddTx(tx types.Transaction, sigs []common.Signature) e
 	}
 	TxHash := chain.HashTransactionByType(fr.cs.cn.Provider().ChainID(), t, tx)
 	ctw := fr.cs.cn.Provider().NewLoaderWrapper(1)
+	if ctw.IsUsedTimeSlot(slot, string(TxHash[:])) {
+		return types.ErrUsedTimeSlot
+	}
+
 	if err := fr.addTx(ctw, TxHash, t, tx, sigs); err != nil {
 		return err
 	}
@@ -377,6 +434,16 @@ func (fr *FormulatorNode) AddTx(tx types.Transaction, sigs []common.Signature) e
 
 // PushTx pushes transaction
 func (fr *FormulatorNode) PushTx(tx types.Transaction, sigs []common.Signature) error {
+	currentSlot := types.ToTimeSlot(fr.cs.cn.Provider().LastTimestamp())
+	slot := types.ToTimeSlot(tx.Timestamp())
+	if currentSlot > 0 {
+		if slot < currentSlot-1 {
+			return types.ErrInvalidTransactionTimeSlot
+		} else if slot > currentSlot+10 {
+			return types.ErrInvalidTransactionTimeSlot
+		}
+	}
+
 	fc := encoding.Factory("transaction")
 	t, err := fc.TypeOf(tx)
 	if err != nil {
@@ -396,29 +463,26 @@ func (fr *FormulatorNode) PushTx(tx types.Transaction, sigs []common.Signature) 
 
 func (fr *FormulatorNode) addTx(ctw types.LoaderWrapper, TxHash hash.Hash256, t uint16, tx types.Transaction, sigs []common.Signature) error {
 	/*
-		if fr.txpool.Size() > 65535 {
+		if fr.txpool.Size() > types.MaxTransactionPerBlock {
 			return txpool.ErrTransactionPoolOverflowed
 		}
 	*/
-	cp := fr.cs.cn.Provider()
 	if fr.txpool.IsExist(TxHash) {
 		return txpool.ErrExistTransaction
 	}
-	if atx, is := tx.(chain.AccountTransaction); is {
-		seq := cp.Seq(atx.From())
-		if atx.Seq() <= seq {
-			return txpool.ErrPastSeq
-		} else if atx.Seq() > seq+100 {
-			return txpool.ErrTooFarSeq
-		}
-	}
 	signers := make([]common.PublicHash, 0, len(sigs))
-	for _, sig := range sigs {
-		pubkey, err := common.RecoverPubkey(TxHash, sig)
-		if err != nil {
-			return err
+	if v, err := fr.sigCache.Get(TxHash); err != nil {
+	} else if v != nil {
+		signers = append(signers, v.(common.PublicHash))
+	}
+	if len(signers) == 0 {
+		for _, sig := range sigs {
+			pubkey, err := common.RecoverPubkey(TxHash, sig)
+			if err != nil {
+				return err
+			}
+			signers = append(signers, common.NewPublicHash(pubkey))
 		}
-		signers = append(signers, common.NewPublicHash(pubkey))
 	}
 	pid := uint8(t >> 8)
 	p, err := fr.cs.cn.Process(pid)
@@ -448,10 +512,12 @@ func (fr *FormulatorNode) OnTimerExpired(height uint32, value string) {
 // OnItemExpired is called when the item is expired
 func (fr *FormulatorNode) OnItemExpired(Interval time.Duration, Key string, Item interface{}, IsLast bool) {
 	item := Item.(*p2p.TxMsgItem)
-	cp := fr.cs.cn.Provider()
-	if atx, is := item.Tx.(chain.AccountTransaction); is {
-		seq := cp.Seq(atx.From())
-		if atx.Seq() <= seq {
+	currentSlot := types.ToTimeSlot(fr.cs.cn.Provider().LastTimestamp())
+	slot := types.ToTimeSlot(item.Tx.Timestamp())
+	if currentSlot > 0 {
+		if slot < currentSlot-1 {
+			return
+		} else if slot > currentSlot+10 {
 			return
 		}
 	}

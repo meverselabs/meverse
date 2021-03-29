@@ -311,7 +311,8 @@ func (ms *NodeMesh) client(Address string, TargetPubHash common.PublicHash) erro
 		return ErrSelfConnection
 	}
 
-	conn, err := net.DialTimeout("tcp", Address, 10*time.Second)
+	d := &net.Dialer{Timeout: 10 * time.Second}
+	conn, err := d.Dial("tcp", Address)
 	if err != nil {
 		return err
 	}

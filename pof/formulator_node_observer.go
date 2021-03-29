@@ -352,6 +352,11 @@ func (fr *FormulatorNode) updateByGenItem() {
 					item := fr.txpool.Get(TxHash)
 					if item != nil {
 						sm[TxHash] = item.Signers
+					} else {
+						if v, err := fr.sigCache.Get(TxHash); err != nil {
+						} else if v != nil {
+							sm[TxHash] = []common.PublicHash{v.(common.PublicHash)} //TEMP
+						}
 					}
 				}
 				if err := fr.cs.ct.ExecuteBlockOnContext(item.BlockGen.Block, ctx, sm); err != nil {
@@ -376,7 +381,6 @@ func (fr *FormulatorNode) updateByGenItem() {
 			TransactionTypes:      item.BlockGen.Block.TransactionTypes,
 			Transactions:          item.BlockGen.Block.Transactions,
 			TransactionSignatures: item.BlockGen.Block.TransactionSignatures,
-			TransactionResults:    item.BlockGen.Block.TransactionResults,
 			Signatures:            append([]common.Signature{item.BlockGen.GeneratorSignature}, item.ObSign.ObserverSignatures...),
 		}
 		if item.Context != nil {
@@ -395,6 +399,11 @@ func (fr *FormulatorNode) updateByGenItem() {
 				item := fr.txpool.Get(TxHash)
 				if item != nil {
 					sm[TxHash] = item.Signers
+				} else {
+					if v, err := fr.sigCache.Get(TxHash); err != nil {
+					} else if v != nil {
+						sm[TxHash] = []common.PublicHash{v.(common.PublicHash)} //TEMP
+					}
 				}
 			}
 			if err := fr.cs.cn.ConnectBlock(b, sm); err != nil {
@@ -408,6 +417,15 @@ func (fr *FormulatorNode) updateByGenItem() {
 		fr.cleanPool(b)
 		rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Transactions))
 		delete(fr.lastGenItemMap, b.Header.Height)
+
+		txs := fr.txpool.Clean(types.ToTimeSlot(b.Header.Timestamp))
+		if len(txs) > 0 {
+			svcs := fr.cs.cn.Services()
+			for _, s := range svcs {
+				s.OnTransactionInPoolExpired(txs)
+			}
+			rlog.Println("Transaction EXPIRED", len(txs))
+		}
 
 		TargetHeight++
 		item = fr.lastGenItemMap[TargetHeight]
@@ -425,15 +443,16 @@ func (fr *FormulatorNode) genBlock(ID string, msg *BlockReqMessage) error {
 	start := time.Now().UnixNano()
 	Now := uint64(time.Now().UnixNano())
 	StartBlockTime := Now
-	EndBlockTime := StartBlockTime + uint64(500*time.Millisecond)*uint64(RemainBlocks)
+	EndBlockTime := StartBlockTime + uint64(BlockTime)*uint64(RemainBlocks)
 
 	LastTimestamp := cp.LastTimestamp()
 	if StartBlockTime < LastTimestamp {
 		StartBlockTime = LastTimestamp + uint64(time.Millisecond)
 	}
 
-	rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockGenBegin", msg.TargetHeight)
+	rlog.Println("Formulator", fr.Config.Formulator.String(), "BlockGenBegin", msg.TargetHeight, fr.txpool.Size())
 
+	MaxTxPerBlock := fr.Config.MaxTransactionsPerBlock
 	var lastHeader *types.Header
 	ctx := fr.cs.cn.NewContext()
 	for i := uint32(0); i < RemainBlocks; i++ {
@@ -444,7 +463,7 @@ func (fr *FormulatorNode) genBlock(ID string, msg *BlockReqMessage) error {
 			ctx = ctx.NextContext(encoding.Hash(lastHeader), lastHeader.Timestamp)
 		}
 
-		Timestamp := StartBlockTime + uint64(i)*uint64(500*time.Millisecond)
+		Timestamp := StartBlockTime + uint64(i)*uint64(BlockTime)
 		if Timestamp > EndBlockTime {
 			Timestamp = EndBlockTime
 		}
@@ -457,7 +476,7 @@ func (fr *FormulatorNode) genBlock(ID string, msg *BlockReqMessage) error {
 		if err := enc.EncodeUint32(TimeoutCount); err != nil {
 			return err
 		}
-		bc := chain.NewBlockCreator(fr.cs.cn, ctx, msg.Formulator, buffer.Bytes())
+		bc := chain.NewBlockCreator(fr.cs.cn, ctx, msg.Formulator, buffer.Bytes(), Timestamp)
 		if err := bc.Init(); err != nil {
 			return err
 		}
@@ -466,6 +485,7 @@ func (fr *FormulatorNode) genBlock(ID string, msg *BlockReqMessage) error {
 
 		fr.txpool.Lock() // Prevent delaying from TxPool.Push
 		Count := 0
+		currentSlot := types.ToTimeSlot(Timestamp)
 	TxLoop:
 		for {
 			select {
@@ -473,24 +493,25 @@ func (fr *FormulatorNode) genBlock(ID string, msg *BlockReqMessage) error {
 				break TxLoop
 			default:
 				sn := ctx.Snapshot()
-				item := fr.txpool.UnsafePop(ctx)
+				item := fr.txpool.UnsafePop(currentSlot)
 				ctx.Revert(sn)
 				if item == nil {
 					break TxLoop
 				}
 				if err := bc.UnsafeAddTx(fr.Config.Formulator, item.TxType, item.TxHash, item.Transaction, item.Signatures, item.Signers); err != nil {
 					rlog.Println("UnsafeAddTx", err)
+					panic(err) //TEMP
 					continue
 				}
 				Count++
-				if Count > fr.Config.MaxTransactionsPerBlock {
+				if Count > MaxTxPerBlock {
 					break TxLoop
 				}
 			}
 		}
 		fr.txpool.Unlock() // Prevent delaying from TxPool.Push
 
-		b, err := bc.Finalize(Timestamp)
+		b, err := bc.Finalize()
 		if err != nil {
 			return err
 		}
@@ -516,11 +537,11 @@ func (fr *FormulatorNode) genBlock(ID string, msg *BlockReqMessage) error {
 		fr.lastGenHeight = ctx.TargetHeight()
 		fr.lastGenTime = time.Now().UnixNano()
 
-		ExpectedTime := 200*time.Millisecond + time.Duration(i)*500*time.Millisecond
+		ExpectedTime := 200*time.Millisecond + time.Duration(i)*BlockTime
 		if i == 0 {
 			ExpectedTime = 200 * time.Millisecond
 		} else if i >= 9 {
-			ExpectedTime = 4200*time.Millisecond + time.Duration(i-9+1)*200*time.Millisecond
+			ExpectedTime = BlockTime*time.Duration(i-1) + 400*time.Millisecond
 		}
 		PastTime := time.Duration(time.Now().UnixNano() - start)
 		if ExpectedTime > PastTime {

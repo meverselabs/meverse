@@ -62,12 +62,6 @@ func (ob *ObserverNode) sendRoundVote() error {
 	}
 	ob.round.VoteFailCount = 0
 
-	if sig, err := ob.key.Sign(encoding.Hash(nm.RoundVote)); err != nil {
-		return err
-	} else {
-		nm.Signature = sig
-	}
-
 	ob.messageQueue.Push(&messageItem{
 		PublicHash: ob.myPublicHash,
 		Message:    nm,
@@ -110,12 +104,6 @@ func (ob *ObserverNode) sendRoundVoteTo(TargetPubHash common.PublicHash) error {
 			nm.RoundVote.Timestamp = uint64(time.Now().UnixNano())
 		}
 
-		if sig, err := ob.key.Sign(encoding.Hash(nm.RoundVote)); err != nil {
-			return err
-		} else {
-			nm.Signature = sig
-		}
-
 		ob.ms.SendTo(TargetPubHash, p2p.MessageToPacket(nm))
 	} else {
 		Top, TimeoutCount, err := ob.cs.rt.TopRankInMap(ob.adjustFormulatorMap())
@@ -134,12 +122,6 @@ func (ob *ObserverNode) sendRoundVoteTo(TargetPubHash common.PublicHash) error {
 				Timestamp:            uint64(time.Now().UnixNano()),
 				IsReply:              true,
 			},
-		}
-
-		if sig, err := ob.key.Sign(encoding.Hash(nm.RoundVote)); err != nil {
-			return err
-		} else {
-			nm.Signature = sig
 		}
 
 		ob.ms.SendTo(TargetPubHash, p2p.MessageToPacket(nm))
@@ -171,11 +153,6 @@ func (ob *ObserverNode) sendRoundVoteAck() error {
 			Timestamp:            uint64(time.Now().UnixNano()),
 			IsReply:              false,
 		},
-	}
-	if sig, err := ob.key.Sign(encoding.Hash(nm.RoundVoteAck)); err != nil {
-		return err
-	} else {
-		nm.Signature = sig
 	}
 
 	ob.messageQueue.Push(&messageItem{
@@ -220,12 +197,6 @@ func (ob *ObserverNode) sendRoundVoteAckTo(TargetPubHash common.PublicHash) erro
 			nm.RoundVoteAck.Timestamp = uint64(time.Now().UnixNano())
 		}
 
-		if sig, err := ob.key.Sign(encoding.Hash(nm.RoundVoteAck)); err != nil {
-			return err
-		} else {
-			nm.Signature = sig
-		}
-
 		ob.ms.SendTo(TargetPubHash, p2p.MessageToPacket(nm))
 	} else {
 		MyMsg, has := ob.round.RoundVoteAckMessageMap[ob.myPublicHash]
@@ -244,12 +215,6 @@ func (ob *ObserverNode) sendRoundVoteAckTo(TargetPubHash common.PublicHash) erro
 				Timestamp:            MyMsg.RoundVoteAck.Timestamp,
 				IsReply:              true,
 			},
-		}
-
-		if sig, err := ob.key.Sign(encoding.Hash(nm.RoundVoteAck)); err != nil {
-			return err
-		} else {
-			nm.Signature = sig
 		}
 
 		ob.ms.SendTo(TargetPubHash, p2p.MessageToPacket(nm))
@@ -275,11 +240,6 @@ func (ob *ObserverNode) sendBlockVote(gen *BlockGenMessage) error {
 		return err
 	} else {
 		nm.BlockVote.ObserverSignature = sig
-	}
-	if sig, err := ob.key.Sign(encoding.Hash(nm.BlockVote)); err != nil {
-		return err
-	} else {
-		nm.Signature = sig
 	}
 
 	ob.messageQueue.Push(&messageItem{
@@ -322,11 +282,6 @@ func (ob *ObserverNode) sendBlockVoteTo(gen *BlockGenMessage, TargetPubHash comm
 	} else {
 		nm.BlockVote.ObserverSignature = sig
 	}
-	if sig, err := ob.key.Sign(encoding.Hash(nm.BlockVote)); err != nil {
-		return err
-	} else {
-		nm.Signature = sig
-	}
 
 	ob.ms.SendTo(TargetPubHash, p2p.MessageToPacket(nm))
 	return nil
@@ -364,11 +319,6 @@ func (ob *ObserverNode) sendBlockGenRequest(br *BlockRound) error {
 			PublicHash:           ob.round.MinRoundVoteAck.PublicHash,
 			Timestamp:            uint64(time.Now().UnixNano()),
 		},
-	}
-	if sig, err := ob.key.Sign(encoding.Hash(nm.BlockGenRequest)); err != nil {
-		return err
-	} else {
-		nm.Signature = sig
 	}
 	if has {
 		ob.ms.SendTo(PublicHash, p2p.MessageToPacket(nm))

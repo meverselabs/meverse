@@ -12,18 +12,12 @@ import (
 // RevertRevoke is used to revert operation that to remove formulator account and get back staked coin
 type RevertRevoke struct {
 	Timestamp_ uint64
-	Seq_       uint64
 	From_      common.Address
 }
 
 // Timestamp returns the timestamp of the transaction
 func (tx *RevertRevoke) Timestamp() uint64 {
 	return tx.Timestamp_
-}
-
-// Seq returns the sequence of the transaction
-func (tx *RevertRevoke) Seq() uint64 {
-	return tx.Seq_
 }
 
 // From returns the from address of the transaction
@@ -40,10 +34,6 @@ func (tx *RevertRevoke) Fee(p types.Process, loader types.LoaderWrapper) *amount
 // Validate validates signatures of the transaction
 func (tx *RevertRevoke) Validate(p types.Process, loader types.LoaderWrapper, signers []common.PublicHash) error {
 	sp := p.(*Formulator)
-
-	if tx.Seq() <= loader.Seq(tx.From()) {
-		return types.ErrInvalidSequence
-	}
 
 	acc, err := loader.Account(tx.From())
 	if err != nil {
@@ -90,13 +80,6 @@ func (tx *RevertRevoke) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
 	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"seq":`)
-	if bs, err := json.Marshal(tx.Seq_); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

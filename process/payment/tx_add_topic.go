@@ -12,7 +12,6 @@ import (
 // AddTopic is a AddTopic
 type AddTopic struct {
 	Timestamp_ uint64
-	Seq_       uint64
 	From_      common.Address
 	Topic      uint64
 	TopicName  string
@@ -21,11 +20,6 @@ type AddTopic struct {
 // Timestamp returns the timestamp of the transaction
 func (tx *AddTopic) Timestamp() uint64 {
 	return tx.Timestamp_
-}
-
-// Seq returns the sequence of the transaction
-func (tx *AddTopic) Seq() uint64 {
-	return tx.Seq_
 }
 
 // From returns the from address of the transaction
@@ -42,9 +36,6 @@ func (tx *AddTopic) Validate(p types.Process, loader types.LoaderWrapper, signer
 	}
 	if tx.Topic != Topic(tx.TopicName) {
 		return ErrInvalidTopicName
-	}
-	if tx.Seq() <= loader.Seq(tx.From()) {
-		return types.ErrInvalidSequence
 	}
 
 	fromAcc, err := loader.Account(tx.From())
@@ -71,13 +62,6 @@ func (tx *AddTopic) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
 	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"seq":`)
-	if bs, err := json.Marshal(tx.Seq_); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

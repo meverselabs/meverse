@@ -25,7 +25,6 @@ type RoundVote struct {
 // RoundVoteMessage is a message for a round vote
 type RoundVoteMessage struct {
 	RoundVote *RoundVote
-	Signature common.Signature
 }
 
 // RoundVoteAck is a message for a round vote ack
@@ -44,7 +43,6 @@ type RoundVoteAck struct {
 // RoundVoteAckMessage is a message for a round vote
 type RoundVoteAckMessage struct {
 	RoundVoteAck *RoundVoteAck
-	Signature    common.Signature
 }
 
 // NextRoundVote is a message for a next round vote
@@ -60,7 +58,6 @@ type NextRoundVote struct {
 // NextRoundVoteMessage is a message for a next round vote
 type NextRoundVoteMessage struct {
 	RoundVote *RoundVote
-	Signature common.Signature
 }
 
 // NextRoundVoteAck is a message for a next round vote ack
@@ -77,7 +74,6 @@ type NextRoundVoteAck struct {
 // NextRoundVoteAckMessage is a message for a next round vote
 type NextRoundVoteAckMessage struct {
 	RoundVoteAck *RoundVoteAck
-	Signature    common.Signature
 }
 
 // BlockReqMessage is a message for a block request
@@ -108,7 +104,6 @@ type BlockVote struct {
 // BlockVoteMessage is a message for a round vote
 type BlockVoteMessage struct {
 	BlockVote *BlockVote
-	Signature common.Signature
 }
 
 // BlockObSignMessage is a message for a block observer signatures
@@ -133,5 +128,4 @@ type BlockGenRequest struct {
 // BlockGenRequestMessage is a message to request block gen
 type BlockGenRequestMessage struct {
 	BlockGenRequest *BlockGenRequest
-	Signature       common.Signature
 }

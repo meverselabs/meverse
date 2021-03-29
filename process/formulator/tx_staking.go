@@ -12,7 +12,6 @@ import (
 // Staking is used to stake coin to the hyper formulator
 type Staking struct {
 	Timestamp_      uint64
-	Seq_            uint64
 	From_           common.Address
 	HyperFormulator common.Address
 	Amount          *amount.Amount
@@ -21,11 +20,6 @@ type Staking struct {
 // Timestamp returns the timestamp of the transaction
 func (tx *Staking) Timestamp() uint64 {
 	return tx.Timestamp_
-}
-
-// Seq returns the sequence of the transaction
-func (tx *Staking) Seq() uint64 {
-	return tx.Seq_
 }
 
 // From returns the from address of the transaction
@@ -45,10 +39,6 @@ func (tx *Staking) Validate(p types.Process, loader types.LoaderWrapper, signers
 
 	if tx.Amount.Less(amount.COIN.DivC(10)) {
 		return ErrInvalidStakingAmount
-	}
-
-	if tx.Seq() <= loader.Seq(tx.From()) {
-		return types.ErrInvalidSequence
 	}
 
 	if tx.From() == tx.HyperFormulator {
@@ -118,13 +108,6 @@ func (tx *Staking) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(`{`)
 	buffer.WriteString(`"timestamp":`)
 	if bs, err := json.Marshal(tx.Timestamp_); err != nil {
-		return nil, err
-	} else {
-		buffer.Write(bs)
-	}
-	buffer.WriteString(`,`)
-	buffer.WriteString(`"seq":`)
-	if bs, err := json.Marshal(tx.Seq_); err != nil {
 		return nil, err
 	} else {
 		buffer.Write(bs)

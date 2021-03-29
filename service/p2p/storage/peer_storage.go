@@ -2,10 +2,11 @@ package storage
 
 import (
 	"errors"
-	"github.com/fletaio/fleta/service/p2p/peermessage"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/fletaio/fleta/service/p2p/peermessage"
 )
 
 // storage errors

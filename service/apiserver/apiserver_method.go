@@ -3,6 +3,8 @@ package apiserver
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -27,15 +29,43 @@ type ReqData struct {
 func (s *APIServer) Run(BindAddress string) error {
 	reqCh := make(chan *ReqData)
 
+	s.e.HTTPErrorHandler = func(err error, c echo.Context) {
+		code := http.StatusInternalServerError
+		if he, ok := err.(*echo.HTTPError); ok {
+			code = he.Code
+		}
+		c.Logger().Error(err, c.Request().URL.String())
+		c.HTML(code, err.Error())
+	}
 	s.e.Use(middleware.CORSWithConfig(middleware.DefaultCORSConfig))
 	s.e.POST("/api/endpoints/http", func(c echo.Context) error {
+		body, err := ioutil.ReadAll(c.Request().Body)
+		if err != nil {
+			return err
+		}
 		defer c.Request().Body.Close()
-		dec := json.NewDecoder(c.Request().Body)
+
+		dec := json.NewDecoder(bytes.NewReader(body))
 		dec.UseNumber()
 
 		var req jRPCRequest
 		if err := dec.Decode(&req); err != nil {
-			return err
+			dec := json.NewDecoder(bytes.NewReader(body))
+			dec.UseNumber()
+
+			var req2 jRPCRequest2
+			if err := dec.Decode(&req2); err != nil {
+				return err
+			}
+			req.JSONRPC = req2.JSONRPC
+			req.ID = req2.ID
+			req.Method = req2.Method
+			req.Params = make([]*json.Number, 0, len(req2.Params))
+			for _, v := range req2.Params {
+				s := fmt.Sprint(v)
+				a := json.Number(s)
+				req.Params = append(req.Params, &a)
+			}
 		}
 		resCh := make(chan *JRPCResponse)
 		reqCh <- &ReqData{
@@ -72,7 +102,22 @@ func (s *APIServer) Run(BindAddress string) error {
 
 				var req jRPCRequest
 				if err := dec.Decode(&req); err != nil {
-					return err
+					dec := json.NewDecoder(bytes.NewReader(data))
+					dec.UseNumber()
+
+					var req2 jRPCRequest2
+					if err := dec.Decode(&req2); err != nil {
+						return err
+					}
+					req.JSONRPC = req2.JSONRPC
+					req.ID = req2.ID
+					req.Method = req2.Method
+					req.Params = make([]*json.Number, 0, len(req2.Params))
+					for _, v := range req2.Params {
+						s := fmt.Sprint(v)
+						a := json.Number(s)
+						req.Params = append(req.Params, &a)
+					}
 				}
 				resCh := make(chan *JRPCResponse)
 				reqCh <- &ReqData{

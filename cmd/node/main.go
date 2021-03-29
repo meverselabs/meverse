@@ -33,18 +33,19 @@ import (
 
 // Config is a configuration for the cmd
 type Config struct {
-	SeedNodeMap   map[string]string
-	NodeKeyHex    string
-	ObserverKeys  []string
-	InitHash      string
-	InitHeight    uint32
-	InitTimestamp uint64
-	Port          int
-	APIPort       int
-	StoreRoot     string
-	RLogHost      string
-	RLogPath      string
-	UseRLog       bool
+	SeedNodeMap     map[string]string
+	NodeKeyHex      string
+	ObserverKeys    []string
+	InitGenesisHash string
+	InitHash        string
+	InitHeight      uint32
+	InitTimestamp   uint64
+	Port            int
+	APIPort         int
+	StoreRoot       string
+	RLogHost        string
+	RLogPath        string
+	UseRLog         bool
 }
 
 func main() {
@@ -130,7 +131,14 @@ func main() {
 	Symbol := "FLETA"
 	Usage := "Mainnet"
 	Version := uint16(0x0001)
-	InitHash := hash.MustParseHash(cfg.InitHash)
+	var InitGenesisHash hash.Hash256
+	if len(cfg.InitGenesisHash) > 0 {
+		InitGenesisHash = hash.MustParseHash(cfg.InitGenesisHash)
+	}
+	var InitHash hash.Hash256
+	if len(cfg.InitHash) > 0 {
+		InitHash = hash.MustParseHash(cfg.InitHash)
+	}
 
 	back, err := backend.Create("buntdb", cfg.StoreRoot+"/context")
 	if err != nil {
@@ -163,7 +171,7 @@ func main() {
 	cn.MustAddProcess(payment.NewPayment(5))
 	as := apiserver.NewAPIServer()
 	cn.MustAddService(as)
-	if err := cn.Init(InitHash, cfg.InitHeight, cfg.InitTimestamp); err != nil {
+	if err := cn.Init(InitGenesisHash, InitHash, cfg.InitHeight, cfg.InitTimestamp); err != nil {
 		panic(err)
 	}
 	cm.RemoveAll()

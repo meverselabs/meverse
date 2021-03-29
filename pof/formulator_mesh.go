@@ -2,6 +2,7 @@ package pof
 
 import (
 	crand "crypto/rand"
+	"net/http"
 	"sync"
 	"time"
 
@@ -112,7 +113,11 @@ func (ms *FormulatorNodeMesh) BroadcastPacket(bs []byte) {
 }
 
 func (ms *FormulatorNodeMesh) client(Address string, TargetPubHash common.PublicHash) error {
-	conn, _, err := websocket.DefaultDialer.Dial(Address, nil)
+	d := &websocket.Dialer{
+		Proxy:            http.ProxyFromEnvironment,
+		HandshakeTimeout: 45 * time.Second,
+	}
+	conn, _, err := d.Dial(Address, nil)
 	if err != nil {
 		return err
 	}

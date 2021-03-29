@@ -94,17 +94,6 @@ func (ctx *Context) Top() *ContextData {
 	return ctx.stack[len(ctx.stack)-1]
 }
 
-// Seq returns the sequence of the target account
-func (ctx *Context) Seq(addr common.Address) uint64 {
-	return ctx.Top().Seq(addr)
-}
-
-// AddSeq update the sequence of the target account
-func (ctx *Context) AddSeq(addr common.Address) {
-	ctx.isLatestHash = false
-	ctx.Top().AddSeq(addr)
-}
-
 // Account returns the account instance of the address
 func (ctx *Context) Account(addr common.Address) (Account, error) {
 	ctx.isLatestHash = false
@@ -193,6 +182,16 @@ func (ctx *Context) SetProcessData(pid uint8, name []byte, value []byte) {
 	ctx.Top().SetProcessData(pid, name, value)
 }
 
+// IsUsedTimeSlot returns timeslot is used or not
+func (ctx *Context) IsUsedTimeSlot(slot uint32, key string) bool {
+	return ctx.Top().IsUsedTimeSlot(slot, key)
+}
+
+// UseTimeSlot consumes timeslot
+func (ctx *Context) UseTimeSlot(slot uint32, key string) error {
+	return ctx.Top().UseTimeSlot(slot, key)
+}
+
 // Dump prints the top context data of the context
 func (ctx *Context) Dump() string {
 	return ctx.Top().Dump()
@@ -223,10 +222,6 @@ func (ctx *Context) Commit(sn int) {
 		ctd := ctx.Top()
 		ctx.stack = ctx.stack[:len(ctx.stack)-1]
 		top := ctx.Top()
-		ctd.SeqMap.EachAll(func(addr common.Address, seq uint64) bool {
-			top.SeqMap.Put(addr, seq)
-			return true
-		})
 		ctd.AccountMap.EachAll(func(addr common.Address, acc Account) bool {
 			top.AccountMap.Put(addr, acc)
 			return true
@@ -274,6 +269,17 @@ func (ctx *Context) Commit(sn int) {
 		ctd.DeletedProcessDataMap.EachAll(func(key string, value bool) bool {
 			top.ProcessDataMap.Delete(key)
 			top.DeletedProcessDataMap.Put(key, value)
+			return true
+		})
+		ctd.TimeSlotMap.EachAll(func(key uint32, mp *StringBoolMap) bool {
+			if tp, has := top.TimeSlotMap.Get(key); has {
+				mp.EachAll(func(key string, value bool) bool {
+					tp.Put(key, value)
+					return true
+				})
+			} else {
+				top.TimeSlotMap.Put(key, mp)
+			}
 			return true
 		})
 	}

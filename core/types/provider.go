@@ -18,7 +18,6 @@ type Provider interface {
 	Hash(height uint32) (hash.Hash256, error)
 	Header(height uint32) (*Header, error)
 	Block(height uint32) (*Block, error)
-	Seq(addr common.Address) uint64
 	Events(From uint32, To uint32) ([]Event, error)
 	NewLoaderWrapper(pid uint8) LoaderWrapper
 	NewAddress(height uint32, index uint16) common.Address

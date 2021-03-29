@@ -87,16 +87,6 @@ func (ctw *ContextWrapper) Top() *ContextData {
 	return ctw.ctx.Top()
 }
 
-// Seq returns the sequence of the target account
-func (ctw *ContextWrapper) Seq(addr common.Address) uint64 {
-	return ctw.ctx.Seq(addr)
-}
-
-// AddSeq update the sequence of the target account
-func (ctw *ContextWrapper) AddSeq(addr common.Address) {
-	ctw.ctx.AddSeq(addr)
-}
-
 // Account returns the account instance of the address
 func (ctw *ContextWrapper) Account(addr common.Address) (Account, error) {
 	return ctw.ctx.Account(addr)
@@ -160,6 +150,11 @@ func (ctw *ContextWrapper) CreateUTXO(id uint64, vout *TxOut) error {
 // DeleteUTXO deletes the UTXO from the top snapshot
 func (ctw *ContextWrapper) DeleteUTXO(utxo *UTXO) error {
 	return ctw.ctx.DeleteUTXO(utxo)
+}
+
+// IsUsedTimeSlot returns timeslot is used or not
+func (ctw *ContextWrapper) IsUsedTimeSlot(slot uint32, key string) bool {
+	return ctw.ctx.IsUsedTimeSlot(slot, key)
 }
 
 // EmitEvent creates the event to the top snapshot

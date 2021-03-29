@@ -75,6 +75,18 @@ func (ms *FormulatorService) Peer(ID string) (peer.Peer, bool) {
 	return p, has
 }
 
+// Peers returns peer list
+func (ms *FormulatorService) Peers() []peer.Peer {
+	peers := []peer.Peer{}
+	ms.Lock()
+	for _, p := range ms.peerMap {
+		peers = append(peers, p)
+	}
+	ms.Unlock()
+
+	return peers
+}
+
 // SendTo sends a message to the formulator
 func (ms *FormulatorService) SendTo(addr common.Address, bs []byte) error {
 	ms.Lock()

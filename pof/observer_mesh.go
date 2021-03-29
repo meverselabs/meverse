@@ -179,7 +179,8 @@ func (ms *ObserverNodeMesh) BroadcastPacket(bs []byte) {
 }
 
 func (ms *ObserverNodeMesh) client(Address string, TargetPubHash common.PublicHash) error {
-	conn, err := net.DialTimeout("tcp", Address, 10*time.Second)
+	d := &net.Dialer{Timeout: 10 * time.Second}
+	conn, err := d.Dial("tcp", Address)
 	if err != nil {
 		return err
 	}
@@ -237,7 +238,7 @@ func (ms *ObserverNodeMesh) server(BindAddress string) error {
 				return
 			}
 			if _, has := ms.netAddressMap[pubhash]; !has {
-				rlog.Println("ErrInvalidPublicHash")
+				rlog.Println("ErrInvalidPublicHash", pubhash)
 				return
 			}
 			if err := ms.recvHandshake(conn); err != nil {

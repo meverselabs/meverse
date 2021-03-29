@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"strings"
+	"time"
 
 	"github.com/fletaio/fleta/common"
 	"github.com/fletaio/fleta/common/binutil"
@@ -92,4 +93,9 @@ func ParseTransactionID(TXID string) (uint32, uint16, error) {
 	Height := binutil.BigEndian.Uint32(bs)
 	Index := binutil.BigEndian.Uint16(bs[4:])
 	return Height, Index, nil
+}
+
+// ToTimeSlot returns the timeslot of the timestamp
+func ToTimeSlot(timestamp uint64) uint32 {
+	return uint32(timestamp / uint64(10*time.Second))
 }

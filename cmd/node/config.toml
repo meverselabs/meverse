@@ -5,9 +5,10 @@ ObserverKeys = [
 	"4Muu1gBArNvekXNF5CNSJhRFq31xPejb6kQ8Js1jwRA",
 	"nnyPSWrxKXpozLZ36u9dEM9yH5mna2jk4oq6hCAZ8c"
 ]
-InitHeight = 91602490
-InitHash = "0879abb001a83c1494f9f2843bd0be610bde0f04e851c6f9dc41a17b058f054f"
-InitTimestamp = 1609919674123233895
+InitGenesisHash = ""
+InitHeight = 0
+InitHash = ""
+InitTimestamp = 0
 Port = 31000
 APIPort = 58000
 StoreRoot = "./ndata"

@@ -232,6 +232,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 					continue
 				}
 				frAcc.RewardCount++
+
 				switch frAcc.FormulatorType {
 				case AlphaFormulatorType:
 					am := frAcc.Amount.MulC(int64(GenCount)).MulC(int64(policy.AlphaEfficiency1000)).DivC(1000)
@@ -268,11 +269,13 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 						if has, err := ctw.HasAccount(StakingAddress); err != nil {
 							if err == types.ErrDeletedAccount {
 								p.subStakingAmount(ctw, frAcc.Address(), StakingAddress, StakingAmount)
+								frAcc.StakingAmount = frAcc.StakingAmount.Sub(StakingAmount)
 							} else {
 								return err
 							}
 						} else if !has {
 							p.subStakingAmount(ctw, frAcc.Address(), StakingAddress, StakingAmount)
+							frAcc.StakingAmount = frAcc.StakingAmount.Sub(StakingAmount)
 						} else {
 							CurrentAmountMap.Put(StakingAddress, StakingAmount)
 							if PrevStakingAmount, has := PrevAmountMap.Get(StakingAddress); has {
@@ -462,6 +465,7 @@ func (p *Formulator) AfterExecuteTransactions(b *types.Block, ctw *types.Context
 							if !RewardAmount.IsZero() {
 								if p.GetUserAutoStaking(ctw, frAcc.Address(), StakingAddress) {
 									p.AddStakingAmount(ctw, frAcc.Address(), StakingAddress, RewardAmount)
+									frAcc.StakingAmount = frAcc.StakingAmount.Add(RewardAmount)
 									ev.AddStaked(frAcc.Address(), StakingAddress, RewardAmount)
 								} else {
 									if err := p.vault.AddBalance(ctw, StakingAddress, RewardAmount); err != nil {
