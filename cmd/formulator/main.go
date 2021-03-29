@@ -16,6 +16,7 @@ import (
 	"github.com/fletaio/fleta/cmd/closer"
 	"github.com/fletaio/fleta/cmd/config"
 	"github.com/fletaio/fleta/common"
+	"github.com/fletaio/fleta/common/hash"
 	"github.com/fletaio/fleta/common/key"
 	"github.com/fletaio/fleta/common/rlog"
 	"github.com/fletaio/fleta/core/backend"
@@ -32,17 +33,21 @@ import (
 
 // Config is a configuration for the cmd
 type Config struct {
-	SeedNodeMap    map[string]string
-	ObserverKeyMap map[string]string
-	GenKeyHex      string
-	NodeKeyHex     string
-	Formulator     string
-	Port           int
-	APIPort        int
-	StoreRoot      string
-	RLogHost       string
-	RLogPath       string
-	UseRLog        bool
+	SeedNodeMap     map[string]string
+	ObserverKeyMap  map[string]string
+	GenKeyHex       string
+	NodeKeyHex      string
+	Formulator      string
+	InitGenesisHash string
+	InitHash        string
+	InitHeight      uint32
+	InitTimestamp   uint64
+	Port            int
+	APIPort         int
+	StoreRoot       string
+	RLogHost        string
+	RLogPath        string
+	UseRLog         bool
 }
 
 func main() {
@@ -139,12 +144,20 @@ func main() {
 	Symbol := "FLETA"
 	Usage := "Mainnet"
 	Version := uint16(0x0001)
+	var InitGenesisHash hash.Hash256
+	if len(cfg.InitGenesisHash) > 0 {
+		InitGenesisHash = hash.MustParseHash(cfg.InitGenesisHash)
+	}
+	var InitHash hash.Hash256
+	if len(cfg.InitHash) > 0 {
+		InitHash = hash.MustParseHash(cfg.InitHash)
+	}
 
 	back, err := backend.Create("buntdb", cfg.StoreRoot+"/context")
 	if err != nil {
 		panic(err)
 	}
-	cdb, err := pile.Open(cfg.StoreRoot + "/chain")
+	cdb, err := pile.Open(cfg.StoreRoot+"/chain", InitHash, cfg.InitHeight, cfg.InitTimestamp)
 	if err != nil {
 		panic(err)
 	}
@@ -155,7 +168,7 @@ func main() {
 	}
 	cm.Add("store", st)
 
-	if st.Height() > 0 {
+	if st.Height() > st.InitHeight() {
 		if _, err := cdb.GetData(st.Height(), 0); err != nil {
 			panic(err)
 		}
@@ -171,7 +184,7 @@ func main() {
 	cn.MustAddProcess(payment.NewPayment(5))
 	as := apiserver.NewAPIServer()
 	cn.MustAddService(as)
-	if err := cn.Init(); err != nil {
+	if err := cn.Init(InitGenesisHash, InitHash, cfg.InitHeight, cfg.InitTimestamp); err != nil {
 		panic(err)
 	}
 	cm.RemoveAll()

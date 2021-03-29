@@ -1,6 +1,10 @@
 Port = 31000
 APIPort = 58000
 KeyHex = "THIS_IS_A_PRIVATE_KEY_THAT_IS_FORMATTED_WITH_HEX"
+InitGenesisHash = ""
+InitHeight = 0
+InitHash = ""
+InitTimestamp = 0
 ObseverPort = 35000
 FormulatorPort = 37000
 StoreRoot = "./odata"
