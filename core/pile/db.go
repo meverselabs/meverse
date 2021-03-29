@@ -251,7 +251,7 @@ func (db *DB) GetData(Height uint32, index int) ([]byte, error) {
 		return nil, ErrUnderInitHeight
 	}
 
-	idx := (Height - 1) / ChunkUnit
+	idx := (Height - db.initHeight - 1) / ChunkUnit
 	if len(db.piles) <= int(idx) {
 		return nil, ErrInvalidHeight
 	}
@@ -273,7 +273,7 @@ func (db *DB) GetDatas(Height uint32, from int, count int) ([]byte, error) {
 		return nil, ErrUnderInitHeight
 	}
 
-	idx := (Height - 1) / ChunkUnit
+	idx := (Height - db.initHeight - 1) / ChunkUnit
 	if len(db.piles) <= int(idx) {
 		return nil, ErrInvalidHeight
 	}
