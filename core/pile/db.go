@@ -58,7 +58,7 @@ func Open(path string, initHash hash.Hash256, InitHeight uint32, InitTimestamp u
 		MinHeight = InitHeight
 	}
 
-	Count := (MaxHeight-MinHeight)/ChunkUnit + 1
+	Count := (MaxHeight-MinHeight+(MinHeight%ChunkUnit))/ChunkUnit + 1
 	piles := make([]*Pile, 0, Count)
 	if (MaxHeight - MinHeight) > 0 {
 		BaseIdx := MinHeight / ChunkUnit
@@ -226,7 +226,7 @@ func (db *DB) GetHash(Height uint32) (hash.Hash256, error) {
 		}
 	}
 
-	idx := (Height - db.initHeight - 1) / ChunkUnit
+	idx := (Height - db.initHeight + (db.initHeight % ChunkUnit) - 1) / ChunkUnit
 	if len(db.piles) <= int(idx) {
 		return hash.Hash256{}, ErrInvalidHeight
 	}
@@ -248,7 +248,7 @@ func (db *DB) GetData(Height uint32, index int) ([]byte, error) {
 		return nil, ErrUnderInitHeight
 	}
 
-	idx := (Height - db.initHeight - 1) / ChunkUnit
+	idx := (Height - db.initHeight + (db.initHeight % ChunkUnit) - 1) / ChunkUnit
 	if len(db.piles) <= int(idx) {
 		return nil, ErrInvalidHeight
 	}
@@ -270,7 +270,7 @@ func (db *DB) GetDatas(Height uint32, from int, count int) ([]byte, error) {
 		return nil, ErrUnderInitHeight
 	}
 
-	idx := (Height - db.initHeight - 1) / ChunkUnit
+	idx := (Height - db.initHeight + (db.initHeight % ChunkUnit) - 1) / ChunkUnit
 	if len(db.piles) <= int(idx) {
 		return nil, ErrInvalidHeight
 	}
