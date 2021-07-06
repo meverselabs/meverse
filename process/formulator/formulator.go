@@ -90,6 +90,7 @@ func (p *Formulator) Init(reg *types.Register, pm types.ProcessManager, cn types
 	reg.RegisterEvent(1, &RewardEvent{})
 	reg.RegisterEvent(2, &RevokedEvent{})
 	reg.RegisterEvent(3, &UnstakedEvent{})
+	reg.RegisterEvent(4, &RevokeToBEP20Event{})
 	return nil
 }
 
