@@ -83,7 +83,7 @@ func (tx *RevokeToBEP20) Execute(p types.Process, ctw *types.ContextWrapper, ind
 
 		RevokeAmount := amount.MustParseAmount(frAcc.Amount.String())
 
-		gf := amount.MustParseAmount("3.1")
+		gf := amount.MustParseAmount("10.1")
 		fam := sp.vault.Balance(ctw, tx.From())
 		ham := sp.vault.Balance(ctw, tx.Heritor)
 		if gf.Cmp(fam.Int) < 0 {
