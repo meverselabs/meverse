@@ -381,6 +381,7 @@ func (p *Formulator) removeUnstakingAmount(ctw *types.ContextWrapper, addr commo
 	} else {
 		ctw.SetProcessData(toUnstakingAmountCountKey(UnstakedHeight), binutil.LittleEndian.Uint32ToBytes(Count))
 	}
+	ctw.SetProcessData(toUnstakingAmountKey(UnstakedHeight, addr), nil)
 	return nil
 }
 
