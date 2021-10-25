@@ -83,7 +83,7 @@ func (tx *RecalcHyperAdmin) Execute(p types.Process, ctw *types.ContextWrapper, 
 			if !is {
 				return types.ErrInvalidAccountType
 			}
-			if frAcc.FormulatorType == HyperFormulatorType {
+			if frAcc.FormulatorType != HyperFormulatorType {
 				return types.ErrInvalidAccountType
 			}
 
