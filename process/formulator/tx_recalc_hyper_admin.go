@@ -50,7 +50,7 @@ func (tx *RecalcHyperAdmin) Validate(p types.Process, loader types.LoaderWrapper
 		if !is {
 			return types.ErrInvalidAccountType
 		}
-		if frAcc.FormulatorType == HyperFormulatorType {
+		if frAcc.FormulatorType != HyperFormulatorType {
 			return types.ErrInvalidAccountType
 		}
 	}
