@@ -88,6 +88,7 @@ func (p *Formulator) Init(reg *types.Register, pm types.ProcessManager, cn types
 	reg.RegisterTransaction(23, &UpdateSigmaPolicy{})
 	reg.RegisterTransaction(24, &UpdateOmegaPolicy{})
 	reg.RegisterTransaction(25, &RevokeToBEP20{})
+	reg.RegisterTransaction(26, &RecalcHyperAdmin{})
 	reg.RegisterEvent(1, &RewardEvent{})
 	reg.RegisterEvent(2, &RevokedEvent{})
 	reg.RegisterEvent(3, &UnstakedEvent{})
