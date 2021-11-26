@@ -100,6 +100,6 @@ func ToTimeSlot(timestamp uint64) uint32 {
 	if 1637895600000000000 > timestamp {
 		return uint32(timestamp / uint64(10*time.Second))
 	} else {
-		return uint32(timestamp / uint64(60*time.Second))
+		return uint32(1637895600000000000/uint64(10*time.Second)) + uint32(timestamp-1637895600000000000/uint64(60*time.Second))
 	}
 }
