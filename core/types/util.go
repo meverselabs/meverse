@@ -97,5 +97,9 @@ func ParseTransactionID(TXID string) (uint32, uint16, error) {
 
 // ToTimeSlot returns the timeslot of the timestamp
 func ToTimeSlot(timestamp uint64) uint32 {
-	return uint32(timestamp / uint64(10*time.Second))
+	if 1637895600000000000 > timestamp {
+		return uint32(timestamp / uint64(10*time.Second))
+	} else {
+		return uint32(timestamp / uint64(60*time.Second))
+	}
 }
