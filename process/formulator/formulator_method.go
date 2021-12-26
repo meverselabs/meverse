@@ -554,9 +554,9 @@ func (p *Formulator) revokeFormulator(ctw *types.ContextWrapper, FormulatorAddr 
 				return err
 			}
 		}
-		if !frAcc.StakingAmount.IsZero() {
-			return ErrCriticalStakingAmountIsNotZero
-		}
+		//if !frAcc.StakingAmount.IsZero() {
+		//	return ErrCriticalStakingAmountIsNotZero
+		//}
 	}
 	if err := ctw.DeleteAccount(frAcc); err != nil {
 		return err
