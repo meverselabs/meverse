@@ -3,9 +3,8 @@ package chain
 import (
 	"bytes"
 
-	"github.com/fletaio/fleta/common/hash"
-	"github.com/fletaio/fleta/core/types"
-	"github.com/fletaio/fleta/encoding"
+	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/pkg/errors"
 )
 
 const hashPerLevel = 16
@@ -14,7 +13,7 @@ const levelHashAppender = "fletablockchain"
 // hash16 returns Hash(x1,'f',x2,'l',...,x16)
 func hash16(hashes []hash.Hash256) (hash.Hash256, error) {
 	if len(hashes) > hashPerLevel {
-		return hash.Hash256{}, ErrExceedHashCount
+		return hash.Hash256{}, errors.WithStack(ErrExceedHashCount)
 	}
 
 	var buffer bytes.Buffer
@@ -27,7 +26,7 @@ func hash16(hashes []hash.Hash256) (hash.Hash256, error) {
 		}
 		if i < len(levelHashAppender) {
 			if err := buffer.WriteByte(byte(levelHashAppender[i])); err != nil {
-				return hash.Hash256{}, err
+				return hash.Hash256{}, errors.WithStack(err)
 			}
 		}
 	}
@@ -58,10 +57,10 @@ func buildLevel(hashes []hash.Hash256) ([]hash.Hash256, error) {
 // BuildLevelRoot returns the level root hash
 func BuildLevelRoot(hashes []hash.Hash256) (hash.Hash256, error) {
 	if len(hashes) > 65536 {
-		return hash.Hash256{}, ErrExceedHashCount
+		return hash.Hash256{}, errors.WithStack(ErrExceedHashCount)
 	}
 	if len(hashes) == 0 {
-		return hash.Hash256{}, ErrInvalidHashCount
+		return hash.Hash256{}, errors.WithStack(ErrInvalidHashCount)
 	}
 
 	lv3, err := buildLevel(hashes)
@@ -81,32 +80,6 @@ func BuildLevelRoot(hashes []hash.Hash256) (hash.Hash256, error) {
 		return hash.Hash256{}, err
 	}
 	return h, nil
-}
-
-// HashTransaction returns the hash of the transaction
-func HashTransaction(ChainID uint8, tx types.Transaction) hash.Hash256 {
-	fc := encoding.Factory("transaction")
-	t, err := fc.TypeOf(tx)
-	if err != nil {
-		panic(err)
-	}
-	return HashTransactionByType(ChainID, t, tx)
-}
-
-// HashTransactionByType returns the hash of the transaction using the type
-func HashTransactionByType(ChainID uint8, t uint16, tx types.Transaction) hash.Hash256 {
-	var buffer bytes.Buffer
-	enc := encoding.NewEncoder(&buffer)
-	if err := enc.EncodeUint8(ChainID); err != nil {
-		panic(err)
-	}
-	if err := enc.EncodeUint16(t); err != nil {
-		panic(err)
-	}
-	if err := enc.Encode(tx); err != nil {
-		panic(err)
-	}
-	return hash.Hash(buffer.Bytes())
 }
 
 func isCapitalAndNumber(Name string) bool {

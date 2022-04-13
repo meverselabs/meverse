@@ -2,10 +2,14 @@ package common
 
 import (
 	"encoding/hex"
+
+	ecommon "github.com/ethereum/go-ethereum/common"
+	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/pkg/errors"
 )
 
-// PublicKeySize is 33 bytes
-const PublicKeySize = 33
+// PublicKeySize is 65 bytes
+const PublicKeySize = 65
 
 // PublicKey is the [PublicKeySize]byte with methods
 type PublicKey [PublicKeySize]byte
@@ -18,10 +22,10 @@ func (pubkey PublicKey) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON is a unmarshaler function
 func (pubkey *PublicKey) UnmarshalJSON(bs []byte) error {
 	if len(bs) < 3 {
-		return ErrInvalidPublicKeyFormat
+		return errors.WithStack(ErrInvalidPublicKeyFormat)
 	}
 	if bs[0] != '"' || bs[len(bs)-1] != '"' {
-		return ErrInvalidPublicKeyFormat
+		return errors.WithStack(ErrInvalidPublicKeyFormat)
 	}
 	v, err := ParsePublicKey(string(bs[1 : len(bs)-1]))
 	if err != nil {
@@ -36,6 +40,12 @@ func (pubkey PublicKey) String() string {
 	return hex.EncodeToString(pubkey[:])
 }
 
+// String returns the hex string of the public key
+func (pubkey PublicKey) Address() Address {
+	h := hash.Hash(pubkey[1:])
+	return ecommon.BytesToAddress(h[12:])
+}
+
 // Clone returns the clonend value of it
 func (pubkey PublicKey) Clone() PublicKey {
 	var cp PublicKey
@@ -43,19 +53,10 @@ func (pubkey PublicKey) Clone() PublicKey {
 	return cp
 }
 
-// Checksum returns the checksum byte
-func (pubkey PublicKey) Checksum() byte {
-	var cs byte
-	for i := 0; i < len(pubkey); i++ {
-		cs = cs ^ pubkey[i]
-	}
-	return cs
-}
-
 // ParsePublicKey parse the public hash from the string
 func ParsePublicKey(str string) (PublicKey, error) {
 	if len(str) != PublicKeySize*2 {
-		return PublicKey{}, ErrInvalidPublicKeyFormat
+		return PublicKey{}, errors.WithStack(ErrInvalidPublicKeyFormat)
 	}
 	bs, err := hex.DecodeString(str)
 	if err != nil {

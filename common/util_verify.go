@@ -1,57 +1,82 @@
 package common
 
 import (
-	"crypto/ecdsa"
 	"crypto/elliptic"
+	"math/big"
 
-	ecrypto "github.com/fletaio/fleta/common/crypto"
-	"github.com/fletaio/fleta/common/hash"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/pkg/errors"
+
+	"github.com/fletaio/fleta_v2/common/hash"
 )
 
 // RecoverPubkey recover the public key using the hash value and the signature
-func RecoverPubkey(h hash.Hash256, sig Signature) (PublicKey, error) {
-	bs, err := ecrypto.Ecrecover(h[:], sig[:])
-	if err != nil {
-		return PublicKey{}, err
+func RecoverPubkey(chainid *big.Int, h hash.Hash256, s Signature) (PublicKey, error) {
+	sig := make([]byte, 64)
+	copy(sig[:], s[:64])
+	vs := make([]byte, len(s[64:]))
+	copy(vs, s[64:])
+
+	ChainCap := GetChainCap(chainid)
+
+	v := big.NewInt(0).SetBytes(vs)
+	legacySignV := big.NewInt(0).SetInt64(28)
+	if legacySignV.Cmp(v) <= 0 {
+		v.Sub(v, ChainCap)
 	}
-	X, Y := elliptic.Unmarshal(ecrypto.S256(), bs)
-	key := ecrypto.CompressPubkey(&ecdsa.PublicKey{
-		Curve: ecrypto.S256(),
-		X:     X,
-		Y:     Y,
-	})
+
+	var vb byte
+	if v.Int64() == 0 {
+		vb = 0
+	} else if v.Int64() == 1 {
+		vb = 1
+	} else {
+		return PublicKey{}, errors.New("invalid recid")
+	}
+
+	bs, err := crypto.Ecrecover(h[:], append(sig, vb))
+	// if err != nil && errors.Cause(err) == secp256k1.ErrInvalidRecoveryID {
+	// 	s[64] = s[64] - 27
+	// 	bs, err = ecrypto.Ecrecover(h[:], s[:])
+	// 	if err != nil {
+	// 		return PublicKey{}, errors.WithStack(err)
+	// 	}
+	// }
+	if err != nil {
+		return PublicKey{}, errors.WithStack(err)
+	}
+	X, Y := elliptic.Unmarshal(crypto.S256(), bs)
 	var pubkey PublicKey
-	copy(pubkey[:], key)
+	copy(pubkey[:], elliptic.Marshal(crypto.S256(), X, Y))
 	return pubkey, nil
 }
 
 // VerifySignature checks the signature with the public key and the hash value
 func VerifySignature(pubkey PublicKey, h hash.Hash256, sig Signature) error {
-	if !ecrypto.VerifySignature(pubkey[:], h[:], sig[:64]) {
-		return ErrInvalidSignature
+	if !crypto.VerifySignature(pubkey[:], h[:], sig[:64]) {
+		return errors.WithStack(ErrInvalidSignature)
 	}
 	return nil
 }
 
 // ValidateSignaturesMajority validates signatures with the signed hash and checks majority
-func ValidateSignaturesMajority(signedHash hash.Hash256, sigs []Signature, KeyMap map[PublicHash]bool) error {
+func ValidateSignaturesMajority(chainID *big.Int, signedHash hash.Hash256, sigs []Signature, KeyMap map[PublicKey]bool) error {
 	if len(sigs) != len(KeyMap)/2+1 {
-		return ErrInsufficientSignature
+		return errors.WithStack(ErrInsufficientSignature)
 	}
-	sigMap := map[PublicHash]bool{}
+	sigMap := map[Address]bool{}
 	for _, sig := range sigs {
-		pubkey, err := RecoverPubkey(signedHash, sig)
+		pubkey, err := RecoverPubkey(chainID, signedHash, sig)
 		if err != nil {
 			return err
 		}
-		pubhash := NewPublicHash(pubkey)
-		if !KeyMap[pubhash] {
-			return ErrInvalidSignature
+		sigMap[pubkey.Address()] = true
+		if !KeyMap[pubkey] {
+			return errors.WithStack(ErrInvalidSignature)
 		}
-		sigMap[pubhash] = true
 	}
 	if len(sigMap) != len(sigs) {
-		return ErrDuplicatedSignature
+		return errors.WithStack(ErrDuplicatedSignature)
 	}
 	return nil
 }

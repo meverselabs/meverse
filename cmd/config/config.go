@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	toml "github.com/fletaio/fleta/cmd/config/go-toml"
+	toml "github.com/fletaio/fleta_v2/cmd/config/go-toml"
 )
 
 // LoadFile parse the config from the file of the path

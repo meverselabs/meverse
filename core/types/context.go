@@ -1,20 +1,25 @@
 package types
 
 import (
-	"github.com/fletaio/fleta/common"
-	"github.com/fletaio/fleta/common/hash"
+	"math/big"
+
+	"github.com/fletaio/fleta_v2/common"
+	"github.com/fletaio/fleta_v2/common/amount"
+	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/pkg/errors"
 )
 
 // Context is an intermediate in-memory state using the context data stack between blocks
 type Context struct {
 	loader          internalLoader
 	genTargetHeight uint32
-	genLastHash     hash.Hash256
+	genPrevHash     hash.Hash256
 	genTimestamp    uint64
 	cache           *contextCache
 	stack           []*ContextData
 	isLatestHash    bool
 	dataHash        hash.Hash256
+	isProcessReward bool
 }
 
 // NewContext returns a Context
@@ -22,7 +27,7 @@ func NewContext(loader internalLoader) *Context {
 	ctx := &Context{
 		loader:          loader,
 		genTargetHeight: loader.TargetHeight(),
-		genLastHash:     loader.LastHash(),
+		genPrevHash:     loader.PrevHash(),
 		genTimestamp:    loader.LastTimestamp(),
 	}
 	ctx.cache = newContextCache(ctx)
@@ -36,13 +41,8 @@ func NewEmptyContext() *Context {
 }
 
 // ChainID returns the id of the chain
-func (ctx *Context) ChainID() uint8 {
+func (ctx *Context) ChainID() *big.Int {
 	return ctx.loader.ChainID()
-}
-
-// Name returns the name of the chain
-func (ctx *Context) Name() string {
-	return ctx.loader.Name()
 }
 
 // Version returns the version of the chain
@@ -50,136 +50,53 @@ func (ctx *Context) Version() uint16 {
 	return ctx.loader.Version()
 }
 
-// NextContext returns the next Context of the Context
-func (ctx *Context) NextContext(NextHash hash.Hash256, Timestamp uint64) *Context {
-	ctx.Top().isTop = false
-	nctx := NewContext(ctx)
-	nctx.genTargetHeight = ctx.genTargetHeight + 1
-	nctx.genLastHash = NextHash
-	nctx.genTimestamp = Timestamp
-	return nctx
-}
-
-// Hash returns the hash value of it
-func (ctx *Context) Hash() hash.Hash256 {
-	if !ctx.isLatestHash {
-		ctx.dataHash = hash.Hashes(ctx.genLastHash, ctx.Top().Hash())
-		ctx.isLatestHash = true
-	}
-	return ctx.dataHash
-}
-
 // TargetHeight returns the recorded target height when context generation
 func (ctx *Context) TargetHeight() uint32 {
 	return ctx.genTargetHeight
 }
 
-// LastStatus returns the recored target height, prev hash and timestamp
-func (ctx *Context) LastStatus() (uint32, hash.Hash256) {
-	return ctx.genTargetHeight, ctx.genLastHash
+// PrevHash returns the recorded prev hash when context generation
+func (ctx *Context) PrevHash() hash.Hash256 {
+	return ctx.genPrevHash
 }
 
-// LastHash returns the recorded prev hash when context generation
-func (ctx *Context) LastHash() hash.Hash256 {
-	return ctx.genLastHash
-}
-
-// LastTimestamp returns the last timestamp of the chain
+// LastTimestamp returns the prev timestamp of the chain
 func (ctx *Context) LastTimestamp() uint64 {
 	return ctx.genTimestamp
 }
 
-// Top returns the top snapshot
-func (ctx *Context) Top() *ContextData {
-	return ctx.stack[len(ctx.stack)-1]
+// IsAdmin returns the account is Admin or not
+func (ctx *Context) IsAdmin(addr common.Address) bool {
+	return ctx.Top().IsAdmin(addr)
 }
 
-// Account returns the account instance of the address
-func (ctx *Context) Account(addr common.Address) (Account, error) {
+// IsProcessReward reeturns the reward is processed or not
+func (ctx *Context) IsProcessReward() bool {
+	return ctx.isProcessReward
+}
+
+// SetAdmin adds the account as a Admin or not
+func (ctx *Context) SetAdmin(addr common.Address, is bool) error {
 	ctx.isLatestHash = false
-	return ctx.Top().Account(addr)
+	return ctx.Top().SetAdmin(addr, is)
 }
 
-// AddressByName returns the account address of the name
-func (ctx *Context) AddressByName(Name string) (common.Address, error) {
-	return ctx.Top().AddressByName(Name)
+// IsGenerator returns the account is generator or not
+func (ctx *Context) IsGenerator(addr common.Address) bool {
+	return ctx.Top().IsGenerator(addr)
 }
 
-// HasAccount checks that the account of the address is exist or not
-func (ctx *Context) HasAccount(addr common.Address) (bool, error) {
-	return ctx.Top().HasAccount(addr)
-}
-
-// HasAccountName checks that the account of the name is exist or not
-func (ctx *Context) HasAccountName(Name string) (bool, error) {
-	return ctx.Top().HasAccountName(Name)
-}
-
-// CreateAccount inserts the account to the top snapshot
-func (ctx *Context) CreateAccount(acc Account) error {
+// SetGenerator adds the account as a generator or not
+func (ctx *Context) SetGenerator(addr common.Address, is bool) error {
 	ctx.isLatestHash = false
-	return ctx.Top().CreateAccount(acc)
+	return ctx.Top().SetGenerator(addr, is)
 }
-
-// CreateAccountIgnoreDelete inserts the account even account has deleted name
-func (ctx *Context) CreateAccountIgnoreDelete(acc Account) error {
+func (ctx *Context) MainToken() *common.Address {
+	return ctx.Top().MainToken()
+}
+func (ctx *Context) SetMainToken(addr common.Address) {
 	ctx.isLatestHash = false
-	return ctx.Top().CreateAccountIgnoreDelete(acc)
-}
-
-// DeleteAccount deletes the account from the top snapshot
-func (ctx *Context) DeleteAccount(acc Account) error {
-	ctx.isLatestHash = false
-	return ctx.Top().DeleteAccount(acc)
-}
-
-// AccountData returns the account data from the top snapshot
-func (ctx *Context) AccountData(addr common.Address, pid uint8, name []byte) []byte {
-	return ctx.Top().AccountData(addr, pid, name)
-}
-
-// SetAccountData inserts the account data to the top snapshot
-func (ctx *Context) SetAccountData(addr common.Address, pid uint8, name []byte, value []byte) {
-	ctx.isLatestHash = false
-	ctx.Top().SetAccountData(addr, pid, name, value)
-}
-
-// HasUTXO checks that the utxo of the id is exist or not
-func (ctx *Context) HasUTXO(id uint64) (bool, error) {
-	return ctx.Top().HasUTXO(id)
-}
-
-// UTXO returns the UTXO from the top snapshot
-func (ctx *Context) UTXO(id uint64) (*UTXO, error) {
-	return ctx.Top().UTXO(id)
-}
-
-// CreateUTXO inserts the UTXO to the top snapshot
-func (ctx *Context) CreateUTXO(id uint64, vout *TxOut) error {
-	ctx.isLatestHash = false
-	return ctx.Top().CreateUTXO(id, vout)
-}
-
-// DeleteUTXO deletes the UTXO from the top snapshot
-func (ctx *Context) DeleteUTXO(utxo *UTXO) error {
-	ctx.isLatestHash = false
-	return ctx.Top().DeleteUTXO(utxo)
-}
-
-// EmitEvent creates the event to the top snapshot
-func (ctx *Context) EmitEvent(e Event) error {
-	ctx.isLatestHash = false
-	return ctx.Top().EmitEvent(e)
-}
-
-// ProcessData returns the process data from the top snapshot
-func (ctx *Context) ProcessData(pid uint8, name []byte) []byte {
-	return ctx.Top().ProcessData(pid, name)
-}
-
-// SetProcessData inserts the process data to the top snapshot
-func (ctx *Context) SetProcessData(pid uint8, name []byte, value []byte) {
-	ctx.Top().SetProcessData(pid, name, value)
+	ctx.Top().SetMainToken(addr)
 }
 
 // IsUsedTimeSlot returns timeslot is used or not
@@ -189,21 +106,131 @@ func (ctx *Context) IsUsedTimeSlot(slot uint32, key string) bool {
 
 // UseTimeSlot consumes timeslot
 func (ctx *Context) UseTimeSlot(slot uint32, key string) error {
+	ctx.isLatestHash = false
 	return ctx.Top().UseTimeSlot(slot, key)
 }
 
-// Dump prints the top context data of the context
-func (ctx *Context) Dump() string {
-	return ctx.Top().Dump()
+// AddrSeq returns the sequence of the target account
+func (ctx *Context) AddrSeq(addr common.Address) uint64 {
+	return ctx.Top().AddrSeq(addr)
+}
+
+// AddAddrSeq update the sequence of the target account
+func (ctx *Context) AddAddrSeq(addr common.Address) {
+	ctx.isLatestHash = false
+	ctx.Top().AddAddrSeq(addr)
+}
+
+// BasicFee returns the basic fee
+func (ctx *Context) BasicFee() *amount.Amount {
+	return ctx.Top().BasicFee()
+}
+
+// SetBasicFee update the basic fee
+func (ctx *Context) SetBasicFee(fee *amount.Amount) {
+	ctx.isLatestHash = false
+	ctx.Top().SetBasicFee(fee)
+}
+
+// Contract returns the contract data
+func (ctx *Context) IsContract(addr common.Address) bool {
+	return ctx.Top().IsContract(addr)
+}
+
+// Contract returns the contract data
+func (ctx *Context) Contract(addr common.Address) (Contract, error) {
+	return ctx.Top().Contract(addr)
+}
+
+// ProcessReward returns processing the reward
+func (ctx *Context) ProcessReward(inctx *Context, b *Block) (map[common.Address][]byte, error) {
+	if inctx.StackSize() > 1 {
+		return nil, errors.WithStack(ErrDirtyContext)
+	}
+	inctx.isLatestHash = false
+	rewardMap, err := ctx.loader.ProcessReward(inctx, b)
+	if err != nil {
+		return nil, err
+	}
+	inctx.isProcessReward = true
+	return rewardMap, nil
+}
+
+// DeployContract deploy contract to the chain
+func (ctx *Context) DeployContract(owner common.Address, ClassID uint64, Args []byte) (Contract, error) {
+	ctx.isLatestHash = false
+	return ctx.Top().DeployContract(owner, ClassID, Args)
+}
+
+// Data returns the data from the top snapshot
+func (ctx *Context) Data(cont common.Address, addr common.Address, name []byte) []byte {
+	return ctx.Top().Data(cont, addr, name)
+}
+
+// SetData inserts the data to the top snapshot
+func (ctx *Context) SetData(cont common.Address, addr common.Address, name []byte, value []byte) {
+	ctx.isLatestHash = false
+	ctx.Top().SetData(cont, addr, name, value)
+}
+
+// NextContext returns the next Context of the Context
+func (ctx *Context) NextContext(LastHash hash.Hash256, Timestamp uint64) *Context {
+	ctx.Top().isTop = false
+	nctx := NewContext(ctx)
+	nctx.genTargetHeight = ctx.genTargetHeight + 1
+	nctx.genPrevHash = LastHash
+	nctx.genTimestamp = Timestamp
+	return nctx
+}
+
+// ContractContext returns a ContractContext
+func (ctx *Context) ContractContext(cont Contract, from common.Address) *ContractContext {
+	cc := &ContractContext{
+		cont: cont.Address(),
+		from: from,
+		ctx:  ctx,
+	}
+	return cc
+}
+
+// ContractLoader returns a ContractLoader
+func (ctx *Context) ContractLoader(cont common.Address) ContractLoader {
+	cc := &ContractContext{
+		cont: cont,
+		ctx:  ctx,
+	}
+	return cc
+}
+
+// Top returns the top snapshot
+func (ctx *Context) Top() *ContextData {
+	return ctx.stack[len(ctx.stack)-1]
+}
+
+// StackSize returns the size of the context data stack
+func (ctx *Context) StackSize() int {
+	return len(ctx.stack)
 }
 
 // Snapshot push a snapshot and returns the snapshot number of it
 func (ctx *Context) Snapshot() int {
 	ctx.isLatestHash = false
-	ctd := NewContextData(ctx.cache, ctx.Top())
+	prevCtd := ctx.Top()
+	ctd := NewContextData(ctx.cache, prevCtd)
 	ctx.stack[len(ctx.stack)-1].isTop = false
 	ctx.stack = append(ctx.stack, ctd)
+	ctd.mainToken = prevCtd.mainToken
+	for k, v := range prevCtd.AddrSeqMap {
+		ctd.AddrSeqMap[k] = v
+	}
+	ctd.seq = prevCtd.seq
 	return len(ctx.stack)
+}
+
+// GetSize returns context data size
+func (ctx *Context) GetPCSize() uint64 {
+	return 0
+	return ctx.Top().GetPCSize()
 }
 
 // Revert removes snapshots after the snapshot number
@@ -222,71 +249,53 @@ func (ctx *Context) Commit(sn int) {
 		ctd := ctx.Top()
 		ctx.stack = ctx.stack[:len(ctx.stack)-1]
 		top := ctx.Top()
-		ctd.AccountMap.EachAll(func(addr common.Address, acc Account) bool {
-			top.AccountMap.Put(addr, acc)
-			return true
-		})
-		ctd.DeletedAccountMap.EachAll(func(addr common.Address, acc Account) bool {
-			top.AccountMap.Delete(addr)
-			top.DeletedAccountMap.Put(addr, acc)
-			return true
-		})
-		ctd.AccountNameMap.EachAll(func(key string, addr common.Address) bool {
-			top.AccountNameMap.Put(key, addr)
-			return true
-		})
-		ctd.AccountDataMap.EachAll(func(key string, value []byte) bool {
-			top.AccountDataMap.Put(key, value)
-			return true
-		})
-		ctd.DeletedAccountDataMap.EachAll(func(key string, value bool) bool {
-			top.AccountDataMap.Delete(key)
-			top.DeletedAccountDataMap.Put(key, value)
-			return true
-		})
-		ctd.UTXOMap.EachAll(func(id uint64, utxo *UTXO) bool {
-			top.UTXOMap.Put(id, utxo)
-			return true
-		})
-		ctd.CreatedUTXOMap.EachAll(func(id uint64, vout *TxOut) bool {
-			top.CreatedUTXOMap.Put(id, vout)
-			return true
-		})
-		ctd.DeletedUTXOMap.EachAll(func(id uint64, utxo *UTXO) bool {
-			top.UTXOMap.Delete(id)
-			top.CreatedUTXOMap.Delete(id)
-			top.DeletedUTXOMap.Put(id, utxo)
-			return true
-		})
-		for _, v := range ctd.Events {
-			top.Events = append(top.Events, v)
+		for key, value := range ctd.AddrSeqMap {
+			top.AddrSeqMap[key] = value
 		}
-		top.EventN = ctd.EventN
-		ctd.ProcessDataMap.EachAll(func(key string, value []byte) bool {
-			top.ProcessDataMap.Put(key, value)
-			return true
-		})
-		ctd.DeletedProcessDataMap.EachAll(func(key string, value bool) bool {
-			top.ProcessDataMap.Delete(key)
-			top.DeletedProcessDataMap.Put(key, value)
-			return true
-		})
-		ctd.TimeSlotMap.EachAll(func(key uint32, mp *StringBoolMap) bool {
-			if tp, has := top.TimeSlotMap.Get(key); has {
-				mp.EachAll(func(key string, value bool) bool {
-					tp.Put(key, value)
-					return true
-				})
+		for key, value := range ctd.GeneratorMap {
+			top.GeneratorMap[key] = value
+			delete(top.DeletedGeneratorMap, key)
+		}
+		for key, value := range ctd.DeletedGeneratorMap {
+			delete(top.GeneratorMap, key)
+			top.DeletedGeneratorMap[key] = value
+		}
+		for key, value := range ctd.ContractDefineMap {
+			top.ContractDefineMap[key] = value
+		}
+		for key, value := range ctd.DataMap {
+			delete(top.DeletedDataMap, key)
+			top.DataMap[key] = value
+		}
+		for key, value := range ctd.DeletedDataMap {
+			delete(top.DataMap, key)
+			top.DeletedDataMap[key] = value
+		}
+		for key, value := range ctd.TimeSlotMap {
+			if tp, has := top.TimeSlotMap[key]; has {
+				for k, v := range value {
+					tp[k] = v
+				}
 			} else {
-				top.TimeSlotMap.Put(key, mp)
+				top.TimeSlotMap[key] = value
 			}
-			return true
-		})
+		}
+		top.mainToken = ctd.mainToken
+		top.seq = ctd.seq
 	}
 	ctx.stack[len(ctx.stack)-1].isTop = true
 }
 
-// StackSize returns the size of the context data stack
-func (ctx *Context) StackSize() int {
-	return len(ctx.stack)
+// Hash returns the hash value of it
+func (ctx *Context) Hash() hash.Hash256 {
+	if !ctx.isLatestHash {
+		ctx.dataHash = hash.Hashes(ctx.genPrevHash, ctx.Top().Hash())
+		ctx.isLatestHash = true
+	}
+	return ctx.dataHash
+}
+
+// Dump prints the top context data of the context
+func (ctx *Context) Dump() string {
+	return ctx.Top().Dump()
 }

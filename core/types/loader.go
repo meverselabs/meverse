@@ -1,31 +1,35 @@
 package types
 
 import (
-	"github.com/fletaio/fleta/common"
-	"github.com/fletaio/fleta/common/hash"
+	"math/big"
+
+	"github.com/fletaio/fleta_v2/common"
+	"github.com/fletaio/fleta_v2/common/amount"
+	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/pkg/errors"
 )
 
 // Loader defines functions that loads state data from the target chain
 type Loader interface {
-	ChainID() uint8
-	Name() string
+	ChainID() *big.Int
 	Version() uint16
 	TargetHeight() uint32
-	Account(addr common.Address) (Account, error)
-	AddressByName(Name string) (common.Address, error)
-	HasAccount(addr common.Address) (bool, error)
-	HasAccountName(Name string) (bool, error)
-	HasUTXO(id uint64) (bool, error)
-	UTXO(id uint64) (*UTXO, error)
-	IsUsedTimeSlot(slot uint32, key string) bool
+	PrevHash() hash.Hash256
+	LastTimestamp() uint64
 }
 
 type internalLoader interface {
 	Loader
-	LastHash() hash.Hash256
-	LastTimestamp() uint64
-	AccountData(addr common.Address, pid uint8, name []byte) []byte
-	ProcessData(pid uint8, name []byte) []byte
+	IsAdmin(addr common.Address) bool
+	IsGenerator(addr common.Address) bool
+	MainToken() *common.Address
+	AddrSeq(addr common.Address) uint64
+	IsUsedTimeSlot(slot uint32, key string) bool
+	BasicFee() *amount.Amount
+	IsContract(addr common.Address) bool
+	Contract(addr common.Address) (Contract, error)
+	Data(cont common.Address, addr common.Address, name []byte) []byte
+	ProcessReward(ctx *Context, b *Block) (map[common.Address][]byte, error)
 }
 
 type emptyLoader struct {
@@ -37,8 +41,8 @@ func newEmptyLoader() internalLoader {
 }
 
 // ChainID returns 0
-func (st *emptyLoader) ChainID() uint8 {
-	return 0
+func (st *emptyLoader) ChainID() *big.Int {
+	return big.NewInt(0)
 }
 
 // Name returns ""
@@ -56,13 +60,8 @@ func (st *emptyLoader) TargetHeight() uint32 {
 	return 0
 }
 
-// LastStatus returns 0, hash.Hash256{}
-func (st *emptyLoader) LastStatus() (uint32, hash.Hash256) {
-	return 0, hash.Hash256{}
-}
-
-// LastHash returns hash.Hash256{}
-func (st *emptyLoader) LastHash() hash.Hash256 {
+// PrevHash returns hash.Hash256{}
+func (st *emptyLoader) PrevHash() hash.Hash256 {
 	return hash.Hash256{}
 }
 
@@ -71,47 +70,52 @@ func (st *emptyLoader) LastTimestamp() uint64 {
 	return 0
 }
 
-// Account returns ErrNotExistAccount
-func (st *emptyLoader) Account(addr common.Address) (Account, error) {
-	return nil, ErrNotExistAccount
-}
-
-// AddressByName returns ErrNotExistAccount
-func (st *emptyLoader) AddressByName(Name string) (common.Address, error) {
-	return common.Address{}, ErrNotExistAccount
-}
-
-// HasAccount returns false
-func (st *emptyLoader) HasAccount(addr common.Address) (bool, error) {
-	return false, nil
-}
-
-// HasAccountName returns false
-func (st *emptyLoader) HasAccountName(Name string) (bool, error) {
-	return false, nil
-}
-
-// AccountData returns nil
-func (st *emptyLoader) AccountData(addr common.Address, pid uint8, name []byte) []byte {
-	return nil
-}
-
-// HasUTXO returns false
-func (st *emptyLoader) HasUTXO(id uint64) (bool, error) {
-	return false, nil
-}
-
-// UTXO returns ErrNotExistUTXO
-func (st *emptyLoader) UTXO(id uint64) (*UTXO, error) {
-	return nil, ErrNotExistUTXO
-}
-
-// ProcessData returns nil
-func (st *emptyLoader) ProcessData(pid uint8, name []byte) []byte {
-	return nil
-}
-
 // IsUsedTimeSlot returns false
 func (st *emptyLoader) IsUsedTimeSlot(slot uint32, key string) bool {
 	return false
+}
+
+// IsAdmin returns false
+func (st *emptyLoader) IsAdmin(addr common.Address) bool {
+	return false
+}
+
+// AddrSeq returns 0
+func (st *emptyLoader) AddrSeq(addr common.Address) uint64 {
+	return 0
+}
+
+// BasicFee returns empty fee
+func (st *emptyLoader) BasicFee() *amount.Amount {
+	return &amount.Amount{}
+}
+
+// IsGenerator returns false
+func (st *emptyLoader) IsGenerator(addr common.Address) bool {
+	return false
+}
+
+// MainToken returns nil
+func (st *emptyLoader) MainToken() *common.Address {
+	return nil
+}
+
+// Contract returns nil
+func (st *emptyLoader) IsContract(addr common.Address) bool {
+	return false
+}
+
+// Contract returns nil
+func (st *emptyLoader) Contract(addr common.Address) (Contract, error) {
+	return nil, errors.WithStack(ErrNotExistContract)
+}
+
+// Data returns nil
+func (st *emptyLoader) Data(cont common.Address, addr common.Address, name []byte) []byte {
+	return nil
+}
+
+// ProcessReward returns nil
+func (st *emptyLoader) ProcessReward(ctx *Context, b *Block) (map[common.Address][]byte, error) {
+	return nil, nil
 }

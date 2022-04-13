@@ -3,10 +3,10 @@ package types
 // Service defines service functions
 type Service interface {
 	Name() string
-	Init(pm ProcessManager, cn Provider) error
 	OnLoadChain(loader Loader) error
-	OnBlockConnected(b *Block, events []Event, loader Loader)
-	OnTransactionInPoolExpired(txs []Transaction)
+	OnBlockConnected(b *Block, loader Loader)
+	OnTransactionInPoolExpired(txs []*Transaction)
+	OnTransactionFail(height uint32, txs []*Transaction, err []error)
 }
 
 // ServiceBase is a base handler of the chain service
@@ -18,9 +18,9 @@ func (s *ServiceBase) OnLoadChain(loader Loader) error {
 }
 
 // OnBlockConnected called when a block is connected to the chain
-func (s *ServiceBase) OnBlockConnected(b *Block, events []Event, loader Loader) {
+func (s *ServiceBase) OnBlockConnected(b *Block, loader Loader) {
 }
 
 // OnTransactionInPoolExpired called when a transaction in pool is expired
-func (s *ServiceBase) OnTransactionInPoolExpired(txs []Transaction) {
+func (s *ServiceBase) OnTransactionInPoolExpired(txs []*Transaction) {
 }

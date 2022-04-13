@@ -16,7 +16,7 @@
 //
 // JSONPath-like queries
 //
-// The package github.com/fletaio/fleta/cmd/config/go-toml/query implements a system
+// The package github.com/fletaio/fleta_v2/cmd/config/go-toml/query implements a system
 // similar to JSONPath to quickly retrieve elements of a TOML document using a
 // single expression. See the package documentation for more information.
 //

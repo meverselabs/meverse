@@ -36,17 +36,17 @@ go build -o toml-test github.com/BurntSushi/toml-test
 
 # vendorize the current lib for testing
 # NOTE: this basically mocks an install without having to go back out to github for code
-mkdir -p src/github.com/fletaio/fleta/cmd/config/go-toml/cmd
-mkdir -p src/github.com/fletaio/fleta/cmd/config/go-toml/query
-cp *.go *.toml src/github.com/fletaio/fleta/cmd/config/go-toml
-cp -R cmd/* src/github.com/fletaio/fleta/cmd/config/go-toml/cmd
-cp -R query/* src/github.com/fletaio/fleta/cmd/config/go-toml/query
-go build -o test_program_bin src/github.com/fletaio/fleta/cmd/config/go-toml/cmd/test_program.go
+mkdir -p src/github.com/fletaio/fleta_v2/cmd/config/go-toml/cmd
+mkdir -p src/github.com/fletaio/fleta_v2/cmd/config/go-toml/query
+cp *.go *.toml src/github.com/fletaio/fleta_v2/cmd/config/go-toml
+cp -R cmd/* src/github.com/fletaio/fleta_v2/cmd/config/go-toml/cmd
+cp -R query/* src/github.com/fletaio/fleta_v2/cmd/config/go-toml/query
+go build -o test_program_bin src/github.com/fletaio/fleta_v2/cmd/config/go-toml/cmd/test_program.go
 
 # Run basic unit tests
-go test github.com/fletaio/fleta/cmd/config/go-toml -race -coverprofile=coverage.txt -covermode=atomic
-go test github.com/fletaio/fleta/cmd/config/go-toml/cmd/tomljson
-go test github.com/fletaio/fleta/cmd/config/go-toml/query
+go test github.com/fletaio/fleta_v2/cmd/config/go-toml -race -coverprofile=coverage.txt -covermode=atomic
+go test github.com/fletaio/fleta_v2/cmd/config/go-toml/cmd/tomljson
+go test github.com/fletaio/fleta_v2/cmd/config/go-toml/query
 
 # run the entire BurntSushi test suite
 if [[ $# -eq 0 ]] ; then

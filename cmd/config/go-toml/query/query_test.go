@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/fletaio/fleta/cmd/config/go-toml"
+	"github.com/fletaio/fleta_v2/cmd/config/go-toml"
 )
 
 func assertArrayContainsInAnyOrder(t *testing.T, array []interface{}, objects ...interface{}) {

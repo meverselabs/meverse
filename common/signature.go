@@ -2,13 +2,16 @@ package common
 
 import (
 	"encoding/hex"
+
+	"github.com/pkg/errors"
 )
 
-// SignatureSize is 65 bytes
-const SignatureSize = 65
+// SignatureSize is 67 bytes r 32 s 32 v 1 => v 3
+// const SignatureSize = 67
+const MinSignatureSize = 65
 
 // Signature is the [SignatureSize]byte with methods
-type Signature [SignatureSize]byte
+type Signature []byte
 
 // MarshalJSON is a marshaler function
 func (sig Signature) MarshalJSON() ([]byte, error) {
@@ -18,16 +21,16 @@ func (sig Signature) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON is a unmarshaler function
 func (sig *Signature) UnmarshalJSON(bs []byte) error {
 	if len(bs) < 3 {
-		return ErrInvalidSignatureFormat
+		return errors.WithStack(ErrInvalidSignatureFormat)
 	}
 	if bs[0] != '"' || bs[len(bs)-1] != '"' {
-		return ErrInvalidSignatureFormat
+		return errors.WithStack(ErrInvalidSignatureFormat)
 	}
 	v, err := ParseSignature(string(bs[1 : len(bs)-1]))
 	if err != nil {
 		return err
 	}
-	copy(sig[:], v[:])
+	*sig = append(*sig, v...)
 	return nil
 }
 
@@ -38,23 +41,21 @@ func (sig Signature) String() string {
 
 // Clone returns the clonend value of it
 func (sig Signature) Clone() Signature {
-	var cp Signature
-	copy(cp[:], sig[:])
-	return cp
+	bs := make([]byte, len(sig))
+	copy(bs, sig[:])
+	return bs
 }
 
 // ParseSignature parse the public hash from the string
 func ParseSignature(str string) (Signature, error) {
-	if len(str) != SignatureSize*2 {
-		return Signature{}, ErrInvalidSignatureFormat
+	if len(str) < MinSignatureSize*2 {
+		return Signature{}, errors.WithStack(ErrInvalidSignatureFormat)
 	}
 	bs, err := hex.DecodeString(str)
 	if err != nil {
-		return Signature{}, err
+		return Signature{}, errors.WithStack(err)
 	}
-	var sig Signature
-	copy(sig[:], bs)
-	return sig, nil
+	return bs, nil
 }
 
 // MustParseSignature panic when error occurred

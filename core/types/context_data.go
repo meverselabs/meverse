@@ -5,241 +5,237 @@ import (
 	"encoding/hex"
 	"strconv"
 
-	"github.com/fletaio/fleta/common"
-	"github.com/fletaio/fleta/common/binutil"
-	"github.com/fletaio/fleta/common/hash"
-	"github.com/fletaio/fleta/encoding"
+	"github.com/fletaio/fleta_v2/common"
+	"github.com/fletaio/fleta_v2/common/amount"
+	"github.com/fletaio/fleta_v2/common/bin"
+	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/pkg/errors"
 )
 
 // ContextData is a state data of the context
 type ContextData struct {
-	loader                internalLoader
-	Parent                *ContextData
-	AccountMap            *AddressAccountMap
-	DeletedAccountMap     *AddressAccountMap
-	AccountNameMap        *StringAddressMap
-	AccountDataMap        *StringBytesMap
-	DeletedAccountDataMap *StringBoolMap
-	ProcessDataMap        *StringBytesMap
-	DeletedProcessDataMap *StringBoolMap
-	UTXOMap               *Uint64UTXOMap
-	CreatedUTXOMap        *Uint64TxOutMap
-	DeletedUTXOMap        *Uint64UTXOMap
-	Events                []Event
-	EventN                uint16
-	TimeSlotMap           *Uint32StringBoolMap
-	isTop                 bool
+	cache               *contextCache
+	Parent              *ContextData
+	mainToken           *common.Address
+	AdminMap            map[common.Address]bool
+	DeletedAdminMap     map[common.Address]bool
+	AddrSeqMap          map[common.Address]uint64
+	GeneratorMap        map[common.Address]bool
+	DeletedGeneratorMap map[common.Address]bool
+	ContractDefineMap   map[common.Address]*ContractDefine
+	DataMap             map[string][]byte
+	DeletedDataMap      map[string]bool
+	TimeSlotMap         map[uint32]map[string]bool
+	basicFee            *amount.Amount
+	isTop               bool
+	seq                 uint32
+	size                uint64
 }
 
 // NewContextData returns a ContextData
-func NewContextData(loader internalLoader, Parent *ContextData) *ContextData {
-	var EventN uint16
-	if Parent != nil {
-		EventN = Parent.EventN
-	}
+func NewContextData(cache *contextCache, Parent *ContextData) *ContextData {
 	ctd := &ContextData{
-		loader:                loader,
-		Parent:                Parent,
-		AccountMap:            NewAddressAccountMap(),
-		DeletedAccountMap:     NewAddressAccountMap(),
-		AccountNameMap:        NewStringAddressMap(),
-		AccountDataMap:        NewStringBytesMap(),
-		DeletedAccountDataMap: NewStringBoolMap(),
-		ProcessDataMap:        NewStringBytesMap(),
-		DeletedProcessDataMap: NewStringBoolMap(),
-		UTXOMap:               NewUint64UTXOMap(),
-		CreatedUTXOMap:        NewUint64TxOutMap(),
-		DeletedUTXOMap:        NewUint64UTXOMap(),
-		Events:                []Event{},
-		EventN:                EventN,
-		TimeSlotMap:           NewUint32StringBoolMap(),
-		isTop:                 true,
+		cache:               cache,
+		Parent:              Parent,
+		AdminMap:            map[common.Address]bool{},
+		DeletedAdminMap:     map[common.Address]bool{},
+		AddrSeqMap:          map[common.Address]uint64{},
+		GeneratorMap:        map[common.Address]bool{},
+		DeletedGeneratorMap: map[common.Address]bool{},
+		ContractDefineMap:   map[common.Address]*ContractDefine{},
+		DataMap:             map[string][]byte{},
+		DeletedDataMap:      map[string]bool{},
+		TimeSlotMap:         map[uint32]map[string]bool{},
+		isTop:               true,
 	}
 	return ctd
 }
 
-// Account returns the account instance of the address
-func (ctd *ContextData) Account(addr common.Address) (Account, error) {
-	if ctd.DeletedAccountMap.Has(addr) {
-		return nil, ErrDeletedAccount
+func (ctd *ContextData) GetPCSize() uint64 {
+	return ctd.size
+}
+
+// IsAdmin returns the account is admin or not
+func (ctd *ContextData) IsAdmin(addr common.Address) bool {
+	if _, has := ctd.DeletedAdminMap[addr]; has {
+		return false
 	}
-	if acc, has := ctd.AccountMap.Get(addr); has {
-		return acc.(Account), nil
+	if is, has := ctd.AdminMap[addr]; has {
+		return is
 	} else if ctd.Parent != nil {
-		if acc, err := ctd.Parent.Account(addr); err != nil {
-			return nil, err
-		} else {
-			if ctd.isTop {
-				nacc := acc.Clone()
-				ctd.AccountMap.Put(addr, nacc)
-				return nacc, nil
-			} else {
-				return acc, nil
-			}
-		}
+		is := ctd.Parent.IsAdmin(addr)
+		ctd.AdminMap[addr] = is
+		ctd.size += 21 //uint32(common.Sizeof(reflect.TypeOf(addr))) + uint32(common.Sizeof(reflect.TypeOf(is)))
+		return is
 	} else {
-		if acc, err := ctd.loader.Account(addr); err != nil {
-			return nil, err
-		} else {
-			if ctd.isTop {
-				nacc := acc.Clone()
-				ctd.AccountMap.Put(addr, nacc)
-				return nacc, nil
-			} else {
-				return acc, nil
-			}
-		}
+		is := ctd.cache.IsAdmin(addr)
+		ctd.AdminMap[addr] = is
+		ctd.size += 21 //uint32(common.Sizeof(reflect.TypeOf(addr))) + uint32(common.Sizeof(reflect.TypeOf(is)))
+		return is
 	}
 }
 
-// AddressByName returns the account address of the name
-func (ctd *ContextData) AddressByName(Name string) (common.Address, error) {
-	if addr, has := ctd.AccountNameMap.Get(Name); has {
-		return addr, nil
-	} else if ctd.Parent != nil {
-		if addr, err := ctd.Parent.AddressByName(Name); err != nil {
-			return common.Address{}, err
-		} else {
-			if ctd.isTop {
-				naddr := addr.Clone()
-				ctd.AccountNameMap.Put(Name, naddr)
-				return naddr, nil
-			} else {
-				return addr, nil
-			}
+// SetAdmin adds the account as a admin or not
+func (ctd *ContextData) SetAdmin(addr common.Address, is bool) error {
+	if is {
+		if ctd.IsAdmin(addr) {
+			return errors.WithStack(ErrAlreadyAdmin)
 		}
+		delete(ctd.DeletedAdminMap, addr)
+		ctd.AdminMap[addr] = true
+		ctd.size += 42 // (uint32(common.Sizeof(reflect.TypeOf(addr))) + uint32(common.Sizeof(reflect.TypeOf(bool)))) * 2
 	} else {
-		if addr, err := ctd.loader.AddressByName(Name); err != nil {
-			return common.Address{}, err
-		} else {
-			if ctd.isTop {
-				naddr := addr.Clone()
-				ctd.AccountNameMap.Put(Name, naddr)
-				return naddr, nil
-			} else {
-				return addr, nil
-			}
+		if !ctd.IsAdmin(addr) {
+			return errors.WithStack(ErrInvalidAdmin)
 		}
+		delete(ctd.AdminMap, addr)
+		ctd.DeletedAdminMap[addr] = true
+		ctd.size += 42 // (uint32(common.Sizeof(reflect.TypeOf(addr))) + uint32(common.Sizeof(reflect.TypeOf(bool)))) * 2
 	}
-}
-
-// HasAccount checks that the account of the address is exist or not
-func (ctd *ContextData) HasAccount(addr common.Address) (bool, error) {
-	if ctd.DeletedAccountMap.Has(addr) {
-		return false, nil
-	}
-	if ctd.AccountMap.Has(addr) {
-		return true, nil
-	} else if ctd.Parent != nil {
-		return ctd.Parent.HasAccount(addr)
-	} else {
-		return ctd.loader.HasAccount(addr)
-	}
-}
-
-// HasAccountName checks that the account of the address is exist or not
-func (ctd *ContextData) HasAccountName(Name string) (bool, error) {
-	if ctd.AccountNameMap.Has(Name) {
-		return true, nil
-	} else if ctd.Parent != nil {
-		return ctd.Parent.HasAccountName(Name)
-	} else {
-		return ctd.loader.HasAccountName(Name)
-	}
-}
-
-// CreateAccount inserts the account
-func (ctd *ContextData) CreateAccount(acc Account) error {
-	if acc.Address().Height() != ctd.loader.TargetHeight() {
-		return ErrInvalidAddressHeight
-	}
-	var emptyAddr common.Address
-	if acc.Address() == emptyAddr {
-		return ErrNotAllowedEmptyAddressAccount
-	}
-	if _, err := common.ParseAddress(acc.Name()); err == nil {
-		return ErrNotAllowedAddressAccountName
-	}
-	if has, err := ctd.HasAccount(acc.Address()); err != nil {
-		if err != ErrNotExistAccount {
-			return err
-		}
-	} else if has {
-		return ErrExistAccount
-	}
-	if has, err := ctd.HasAccountName(acc.Name()); err != nil {
-		if err != ErrNotExistAccount {
-			return err
-		}
-	} else if has {
-		return ErrExistAccountName
-	}
-	ctd.AccountMap.Put(acc.Address(), acc)
-	ctd.AccountNameMap.Put(acc.Name(), acc.Address())
 	return nil
 }
 
-// CreateAccountIgnoreDelete inserts the account even account has deleted name
-func (ctd *ContextData) CreateAccountIgnoreDelete(acc Account) error {
-	if acc.Address().Height() != ctd.loader.TargetHeight() {
-		return ErrInvalidAddressHeight
+// IsGenerator returns the account is generator or not
+func (ctd *ContextData) IsGenerator(addr common.Address) bool {
+	if _, has := ctd.DeletedGeneratorMap[addr]; has {
+		return false
 	}
-	var emptyAddr common.Address
-	if acc.Address() == emptyAddr {
-		return ErrNotAllowedEmptyAddressAccount
+	ctd.size += 1 // uint32(common.Sizeof(reflect.TypeOf(bool)))
+	if is, has := ctd.GeneratorMap[addr]; has {
+		return is
+	} else if ctd.Parent != nil {
+		return ctd.Parent.IsGenerator(addr)
+	} else {
+		return ctd.cache.IsGenerator(addr)
 	}
-	if _, err := common.ParseAddress(acc.Name()); err == nil {
-		return ErrNotAllowedAddressAccountName
-	}
-	if has, err := ctd.HasAccount(acc.Address()); err != nil {
-		if err != ErrNotExistAccount {
-			if err != ErrDeletedAccount {
-				return err
-			}
+}
+
+// SetGenerator adds the account as a generator or not
+func (ctd *ContextData) SetGenerator(addr common.Address, is bool) error {
+	if is {
+		if ctd.IsGenerator(addr) {
+			return errors.WithStack(ErrAlreadyGenerator)
 		}
-	} else if has {
-		return ErrExistAccount
-	}
-	if has, err := ctd.HasAccountName(acc.Name()); err != nil {
-		if err != ErrNotExistAccount {
-			if err != ErrDeletedAccount {
-				return err
-			}
+		delete(ctd.DeletedGeneratorMap, addr)
+		ctd.GeneratorMap[addr] = true
+		ctd.size += 42 // (uint32(common.Sizeof(reflect.TypeOf(addr))) + uint32(common.Sizeof(reflect.TypeOf(bool)))) * 2
+	} else {
+		if !ctd.IsGenerator(addr) {
+			return errors.WithStack(ErrInvalidGenerator)
 		}
-	} else if has {
-		return ErrExistAccountName
+		delete(ctd.GeneratorMap, addr)
+		ctd.DeletedGeneratorMap[addr] = true
+		ctd.size += 42 // (uint32(common.Sizeof(reflect.TypeOf(addr))) + uint32(common.Sizeof(reflect.TypeOf(bool)))) * 2
 	}
-	ctd.AccountMap.Put(acc.Address(), acc)
-	ctd.AccountNameMap.Put(acc.Name(), acc.Address())
 	return nil
 }
 
-// DeleteAccount deletes the account
-func (ctd *ContextData) DeleteAccount(acc Account) error {
-	if _, err := ctd.Account(acc.Address()); err != nil {
-		return err
-	}
-	ctd.DeletedAccountMap.Put(acc.Address(), acc)
-	ctd.AccountMap.Delete(acc.Address())
-	ctd.AccountNameMap.Delete(acc.Name())
-	return nil
+// UnsafeGetMainToken returns the MainToken or nil
+func (ctd *ContextData) UnsafeGetMainToken() *common.Address {
+	return ctd.mainToken
 }
 
-// AccountData returns the account data
-func (ctd *ContextData) AccountData(addr common.Address, pid uint8, name []byte) []byte {
-	key := string(addr[:]) + string(pid) + string(name)
-	if ctd.DeletedAccountDataMap.Has(key) {
+// MainToken returns the MainToken
+func (ctd *ContextData) MainToken() *common.Address {
+	if ctd.mainToken != nil {
+		return ctd.mainToken
+	}
+	var mainToken *common.Address
+	if ctd.Parent != nil {
+		mainToken = ctd.Parent.MainToken()
+	} else {
+		mainToken = ctd.cache.MainToken()
+	}
+	if ctd.isTop {
+		ctd.mainToken = mainToken
+	}
+	ctd.size += 20 // uint32(common.Sizeof(reflect.TypeOf(addr)))
+	return mainToken
+}
+
+// SetMainToken is set the maintoken
+func (ctd *ContextData) SetMainToken(addr common.Address) {
+	ctd.mainToken = &addr
+	ctd.size += 20 // uint32(common.Sizeof(reflect.TypeOf(addr)))
+}
+
+// IsContract returns is the contract
+func (ctd *ContextData) IsContract(addr common.Address) bool {
+	if _, has := ctd.ContractDefineMap[addr]; has {
+		return true
+	} else if ctd.Parent != nil {
+		return ctd.Parent.IsContract(addr)
+	} else {
+		ctd.size += 20 // uint32(common.Sizeof(reflect.TypeOf(addr)))
+		return ctd.cache.IsContract(addr)
+	}
+
+}
+
+// Contract returns the contract
+func (ctd *ContextData) Contract(addr common.Address) (Contract, error) {
+	if cd, has := ctd.ContractDefineMap[addr]; has {
+		return CreateContract(cd)
+	} else if ctd.Parent != nil {
+		ctd.size += 20 // uint32(common.Sizeof(reflect.TypeOf(addr)))
+		return ctd.Parent.Contract(addr)
+	} else {
+		ctd.size += 20 // uint32(common.Sizeof(reflect.TypeOf(addr)))
+		return ctd.cache.Contract(addr)
+	}
+}
+
+// NextSeq returns the next squence number
+func (ctd *ContextData) NextSeq() uint32 {
+	ctd.seq++
+	return ctd.seq
+}
+
+// DeployContract deploy contract to the chain
+func (ctd *ContextData) DeployContract(sender common.Address, ClassID uint64, Args []byte) (Contract, error) {
+	if !IsValidClassID(ClassID) {
+		return nil, errors.WithStack(ErrInvalidClassID)
+	}
+
+	base := make([]byte, 1+common.AddressLength+8+4)
+	base[0] = 0xff
+	copy(base[1:], sender[:])
+	copy(base[1+common.AddressLength:], bin.Uint64Bytes(ClassID))
+	copy(base[1+common.AddressLength+8:], bin.Uint32Bytes(ctd.NextSeq()))
+	h := hash.Hash(base)
+	addr := common.BytesToAddress(h[12:])
+	cd := &ContractDefine{
+		Address: addr,
+		Owner:   sender,
+		ClassID: ClassID,
+	}
+	cont, err := CreateContract(cd)
+	if err != nil {
+		return nil, err
+	}
+	ctd.ContractDefineMap[addr] = cd
+	if err := cont.OnCreate(ctd.cache.ctx.ContractContext(cont, addr), Args); err != nil {
+		return nil, err
+	}
+	ctd.size += 68 // uint32(common.Sizeof(reflect.TypeOf(addr))) + uint32(common.Sizeof(reflect.TypeOf(cd)))
+	return cont, nil
+}
+
+// Data returns the data
+func (ctd *ContextData) Data(cont common.Address, addr common.Address, name []byte) []byte {
+	key := string(cont[:]) + string(addr[:]) + string(name)
+	if _, has := ctd.DeletedDataMap[key]; has {
 		return nil
 	}
-	if value, has := ctd.AccountDataMap.Get(key); has {
+	if value, has := ctd.DataMap[key]; has {
 		return value
 	} else if ctd.Parent != nil {
-		value := ctd.Parent.AccountData(addr, pid, name)
+		value := ctd.Parent.Data(cont, addr, name)
+		ctd.size += uint64(len(name)) + uint64(len(value))
 		if len(value) > 0 {
 			if ctd.isTop {
 				nvalue := make([]byte, len(value))
 				copy(nvalue, value)
-				ctd.AccountDataMap.Put(key, nvalue)
 				return nvalue
 			} else {
 				return value
@@ -248,12 +244,12 @@ func (ctd *ContextData) AccountData(addr common.Address, pid uint8, name []byte)
 			return nil
 		}
 	} else {
-		value := ctd.loader.AccountData(addr, pid, name)
+		value := ctd.cache.Data(cont, addr, name)
+		ctd.size += uint64(len(name)) + uint64(len(value))
 		if len(value) > 0 {
 			if ctd.isTop {
 				nvalue := make([]byte, len(value))
 				copy(nvalue, value)
-				ctd.AccountDataMap.Put(key, nvalue)
 				return nvalue
 			} else {
 				return value
@@ -264,163 +260,36 @@ func (ctd *ContextData) AccountData(addr common.Address, pid uint8, name []byte)
 	}
 }
 
-// SetAccountData inserts the account data
-func (ctd *ContextData) SetAccountData(addr common.Address, pid uint8, name []byte, value []byte) {
-	key := string(addr[:]) + string(pid) + string(name)
+// SetData inserts the data
+func (ctd *ContextData) SetData(cont common.Address, addr common.Address, name []byte, value []byte) {
+	key := string(cont[:]) + string(addr[:]) + string(name)
+	ctd.size += uint64(len(key))
 	if len(value) == 0 {
-		ctd.AccountDataMap.Delete(key)
-		ctd.DeletedAccountDataMap.Put(key, true)
+		delete(ctd.DataMap, key)
+		ctd.DeletedDataMap[key] = true
+		ctd.size += 1 // bool
 	} else {
-		ctd.DeletedAccountDataMap.Delete(key)
-		ctd.AccountDataMap.Put(key, value)
-	}
-}
-
-// HasUTXO checks that the utxo of the id is exist or not
-func (ctd *ContextData) HasUTXO(id uint64) (bool, error) {
-	if ctd.DeletedUTXOMap.Has(id) {
-		return false, nil
-	}
-	if ctd.UTXOMap.Has(id) {
-		return true, nil
-	} else if ctd.CreatedUTXOMap.Has(id) {
-		return true, nil
-	} else if ctd.Parent != nil {
-		return ctd.Parent.HasUTXO(id)
-	} else {
-		return ctd.loader.HasUTXO(id)
-	}
-}
-
-// UTXO returns the UTXO
-func (ctd *ContextData) UTXO(id uint64) (*UTXO, error) {
-	if ctd.DeletedUTXOMap.Has(id) {
-		return nil, ErrUsedUTXO
-	}
-	if utxo, has := ctd.UTXOMap.Get(id); has {
-		return utxo, nil
-	} else if ctd.Parent != nil {
-		if utxo, err := ctd.Parent.UTXO(id); err != nil {
-			return nil, err
-		} else {
-			if ctd.isTop {
-				nutxo := utxo.Clone()
-				ctd.UTXOMap.Put(id, nutxo)
-				return nutxo, nil
-			} else {
-				return utxo, nil
-			}
-		}
-	} else {
-		if utxo, err := ctd.loader.UTXO(id); err != nil {
-			return nil, err
-		} else {
-			if ctd.isTop {
-				nutxo := utxo.Clone()
-				ctd.UTXOMap.Put(id, nutxo)
-				return nutxo, nil
-			} else {
-				return utxo, nil
-			}
-		}
-	}
-}
-
-// CreateUTXO inserts the UTXO
-func (ctd *ContextData) CreateUTXO(id uint64, vout *TxOut) error {
-	if _, err := ctd.UTXO(id); err != nil {
-		if err != ErrNotExistUTXO {
-			return err
-		}
-	} else {
-		return ErrExistUTXO
-	}
-	ctd.CreatedUTXOMap.Put(id, vout)
-	return nil
-}
-
-// DeleteUTXO deletes the UTXO
-func (ctd *ContextData) DeleteUTXO(utxo *UTXO) error {
-	if _, err := ctd.UTXO(utxo.ID()); err != nil {
-		return err
-	}
-	ctd.DeletedUTXOMap.Put(utxo.ID(), utxo)
-	return nil
-}
-
-// EmitEvent creates the event to the top snapshot
-func (ctd *ContextData) EmitEvent(e Event) error {
-	e.SetN(ctd.EventN)
-	ctd.EventN++
-	ctd.Events = append(ctd.Events, e)
-	return nil
-}
-
-// ProcessData returns the process data
-func (ctd *ContextData) ProcessData(pid uint8, name []byte) []byte {
-	key := string(pid) + string(name)
-	if ctd.DeletedProcessDataMap.Has(key) {
-		return nil
-	}
-	if value, has := ctd.ProcessDataMap.Get(key); has {
-		return value
-	} else if ctd.Parent != nil {
-		value := ctd.Parent.ProcessData(pid, name)
-		if len(value) > 0 {
-			if ctd.isTop {
-				nvalue := make([]byte, len(value))
-				copy(nvalue, value)
-				ctd.ProcessDataMap.Put(key, nvalue)
-				return nvalue
-			} else {
-				return value
-			}
-		} else {
-			return nil
-		}
-	} else {
-		value := ctd.loader.ProcessData(pid, name)
-		if len(value) > 0 {
-			if ctd.isTop {
-				nvalue := make([]byte, len(value))
-				copy(nvalue, value)
-				ctd.ProcessDataMap.Put(key, nvalue)
-				return nvalue
-			} else {
-				return value
-			}
-		} else {
-			return nil
-		}
-	}
-}
-
-// SetProcessData inserts the process data
-func (ctd *ContextData) SetProcessData(pid uint8, name []byte, value []byte) {
-	key := string(pid) + string(name)
-	if len(value) == 0 {
-		ctd.ProcessDataMap.Delete(key)
-		ctd.DeletedProcessDataMap.Put(key, true)
-	} else {
-		ctd.DeletedProcessDataMap.Delete(key)
-		ctd.ProcessDataMap.Put(key, value)
+		delete(ctd.DeletedDataMap, key)
+		ctd.DataMap[key] = value
+		ctd.size += uint64(len(value))
 	}
 }
 
 // IsUsedTimeSlot returns timeslot is used or not
 func (ctd *ContextData) IsUsedTimeSlot(slot uint32, key string) bool {
-	if mp, has := ctd.TimeSlotMap.Get(slot); has {
-		if mp.Has(key) {
+	if mp, has := ctd.TimeSlotMap[slot]; has {
+		if _, has := mp[key]; has {
 			return true
 		}
 	}
-	if has := ctd.loader.IsUsedTimeSlot(slot, key); has {
-		mp, has := ctd.TimeSlotMap.Get(slot)
+	if has := ctd.cache.IsUsedTimeSlot(slot, key); has {
+		mp, has := ctd.TimeSlotMap[slot]
 		if !has {
-			mp = NewStringBoolMap()
-			ctd.TimeSlotMap.Put(slot, mp)
+			mp = map[string]bool{}
+			ctd.TimeSlotMap[slot] = mp
 		}
-		mp.Put(key, true)
+		ctd.size += 5 // uint32 + bool
+		mp[key] = true
 		return true
 	}
 	return false
@@ -428,76 +297,135 @@ func (ctd *ContextData) IsUsedTimeSlot(slot uint32, key string) bool {
 
 // UseTimeSlot consumes timeslot
 func (ctd *ContextData) UseTimeSlot(slot uint32, key string) error {
-	mp, has := ctd.TimeSlotMap.Get(slot)
+	mp, has := ctd.TimeSlotMap[slot]
 	if !has {
-		mp = NewStringBoolMap()
-		ctd.TimeSlotMap.Put(slot, mp)
-	} else if mp.Has(key) {
-		return ErrUsedTimeSlot
+		mp = map[string]bool{}
+		ctd.TimeSlotMap[slot] = mp
+	} else if _, has := mp[key]; has {
+		return errors.WithStack(ErrUsedTimeSlot)
 	}
-	if has := ctd.loader.IsUsedTimeSlot(slot, key); has {
-		mp.Put(key, true)
-		return ErrUsedTimeSlot
+	if has := ctd.cache.IsUsedTimeSlot(slot, key); has {
+		ctd.size += uint64(len(key) + 1) // string + bool
+		mp[key] = true
+		return errors.WithStack(ErrUsedTimeSlot)
 	} else {
-		mp.Put(key, true)
+		ctd.size += uint64(len(key) + 1) // string + bool
+		mp[key] = true
 	}
 	return nil
+}
+
+// Seq returns the number of txs using the UseSeq flag of the address.
+func (ctd *ContextData) AddrSeq(addr common.Address) uint64 {
+	var seq uint64
+	var has bool
+	if seq, has = ctd.AddrSeqMap[addr]; has {
+		return seq
+	}
+
+	if ctd.Parent != nil {
+		seq = ctd.Parent.AddrSeq(addr)
+	} else {
+		seq = ctd.cache.AddrSeq(addr)
+	}
+	if ctd.isTop {
+		ctd.AddrSeqMap[addr] = seq
+	}
+	return seq
+}
+
+// AddSeq update the sequence of the target address
+func (ctd *ContextData) AddAddrSeq(addr common.Address) {
+	ctd.AddrSeqMap[addr] = ctd.AddrSeq(addr) + 1
+	ctd.size += 28 // addr + uint64
+}
+
+// BasicFee returns the basic fee
+func (ctd *ContextData) BasicFee() *amount.Amount {
+	if ctd.basicFee != nil {
+		return ctd.basicFee
+	}
+
+	var fee *amount.Amount
+	if ctd.Parent != nil {
+		fee = ctd.Parent.BasicFee()
+	} else {
+		fee = ctd.cache.BasicFee()
+	}
+	if ctd.isTop {
+		ctd.basicFee = fee
+	}
+
+	return fee
+}
+
+// SetBasicFee update the basic fee
+func (ctd *ContextData) SetBasicFee(fee *amount.Amount) {
+	ctd.basicFee = fee
 }
 
 // Hash returns the hash value of it
 func (ctd *ContextData) Hash() hash.Hash256 {
 	var buffer bytes.Buffer
 	buffer.WriteString("ChainID")
-	buffer.Write([]byte{ctd.loader.ChainID()})
-	buffer.WriteString("ChainName")
-	buffer.WriteString(ctd.loader.Name())
+	buffer.Write(ctd.cache.ctx.ChainID().Bytes())
 	buffer.WriteString("ChainVersion")
-	buffer.Write(binutil.LittleEndian.Uint16ToBytes(ctd.loader.Version()))
+	buffer.Write(bin.Uint16Bytes(ctd.cache.ctx.Version()))
 	buffer.WriteString("Height")
-	buffer.Write(binutil.LittleEndian.Uint32ToBytes(ctd.loader.TargetHeight()))
+	buffer.Write(bin.Uint32Bytes(ctd.cache.ctx.TargetHeight()))
 	buffer.WriteString("PrevHash")
-	lastHash := ctd.loader.LastHash()
-	buffer.Write(lastHash[:])
-	buffer.WriteString("TimeSlotMap")
-	buffer.WriteString(encoding.Hash(ctd.TimeSlotMap).String())
-	buffer.WriteString("AccountMap")
-	buffer.WriteString(encoding.Hash(ctd.AccountMap).String())
-	buffer.WriteString("DeletedAccountMap")
-	ctd.DeletedAccountMap.EachAll(func(addr common.Address, acc Account) bool {
-		buffer.Write(addr[:])
-		return true
+	PrevHash := ctd.cache.ctx.PrevHash()
+	buffer.Write(PrevHash[:])
+	buffer.WriteString("AdminMap")
+	EachAllAddressBool(ctd.AdminMap, func(key common.Address, value bool) error {
+		buffer.Write(key[:])
+		return nil
 	})
-	buffer.WriteString("AccountNameMap")
-	buffer.WriteString(encoding.Hash(ctd.AccountNameMap).String())
-	buffer.WriteString("AccountDataMap")
-	buffer.WriteString(encoding.Hash(ctd.AccountDataMap).String())
-	buffer.WriteString("DeletedAccountDataMap")
-	ctd.DeletedAccountDataMap.EachAll(func(key string, value bool) bool {
-		buffer.WriteString(key)
-		return true
+	buffer.WriteString("DeletedAdminMap")
+	EachAllAddressBool(ctd.DeletedAdminMap, func(key common.Address, value bool) error {
+		buffer.Write(key[:])
+		return nil
 	})
-	buffer.WriteString("UTXOMap")
-	buffer.WriteString(encoding.Hash(ctd.UTXOMap).String())
-	buffer.WriteString("CreatedUTXOMap")
-	buffer.WriteString(encoding.Hash(ctd.CreatedUTXOMap).String())
-	buffer.WriteString("DeletedUTXOMap")
-	ctd.DeletedUTXOMap.EachAll(func(key uint64, utxo *UTXO) bool {
-		buffer.Write(binutil.LittleEndian.Uint64ToBytes(key))
-		return true
+	buffer.WriteString("AddrSeqMap")
+	EachAllAddressUint64(ctd.AddrSeqMap, func(key common.Address, value uint64) error {
+		buffer.Write(key[:])
+		buffer.Write([]byte{0})
+		buffer.Write(bin.Uint64Bytes(value))
+		return nil
 	})
-	buffer.WriteString("Events")
-	if len(ctd.Events) > 0 {
-		for _, e := range ctd.Events {
-			h := encoding.Hash(e)
-			buffer.Write(h[:])
-		}
+	buffer.WriteString("GeneratorMap")
+	EachAllAddressBool(ctd.GeneratorMap, func(key common.Address, value bool) error {
+		buffer.Write(key[:])
+		return nil
+	})
+	buffer.WriteString("MainToken")
+	if ctd.mainToken != nil {
+		buffer.Write((*ctd.mainToken)[:])
 	}
-	buffer.WriteString("ProcessDataMap")
-	buffer.WriteString(encoding.Hash(ctd.ProcessDataMap).String())
-	buffer.WriteString("DeletedProcessDataMap")
-	ctd.DeletedProcessDataMap.EachAll(func(key string, value bool) bool {
+	buffer.WriteString("DeletedGeneratorMap")
+	EachAllAddressBool(ctd.DeletedGeneratorMap, func(key common.Address, value bool) error {
+		buffer.Write(key[:])
+		return nil
+	})
+	buffer.WriteString("DataMap")
+	EachAllStringBytes(ctd.DataMap, func(key string, value []byte) error {
+		buffer.Write([]byte(key))
+		buffer.Write(value)
+		return nil
+	})
+	buffer.WriteString("DeletedDataMap")
+	EachAllStringBool(ctd.DeletedDataMap, func(key string, value bool) error {
 		buffer.WriteString(key)
-		return true
+		return nil
+	})
+	buffer.WriteString("TimeSlotMap")
+	EachAllTimeSlotMap(ctd.TimeSlotMap, func(key uint32, value map[string]bool) error {
+		buffer.Write(bin.Uint32Bytes(key))
+		EachAllStringBool(value, func(key string, value bool) error {
+			buffer.WriteString(key)
+			return nil
+		})
+		return nil
 	})
 	return hash.DoubleHash(buffer.Bytes())
 }
@@ -506,126 +434,80 @@ func (ctd *ContextData) Hash() hash.Hash256 {
 func (ctd *ContextData) Dump() string {
 	var buffer bytes.Buffer
 	buffer.WriteString("ChainID\n")
-	buffer.WriteString(strconv.FormatUint(uint64(ctd.loader.ChainID()), 10))
-	buffer.WriteString("\n")
-	buffer.WriteString("ChainName\n")
-	buffer.WriteString(ctd.loader.Name())
+	buffer.WriteString(ctd.cache.ctx.ChainID().String())
 	buffer.WriteString("\n")
 	buffer.WriteString("ChainVersion\n")
-	buffer.WriteString(strconv.FormatUint(uint64(ctd.loader.Version()), 10))
+	buffer.WriteString(strconv.FormatUint(uint64(ctd.cache.ctx.Version()), 10))
 	buffer.WriteString("\n")
 	buffer.WriteString("Height\n")
-	buffer.WriteString(strconv.FormatUint(uint64(ctd.loader.TargetHeight()), 10))
+	buffer.WriteString(strconv.FormatUint(uint64(ctd.cache.ctx.TargetHeight()), 10))
 	buffer.WriteString("\n")
 	buffer.WriteString("PrevHash\n")
-	lastHash := ctd.loader.LastHash()
-	buffer.WriteString(lastHash.String())
-	if false {
+	PrevHash := ctd.cache.ctx.PrevHash()
+	buffer.WriteString(PrevHash.String())
+	buffer.WriteString("\n")
+	buffer.WriteString("AdminMap\n")
+	EachAllAddressBool(ctd.AdminMap, func(key common.Address, value bool) error {
+		buffer.WriteString(key.String())
 		buffer.WriteString("\n")
-		buffer.WriteString("TimeSlotMap\n")
-		ctd.TimeSlotMap.EachAll(func(slot uint32, mp *StringBoolMap) bool {
-			buffer.WriteString(strconv.FormatUint(uint64(slot), 10))
-			buffer.WriteString(": ")
-			mp.EachAll(func(key string, used bool) bool {
-				buffer.WriteString(key)
-				buffer.WriteString("\n")
-				return true
-			})
-			buffer.WriteString("\n")
-			return true
-		})
+		return nil
+	})
+	buffer.WriteString("DeletedAdminMap\n")
+	EachAllAddressBool(ctd.DeletedAdminMap, func(key common.Address, value bool) error {
+		buffer.WriteString(key.String())
 		buffer.WriteString("\n")
-		buffer.WriteString("AccountMap\n")
-		ctd.AccountMap.EachAll(func(addr common.Address, acc Account) bool {
-			buffer.WriteString(addr.String())
-			buffer.WriteString(": ")
-			buffer.WriteString(encoding.Hash(acc).String())
-			buffer.WriteString("\n")
-			return true
-		})
+		return nil
+	})
+	buffer.WriteString("AddrSeqMap\n")
+	EachAllAddressUint64(ctd.AddrSeqMap, func(key common.Address, value uint64) error {
+		buffer.WriteString(key.String())
+		buffer.WriteString(":")
+		buffer.WriteString(strconv.FormatUint(value, 10))
 		buffer.WriteString("\n")
-		buffer.WriteString("DeletedAccountMap\n")
-		ctd.DeletedAccountMap.EachAll(func(addr common.Address, acc Account) bool {
-			buffer.WriteString(addr.String())
-			buffer.WriteString("\n")
-			return true
-		})
+		return nil
+	})
+	buffer.WriteString("GeneratorMap\n")
+	EachAllAddressBool(ctd.GeneratorMap, func(key common.Address, value bool) error {
+		buffer.WriteString(key.String())
 		buffer.WriteString("\n")
-		buffer.WriteString("AccountNameMap\n")
-		ctd.AccountNameMap.EachAll(func(key string, addr common.Address) bool {
-			buffer.WriteString(key)
-			buffer.WriteString(": ")
-			buffer.WriteString(addr.String())
-			buffer.WriteString("\n")
-			return true
-		})
-		buffer.WriteString("\n")
-		buffer.WriteString("AccountDataMap\n")
-		ctd.AccountDataMap.EachAll(func(key string, value []byte) bool {
-			buffer.WriteString(hex.EncodeToString([]byte(key)) + ":" + hash.Hash([]byte(key)).String())
-			buffer.WriteString(": ")
-			buffer.WriteString(hex.EncodeToString(value) + ":" + hash.Hash(value).String())
-			buffer.WriteString("\n")
-			return true
-		})
-		buffer.WriteString("\n")
-		buffer.WriteString("DeletedAccountDataMap\n")
-		ctd.DeletedAccountDataMap.EachAll(func(key string, value bool) bool {
-			buffer.WriteString(hash.Hash([]byte(key)).String())
-			buffer.WriteString("\n")
-			return true
-		})
-		buffer.WriteString("\n")
-		buffer.WriteString("UTXOMap\n")
-		ctd.UTXOMap.EachAll(func(id uint64, utxo *UTXO) bool {
-			buffer.WriteString(strconv.FormatUint(id, 10))
-			buffer.WriteString(": ")
-			buffer.WriteString(encoding.Hash(utxo).String())
-			buffer.WriteString("\n")
-			return true
-		})
-		buffer.WriteString("\n")
-		buffer.WriteString("CreatedUTXOMap\n")
-		ctd.CreatedUTXOMap.EachAll(func(id uint64, vout *TxOut) bool {
-			buffer.WriteString(strconv.FormatUint(id, 10))
-			buffer.WriteString(": ")
-			buffer.WriteString(encoding.Hash(vout).String())
-			buffer.WriteString("\n")
-			return true
-		})
-		buffer.WriteString("\n")
-		buffer.WriteString("DeletedUTXOMap\n")
-		ctd.DeletedUTXOMap.EachAll(func(id uint64, utxo *UTXO) bool {
-			buffer.WriteString(strconv.FormatUint(id, 10))
-			buffer.WriteString("\n")
-			return true
-		})
-		buffer.WriteString("\n")
-		buffer.WriteString("Events\n")
-		{
-			for _, e := range ctd.Events {
-				buffer.WriteString(encoding.Hash(e).String())
-				buffer.WriteString("\n")
-			}
-		}
-		buffer.WriteString("\n")
-		buffer.WriteString("ProcessDataMap\n")
-		ctd.ProcessDataMap.EachAll(func(key string, value []byte) bool {
-			//buffer.WriteString(hash.Hash([]byte(key)).String())
-			buffer.WriteString(hex.EncodeToString([]byte(key)))
-			buffer.WriteString(": ")
-			//buffer.WriteString(hash.Hash(value).String())
-			buffer.WriteString(hex.EncodeToString(value))
-			buffer.WriteString("\n")
-			return true
-		})
-		buffer.WriteString("\n")
-		buffer.WriteString("DeletedProcessDataMap\n")
-		ctd.DeletedProcessDataMap.EachAll(func(key string, value bool) bool {
-			buffer.WriteString(hash.Hash([]byte(key)).String())
-			buffer.WriteString("\n")
-			return true
-		})
+		return nil
+	})
+	buffer.WriteString("MainToken")
+	if ctd.mainToken != nil {
+		buffer.Write((*ctd.mainToken)[:])
 	}
+	buffer.WriteString("DeletedGeneratorMap\n")
+	EachAllAddressBool(ctd.DeletedGeneratorMap, func(key common.Address, value bool) error {
+		buffer.WriteString(key.String())
+		buffer.WriteString("\n")
+		return nil
+	})
+	buffer.WriteString("DataMap\n")
+	EachAllStringBytes(ctd.DataMap, func(key string, value []byte) error {
+		buffer.WriteString(hex.EncodeToString([]byte(key)))
+		buffer.WriteString(":")
+		buffer.WriteString(hash.Hash(value).String())
+		buffer.WriteString("\n")
+		return nil
+	})
+	buffer.WriteString("DeletedDataMap\n")
+	EachAllStringBool(ctd.DeletedDataMap, func(key string, value bool) error {
+		buffer.WriteString(hex.EncodeToString([]byte(key)))
+		buffer.WriteString("\n")
+		return nil
+	})
+	buffer.WriteString("TimeSlotMap")
+	EachAllTimeSlotMap(ctd.TimeSlotMap, func(key uint32, value map[string]bool) error {
+		buffer.WriteString(strconv.FormatUint(uint64(key), 10))
+		buffer.WriteString(":\n")
+		EachAllStringBool(value, func(key string, value bool) error {
+			buffer.WriteString("    ")
+			buffer.WriteString(hex.EncodeToString([]byte(key)))
+			buffer.WriteString("\n")
+			return nil
+		})
+		buffer.WriteString("\n")
+		return nil
+	})
 	return buffer.String()
 }

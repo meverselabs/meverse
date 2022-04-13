@@ -1,8 +1,9 @@
 package queue
 
 import (
-	"errors"
 	"sync"
+
+	"github.com/pkg/errors"
 )
 
 // Queue provides a basic queue ability with the peek method
@@ -87,8 +88,6 @@ var queuePagePool = sync.Pool{
 	},
 }
 
-var errFullQueue = errors.New("full queue")
-
 type queuePage struct {
 	queue [1024]interface{}
 	head  int
@@ -98,7 +97,7 @@ type queuePage struct {
 
 func (page *queuePage) push(item interface{}) error {
 	if page.size >= page.cap() {
-		return errFullQueue
+		return errors.New("full queue")
 	}
 	page.queue[page.tail] = item
 	page.tail = (page.tail + 1) % page.cap()

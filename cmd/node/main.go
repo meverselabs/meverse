@@ -3,32 +3,22 @@ package main
 import (
 	"encoding/hex"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
 
-	"github.com/fletaio/fleta/core/pile"
-
-	"github.com/fletaio/fleta/cmd/app"
-	"github.com/fletaio/fleta/cmd/closer"
-	"github.com/fletaio/fleta/cmd/config"
-	"github.com/fletaio/fleta/common"
-	"github.com/fletaio/fleta/common/hash"
-	"github.com/fletaio/fleta/common/key"
-	"github.com/fletaio/fleta/common/rlog"
-	"github.com/fletaio/fleta/core/backend"
-	_ "github.com/fletaio/fleta/core/backend/buntdb_driver"
-	"github.com/fletaio/fleta/core/chain"
-	"github.com/fletaio/fleta/core/types"
-	"github.com/fletaio/fleta/pof"
-	"github.com/fletaio/fleta/process/admin"
-	"github.com/fletaio/fleta/process/formulator"
-	"github.com/fletaio/fleta/process/gateway"
-	"github.com/fletaio/fleta/process/payment"
-	"github.com/fletaio/fleta/process/vault"
-	"github.com/fletaio/fleta/service/apiserver"
-	"github.com/fletaio/fleta/service/p2p"
+	"github.com/fletaio/fleta_v2/cmd/app"
+	"github.com/fletaio/fleta_v2/cmd/closer"
+	"github.com/fletaio/fleta_v2/cmd/config"
+	"github.com/fletaio/fleta_v2/common"
+	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/fletaio/fleta_v2/common/key"
+	"github.com/fletaio/fleta_v2/core/chain"
+	"github.com/fletaio/fleta_v2/core/piledb"
+	"github.com/fletaio/fleta_v2/core/types"
+	"github.com/fletaio/fleta_v2/p2p"
 )
 
 // Config is a configuration for the cmd
@@ -41,14 +31,12 @@ type Config struct {
 	InitHeight      uint32
 	InitTimestamp   uint64
 	Port            int
-	APIPort         int
 	StoreRoot       string
-	RLogHost        string
-	RLogPath        string
-	UseRLog         bool
 }
 
 func main() {
+	ChainID := big.NewInt(0x1D5E)
+	Version := uint16(0x0001)
 	var cfg Config
 	if err := config.LoadFile("./config.toml", &cfg); err != nil {
 		panic(err)
@@ -56,26 +44,19 @@ func main() {
 	if len(cfg.StoreRoot) == 0 {
 		cfg.StoreRoot = "./ndata"
 	}
-	if len(cfg.RLogHost) > 0 && cfg.UseRLog {
-		if len(cfg.RLogPath) == 0 {
-			cfg.RLogPath = "./ndata_rlog"
-		}
-		rlog.SetRLogHost(cfg.RLogHost)
-		rlog.Enablelogger(cfg.RLogPath)
-	}
 
 	var ndkey key.Key
 	if len(cfg.NodeKeyHex) > 0 {
 		if bs, err := hex.DecodeString(cfg.NodeKeyHex); err != nil {
 			panic(err)
-		} else if Key, err := key.NewMemoryKeyFromBytes(bs); err != nil {
+		} else if Key, err := key.NewMemoryKeyFromBytes(ChainID, bs); err != nil {
 			panic(err)
 		} else {
 			ndkey = Key
 		}
 	} else {
 		if bs, err := ioutil.ReadFile("./ndkey.key"); err != nil {
-			k, err := key.NewMemoryKey()
+			k, err := key.NewMemoryKey(ChainID)
 			if err != nil {
 				panic(err)
 			}
@@ -88,7 +69,7 @@ func main() {
 			fs.Close()
 			ndkey = k
 		} else {
-			if Key, err := key.NewMemoryKeyFromBytes(bs); err != nil {
+			if Key, err := key.NewMemoryKeyFromBytes(ChainID, bs); err != nil {
 				panic(err)
 			} else {
 				ndkey = Key
@@ -96,21 +77,21 @@ func main() {
 		}
 	}
 
-	ObserverKeys := []common.PublicHash{}
+	ObserverKeys := []common.PublicKey{}
 	for _, k := range cfg.ObserverKeys {
-		pubhash, err := common.ParsePublicHash(k)
+		pubkey, err := common.ParsePublicKey(k)
 		if err != nil {
 			panic(err)
 		}
-		ObserverKeys = append(ObserverKeys, pubhash)
+		ObserverKeys = append(ObserverKeys, pubkey)
 	}
-	SeedNodeMap := map[common.PublicHash]string{}
+	SeedNodeMap := map[common.PublicKey]string{}
 	for k, netAddr := range cfg.SeedNodeMap {
-		pubhash, err := common.ParsePublicHash(k)
+		pubkey, err := common.ParsePublicKey(k)
 		if err != nil {
 			panic(err)
 		}
-		SeedNodeMap[pubhash] = netAddr
+		SeedNodeMap[pubkey] = netAddr
 	}
 
 	cm := closer.NewManager()
@@ -126,30 +107,23 @@ func main() {
 	}()
 	defer cm.CloseAll()
 
-	MaxBlocksPerFormulator := uint32(10)
-	ChainID := uint8(0x01)
-	Symbol := "FLETA"
-	Usage := "Mainnet"
-	Version := uint16(0x0001)
+	//MaxBlocksPerFormulator := uint32(10)
+
 	var InitGenesisHash hash.Hash256
 	if len(cfg.InitGenesisHash) > 0 {
-		InitGenesisHash = hash.MustParseHash(cfg.InitGenesisHash)
+		InitGenesisHash = hash.HexToHash(cfg.InitGenesisHash)
 	}
 	var InitHash hash.Hash256
 	if len(cfg.InitHash) > 0 {
-		InitHash = hash.MustParseHash(cfg.InitHash)
+		InitHash = hash.HexToHash(cfg.InitHash)
 	}
 
-	back, err := backend.Create("buntdb", cfg.StoreRoot+"/context")
-	if err != nil {
-		panic(err)
-	}
-	cdb, err := pile.Open(cfg.StoreRoot+"/chain", InitHash, cfg.InitHeight, cfg.InitTimestamp)
+	cdb, err := piledb.Open(cfg.StoreRoot+"/chain", InitHash, cfg.InitHeight, cfg.InitTimestamp)
 	if err != nil {
 		panic(err)
 	}
 	cdb.SetSyncMode(true)
-	st, err := chain.NewStore(back, cdb, ChainID, Symbol, Usage, Version)
+	st, err := chain.NewStore(cfg.StoreRoot+"/context", cdb, ChainID, Version)
 	if err != nil {
 		panic(err)
 	}
@@ -161,18 +135,16 @@ func main() {
 		}
 	}
 
-	cs := pof.NewConsensus(MaxBlocksPerFormulator, ObserverKeys)
-	app := app.NewFletaApp()
-	cn := chain.NewChain(cs, app, st)
-	cn.MustAddProcess(admin.NewAdmin(1))
-	cn.MustAddProcess(vault.NewVault(2))
-	cn.MustAddProcess(formulator.NewFormulator(3))
-	cn.MustAddProcess(gateway.NewGateway(4))
-	cn.MustAddProcess(payment.NewPayment(5))
-	as := apiserver.NewAPIServer()
-	cn.MustAddService(as)
-	if err := cn.Init(InitGenesisHash, InitHash, cfg.InitHeight, cfg.InitTimestamp); err != nil {
-		panic(err)
+	cn := chain.NewChain(ObserverKeys, st, "")
+
+	if cfg.InitHeight == 0 {
+		if err := cn.Init(app.Genesis()); err != nil {
+			panic(err)
+		}
+	} else {
+		if err := cn.InitWith(InitGenesisHash, InitHash, cfg.InitHeight, cfg.InitTimestamp); err != nil {
+			panic(err)
+		}
 	}
 	cm.RemoveAll()
 	cm.Add("chain", cn)
@@ -192,7 +164,7 @@ func main() {
 		panic(err)
 	}
 
-	nd := p2p.NewNode(ndkey, SeedNodeMap, cn, cfg.StoreRoot+"/peer")
+	nd := p2p.NewNode(ChainID, ndkey, SeedNodeMap, cn, cfg.StoreRoot+"/peer")
 	if err := nd.Init(); err != nil {
 		panic(err)
 	}
@@ -200,7 +172,5 @@ func main() {
 	cm.Add("node", nd)
 
 	go nd.Run(":" + strconv.Itoa(cfg.Port))
-	go as.Run(":" + strconv.Itoa(cfg.APIPort))
-
 	cm.Wait()
 }

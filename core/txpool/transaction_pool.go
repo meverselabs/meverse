@@ -2,28 +2,28 @@ package txpool
 
 import (
 	"bytes"
+	"math"
 	"strconv"
 	"sync"
 
-	"github.com/fletaio/fleta/common"
-	"github.com/fletaio/fleta/common/hash"
-	"github.com/fletaio/fleta/common/queue"
-	"github.com/fletaio/fleta/core/types"
+	"github.com/fletaio/fleta_v2/common"
+	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/fletaio/fleta_v2/common/queue"
+	"github.com/fletaio/fleta_v2/core/types"
+	"github.com/pkg/errors"
 )
 
 // TransactionPool provides a transaction queue
 // User can push transaction regardless of UTXO model based transactions or account model based transactions
 type TransactionPool struct {
 	sync.Mutex
-	slotMap   map[uint32]*queue.LinkedQueue
-	txhashMap map[hash.Hash256]*PoolItem
+	slotQue queue.IDoubleKeyQueue
 }
 
 // NewTransactionPool returns a TransactionPool
 func NewTransactionPool() *TransactionPool {
 	tp := &TransactionPool{
-		slotMap:   map[uint32]*queue.LinkedQueue{},
-		txhashMap: map[hash.Hash256]*PoolItem{},
+		slotQue: queue.NewDoubleKeyPriorityQueue(queue.LOWEST),
 	}
 	return tp
 }
@@ -33,8 +33,7 @@ func (tp *TransactionPool) IsExist(TxHash hash.Hash256) bool {
 	tp.Lock()
 	defer tp.Unlock()
 
-	_, has := tp.txhashMap[TxHash]
-	return has
+	return tp.slotQue.Get(TxHash) != nil
 }
 
 // Size returns the size of TxPool
@@ -42,34 +41,56 @@ func (tp *TransactionPool) Size() int {
 	tp.Lock()
 	defer tp.Unlock()
 
-	return len(tp.txhashMap)
+	return tp.slotQue.Size()
+}
+
+// UnsafeSize returns the size of TxPool without mutex
+func (tp *TransactionPool) UnsafeSize() int {
+	return tp.slotQue.Size()
+}
+
+// Size returns the size of TxPool
+func (tp *TransactionPool) GasLevel() (glv uint16) {
+	l := tp.slotQue.Size()
+	if 65535 < l {
+		glv = glv - 1
+	} else {
+		glv = uint16(l)
+	}
+	switch true {
+	case glv < 100:
+		return 10
+	case glv < 500:
+		return 15
+	case glv < 1000:
+		return 100
+	case glv < 2000:
+		return 500
+	default:
+		return 5000
+	}
 }
 
 // Push inserts the transaction and signatures of it by base model
 // An UTXO model based transaction will be handled by FIFO
-func (tp *TransactionPool) Push(t uint16, TxHash hash.Hash256, tx types.Transaction, sigs []common.Signature, signers []common.PublicHash) error {
+func (tp *TransactionPool) Push(TxHash hash.Hash256, tx *types.Transaction, sig common.Signature, signer common.Address) error {
 	tp.Lock()
 	defer tp.Unlock()
 
-	if _, has := tp.txhashMap[TxHash]; has {
-		return ErrExistTransaction
+	if tp.slotQue.Get(TxHash) != nil {
+		return errors.WithStack(ErrExistTransaction)
 	}
 
+	slot := types.ToTimeSlot(tx.Timestamp)
 	item := &PoolItem{
-		TxType:      t,
 		TxHash:      TxHash,
 		Transaction: tx,
-		Signatures:  sigs,
-		Signers:     signers,
+		Signature:   sig,
+		Signer:      signer,
+		Slot:        slot,
 	}
-	slot := types.ToTimeSlot(tx.Timestamp())
-	q, has := tp.slotMap[slot]
-	if !has {
-		q = queue.NewLinkedQueue()
-		tp.slotMap[slot] = q
-	}
-	q.Push(TxHash, item)
-	tp.txhashMap[TxHash] = item
+
+	tp.slotQue.Push(item)
 	return nil
 }
 
@@ -78,43 +99,35 @@ func (tp *TransactionPool) Get(TxHash hash.Hash256) *PoolItem {
 	tp.Lock()
 	defer tp.Unlock()
 
-	return tp.txhashMap[TxHash]
+	i := tp.slotQue.Get(TxHash)
+	if i == nil {
+		return nil
+	}
+	return i.(*PoolItem)
 }
 
 // Remove deletes the target transaction from the queue
-func (tp *TransactionPool) Remove(TxHash hash.Hash256, tx types.Transaction) {
+func (tp *TransactionPool) Remove(TxHash hash.Hash256, tx *types.Transaction) {
 	tp.Lock()
 	defer tp.Unlock()
 
-	slot := types.ToTimeSlot(tx.Timestamp())
-	q, has := tp.slotMap[slot]
-	if has {
-		q.Remove(TxHash)
-		delete(tp.txhashMap, TxHash)
-	}
+	tp.slotQue.RemoveKey(TxHash)
 }
 
 // Clean removes outdated slot queue
-func (tp *TransactionPool) Clean(currentSlot uint32) []types.Transaction {
+func (tp *TransactionPool) Clean(currentSlot uint32) []*types.Transaction {
 	tp.Lock()
 	defer tp.Unlock()
 
-	deletes := []uint32{}
-	for slot := range tp.slotMap {
-		if slot < currentSlot-1 {
-			deletes = append(deletes, slot)
+	items := []*types.Transaction{}
+
+	tp.slotQue.Iter(func(i queue.IDoubleKeyQueueItem) bool {
+		if i.DKey().(uint32) < currentSlot-1 {
+			items = append(items, i.(*PoolItem).Transaction)
+			return true
 		}
-	}
-	items := []types.Transaction{}
-	for _, v := range deletes {
-		if q, has := tp.slotMap[v]; has {
-			q.Iter(func(key hash.Hash256, value interface{}) {
-				delete(tp.txhashMap, key)
-				items = append(items, value.(*PoolItem).Transaction)
-			})
-			delete(tp.slotMap, v)
-		}
-	}
+		return false
+	})
 	return items
 }
 
@@ -128,35 +141,41 @@ func (tp *TransactionPool) Pop(currentSlot uint32) *PoolItem {
 
 // UnsafePop returns and removes the proper transaction without mutex locking
 func (tp *TransactionPool) UnsafePop(currentSlot uint32) *PoolItem {
-	slots := []uint32{}
-	for slot := range tp.slotMap {
-		slots = append(slots, slot)
+	item := tp.slotQue.Pop()
+	if item == nil {
+		return nil
 	}
-
-	if q, has := tp.slotMap[currentSlot-1]; has {
-		v := q.Pop()
-		if v != nil {
-			return v.(*PoolItem)
-		} else {
-			delete(tp.slotMap, currentSlot-1)
-		}
-	}
-	if q, has := tp.slotMap[currentSlot]; has {
-		v := q.Pop()
-		if v != nil {
-			return v.(*PoolItem)
-		}
-	}
-	return nil
+	return item.(*PoolItem)
 }
 
 // PoolItem represents the item of the queue
 type PoolItem struct {
-	TxType      uint16
 	TxHash      hash.Hash256
-	Transaction types.Transaction
-	Signatures  []common.Signature
-	Signers     []common.PublicHash
+	Transaction *types.Transaction
+	Signature   common.Signature
+	Signer      common.Address
+	Slot        uint32
+}
+
+func (pi *PoolItem) DKey() interface{} {
+	return pi.Slot
+}
+func (pi *PoolItem) DPriority() uint64 {
+	return uint64(pi.Slot)
+}
+func (pi *PoolItem) Key() interface{} {
+	return pi.TxHash
+}
+
+func (pi *PoolItem) Priority() uint64 {
+	if pi.Transaction.IsEtherType {
+		gasFactor := uint64(math.MaxUint32 - pi.Transaction.GasPrice.Uint64())
+		return uint64(gasFactor<<47) /*less then int64 max*/ + pi.Transaction.Seq
+	}
+	if pi.Transaction.GasPrice == nil {
+		return uint64(math.MaxUint32)
+	}
+	return uint64(math.MaxUint32 - pi.Transaction.GasPrice.Uint64())
 }
 
 // List return txpool list
@@ -166,13 +185,15 @@ func (tp *TransactionPool) List() []*PoolItem {
 
 	pis := []*PoolItem{}
 
-	for _, item := range tp.txhashMap {
+	list := tp.slotQue.List()
+
+	for _, i := range list {
+		item := i.(*PoolItem)
 		pis = append(pis, &PoolItem{
-			TxType:      item.TxType,
 			TxHash:      item.TxHash,
 			Transaction: item.Transaction,
-			Signatures:  item.Signatures,
-			Signers:     item.Signers,
+			Signature:   item.Signature,
+			Signer:      item.Signer,
 		})
 	}
 	return pis
@@ -184,24 +205,15 @@ func (tp *TransactionPool) Dump() string {
 	defer tp.Unlock()
 
 	var buffer bytes.Buffer
-	if len(tp.slotMap) > 0 {
-		buffer.WriteString("slotMap\n")
-		for k, v := range tp.slotMap {
-			buffer.WriteString(strconv.FormatUint(uint64(k), 10))
+	list := tp.slotQue.List()
+
+	if tp.slotQue.Size() > 0 {
+		buffer.WriteString("slotQue\n")
+		for _, i := range list {
+			item := i.(*PoolItem)
+			buffer.WriteString(strconv.FormatUint(item.DKey().(uint64), 10))
 			buffer.WriteString(":")
-			v.Iter(func(key hash.Hash256, value interface{}) {
-				buffer.WriteString(key.String())
-				buffer.WriteString("\n")
-			})
-			buffer.WriteString("\n")
-			buffer.WriteString("\n")
-		}
-		buffer.WriteString("\n")
-	}
-	if len(tp.txhashMap) > 0 {
-		buffer.WriteString("txhashMap\n")
-		for k := range tp.txhashMap {
-			buffer.WriteString(k.String())
+			buffer.WriteString(item.Key().(string))
 			buffer.WriteString("\n")
 		}
 		buffer.WriteString("\n")

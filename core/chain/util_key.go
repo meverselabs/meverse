@@ -1,139 +1,75 @@
 package chain
 
 import (
-	"github.com/fletaio/fleta/common"
-	"github.com/fletaio/fleta/common/binutil"
-	"github.com/fletaio/fleta/common/hash"
+	"github.com/fletaio/fleta_v2/common"
+	"github.com/fletaio/fleta_v2/common/bin"
 )
 
 var (
-	tagHeight              = []byte{1, 0}
-	tagHeightHash          = []byte{1, 1}
-	tagHeightHeader        = []byte{1, 2}
-	tagHeightBlock         = []byte{1, 3}
-	tagHashHeight          = []byte{1, 4}
-	tagAccount             = []byte{2, 0}
-	tagAccountName         = []byte{2, 1}
-	tagAccountData         = []byte{2, 3}
-	tagUTXO                = []byte{3, 0}
-	tagProcessData         = []byte{4, 0}
-	tagEvent               = []byte{5, 0}
-	tagLockedBalance       = []byte{6, 0}
-	tagLockedBalanceHeight = []byte{6, 1}
+	tagHeight       = byte(0x01)
+	tagHeightHash   = byte(0x02)
+	tagPoFRankTable = byte(0x12)
+	tagAdmin        = byte(0x20)
+	tagAddressSeq   = byte(0x21)
+	tagGenerator    = byte(0x30)
+	tagContract     = byte(0x40)
+	tagData         = byte(0x50)
+	tagBlockGen     = byte(0x60)
+	tagMainToken    = byte(0x70)
+	tagBasicFee     = byte(0x80)
 )
 
-func toHeightBlockKey(height uint32) []byte {
-	bs := make([]byte, 6)
-	copy(bs, tagHeightBlock)
-	binutil.BigEndian.PutUint32(bs[2:], height)
-	return bs
-}
-
-func toHeightHeaderKey(height uint32) []byte {
-	bs := make([]byte, 6)
-	copy(bs, tagHeightHeader)
-	binutil.BigEndian.PutUint32(bs[2:], height)
-	return bs
-}
-
 func toHeightHashKey(height uint32) []byte {
-	bs := make([]byte, 6)
-	copy(bs, tagHeightHash)
-	binutil.BigEndian.PutUint32(bs[2:], height)
+	bs := make([]byte, 5)
+	bs[0] = tagHeightHash
+	bin.PutUint32(bs[1:], height)
 	return bs
 }
 
-func toHashHeightKey(h hash.Hash256) []byte {
-	bs := make([]byte, 34)
-	copy(bs, tagHashHeight)
-	copy(bs[2:], h[:])
+func toAdminKey(addr common.Address) []byte {
+	bs := make([]byte, 1+len(addr[:]))
+	bs[0] = tagAdmin
+	copy(bs[1:], addr[:])
 	return bs
 }
 
-func toAccountKey(addr common.Address) []byte {
-	bs := make([]byte, 2+common.AddressSize)
-	copy(bs, tagAccount)
-	copy(bs[2:], addr[:])
+func toAddressSeqKey(addr common.Address) []byte {
+	bs := make([]byte, 1+len(addr[:]))
+	bs[0] = tagAddressSeq
+	copy(bs[1:], addr[:])
 	return bs
 }
 
-func toAccountNameKey(Name string) []byte {
-	bs := make([]byte, 2+len(Name))
-	copy(bs, tagAccountName)
-	copy(bs[2:], []byte(Name))
+func toGeneratorKey(addr common.Address) []byte {
+	bs := make([]byte, 1+len(addr[:]))
+	bs[0] = tagGenerator
+	copy(bs[1:], addr[:])
 	return bs
 }
 
-func toAccountDataKey(key string) []byte {
-	bs := make([]byte, 2+len(key))
-	copy(bs, tagAccountData)
-	copy(bs[2:], []byte(key))
+func toContractKey(addr common.Address) []byte {
+	bs := make([]byte, 1+len(addr[:]))
+	bs[0] = tagContract
+	copy(bs[1:], addr[:])
 	return bs
 }
 
-func toUTXOKey(id uint64) []byte {
-	bs := make([]byte, 10)
-	copy(bs, tagUTXO)
-	binutil.BigEndian.PutUint64(bs[2:], id)
+func toDataKey(key string) []byte {
+	bs := make([]byte, 1+len(key))
+	bs[0] = tagData
+	copy(bs[1:], []byte(key))
 	return bs
 }
 
-func fromUTXOKey(bs []byte) uint64 {
-	return binutil.BigEndian.Uint64(bs[2:])
-}
-
-func toProcessDataKey(key string) []byte {
-	bs := make([]byte, 2+len(key))
-	copy(bs, tagProcessData)
-	copy(bs[2:], []byte(key))
+func toBlockGenKey(addr common.Address) []byte {
+	bs := make([]byte, 1+len(addr[:]))
+	bs[0] = tagBlockGen
+	copy(bs[1:], addr[:])
 	return bs
 }
 
-func toEventKey(id uint32) []byte {
-	bs := make([]byte, 6)
-	copy(bs, tagEvent)
-	binutil.BigEndian.PutUint32(bs[2:], id)
-	return bs
-}
-
-func toLockedBalancePrefix(Address common.Address) []byte {
-	bs := make([]byte, 2+common.AddressSize)
-	copy(bs, tagLockedBalance)
-	copy(bs[2:], Address[:])
-	return bs
-}
-
-func toLockedBalanceKey(Address common.Address, UnlockHeight uint32) []byte {
-	bs := make([]byte, 6+common.AddressSize)
-	copy(bs, tagLockedBalance)
-	copy(bs[2:], Address[:])
-	binutil.BigEndian.PutUint32(bs[2+common.AddressSize:], UnlockHeight)
-	return bs
-}
-
-func fromLockedBalanceKey(bs []byte) (common.Address, uint32) {
+func fromBlockGenKey(bs []byte) common.Address {
 	var addr common.Address
-	copy(addr[:], bs[2:])
-	return addr, binutil.LittleEndian.Uint32(bs[2+common.AddressSize:])
-}
-
-func toLockedBalanceHeightPrefix(Height uint32) []byte {
-	bs := make([]byte, 6)
-	copy(bs, tagLockedBalance)
-	binutil.BigEndian.PutUint32(bs[2:], Height)
-	return bs
-}
-
-func toLockedBalanceHeightKey(UnlockHeight uint32, Address common.Address) []byte {
-	bs := make([]byte, 6+common.AddressSize)
-	copy(bs, tagLockedBalance)
-	binutil.BigEndian.PutUint32(bs[2:], UnlockHeight)
-	copy(bs[6:], Address[:])
-	return bs
-}
-
-func fromLockedBalanceHeightKey(bs []byte) (common.Address, uint32) {
-	var addr common.Address
-	copy(addr[:], bs[6:])
-	return addr, binutil.LittleEndian.Uint32(bs[2:])
+	copy(addr[:], bs[1:])
+	return addr
 }

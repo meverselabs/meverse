@@ -2,7 +2,7 @@ package query
 
 import (
 	"fmt"
-	"github.com/fletaio/fleta/cmd/config/go-toml"
+	"github.com/fletaio/fleta_v2/cmd/config/go-toml"
 	"strconv"
 	"unicode"
 )

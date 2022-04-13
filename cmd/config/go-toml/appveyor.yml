@@ -33,7 +33,7 @@ test_script:
   - go get github.com/davecgh/go-spew/spew
   - go get gopkg.in/yaml.v2
   - go get github.com/BurntSushi/toml
-  - go build github.com/fletaio/fleta/cmd/config/go-toml
-  - go test github.com/fletaio/fleta/cmd/config/go-toml
-  - go test github.com/fletaio/fleta/cmd/config/go-toml/cmd/tomljson
-  - go test github.com/fletaio/fleta/cmd/config/go-toml/query
+  - go build github.com/fletaio/fleta_v2/cmd/config/go-toml
+  - go test github.com/fletaio/fleta_v2/cmd/config/go-toml
+  - go test github.com/fletaio/fleta_v2/cmd/config/go-toml/cmd/tomljson
+  - go test github.com/fletaio/fleta_v2/cmd/config/go-toml/query

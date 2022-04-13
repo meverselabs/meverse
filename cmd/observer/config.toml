@@ -1,20 +1,15 @@
-Port = 31000
-APIPort = 58000
-KeyHex = "THIS_IS_A_PRIVATE_KEY_THAT_IS_FORMATTED_WITH_HEX"
 InitGenesisHash = ""
 InitHeight = 0
 InitHash = ""
 InitTimestamp = 0
-ObseverPort = 35000
-FormulatorPort = 37000
+Port = 20001
+GeneratorPort = 21001
 StoreRoot = "./odata"
-RLogHost = ""
-RLogPath = ""
-UseRLog = false
+ObserverKeyHex = "OBSERVER_KEY_HEX_HERE"
 
-[ObserverKeyMap]
-3UwhKPR25vZyycKXzvTjTTEvaQhLYNdga7Qfu96nkFS = "observer1.fletamain.net:35000"
-3LRTWd7Gsjx6nLtyPewi5z1wkMGMT4GDYwnkYWFwDjx = "observer2.fletamain.net:35000"
-6NCt1mLHxVSQYrSLJv5QmRWh236eEfw6jUMXAGURBN = "observer3.fletamain.net:35000"
-4Muu1gBArNvekXNF5CNSJhRFq31xPejb6kQ8Js1jwRA = "observer4.fletamain.net:35000"
-nnyPSWrxKXpozLZ36u9dEM9yH5mna2jk4oq6hCAZ8c = "observer5.fletamain.net:35000"
+[ObserverMap]
+04d575bb4e7dcdc14e7715371153e1acf9642caf47ea3a62f73dabd59e378725946ac77b5230774a1060e7944a05dc695e143a6619aac299c944d57da160c367cd = "207.246.81.180:20001"
+04bb20d3210019e9ba61a7efc3cbcdbeb45f2498a1f870c07d60ad2833d7c2143458a7a7f86e55d0f6b2635dca7ef9c927238b6a6c3037da6971b520d2a775f3e5 = "66.135.3.38:20001"
+045e4fef185d243012e9ce64adc0616c6135c4a661bf1fa009ec56863fb5bce7bdf484a7883370d1720739df785ef38e038dd951cd9b64de7f73fbcceb7244e828 = "208.167.255.57:20001"
+0450118ef3133fbeadf4bc66b21c37da55ba25ecc339ba124849625acc9f3a60123dd0e39df4ff204ec7e2eb9f8e80670ddd93bb62e71209f5f0b5409b9f5f0575 = "45.76.6.193:20001"
+04953e135e4f4937d5fe0cd862cd52b7cdea7f849b5f480e86d9e6301218b3e6875600a032b12248f4bb5fc5609c58b9901c138cc454debd372880ddcd131deeb9 = "149.28.235.160:20001"

@@ -1,15 +1,16 @@
 package chain
 
 import (
-	"github.com/fletaio/fleta/common"
-	"github.com/fletaio/fleta/common/hash"
-	"github.com/fletaio/fleta/core/types"
+	"github.com/fletaio/fleta_v2/common"
+	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/fletaio/fleta_v2/core/types"
 )
 
 // Committer enables to commit block with pre-executed context
 type Committer interface {
+	Generators() ([]common.Address, error)
 	ValidateHeader(bh *types.Header) error
-	ExecuteBlockOnContext(b *types.Block, ctx *types.Context, SigMap map[hash.Hash256][]common.PublicHash) error
+	ExecuteBlockOnContext(b *types.Block, ctx *types.Context, SigMap map[hash.Hash256]common.Address) error
 	ConnectBlockWithContext(b *types.Block, ctx *types.Context) error
 	NewContext() *types.Context
 }
@@ -18,11 +19,15 @@ type chainCommiter struct {
 	cn *Chain
 }
 
-func newChainCommiter(cn *Chain) *chainCommiter {
+func NewChainCommiter(cn *Chain) *chainCommiter {
 	ct := &chainCommiter{
 		cn: cn,
 	}
 	return ct
+}
+
+func (ct *chainCommiter) Generators() ([]common.Address, error) {
+	return ct.cn.store.Generators()
 }
 
 func (ct *chainCommiter) ValidateHeader(bh *types.Header) error {
@@ -32,7 +37,7 @@ func (ct *chainCommiter) ValidateHeader(bh *types.Header) error {
 	return ct.cn.validateHeader(bh)
 }
 
-func (ct *chainCommiter) ExecuteBlockOnContext(b *types.Block, ctx *types.Context, sm map[hash.Hash256][]common.PublicHash) error {
+func (ct *chainCommiter) ExecuteBlockOnContext(b *types.Block, ctx *types.Context, sm map[hash.Hash256]common.Address) error {
 	ct.cn.Lock()
 	defer ct.cn.Unlock()
 

@@ -5,12 +5,12 @@ Go library for the [TOML](https://github.com/mojombo/toml) format.
 This library supports TOML version
 [v0.4.0](https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.4.0.md)
 
-[![GoDoc](https://godoc.org/github.com/fletaio/fleta/cmd/config/go-toml?status.svg)](http://godoc.org/github.com/fletaio/fleta/cmd/config/go-toml)
-[![license](https://img.shields.io/github/license/pelletier/go-toml.svg)](https://github.com/fletaio/fleta/cmd/config/go-toml/blob/master/LICENSE)
+[![GoDoc](https://godoc.org/github.com/fletaio/fleta_v2/cmd/config/go-toml?status.svg)](http://godoc.org/github.com/fletaio/fleta_v2/cmd/config/go-toml)
+[![license](https://img.shields.io/github/license/pelletier/go-toml.svg)](https://github.com/fletaio/fleta_v2/cmd/config/go-toml/blob/master/LICENSE)
 [![Build Status](https://travis-ci.org/pelletier/go-toml.svg?branch=master)](https://travis-ci.org/pelletier/go-toml)
 [![Windows Build status](https://ci.appveyor.com/api/projects/status/4aepwwjori266hkt/branch/master?svg=true)](https://ci.appveyor.com/project/pelletier/go-toml/branch/master)
 [![codecov](https://codecov.io/gh/pelletier/go-toml/branch/master/graph/badge.svg)](https://codecov.io/gh/pelletier/go-toml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/fletaio/fleta/cmd/config/go-toml)](https://goreportcard.com/report/github.com/fletaio/fleta/cmd/config/go-toml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/fletaio/fleta_v2/cmd/config/go-toml)](https://goreportcard.com/report/github.com/fletaio/fleta_v2/cmd/config/go-toml)
 
 ## Features
 
@@ -26,7 +26,7 @@ Go-toml provides the following features for using data parsed from TOML document
 ## Import
 
 ```go
-import "github.com/fletaio/fleta/cmd/config/go-toml"
+import "github.com/fletaio/fleta_v2/cmd/config/go-toml"
 ```
 
 ## Usage example
@@ -81,7 +81,7 @@ for ii, item := range results.Values() {
 ## Documentation
 
 The documentation and additional examples are available at
-[godoc.org](http://godoc.org/github.com/fletaio/fleta/cmd/config/go-toml).
+[godoc.org](http://godoc.org/github.com/fletaio/fleta_v2/cmd/config/go-toml).
 
 ## Tools
 
@@ -90,20 +90,20 @@ Go-toml provides two handy command line tools:
 * `tomll`: Reads TOML files and lint them.
 
     ```
-    go install github.com/fletaio/fleta/cmd/config/go-toml/cmd/tomll
+    go install github.com/fletaio/fleta_v2/cmd/config/go-toml/cmd/tomll
     tomll --help
     ```
 * `tomljson`: Reads a TOML file and outputs its JSON representation.
 
     ```
-    go install github.com/fletaio/fleta/cmd/config/go-toml/cmd/tomljson
+    go install github.com/fletaio/fleta_v2/cmd/config/go-toml/cmd/tomljson
     tomljson --help
     ```
 
 ## Contribute
 
 Feel free to report bugs and patches using GitHub's pull requests system on
-[pelletier/go-toml](https://github.com/fletaio/fleta/cmd/config/go-toml). Any feedback would be
+[pelletier/go-toml](https://github.com/fletaio/fleta_v2/cmd/config/go-toml). Any feedback would be
 much appreciated!
 
 ### Run tests

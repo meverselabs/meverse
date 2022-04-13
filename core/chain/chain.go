@@ -1,162 +1,138 @@
 package chain
 
 import (
+	"bytes"
 	"log"
 	"runtime"
 	"sync"
+	"time"
 
-	"github.com/fletaio/fleta/common"
-	"github.com/fletaio/fleta/common/hash"
-	"github.com/fletaio/fleta/core/pile"
-	"github.com/fletaio/fleta/core/types"
+	"github.com/fletaio/fleta_v2/common"
+	"github.com/fletaio/fleta_v2/common/bin"
+	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/fletaio/fleta_v2/core/piledb"
+	"github.com/fletaio/fleta_v2/core/prefix"
+	"github.com/fletaio/fleta_v2/core/types"
+	"github.com/google/uuid"
+	"github.com/pkg/errors"
 )
 
-// Chain manages the chain data using processes
+// Chain manages the chain data
 type Chain struct {
 	sync.Mutex
-	isInit          bool
-	store           *Store
-	consensus       Consensus
-	app             types.Application
-	processes       []types.Process
-	processIDMap    map[string]uint8
-	processIndexMap map[uint8]int
-	services        []types.Service
-	serviceMap      map[string]types.Service
-	closeLock       sync.RWMutex
-	isClose         bool
+	isInit         bool
+	store          *Store
+	services       []types.Service
+	serviceMap     map[string]types.Service
+	observerKeyMap map[common.PublicKey]bool
+	closeLock      sync.RWMutex
+	waitChan       map[uuid.UUID]*common.SyncChan
+	waitLock       sync.Mutex
+	isClose        bool
+	tag            string
 }
 
 // NewChain returns a Chain
-func NewChain(consensus Consensus, app types.Application, store *Store) *Chain {
-	if app.ID() != 255 {
-		panic(ErrApplicationIDMustBe255)
+func NewChain(ObserverKeys []common.PublicKey, store *Store, tag string) *Chain {
+	ObserverKeyMap := map[common.PublicKey]bool{}
+	for _, v := range ObserverKeys {
+		ObserverKeyMap[v] = true
 	}
 	cn := &Chain{
-		consensus:       consensus,
-		app:             app,
-		store:           store,
-		processes:       []types.Process{},
-		processIDMap:    map[string]uint8{},
-		processIndexMap: map[uint8]int{},
-		services:        []types.Service{},
-		serviceMap:      map[string]types.Service{},
+		store:          store,
+		observerKeyMap: ObserverKeyMap,
+		services:       []types.Service{},
+		serviceMap:     map[string]types.Service{},
+		waitChan:       map[uuid.UUID]*common.SyncChan{},
+		tag:            tag,
 	}
 	return cn
 }
 
 // Init initializes the chain
-func (cn *Chain) Init(InitGenesisHash hash.Hash256, initHash hash.Hash256, initHeight uint32, initTimestamp uint64) error {
+func (cn *Chain) Init(genesisContextData *types.ContextData) error {
 	cn.Lock()
 	defer cn.Unlock()
 
-	IDMap := map[int]uint8{}
-	for id, idx := range cn.processIndexMap {
-		IDMap[idx] = id
-	}
-
-	// Init
-	for i, p := range cn.processes {
-		if err := p.Init(types.NewRegister(IDMap[i]), cn, cn.Provider()); err != nil {
+	GenesisHash := hash.Hashes(hash.Hash(cn.store.ChainID().Bytes()), genesisContextData.Hash())
+	Height := cn.store.Height()
+	if Height > 0 {
+		if h, err := cn.store.Hash(0); err != nil {
 			return err
-		}
-	}
-	if err := cn.app.Init(types.NewRegister(255), cn, cn.Provider()); err != nil {
-		return err
-	}
-	if err := cn.consensus.Init(cn, newChainCommiter(cn)); err != nil {
-		return err
-	}
-	for _, s := range cn.services {
-		if err := s.Init(cn, cn.Provider()); err != nil {
-			return err
-		}
-	}
-
-	if initHeight > 0 {
-		Height := cn.store.Height()
-		if Height > initHeight {
-			if h, err := cn.store.Hash(0); err != nil {
-				return err
-			} else {
-				if InitGenesisHash != h {
-					return pile.ErrInvalidGenesisHash
-				}
-			}
-			if h, err := cn.store.Hash(initHeight); err != nil {
-				return err
-			} else {
-				if initHash != h {
-					return pile.ErrInvalidInitialHash
-				}
-			}
 		} else {
-			if err := cn.store.StoreInit(InitGenesisHash, initHash, initHeight, initTimestamp); err != nil {
-				return err
+			if GenesisHash != h {
+				return errors.WithStack(piledb.ErrInvalidGenesisHash)
 			}
 		}
 	} else {
-		// InitGenesis
-		genesisContext := types.NewEmptyContext()
-		if err := cn.app.InitGenesis(types.NewContextWrapper(255, genesisContext)); err != nil {
+		if err := cn.store.StoreGenesis(GenesisHash, genesisContextData); err != nil {
 			return err
 		}
-		if err := cn.consensus.InitGenesis(types.NewContextWrapper(0, genesisContext)); err != nil {
-			return err
-		}
-		if genesisContext.StackSize() > 1 {
-			return ErrDirtyContext
-		}
-		top := genesisContext.Top()
-
-		GenesisHash := hash.Hashes(hash.Hash([]byte(cn.store.Name())), hash.Hash([]byte{cn.store.ChainID()}), genesisContext.Hash())
-		if initHeight == 0 {
-			initHash = GenesisHash
-		}
-		Height := cn.store.Height()
-		if Height > 0 {
-			if h, err := cn.store.Hash(0); err != nil {
-				return err
-			} else {
-				if GenesisHash != h {
-					return pile.ErrInvalidGenesisHash
-				}
-			}
-		} else {
-			if err := cn.store.StoreGenesis(GenesisHash, top); err != nil {
-				return err
-			}
-		}
+	}
+	if err := cn.store.Prepare(); err != nil {
+		return err
 	}
 
 	// OnLoadChain
 	ctx := types.NewContext(cn.store)
-	for i, p := range cn.processes {
-		if err := p.OnLoadChain(types.NewContextWrapper(IDMap[i], ctx)); err != nil {
-			return err
-		}
-	}
-	if err := cn.app.OnLoadChain(types.NewContextWrapper(255, ctx)); err != nil {
-		return err
-	}
-	if err := cn.consensus.OnLoadChain(types.NewContextWrapper(0, ctx)); err != nil {
-		return err
-	}
 	for _, s := range cn.services {
 		if err := s.OnLoadChain(ctx); err != nil {
 			return err
 		}
 	}
 
-	log.Println("Chain loaded", cn.store.Height(), ctx.LastHash().String())
+	log.Println("Chain loaded", cn.store.Height(), ctx.PrevHash().String())
 
 	cn.isInit = true
 	return nil
 }
 
-// Provider returns a chain provider
-func (cn *Chain) Provider() types.Provider {
-	return cn.store
+// InitWith initializes the chain with snapshot informations
+func (cn *Chain) InitWith(InitGenesisHash hash.Hash256, initHash hash.Hash256, initHeight uint32, initTimestamp uint64) error {
+	cn.Lock()
+	defer cn.Unlock()
+
+	if initHeight == 0 {
+		return errors.WithStack(piledb.ErrInvalidInitialHash)
+	}
+
+	Height := cn.store.Height()
+	if Height > initHeight {
+		if h, err := cn.store.Hash(0); err != nil {
+			return err
+		} else {
+			if InitGenesisHash != h {
+				return errors.WithStack(piledb.ErrInvalidGenesisHash)
+			}
+		}
+		if h, err := cn.store.Hash(initHeight); err != nil {
+			return err
+		} else {
+			if initHash != h {
+				return errors.WithStack(piledb.ErrInvalidInitialHash)
+			}
+		}
+	} else {
+		if err := cn.store.StoreInit(InitGenesisHash, initHash, initHeight, initTimestamp); err != nil {
+			return err
+		}
+	}
+	if err := cn.store.Prepare(); err != nil {
+		return err
+	}
+
+	// OnLoadChain
+	ctx := types.NewContext(cn.store)
+	for _, s := range cn.services {
+		if err := s.OnLoadChain(ctx); err != nil {
+			return err
+		}
+	}
+
+	log.Println("Chain loaded", cn.store.Height(), ctx.PrevHash().String())
+
+	cn.isInit = true
+	return nil
 }
 
 // Close terminates and cleans the chain
@@ -173,74 +149,33 @@ func (cn *Chain) Close() {
 	}
 }
 
-// Processes returns processes
-func (cn *Chain) Processes() []types.Process {
-	list := []types.Process{}
-	for _, p := range cn.processes {
-		list = append(list, p)
-	}
-	return list
-}
-
-// Process returns the process by the id
-func (cn *Chain) Process(id uint8) (types.Process, error) {
-	if id == 255 {
-		return cn.app, nil
-	}
-	idx, has := cn.processIndexMap[id]
-	if !has {
-		return nil, types.ErrNotExistProcess
-	}
-	return cn.processes[idx], nil
-}
-
-// ProcessByName returns the process by the name
-func (cn *Chain) ProcessByName(name string) (types.Process, error) {
-	id, has := cn.processIDMap[name]
-	if !has {
-		return nil, types.ErrNotExistProcess
-	}
-	idx, has := cn.processIndexMap[id]
-	if !has {
-		return nil, types.ErrNotExistProcess
-	}
-	return cn.processes[idx], nil
-}
-
-// MustAddProcess adds Process but panic when has the same name process
-func (cn *Chain) MustAddProcess(p types.Process) {
-	if cn.isInit {
-		panic(ErrAddBeforeChainInit)
-	}
-	if p.ID() == 0 || p.ID() == 255 {
-		panic(ErrReservedID)
-	}
-	if _, has := cn.processIDMap[p.Name()]; has {
-		panic(types.ErrExistProcessName)
-	}
-	if _, has := cn.processIndexMap[p.ID()]; has {
-		panic(types.ErrExistProcessID)
-	}
-	idx := len(cn.processes)
-	cn.processes = append(cn.processes, p)
-	cn.processIDMap[p.Name()] = p.ID()
-	cn.processIndexMap[p.ID()] = idx
-}
-
 // Services returns services
 func (cn *Chain) Services() []types.Service {
 	list := []types.Service{}
-	for _, s := range cn.services {
-		list = append(list, s)
-	}
+	list = append(list, cn.services...)
 	return list
+}
+
+// TopGenerator returns current top generator
+func (cn *Chain) TopGenerator(TimeoutCount uint32) (common.Address, error) {
+	return cn.store.TopGenerator(TimeoutCount)
+}
+
+// GeneratorInMap returns current top generator
+func (cn *Chain) GeneratorsInMap(GeneratorMap map[common.Address]bool, Limit int) ([]common.Address, error) {
+	return cn.store.GeneratorsInMap(GeneratorMap, Limit)
+}
+
+// TopRankInMap returns current top generator
+func (cn *Chain) TopGeneratorInMap(GeneratorMap map[common.Address]bool) (common.Address, uint32, error) {
+	return cn.store.TopGeneratorInMap(GeneratorMap)
 }
 
 // ServiceByName returns the service by the name
 func (cn *Chain) ServiceByName(name string) (types.Service, error) {
 	s, has := cn.serviceMap[name]
 	if !has {
-		return nil, ErrNotExistService
+		return nil, errors.WithStack(ErrNotExistService)
 	}
 	return s, nil
 }
@@ -257,17 +192,58 @@ func (cn *Chain) MustAddService(s types.Service) {
 	cn.serviceMap[s.Name()] = s
 }
 
+// Provider returns the context of the chain
+func (cn *Chain) Provider() types.Provider {
+	return cn.store
+}
+
+// WaitConnectedBlock is wait untile target block stored
+func (cn *Chain) WaitConnectedBlock(targetBlock uint32) {
+	if cn.Provider().Height() >= targetBlock {
+		return
+	}
+	id := uuid.New()
+	wc := common.NewSyncChan()
+	cn.waitLock.Lock()
+	cn.waitChan[id] = wc
+	cn.waitLock.Unlock()
+	defer func() {
+		cn.waitLock.Lock()
+		delete(cn.waitChan, id)
+		cn.waitLock.Unlock()
+		wc.Close()
+	}()
+
+	done := make(chan bool)
+	go func() {
+		defer close(done)
+		for cn.Provider().Height() < targetBlock {
+			time.Sleep(time.Millisecond * 10)
+		}
+	}()
+
+	var conntced uint32
+	for conntced < targetBlock {
+		select {
+		case data := <-wc.Chan:
+			conntced = data.(uint32)
+		case <-done:
+			return
+		}
+	}
+}
+
 // NewContext returns the context of the chain
 func (cn *Chain) NewContext() *types.Context {
 	return types.NewContext(cn.store)
 }
 
 // ConnectBlock try to connect block to the chain
-func (cn *Chain) ConnectBlock(b *types.Block, SigMap map[hash.Hash256][]common.PublicHash) error {
+func (cn *Chain) ConnectBlock(b *types.Block, SigMap map[hash.Hash256]common.Address) error {
 	cn.closeLock.RLock()
 	defer cn.closeLock.RUnlock()
 	if cn.isClose {
-		return ErrChainClosed
+		return errors.WithStack(ErrChainClosed)
 	}
 
 	cn.Lock()
@@ -276,10 +252,9 @@ func (cn *Chain) ConnectBlock(b *types.Block, SigMap map[hash.Hash256][]common.P
 	if err := cn.validateHeader(&b.Header); err != nil {
 		return err
 	}
-	if err := cn.consensus.ValidateSignature(&b.Header, b.Signatures); err != nil {
+	if err := cn.ValidateSignature(&b.Header, b.Body.BlockSignatures); err != nil {
 		return err
 	}
-
 	ctx := types.NewContext(cn.store)
 	if err := cn.executeBlockOnContext(b, ctx, SigMap); err != nil {
 		return err
@@ -287,229 +262,219 @@ func (cn *Chain) ConnectBlock(b *types.Block, SigMap map[hash.Hash256][]common.P
 	return cn.connectBlockWithContext(b, ctx)
 }
 
-func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context) error {
-	IDMap := map[int]uint8{}
-	for id, idx := range cn.processIndexMap {
-		IDMap[idx] = id
-	}
-
-	if b.Header.ContextHash != ctx.Hash() {
-		log.Println(ctx.Dump())
-		return ErrInvalidContextHash
-	}
-
-	if ctx.StackSize() > 1 {
-		return ErrDirtyContext
-	}
-
-	// OnSaveData
-	for i, p := range cn.processes {
-		if err := p.OnSaveData(b, types.NewContextWrapper(IDMap[i], ctx)); err != nil {
-			return err
-		} else if ctx.StackSize() > 1 {
-			return ErrDirtyContext
-		}
-	}
-	if err := cn.app.OnSaveData(b, types.NewContextWrapper(255, ctx)); err != nil {
-		return err
-	} else if ctx.StackSize() > 1 {
-		return ErrDirtyContext
-	}
-	if err := cn.consensus.OnSaveData(b, types.NewContextWrapper(0, ctx)); err != nil {
-		return err
-	} else if ctx.StackSize() > 1 {
-		return ErrDirtyContext
-	}
-
-	top := ctx.Top()
-	if err := cn.store.StoreBlock(b, top); err != nil {
+func (cn *Chain) ValidateSignature(bh *types.Header, sigs []common.Signature) error {
+	Top, err := cn.store.rankTable.TopRank(bh.TimeoutCount)
+	if err != nil {
 		return err
 	}
-	for _, s := range cn.services {
-		s.OnBlockConnected(b, top.Events, ctx)
+	if Top.Address != bh.Generator {
+		return errors.WithStack(ErrInvalidTopAddress)
+	}
+
+	GeneratorSignature := sigs[0]
+	h, _, err := bin.WriterToHash(bh)
+	if err != nil {
+		return err
+	}
+	pubkey, err := common.RecoverPubkey(bh.ChainID, h, GeneratorSignature)
+	if err != nil {
+		return err
+	}
+	if Top.Address != pubkey.Address() {
+		return errors.WithStack(ErrInvalidTopSignature)
+	}
+
+	if len(sigs) != len(cn.observerKeyMap)/2+2 {
+		return errors.WithStack(ErrInvalidSignatureCount)
+	}
+	KeyMap := map[common.PublicKey]bool{}
+	for pubkey := range cn.observerKeyMap {
+		KeyMap[pubkey] = true
+	}
+	bs := types.BlockSign{
+		HeaderHash:         h,
+		GeneratorSignature: sigs[0],
+	}
+	ObserverSignatures := sigs[1:]
+	sh, _, err := bin.WriterToHash(&bs)
+	if err != nil {
+		return err
+	}
+	if err := common.ValidateSignaturesMajority(bh.ChainID, sh, ObserverSignatures, KeyMap); err != nil {
+		return err
 	}
 	return nil
 }
 
-func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context, sm map[hash.Hash256][]common.PublicHash) error {
+func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context) error {
+	if b.Header.ContextHash != ctx.Hash() {
+		log.Println("CONNECT", ctx.Dump())
+		panic("")
+		return errors.WithStack(ErrInvalidContextHash)
+	}
+
+	if ctx.StackSize() > 1 {
+		return errors.WithStack(types.ErrDirtyContext)
+	}
+
+	if err := cn.store.StoreBlock(b, ctx); err != nil {
+		return err
+	}
+	var ca []*common.SyncChan
+	cn.waitLock.Lock()
+	for _, c := range cn.waitChan {
+		ca = append(ca, c)
+	}
+	cn.waitLock.Unlock()
+	for _, c := range ca {
+		c.Send(b.Header.Height)
+	}
+
+	for _, s := range cn.services {
+		s.OnBlockConnected(b.Clone(), ctx)
+	}
+	return nil
+}
+
+func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context, sm map[hash.Hash256]common.Address) error {
 	TxSigners, TxHashes, err := cn.validateTransactionSignatures(b, sm)
 	if err != nil {
 		return err
 	}
-	IDMap := map[int]uint8{}
-	for id, idx := range cn.processIndexMap {
-		IDMap[idx] = id
-	}
-
-	// BeforeExecuteTransactions
-	for i, p := range cn.processes {
-		if err := p.BeforeExecuteTransactions(types.NewContextWrapper(IDMap[i], ctx)); err != nil {
-			return err
-		} else if ctx.StackSize() > 1 {
-			return ErrDirtyContext
-		}
-	}
-	if err := cn.app.BeforeExecuteTransactions(types.NewContextWrapper(255, ctx)); err != nil {
-		return err
-	} else if ctx.StackSize() > 1 {
-		return ErrDirtyContext
-	}
 
 	// Execute Transctions
 	currentSlot := types.ToTimeSlot(b.Header.Timestamp)
-	for i, tx := range b.Transactions {
-		slot := types.ToTimeSlot(tx.Timestamp())
+	for i, tx := range b.Body.Transactions {
+		slot := types.ToTimeSlot(tx.Timestamp)
 		if slot < currentSlot-1 {
-			return types.ErrInvalidTransactionTimeSlot
+			return errors.WithStack(types.ErrInvalidTransactionTimeSlot)
 		} else if slot > currentSlot {
-			return types.ErrInvalidTransactionTimeSlot
+			return errors.WithStack(types.ErrInvalidTransactionTimeSlot)
 		}
 
-		signers := TxSigners[i]
-		t := b.TransactionTypes[i]
-		pid := uint8(t >> 8)
-		p, err := cn.Process(pid)
-		if err != nil {
-			return err
-		}
-		ctw := types.NewContextWrapper(pid, ctx)
-
-		sn := ctw.Snapshot()
+		sn := ctx.Snapshot()
 		if err := ctx.UseTimeSlot(slot, string(TxHashes[i][:])); err != nil {
+			ctx.Revert(sn)
 			return err
 		}
-		if err := tx.Validate(p, ctw, signers); err != nil {
-			ctw.Revert(sn)
-			return err
-		}
-		if err := tx.Execute(p, ctw, uint16(i)); err != nil {
-			ctw.Revert(sn)
-			return err
-		}
-		if Has, err := ctw.HasAccount(b.Header.Generator); err != nil {
-			ctw.Revert(sn)
-			if err == types.ErrDeletedAccount {
-				return ErrCannotDeleteGeneratorAccount
-			} else {
+		TXID := types.TransactionID(b.Header.Height, uint16(len(b.Body.Transactions)))
+		if tx.To == common.ZeroAddr {
+			if !ctx.IsAdmin(TxSigners[i]) {
+				ctx.Revert(sn)
+				return errors.WithStack(ErrInvalidAdminAddress)
+			}
+			if err := cn.ExecuteTransaction(ctx, tx, TXID); err != nil {
+				ctx.Revert(sn)
 				return err
 			}
-		} else if !Has {
-			ctw.Revert(sn)
-			return ErrCannotDeleteGeneratorAccount
+		} else {
+			if _, err := ExecuteContractTx(ctx, tx, TxSigners[i]); err != nil {
+				ctx.Revert(sn)
+				return err
+			}
 		}
-		ctw.Commit(sn)
+		ctx.Commit(sn)
 	}
-
 	if ctx.StackSize() > 1 {
-		return ErrDirtyContext
+		return errors.WithStack(types.ErrDirtyContext)
 	}
-
-	// AfterExecuteTransactions
-	for i, p := range cn.processes {
-		if err := p.AfterExecuteTransactions(b, types.NewContextWrapper(IDMap[i], ctx)); err != nil {
+	if b.Header.Height%prefix.RewardIntervalBlocks == 0 {
+		if _, err := ctx.ProcessReward(ctx, b); err != nil {
 			return err
-		} else if ctx.StackSize() > 1 {
-			return ErrDirtyContext
 		}
 	}
-	if err := cn.app.AfterExecuteTransactions(b, types.NewContextWrapper(255, ctx)); err != nil {
-		return err
-	} else if ctx.StackSize() > 1 {
-		return ErrDirtyContext
+	if ctx.StackSize() > 1 {
+		return errors.WithStack(types.ErrDirtyContext)
 	}
 	return nil
 }
 
 func (cn *Chain) validateHeader(bh *types.Header) error {
-	provider := cn.Provider()
-	height, lastHash := provider.LastStatus()
-	if bh.ChainID != provider.ChainID() {
-		return ErrInvalidChainID
+	height, lastHash := cn.store.LastStatus()
+	if bh.ChainID.Cmp(cn.store.ChainID()) != 0 {
+		return errors.Wrapf(ErrInvalidChainID, "chainid %v, %v", bh.ChainID, cn.store.ChainID())
 	}
-	if bh.Version > provider.Version() {
-		return ErrInvalidVersion
+	if bh.Version > cn.store.Version() {
+		return errors.WithStack(ErrInvalidVersion)
 	}
 	if bh.PrevHash != lastHash {
-		return ErrInvalidPrevHash
+		return errors.WithStack(ErrInvalidPrevHash)
 	}
-	if bh.Timestamp <= provider.LastTimestamp() {
-		return ErrInvalidTimestamp
+	if bh.Timestamp <= cn.store.LastTimestamp() {
+		return errors.WithStack(ErrInvalidTimestamp)
 	}
 	var emptyAddr common.Address
 	if bh.Generator == emptyAddr {
-		return ErrInvalidGenerator
+		return errors.WithStack(ErrInvalidGenerator)
+	}
+	if bh.Height != height+1 {
+		return errors.WithStack(ErrInvalidHeight)
 	}
 
-	if bh.Height != height+1 {
-		return ErrInvalidHeight
-	}
 	if bh.Height == cn.store.InitHeight()+1 {
 		if bh.Version <= 0 {
-			return ErrInvalidVersion
+			return errors.WithStack(ErrInvalidVersion)
 		}
 	} else {
-		TargetHeader, err := provider.Header(height)
+		TargetHeader, err := cn.store.Header(height)
 		if err != nil {
 			return err
 		}
 		if bh.Version < TargetHeader.Version {
-			return ErrInvalidVersion
+			return errors.WithStack(ErrInvalidVersion)
 		}
-		if bh.ChainID != TargetHeader.ChainID {
-			return ErrInvalidChainID
+		if bh.ChainID.Cmp(TargetHeader.ChainID) != 0 {
+			return errors.WithStack(ErrInvalidChainID)
 		}
 	}
 	return nil
 }
 
-func (cn *Chain) validateTransactionSignatures(b *types.Block, SigMap map[hash.Hash256][]common.PublicHash) ([][]common.PublicHash, []hash.Hash256, error) {
-	TxHashes := make([]hash.Hash256, len(b.Transactions)+1)
+func (cn *Chain) validateTransactionSignatures(b *types.Block, SigMap map[hash.Hash256]common.Address) ([]common.Address, []hash.Hash256, error) {
+	TxHashes := make([]hash.Hash256, len(b.Body.Transactions)+1)
 	TxHashes[0] = b.Header.PrevHash
-	TxSigners := make([][]common.PublicHash, len(b.Transactions))
-	if len(b.Transactions) > 0 {
+	TxSigners := make([]common.Address, len(b.Body.Transactions))
+	if len(b.Body.Transactions) > 0 {
 		var wg sync.WaitGroup
 		cpuCnt := runtime.NumCPU()
-		if len(b.Transactions) < 1000 {
+		if len(b.Body.Transactions) < 1000 {
 			cpuCnt = 1
 		}
-		txUnit := len(b.Transactions) / cpuCnt
-		if len(b.Transactions)%cpuCnt != 0 {
+		txUnit := len(b.Body.Transactions) / cpuCnt
+		if len(b.Body.Transactions)%cpuCnt != 0 {
 			txUnit++
 		}
 		errs := make(chan error, cpuCnt)
 		defer close(errs)
 		for i := 0; i < cpuCnt; i++ {
 			lastCnt := (i + 1) * txUnit
-			if lastCnt > len(b.Transactions) {
-				lastCnt = len(b.Transactions)
+			if lastCnt > len(b.Body.Transactions) {
+				lastCnt = len(b.Body.Transactions)
 			}
 			wg.Add(1)
-			go func(sidx int, txs []types.Transaction) {
+			go func(sidx int, txs []*types.Transaction) {
 				defer wg.Done()
 				for q, tx := range txs {
-					t := b.TransactionTypes[sidx+q]
-					sigs := b.TransactionSignatures[sidx+q]
-
-					TxHash := HashTransactionByType(cn.store.chainID, t, tx)
+					TxHash := tx.Hash()
 					TxHashes[sidx+q+1] = TxHash
-					var signers []common.PublicHash
+					hasSigner := false
 					if SigMap != nil {
-						signers = SigMap[TxHash]
-					}
-					if signers == nil {
-						signers = make([]common.PublicHash, 0, len(sigs))
-						for _, sig := range sigs {
-							pubkey, err := common.RecoverPubkey(TxHash, sig)
-							if err != nil {
-								errs <- err
-								return
-							}
-							signers = append(signers, common.NewPublicHash(pubkey))
+						if s, has := SigMap[TxHash]; has {
+							TxSigners[sidx+q] = s
+							hasSigner = true
 						}
 					}
-					TxSigners[sidx+q] = signers
+					if !hasSigner {
+						sig := b.Body.TransactionSignatures[sidx+q]
+						pubkey, err := common.RecoverPubkey(tx.ChainID, TxHash, sig)
+						if err != nil {
+							errs <- err
+							return
+						}
+						TxSigners[sidx+q] = pubkey.Address()
+					}
 				}
-			}(i*txUnit, b.Transactions[i*txUnit:lastCnt])
+			}(i*txUnit, b.Body.Transactions[i*txUnit:lastCnt])
 		}
 		wg.Wait()
 		if len(errs) > 0 {
@@ -520,7 +485,31 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block, SigMap map[hash.H
 	if h, err := BuildLevelRoot(TxHashes); err != nil {
 		return nil, nil, err
 	} else if b.Header.LevelRootHash != h {
-		return nil, nil, ErrInvalidLevelRootHash
+		return nil, nil, errors.WithStack(ErrInvalidLevelRootHash)
 	}
 	return TxSigners, TxHashes[1:], nil
+}
+
+func (cn *Chain) ExecuteTransaction(ctx *types.Context, tx *types.Transaction, TXID string) error {
+	switch tx.Method {
+	case "Admin.Add":
+		return ctx.SetAdmin(common.BytesToAddress(tx.Args), true)
+	case "Admin.Remove":
+		return ctx.SetAdmin(common.BytesToAddress(tx.Args), false)
+	case "Generator.Add":
+		return ctx.SetGenerator(common.BytesToAddress(tx.Args), true)
+	case "Generator.Remove":
+		return ctx.SetGenerator(common.BytesToAddress(tx.Args), false)
+	case "Contract.Deploy":
+		data := &DeployContractData{}
+		if _, err := data.ReadFrom(bytes.NewReader(tx.Args)); err != nil {
+			return err
+		}
+		if _, err := ctx.DeployContract(data.Owner, data.ClassID, data.Args); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.WithStack(ErrUnknownTransactionMethod)
+	}
 }

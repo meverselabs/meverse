@@ -1,4 +1,12 @@
 _data*
 __debug_bin
+__debug_bin.exe
 .vscode
 /debug
+_test*
+fdata/
+ndata/
+odata/
+cmd/observer/observer
+cmd/node/node
+ndkey.key
