@@ -19,11 +19,6 @@ import (
 	"github.com/fletaio/fleta_v2/core/piledb"
 	"github.com/fletaio/fleta_v2/core/types"
 	"github.com/fletaio/fleta_v2/node"
-	"github.com/fletaio/fleta_v2/service/account"
-	"github.com/fletaio/fleta_v2/service/apiserver"
-	"github.com/fletaio/fleta_v2/service/apiserver/metamaskrelay"
-	"github.com/fletaio/fleta_v2/service/apiserver/viewchain"
-	"github.com/fletaio/fleta_v2/service/txsearch"
 )
 
 // Config is a configuration for the cmd
@@ -163,12 +158,6 @@ func main() {
 	}
 
 	cn := chain.NewChain(ObserverKeys, st, "")
-	api := account.NewAccountAPI()
-	rpcapi := apiserver.NewAPIServer()
-	ts := txsearch.NewTxSearch(cfg.StoreRoot+"/_txsearch", rpcapi, st, cn)
-	cn.MustAddService(ts)
-	cn.MustAddService(api)
-	cn.MustAddService(rpcapi)
 	if cfg.InitHeight == 0 {
 		if err := cn.Init(app.Genesis()); err != nil {
 			panic(err)
@@ -204,11 +193,6 @@ func main() {
 	}
 	cm.RemoveAll()
 	cm.Add("formulator", fr)
-
-	metamaskrelay.NewMetamaskRelay(rpcapi, ts, cn, fr)
-	go rpcapi.Run(":8541")
-	go api.Run(cn, fr, st)
-	viewchain.NewViewchain(rpcapi, ts, cn, st, fr)
 
 	go fr.Run(":" + strconv.Itoa(cfg.Port))
 
