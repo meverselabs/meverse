@@ -1,3 +1,5 @@
+This readme file is deprecated. It will be updated soon.
+
 ## FLETA
 
 This is repository of FLETA project.<br/>
