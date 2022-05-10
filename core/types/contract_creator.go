@@ -39,6 +39,18 @@ func RegisterContractType(cont Contract) (uint64, error) {
 	return ClassID, nil
 }
 
+func UpgrageContractType(cont Contract, ClassID uint64) (uint64, error) {
+	rt := reflect.TypeOf(cont)
+	for rt.Kind() == reflect.Ptr {
+		rt = rt.Elem()
+	}
+	if _, has := gContractNameMap[ClassID]; !has {
+		return 0, errors.WithStack(ErrNotExistContract)
+	}
+	gContractTypeMap[ClassID] = rt
+	return ClassID, nil
+}
+
 func CreateContract(cd *ContractDefine) (Contract, error) {
 	rt, has := gContractTypeMap[cd.ClassID]
 	if !has {
