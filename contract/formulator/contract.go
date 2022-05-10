@@ -2,16 +2,19 @@ package formulator
 
 import (
 	"bytes"
+	"encoding/hex"
+	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/pkg/errors"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/amount"
-	"github.com/fletaio/fleta_v2/common/bin"
-	"github.com/fletaio/fleta_v2/common/hash"
-	"github.com/fletaio/fleta_v2/core/prefix"
-	"github.com/fletaio/fleta_v2/core/types"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
+	"github.com/meverselabs/meverse/common/bin"
+	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/core/prefix"
+	"github.com/meverselabs/meverse/core/types"
 )
 
 type FormulatorContract struct {
@@ -653,7 +656,7 @@ func (cont *FormulatorContract) CreateSigma(cc *types.ContractContext, TokenIDs 
 			return errors.New("duplicate formulator")
 		}
 		uniqueCheck[addr] = addr
-		fr, err := cont.Formulator(cc, addr)
+		fr, err := cont._formulator(cc, addr)
 		if err != nil {
 			return err
 		}
@@ -700,7 +703,7 @@ func (cont *FormulatorContract) CreateOmega(cc *types.ContractContext, TokenIDs 
 			return errors.New("duplicate formulator")
 		}
 		uniqueCheck[addr] = addr
-		fr, err := cont.Formulator(cc, addr)
+		fr, err := cont._formulator(cc, addr)
 		if err != nil {
 			return err
 		}
@@ -730,7 +733,7 @@ func (cont *FormulatorContract) CreateOmega(cc *types.ContractContext, TokenIDs 
 }
 
 func (cont *FormulatorContract) Revoke(cc *types.ContractContext, TokenID common.Address) error {
-	fr, err := cont.Formulator(cc, TokenID)
+	fr, err := cont._formulator(cc, TokenID)
 	if err != nil {
 		return err
 	}
@@ -802,7 +805,7 @@ func (cont *FormulatorContract) Unstake(cc *types.ContractContext, HyperAddress 
 }
 
 func (cont *FormulatorContract) Approve(cc *types.ContractContext, To common.Address, TokenID common.Address) error {
-	formulator, err := cont.Formulator(cc, TokenID)
+	formulator, err := cont._formulator(cc, TokenID)
 	if err != nil {
 		return err
 	}
@@ -822,7 +825,7 @@ func (cont *FormulatorContract) _Approve(cc *types.ContractContext, TokenID comm
 }
 
 func (cont *FormulatorContract) TransferFrom(cc *types.ContractContext, From common.Address, To common.Address, TokenID common.Address) error {
-	formulator, err := cont.Formulator(cc, TokenID)
+	formulator, err := cont._formulator(cc, TokenID)
 	if err != nil {
 		return err
 	}
@@ -849,7 +852,7 @@ func (cont *FormulatorContract) _transferFrom(cc *types.ContractContext, formula
 }
 
 func (cont *FormulatorContract) RegisterSales(cc *types.ContractContext, TokenID common.Address, Amount *amount.Amount) error {
-	formulator, err := cont.Formulator(cc, TokenID)
+	formulator, err := cont._formulator(cc, TokenID)
 	if err != nil {
 		return err
 	}
@@ -874,7 +877,7 @@ func (cont *FormulatorContract) RegisterSales(cc *types.ContractContext, TokenID
 }
 
 func (cont *FormulatorContract) CancelSales(cc *types.ContractContext, TokenID common.Address) error {
-	formulator, err := cont.Formulator(cc, TokenID)
+	formulator, err := cont._formulator(cc, TokenID)
 	if err != nil {
 		return err
 	}
@@ -901,7 +904,7 @@ func (cont *FormulatorContract) CancelSales(cc *types.ContractContext, TokenID c
 
 func (cont *FormulatorContract) BuyFormulator(cc *types.ContractContext, TokenID common.Address) error {
 	// formulator transfer
-	formulator, err := cont.Formulator(cc, TokenID)
+	formulator, err := cont._formulator(cc, TokenID)
 	if err != nil {
 		return err
 	}
@@ -925,10 +928,22 @@ func (cont *FormulatorContract) BuyFormulator(cc *types.ContractContext, TokenID
 }
 
 //////////////////////////////////////////////////
+// Public Writer only owner Functions
+//////////////////////////////////////////////////
+
+func (cont *FormulatorContract) SetURI(cc *types.ContractContext, uri string) error {
+	if cont.master != cc.From() {
+		return errors.New("is not master")
+	}
+	cc.SetContractData([]byte{tagUri}, []byte(uri))
+	return nil
+}
+
+//////////////////////////////////////////////////
 // Public Reader Functions
 //////////////////////////////////////////////////
 
-func (cont *FormulatorContract) Formulator(cc types.ContractLoader, _tokenID common.Address) (*Formulator, error) {
+func (cont *FormulatorContract) _formulator(cc types.ContractLoader, _tokenID common.Address) (*Formulator, error) {
 	fr := &Formulator{}
 	bs := cc.AccountData(_tokenID, []byte{tagFormulator})
 	if len(bs) == 0 {
@@ -968,7 +983,7 @@ func (cont *FormulatorContract) FormulatorMap(cc types.ContractLoader) (map[comm
 		for i := uint32(0); i < Count; i++ {
 			var addr common.Address
 			copy(addr[:], cc.ContractData(toFormulatorReverseKey(i)))
-			fr, err := cont.Formulator(cc, addr)
+			fr, err := cont._formulator(cc, addr)
 			if err != nil {
 				return nil, err
 			}
@@ -986,8 +1001,16 @@ func (cont *FormulatorContract) BalanceOf(cc types.ContractLoader, _owner common
 	return bin.Uint32(formulatorCount)
 }
 
+func (cont *FormulatorContract) TotalSupply(cc types.ContractLoader) uint32 {
+	var Count uint32
+	if bs := cc.ContractData([]byte{tagFormulatorCount}); len(bs) > 0 {
+		Count = bin.Uint32(bs)
+	}
+	return Count
+}
+
 func (cont *FormulatorContract) OwnerOf(cc types.ContractLoader, _tokenID common.Address) (common.Address, error) {
-	formulator, err := cont.Formulator(cc, _tokenID)
+	formulator, err := cont._formulator(cc, _tokenID)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -999,4 +1022,57 @@ func (cont *FormulatorContract) GetApproved(cc types.ContractLoader, TokenID com
 	var approvedTo common.Address
 	copy(approvedTo[:], bs)
 	return approvedTo
+}
+
+func (cont *FormulatorContract) URI(cc types.ContractLoader, _id *big.Int) string {
+	strID := hex.EncodeToString(_id.Bytes())
+	idstr := fmt.Sprintf("%064v", strID)
+
+	bs := cc.ContractData([]byte{tagUri})
+	uri := string(bs)
+	return strings.Replace(uri, "{id}", idstr, -1)
+}
+
+func (cont *FormulatorContract) SupportsInterface(cc types.ContractLoader, interfaceID []byte) bool {
+	// 01ffc9a7 eip-165
+	// d9b67a26 Multi Token Standard
+	// 80ac58cd NFT
+	// 0e89341c ERC1155Metadata_URI
+	switch hex.EncodeToString(interfaceID) {
+	case "80ac58cd", "d9b67a26", "01ffc9a7", "0e89341c":
+		return true
+	}
+	return false
+}
+
+func (cont *FormulatorContract) TokenByIndex(cc types.ContractLoader, _id uint32) (*big.Int, error) {
+	var addr common.Address
+	copy(addr[:], cc.ContractData(toFormulatorReverseKey(_id)))
+	fr, err := cont._formulator(cc, addr)
+	if err != nil {
+		return nil, err
+	}
+	return big.NewInt(0).SetBytes(fr.TokenID[:]), nil
+}
+
+func (cont *FormulatorContract) TokenOfOwnerByIndex(cc types.ContractLoader, _owner common.Address, _index uint32) (*big.Int, error) {
+	var userCount uint32 = 0
+	if bs := cc.ContractData([]byte{tagFormulatorCount}); len(bs) > 0 {
+		Count := bin.Uint32(bs)
+		for i := uint32(0); i < Count; i++ {
+			var addr common.Address
+			copy(addr[:], cc.ContractData(toFormulatorReverseKey(i)))
+			fr, err := cont._formulator(cc, addr)
+			if err != nil {
+				return nil, err
+			}
+			if fr.Owner == _owner {
+				if _index == userCount {
+					return big.NewInt(0).SetBytes(fr.TokenID[:]), nil
+				}
+				userCount++
+			}
+		}
+	}
+	return nil, errors.New("not exist")
 }

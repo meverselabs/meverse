@@ -1,0 +1,70 @@
+([a-zA-Z_]+)[ ]*\([ ]*([\{\}\[\]$ 0-9a-zA-Z_":\t,]*)\) [(]*([^)]*)[)]*[\) ]*\{$
+
+
+{"inputs": [$2], "name": "$1","outputs": [$3],"stateMutability": "nonpayable","type": "function"},
+{"constant": true,"inputs": [$2],"name": "$1","outputs": [$3],"payable": false,"stateMutability": "view","type": "function"},
+
+(string|*amount.Amount)
+
+(^[a-zA-Z_]+) \(
+    (?:(?:cc types.ContractLoader|cc \*types.ContractContext)[, ]?)
+
+
+(cc types.ContractLoader|cc \*types.ContractContext)[, ]*
+[, ]+error
+
+
+(?:([a-zA-Z0-9_]+) (common.Address))
+{"internalType": "address","name": "$1","type": "address"}
+(?:([a-zA-Z0-9_]+) (\[\]common.Address))
+{"internalType": "address[]","name": "$1","type": "address[]"}
+(?:([a-zA-Z0-9_]+) (string))
+{"internalType": "string","name": "$1","type": "string"}
+(?:([a-zA-Z0-9_]+) (\*amount.Amount|\*big.Int|uint[0-9]+))
+{"internalType": "uint256","name": "$1","type": "uint256"}
+(?:([a-zA-Z0-9_]+) (\[\]\*amount.Amount|\[\]\*big.Int|\[\]uint[0-9]+))
+{"internalType": "uint256[]","name": "$1","type": "uint256[]"}
+(?:([a-zA-Z0-9_]+) (\[\]\byte))
+{"internalType": "bytes32","name": "$1","type": "bytes32"}
+(?:([a-zA-Z0-9_]+) (bool))
+{"internalType": "bool","name": "$1","type": "bool"}
+
+(?:(\[\]common.Address))
+{"internalType": "address[]","name": "","type": "address[]"}
+(?:(common.Address))
+{"internalType": "address","name": "","type": "address"}
+(?:(string))
+{"internalType": "string","name": "","type": "string"}
+(?:(\[\]\*amount.Amount|\[\]\*big.Int|\[\]uint8|\[\]uint16|\[\]uint32|\[\]uint64))
+{"internalType": "uint256[]","name": "","type": "uint256[]"}
+(?:(\*amount.Amount|\*big.Int|uint8|uint16|uint32|uint64? ))
+{"internalType": "uint256","name": "","type": "uint256"}
+(?:(\[\]\byte))
+{"internalType": "bytes32","name": "","type": "bytes32"}
+(?:(bool))
+{"internalType": "bool","name": "","type": "bool"}
+
+
+(?:([a-zA-Z_]+) (\*amount.Amount|\*big.Int|uint[0-9]+))|(?:([a-zA-Z_]+) (\[\]\*amount.Amount|\[\]\*big.Int|\[\]uint[0-9]+))
+{"internalType": "address","name": "from","type": "address"}
+
+
+
+(^[a-zA-Z_]+) \(
+(?:
+    (?:cc types.ContractLoader|cc \*types.ContractContext)[, ]?)
+    (?:(?:
+        (?:([a-zA-Z_]+) (common.Address))
+        |(?:([a-zA-Z_]+) (string))
+        |(?:([a-zA-Z_]+) (\*amount.Amount|\*big.Int|uint[0-9]+))
+        |(?:([a-zA-Z_]+) (\[\]\*amount.Amount|\[\]\*big.Int|\[\]uint[0-9]+))
+        |(?:([a-zA-Z_]+) (\[\]\byte))
+        |(?:([a-zA-Z_]+) (bool))
+    )[, ]*)*\)
+
+(^[a-zA-Z_]+) (?:(?:cc types.ContractLoader|cc \*types.ContractContext)[, ]*)(?:(?:([a-zA-Z_]+) (common.Address))|(?:([a-zA-Z_]+) (string))|(?:([a-zA-Z_]+) (\*amount.Amount|\*big.Int|uint[0-9]+))|(?:([a-zA-Z_]+) (\[\]\*amount.Amount|\[\]\*big.Int|\[\]uint[0-9]+))|(?:([a-zA-Z_]+) (\[\]\byte))|(?:([a-zA-Z_]+) (bool)))*
+$4 $5 $6
+$7 $8 $9
+$10 $11 $12
+
+common.Address

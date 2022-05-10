@@ -5,9 +5,9 @@ import (
 	"encoding/hex"
 	"io"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/bin"
-	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/bin"
+	"github.com/meverselabs/meverse/common/hash"
 )
 
 // Rank represents the rank information of the formulator account

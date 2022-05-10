@@ -1,8 +1,8 @@
 package formulator
 
 import (
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/bin"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/bin"
 )
 
 var (
@@ -22,6 +22,7 @@ var (
 	tagStakingAmountMap     = byte(0x24)
 	tagStakingPowerMap      = byte(0x25)
 	tagStackRewardMap       = byte(0x31)
+	tagUri                  = byte(0x41)
 )
 
 func makeFormulatorKey(key byte, addr common.Address) []byte {

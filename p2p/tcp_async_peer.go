@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/fletaio/fleta_v2/common/bin"
-	"github.com/fletaio/fleta_v2/common/queue"
+	"github.com/meverselabs/meverse/common/bin"
+	"github.com/meverselabs/meverse/common/queue"
 )
 
 // TCPAsyncPeer manages send and recv of the connection

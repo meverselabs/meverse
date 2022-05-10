@@ -2,9 +2,10 @@ package types
 
 import (
 	"reflect"
+	"strings"
 
-	"github.com/fletaio/fleta_v2/common/bin"
-	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/meverselabs/meverse/common/bin"
+	"github.com/meverselabs/meverse/common/hash"
 	"github.com/pkg/errors"
 )
 
@@ -20,6 +21,7 @@ func RegisterContractType(cont Contract) (uint64, error) {
 	}
 	name := rt.Name()
 	if pkgPath := rt.PkgPath(); len(pkgPath) > 0 {
+		pkgPath = strings.Replace(pkgPath, "meverselabs/meverse", "fletaio/fleta_v2", -1)
 		name = pkgPath + "." + name
 	}
 	h := hash.Hash([]byte(name))

@@ -7,13 +7,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/amount"
-	"github.com/fletaio/fleta_v2/common/bin"
-	"github.com/fletaio/fleta_v2/common/hash"
-	"github.com/fletaio/fleta_v2/core/keydb"
-	"github.com/fletaio/fleta_v2/core/piledb"
-	"github.com/fletaio/fleta_v2/core/types"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
+	"github.com/meverselabs/meverse/common/bin"
+	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/core/keydb"
+	"github.com/meverselabs/meverse/core/piledb"
+	"github.com/meverselabs/meverse/core/types"
 	"github.com/pkg/errors"
 )
 
@@ -34,6 +34,7 @@ type Store struct {
 	timeSlotMap    map[uint32]map[string]bool
 	timeSlotLock   sync.Mutex
 	rankTable      *RankTable
+	keydbPath      string
 }
 
 type storecache struct {
@@ -102,6 +103,7 @@ func NewStore(keydbPath string, cdb *piledb.DB, ChainID *big.Int, Version uint16
 		version:     Version,
 		AddrSeqMap:  map[common.Address]uint64{},
 		timeSlotMap: map[uint32]map[string]bool{},
+		keydbPath:   keydbPath,
 	}
 
 	go func() {
@@ -114,7 +116,6 @@ func NewStore(keydbPath string, cdb *piledb.DB, ChainID *big.Int, Version uint16
 			time.Sleep(5 * time.Minute)
 		}
 	}()
-
 	return st, nil
 }
 
@@ -370,7 +371,7 @@ func (st *Store) Admins() ([]common.Address, error) {
 		return txn.Iterate([]byte{tagAdmin}, func(key []byte, value interface{}) error {
 			if value.(bool) {
 				var addr common.Address
-				copy(addr[:], key)
+				copy(addr[:], key[1:])
 				admins = append(admins, addr)
 			}
 			return nil
@@ -780,7 +781,12 @@ func (st *Store) StoreInit(genHash hash.Hash256, initHash hash.Hash256, initHeig
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		bsHash := value.([]byte)
+		bsHash, ok := value.([]byte)
+		if !ok {
+			if Hash, ok := value.(hash.Hash256); ok {
+				bsHash = Hash[:]
+			}
+		}
 		if !bytes.Equal(bsHash, genHash[:]) {
 			return errors.WithStack(piledb.ErrInvalidGenesisHash)
 		}
@@ -919,7 +925,7 @@ func (st *Store) ProcessReward(ctx *types.Context, b *types.Block) (map[common.A
 	}
 	for _, cont := range conts {
 		cc := ctx.ContractContext(cont, common.Address{})
-		intr := types.NewInteractor(ctx, cont, cc)
+		intr := types.NewInteractor(ctx, cont, cc, "000000000000", false)
 		cc.Exec = intr.Exec
 		if rewardEvent, err := cont.OnReward(cc, b, GenMap); err != nil {
 			return nil, err
@@ -1140,6 +1146,16 @@ func applyContextData(txn *keydb.Tx, ctd *types.ContextData) error {
 	addr := ctd.UnsafeGetMainToken()
 	if addr != nil {
 		txn.Set([]byte{tagMainToken}, *addr, (*addr)[:])
+	}
+	if err := types.EachAllAddressBool(ctd.AdminMap, func(key common.Address, value bool) error {
+		return txn.Set(toAdminKey(key), true, []byte{1})
+	}); err != nil {
+		return err
+	}
+	if err := types.EachAllAddressBool(ctd.DeletedAdminMap, func(key common.Address, value bool) error {
+		return txn.Delete(toAdminKey(key))
+	}); err != nil {
+		return err
 	}
 	if err := types.EachAllAddressBool(ctd.GeneratorMap, func(key common.Address, value bool) error {
 		return txn.Set(toGeneratorKey(key), true, []byte{1})

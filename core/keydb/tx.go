@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"time"
 
-	"github.com/fletaio/fleta_v2/common/bin"
+	"github.com/meverselabs/meverse/common/bin"
 	"github.com/pkg/errors"
 	"github.com/tidwall/btree"
 )

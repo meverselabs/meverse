@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"reflect"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/amount"
-	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
+	"github.com/meverselabs/meverse/common/hash"
 	"github.com/pkg/errors"
 )
 
@@ -40,6 +40,16 @@ func (tw *TypeWriter) writeThing(w io.Writer, v interface{}) (int64, error) {
 	var err error
 	rv := reflect.ValueOf(v)
 	switch rv.Kind() {
+	case reflect.Int:
+		_, err = tw.uint32(w, uint32(v.(int)))
+	case reflect.Int16:
+		_, err = tw.uint16(w, uint16(v.(int16)))
+	case reflect.Int32:
+		_, err = tw.uint32(w, uint32(v.(int32)))
+	case reflect.Int64:
+		_, err = tw.uint64(w, uint64(v.(int64)))
+	case reflect.Uint:
+		_, err = tw.uint32(w, uint32(v.(uint)))
 	case reflect.Uint8:
 		_, err = tw.uint8(w, v.(uint8))
 	case reflect.Uint16:
@@ -300,6 +310,7 @@ func (tw *TypeWriter) addrs(w io.Writer, vs []common.Address) (int64, error) {
 }
 
 func (tw *TypeWriter) amounts(w io.Writer, vs []*amount.Amount) (int64, error) {
+
 	if _, err := tw.writeType(w, tagAmountArr); err != nil {
 		return tw.sum, err
 	}
@@ -318,7 +329,6 @@ func (tw *TypeWriter) amounts(w io.Writer, vs []*amount.Amount) (int64, error) {
 			return tw.sum, err
 		} else {
 			tw.sum += int64(n)
-			return tw.sum, nil
 		}
 	}
 	return tw.sum, nil

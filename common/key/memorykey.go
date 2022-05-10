@@ -8,8 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/hash"
 )
 
 // MemoryKey is the in-memory crypto key

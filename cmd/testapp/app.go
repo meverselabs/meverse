@@ -2,14 +2,23 @@ package testapp
 
 import (
 	"fmt"
+	"log"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/amount"
-	"github.com/fletaio/fleta_v2/common/bin"
-	"github.com/fletaio/fleta_v2/contract/formulator"
-	"github.com/fletaio/fleta_v2/contract/gateway"
-	"github.com/fletaio/fleta_v2/contract/token"
-	"github.com/fletaio/fleta_v2/core/types"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
+	"github.com/meverselabs/meverse/common/bin"
+	"github.com/meverselabs/meverse/contract/bridge"
+	"github.com/meverselabs/meverse/contract/connect/farm"
+	"github.com/meverselabs/meverse/contract/connect/imo"
+	"github.com/meverselabs/meverse/contract/connect/pool"
+	"github.com/meverselabs/meverse/contract/exchange/factory"
+	"github.com/meverselabs/meverse/contract/exchange/router"
+	"github.com/meverselabs/meverse/contract/exchange/trade"
+	"github.com/meverselabs/meverse/contract/formulator"
+	"github.com/meverselabs/meverse/contract/gateway"
+	"github.com/meverselabs/meverse/contract/token"
+	"github.com/meverselabs/meverse/contract/whitelist"
+	"github.com/meverselabs/meverse/core/types"
 )
 
 func Genesis() *types.ContextData {
@@ -37,27 +46,17 @@ func Genesis() *types.ContextData {
 	stakingMap := map[common.Address]map[common.Address]*amount.Amount{}
 
 	ClassMap := map[string]uint64{}
-	if true {
-		ClassID, err := types.RegisterContractType(&token.TokenContract{})
-		if err != nil {
-			panic(err)
-		}
-		ClassMap["Token"] = ClassID
-	}
-	if true {
-		ClassID, err := types.RegisterContractType(&formulator.FormulatorContract{})
-		if err != nil {
-			panic(err)
-		}
-		ClassMap["Formulator"] = ClassID
-	}
-	if true {
-		ClassID, err := types.RegisterContractType(&gateway.GatewayContract{})
-		if err != nil {
-			panic(err)
-		}
-		ClassMap["Gateway"] = ClassID
-	}
+	registerContractClass(&token.TokenContract{}, "Token", ClassMap)
+	registerContractClass(&formulator.FormulatorContract{}, "Formulator", ClassMap)
+	registerContractClass(&gateway.GatewayContract{}, "Gateway", ClassMap)
+	registerContractClass(&factory.FactoryContract{}, "Factory", ClassMap)
+	registerContractClass(&router.RouterContract{}, "Router", ClassMap)
+	registerContractClass(&trade.UniSwap{}, "UniSwap", ClassMap)
+	registerContractClass(&bridge.BridgeContract{}, "Bridge", ClassMap)
+	registerContractClass(&farm.FarmContract{}, "ConnectFarm", ClassMap)
+	registerContractClass(&pool.PoolContract{}, "ConnectPool", ClassMap)
+	registerContractClass(&whitelist.WhiteListContract{}, "WhiteList", ClassMap)
+	registerContractClass(&imo.ImoContract{}, "IMO", ClassMap)
 
 	genesis := types.NewEmptyContext()
 	var tokenAddress common.Address
@@ -111,7 +110,7 @@ func Genesis() *types.ContextData {
 		gatewayAddress = cont.Address()
 
 		cc := genesis.ContractContext(cont, adminAddress)
-		intr := types.NewInteractor(genesis, cont, cc)
+		intr := types.NewInteractor(genesis, cont, cc, "000000000000", false)
 		cc.Exec = intr.Exec
 
 		PlatformList := map[string]*amount.Amount{
@@ -127,7 +126,6 @@ func Genesis() *types.ContextData {
 				panic(err)
 			}
 		}
-		intr.Distroy()
 
 		fmt.Println("Gateway", gatewayAddress.String())
 	}
@@ -138,7 +136,7 @@ func Genesis() *types.ContextData {
 			FormulatorPolicy: formulator.FormulatorPolicy{
 				AlphaAmount:    amount.NewAmount(200000, 0),
 				SigmaCount:     4,
-				SigmaBlocks:    200,
+				SigmaBlocks:    0,
 				OmegaCount:     2,
 				OmegaBlocks:    300,
 				HyperAmount:    amount.NewAmount(3000000, 0),
@@ -180,11 +178,13 @@ func Genesis() *types.ContextData {
 		}
 
 		cc := genesis.ContractContext(cont, cont.Address())
-		intr := types.NewInteractor(genesis, cont, cc)
+		intr := types.NewInteractor(genesis, cont, cc, "000000000000", false)
 		cc.Exec = intr.Exec
 		for _, addr := range alphaOwners {
-			if _, err := cont.CreateGenesisAlpha(cc, addr); err != nil {
+			if alphaAddr, err := cont.CreateGenesisAlpha(cc, addr); err != nil {
 				panic(err)
+			} else {
+				log.Println(addr, alphaAddr)
 			}
 		}
 		for _, addr := range sigmaOwners {
@@ -204,9 +204,16 @@ func Genesis() *types.ContextData {
 				}
 			}
 		}
-		intr.Distroy()
 
 		fmt.Println("formulatorAddress", formulatorAddress.String())
 	}
 	return genesis.Top()
+}
+
+func registerContractClass(cont types.Contract, className string, ClassMap map[string]uint64) {
+	ClassID, err := types.RegisterContractType(cont)
+	if err != nil {
+		panic(err)
+	}
+	ClassMap[className] = ClassID
 }

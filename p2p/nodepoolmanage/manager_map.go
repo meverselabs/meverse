@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"time"
 
-	// "github.com/fletaio/fleta_v2/p2p/storage"
+	// "github.com/meverselabs/meverse/p2p/storage"
 	"os"
 	"path/filepath"
 	"sync"
 
-	"github.com/fletaio/fleta_v2/core/keydb"
-	"github.com/fletaio/fleta_v2/p2p/peermessage"
+	"github.com/meverselabs/meverse/core/keydb"
+	"github.com/meverselabs/meverse/p2p/peermessage"
 	"github.com/pkg/errors"
 )
 

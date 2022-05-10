@@ -1,9 +1,14 @@
 package testapp
 
-import "github.com/fletaio/fleta_v2/common"
+import "github.com/meverselabs/meverse/common"
 
 func genesisAlphas() []common.Address {
 	return []common.Address{
+		common.HexToAddress("0x477C578843cBe53C3568736347f640c2cdA4616F"),
+		common.HexToAddress("0x477C578843cBe53C3568736347f640c2cdA4616F"),
+		common.HexToAddress("0x477C578843cBe53C3568736347f640c2cdA4616F"),
+		common.HexToAddress("0x477C578843cBe53C3568736347f640c2cdA4616F"),
+		common.HexToAddress("0x477C578843cBe53C3568736347f640c2cdA4616F"),
 		common.HexToAddress("0x505d734566f2a5C7BC43e63d2D7448A8fd30482a"),
 		common.HexToAddress("0x505d734566f2a5C7BC43e63d2D7448A8fd30482a"),
 		common.HexToAddress("0x505d734566f2a5C7BC43e63d2D7448A8fd30482a"),

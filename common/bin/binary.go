@@ -4,8 +4,8 @@ import (
 	"encoding/binary"
 	"math/big"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/amount"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
 )
 
 // Uint16Bytes returns a byte array of the uint16 number

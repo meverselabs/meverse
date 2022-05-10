@@ -6,7 +6,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/fletaio/fleta_v2/common/queue"
+	"github.com/meverselabs/meverse/common/queue"
 )
 
 type testdq struct {

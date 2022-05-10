@@ -6,10 +6,10 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/amount"
-	"github.com/fletaio/fleta_v2/common/hash"
-	"github.com/fletaio/fleta_v2/core/types"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
+	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/core/types"
 )
 
 type GatewayContract struct {
@@ -167,7 +167,7 @@ func (cont *GatewayContract) TokenIn(cc *types.ContractContext, Platform string,
 	if len(bs) == 1 && bs[0] == 1 {
 		return errors.New("exist hash: " + ercHash)
 	}
-	if cc.TargetHeight() > 10 {
+	if cc.TargetHeight() > 1783888 {
 		cc.SetContractData(makeTokenInKey(ErcHash, pf), []byte{1})
 	}
 

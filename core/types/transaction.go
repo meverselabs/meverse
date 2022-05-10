@@ -7,12 +7,13 @@ import (
 	"strconv"
 
 	etypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/pkg/errors"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/amount"
-	"github.com/fletaio/fleta_v2/common/bin"
-	"github.com/fletaio/fleta_v2/common/hash"
-	"github.com/fletaio/fleta_v2/extern/txparser"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
+	"github.com/meverselabs/meverse/common/bin"
+	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/extern/txparser"
 )
 
 type Transaction struct {
@@ -151,29 +152,27 @@ func (s *Transaction) Hash() (h hash.Hash256) {
 	return
 }
 
-func TxArg(ctx *Context, tx *Transaction) (data []interface{}, err error) {
-	var etx *etypes.Transaction
+func TxArg(ctx *Context, tx *Transaction) (data []interface{}, isSendValue bool, err error) {
 	if tx.IsEtherType {
+		var etx *etypes.Transaction
 		etx, _, err = txparser.EthTxFromRLP(tx.Args)
-		if err != nil {
-			return
-		}
-		if etx.Value().Cmp(amount.ZeroCoin.Int) > 0 && tx.To != *ctx.MainToken() {
-			data = []interface{}{&amount.Amount{Int: etx.Value()}}
-		} else {
+		if err == nil {
 			eData := etx.Data()
-			if len(eData) > 0 {
-				data, err = txparser.Inputs(eData)
-				if err != nil {
-					return
+			if etx.Value().Cmp(amount.ZeroCoin.Int) > 0 && tx.To != *ctx.MainToken() {
+				if len(eData) > 0 {
+					err = errors.New("not support value transfer call")
+				} else {
+					isSendValue = true
+					data = []interface{}{&amount.Amount{Int: etx.Value()}}
 				}
+			} else if len(eData) > 0 {
+				data, err = txparser.Inputs(eData)
+			} else {
+				err = errors.New("invalid call")
 			}
 		}
 	} else {
 		data, err = bin.TypeReadAll(tx.Args, -1)
-		if err != nil {
-			return
-		}
 	}
 	return
 }

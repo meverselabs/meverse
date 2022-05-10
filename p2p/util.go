@@ -8,8 +8,8 @@ import (
 	"math/big"
 
 	"github.com/bluele/gcache"
-	"github.com/fletaio/fleta_v2/common/bin"
-	"github.com/fletaio/fleta_v2/core/types"
+	"github.com/meverselabs/meverse/common/bin"
+	"github.com/meverselabs/meverse/core/types"
 	"github.com/pkg/errors"
 )
 

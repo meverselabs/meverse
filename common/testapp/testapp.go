@@ -3,12 +3,12 @@ package testapp
 import (
 	"fmt"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/amount"
-	"github.com/fletaio/fleta_v2/common/bin"
-	"github.com/fletaio/fleta_v2/contract/formulator"
-	"github.com/fletaio/fleta_v2/contract/token"
-	"github.com/fletaio/fleta_v2/core/types"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
+	"github.com/meverselabs/meverse/common/bin"
+	"github.com/meverselabs/meverse/contract/formulator"
+	"github.com/meverselabs/meverse/contract/token"
+	"github.com/meverselabs/meverse/core/types"
 )
 
 func Genesis() *types.ContextData {
@@ -171,7 +171,7 @@ func Genesis() *types.ContextData {
 		}
 
 		cc := genesis.ContractContext(cont, cont.Address())
-		intr := types.NewInteractor(genesis, cont, cc)
+		intr := types.NewInteractor(genesis, cont, cc, "000000000000", false)
 		cc.Exec = intr.Exec
 
 		for _, addr := range alphaOwners {

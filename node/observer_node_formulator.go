@@ -3,9 +3,9 @@ package node
 import (
 	"log"
 
-	"github.com/fletaio/fleta_v2/core/chain"
-	"github.com/fletaio/fleta_v2/p2p"
-	"github.com/fletaio/fleta_v2/p2p/peer"
+	"github.com/meverselabs/meverse/core/chain"
+	"github.com/meverselabs/meverse/p2p"
+	"github.com/meverselabs/meverse/p2p/peer"
 	"github.com/pkg/errors"
 )
 

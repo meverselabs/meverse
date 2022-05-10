@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fletaio/fleta_v2/p2p/peermessage"
+	"github.com/meverselabs/meverse/p2p/peermessage"
 )
 
 // storage errors

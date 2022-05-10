@@ -3,9 +3,9 @@ package formulator
 import (
 	"math/big"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/amount"
-	"github.com/fletaio/fleta_v2/core/types"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
+	"github.com/meverselabs/meverse/core/types"
 )
 
 func (cont *FormulatorContract) Front() interface{} {
@@ -86,20 +86,37 @@ func (f *front) BuyFormulator(cc *types.ContractContext, TokenID common.Address)
 	return f.cont.BuyFormulator(cc, TokenID)
 }
 
+func (f *front) SetURI(cc *types.ContractContext, uri string) error {
+	return f.cont.SetURI(cc, uri)
+}
+
 //////////////////////////////////////////////////
 // Public Reader Functions
 //////////////////////////////////////////////////
 
-func (f *front) Formulator(cc types.ContractLoader, _tokenID common.Address) (*Formulator, error) {
-	return f.cont.Formulator(cc, _tokenID)
+func (f *front) Formulator(cc types.ContractLoader, _tokenID common.Address) (uint8, uint32, *amount.Amount, common.Address, common.Address, error) {
+	formulator, err := f.cont._formulator(cc, _tokenID)
+	if err != nil {
+		return 0, 0, nil, common.Address{}, common.Address{}, err
+	}
+	return formulator.Type, formulator.Height, formulator.Amount, formulator.Owner, formulator.TokenID, nil
+}
+
+/// @notice Enumerate valid NFTs
+/// @dev Throws if `_index` >= `totalSupply()`.
+/// @param _index A counter less than `totalSupply()`
+/// @return The token identifier for the `_index`th NFT,
+///  (sort order not specified)
+func (f *front) TokenByIndex(cc types.ContractLoader, _id uint32) (*big.Int, error) {
+	return f.cont.TokenByIndex(cc, _id)
 }
 
 func (f *front) StakingAmount(cc types.ContractLoader, HyperAddress common.Address, StakingAddress common.Address) *amount.Amount {
 	return f.cont.StakingAmount(cc, HyperAddress, StakingAddress)
 }
 
-func (f *front) StakingAmountMap(cc types.ContractLoader, HyperAddress common.Address) (map[common.Address]*amount.Amount, error) {
-	return f.cont.StakingAmountMap(cc, HyperAddress)
+func (f *front) StakingAmountMap(cc types.ContractLoader, HyperAddress common.Address, addr common.Address) *amount.Amount {
+	return f.StakingAmount(cc, HyperAddress, addr)
 }
 
 func (f *front) FormulatorMap(cc types.ContractLoader) (map[common.Address]*Formulator, error) {
@@ -116,4 +133,43 @@ func (f *front) OwnerOf(cc types.ContractLoader, _tokenID common.Address) (commo
 
 func (f *front) GetApproved(cc types.ContractLoader, TokenID common.Address) common.Address {
 	return f.cont.GetApproved(cc, TokenID)
+}
+
+func (f *front) TotalSupply(cc types.ContractLoader) uint32 {
+	return f.cont.TotalSupply(cc)
+}
+
+func (f *front) Name(cc types.ContractLoader) string {
+	return f.cont.Name()
+}
+
+func (f *front) Decimals(cc types.ContractLoader) *big.Int {
+	return big.NewInt(0)
+}
+
+func (f *front) Uri(cc types.ContractLoader, _id *big.Int) string {
+	return f.cont.URI(cc, _id)
+}
+
+/// @notice A distinct Uniform Resource Identifier (URI) for a given asset.
+/// @dev Throws if `_tokenId` is not a valid NFT. URIs are defined in RFC
+///  3986. The URI may point to a JSON file that conforms to the "ERC721
+///  Metadata JSON Schema".
+func (f *front) TokenURI(cc types.ContractLoader, _id *big.Int) string {
+	return f.cont.URI(cc, _id)
+}
+
+func (f *front) SupportsInterface(cc types.ContractLoader, interfaceID []byte) bool {
+	return f.cont.SupportsInterface(cc, interfaceID)
+}
+
+/// @notice Enumerate NFTs assigned to an owner
+/// @dev Throws if `_index` >= `balanceOf(_owner)` or if
+///  `_owner` is the zero address, representing invalid NFTs.
+/// @param _owner An address where we are interested in NFTs owned by them
+/// @param _index A counter less than `balanceOf(_owner)`
+/// @return The token identifier for the `_index`th NFT assigned to `_owner`,
+///   (sort order not specified)
+func (f *front) TokenOfOwnerByIndex(cc types.ContractLoader, _owner common.Address, _index uint32) (*big.Int, error) {
+	return f.cont.TokenOfOwnerByIndex(cc, _owner, _index)
 }

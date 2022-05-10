@@ -1,8 +1,8 @@
 package key
 
 import (
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/hash"
 )
 
 // Key defines crypto key functions

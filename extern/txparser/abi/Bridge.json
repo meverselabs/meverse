@@ -1,0 +1,378 @@
+[
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "token",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "amt",
+                "type": "uint256"
+            },
+            {
+                "internalType": "address[]",
+                "name": "path",
+                "type": "address[]"
+            },
+            {
+                "internalType": "string",
+                "name": "toChain",
+                "type": "string"
+            },
+            {
+                "internalType": "bytes32",
+                "name": "summary",
+                "type": "bytes32"
+            }
+        ],
+        "name": "sendToGateway",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "string",
+                "name": "chain",
+                "type": "string"
+            },
+            {
+                "internalType": "uint256",
+                "name": "transferFee",
+                "type": "uint256"
+            }
+        ],
+        "name": "setTransferFeeInfo",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "string",
+                "name": "chain",
+                "type": "string"
+            },
+            {
+                "internalType": "uint256",
+                "name": "tokenFee",
+                "type": "uint256"
+            }
+        ],
+        "name": "setTokenFeeInfo",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "newBank",
+                "type": "address"
+            }
+        ],
+        "name": "transferBankOwnership",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "newTokenAddress",
+                "type": "address"
+            }
+        ],
+        "name": "changeMeverseAddress",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "newFeeOwner",
+                "type": "address"
+            }
+        ],
+        "name": "transferFeeOwnership",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "token",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "amt",
+                "type": "uint256"
+            }
+        ],
+        "name": "reclaimToken",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "token",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "amt",
+                "type": "uint256"
+            },
+            {
+                "internalType": "address[]",
+                "name": "path",
+                "type": "address[]"
+            },
+            {
+                "internalType": "string",
+                "name": "fromChain",
+                "type": "string"
+            },
+            {
+                "internalType": "bytes32",
+                "name": "summary",
+                "type": "bytes32"
+            }
+        ],
+        "name": "sendFromGateway",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "constant": true,
+        "inputs": [],
+        "name": "meverseToken",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "constant": true,
+        "inputs": [],
+        "name": "bank",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "constant": true,
+        "inputs": [],
+        "name": "feeOwner",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "constant": true,
+        "inputs": [
+            {
+                "internalType": "string",
+                "name": "chain",
+                "type": "string"
+            }
+        ],
+        "name": "transferFeeInfoToChain",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "constant": true,
+        "inputs": [
+            {
+                "internalType": "string",
+                "name": "chain",
+                "type": "string"
+            }
+        ],
+        "name": "tokenFeeInfoFromChain",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "constant": true,
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "internalType": "string",
+                "name": "chain",
+                "type": "string"
+            }
+        ],
+        "name": "getSequenceFrom",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "constant": true,
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "internalType": "string",
+                "name": "chain",
+                "type": "string"
+            }
+        ],
+        "name": "getSequenceTo",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "constant": true,
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "token",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "from",
+                "type": "address"
+            }
+        ],
+        "name": "allowanceTokenFromGateway",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "constant": true,
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "token",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "from",
+                "type": "address"
+            }
+        ],
+        "name": "balanceOfToGateway",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "constant": true,
+        "inputs": [
+            {
+                "internalType": "string",
+                "name": "source",
+                "type": "string"
+            }
+        ],
+        "name": "stringToBytes32",
+        "outputs": [
+            {
+                "internalType": "bytes32",
+                "name": "",
+                "type": "bytes32"
+            }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+    }
+]

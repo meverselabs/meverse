@@ -5,14 +5,14 @@ import (
 	"log"
 	"time"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/bin"
-	"github.com/fletaio/fleta_v2/common/hash"
-	"github.com/fletaio/fleta_v2/core/chain"
-	"github.com/fletaio/fleta_v2/core/prefix"
-	"github.com/fletaio/fleta_v2/core/types"
-	"github.com/fletaio/fleta_v2/p2p"
-	"github.com/fletaio/fleta_v2/p2p/peer"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/bin"
+	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/core/chain"
+	"github.com/meverselabs/meverse/core/prefix"
+	"github.com/meverselabs/meverse/core/types"
+	"github.com/meverselabs/meverse/p2p"
+	"github.com/meverselabs/meverse/p2p/peer"
 	"github.com/pkg/errors"
 )
 

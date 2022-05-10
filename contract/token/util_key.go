@@ -1,6 +1,6 @@
 package token
 
-import "github.com/fletaio/fleta_v2/common"
+import "github.com/meverselabs/meverse/common"
 
 var (
 	tagTokenName        = byte(0x01)
@@ -11,6 +11,8 @@ var (
 	tagTokenAmount      = byte(0x10)
 	tagCollectedFee     = byte(0x11)
 	tagTokenApprove     = byte(0x12)
+	tagRouterAddress    = byte(0x13)
+	tagRouterPaths      = byte(0x14)
 )
 
 func MakeAllowanceTokenKey(sender common.Address) []byte {

@@ -3,7 +3,7 @@ package types
 import (
 	"io"
 
-	"github.com/fletaio/fleta_v2/common/bin"
+	"github.com/meverselabs/meverse/common/bin"
 )
 
 type Block struct {

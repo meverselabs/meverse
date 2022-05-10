@@ -1,0 +1,29 @@
+[
+    {"inputs": [{"internalType": "uint256","name": "am","type": "uint256"}], "name": "Deposit","outputs": [],"stateMutability": "nonpayable","type": "function"},
+    {"inputs": [], "name": "Harvest","outputs": [],"stateMutability": "nonpayable","type": "function"},
+
+    {"constant": true,"inputs": [],"name": "ProjectOwner","outputs": [{"internalType": "address","name": "","type": "address"} ],"payable": false,"stateMutability": "view","type": "function"},
+    {"constant": true,"inputs": [],"name": "PayToken","outputs": [{"internalType": "address","name": "","type": "address"} ],"payable": false,"stateMutability": "view","type": "function"},
+    {"constant": true,"inputs": [],"name": "ProjectToken","outputs": [{"internalType": "address","name": "","type": "address"} ],"payable": false,"stateMutability": "view","type": "function"},
+    {"constant": true,"inputs": [],"name": "ProjectOffering","outputs": [{"internalType": "uint256","name": "","type": "uint256"} ],"payable": false,"stateMutability": "view","type": "function"},
+    {"constant": true,"inputs": [],"name": "ProjectRaising","outputs": [{"internalType": "uint256","name": "","type": "uint256"} ],"payable": false,"stateMutability": "view","type": "function"},
+    {"constant": true,"inputs": [],"name": "StartBlock","outputs": [{"internalType": "uint256","name": "","type": "uint256"} ],"payable": false,"stateMutability": "view","type": "function"},
+    {"constant": true,"inputs": [],"name": "EndBlock","outputs": [{"internalType": "uint256","name": "","type": "uint256"} ],"payable": false,"stateMutability": "view","type": "function"},
+    {"constant": true,"inputs": [],"name": "WhiteListGroupId","outputs": [{"internalType": "bytes32","name": "","type": "bytes32"} ],"payable": false,"stateMutability": "view","type": "function"},
+    {"constant": true,"inputs": [],"name": "IsOwner","outputs": [{"internalType": "bool","name": "","type": "bool"} ],"payable": false,"stateMutability": "view","type": "function"},
+    {"constant": true,"inputs": [],"name": "HarvestFeeFactor","outputs": [{"internalType": "uint256","name": "","type": "uint256"} ],"payable": false,"stateMutability": "view","type": "function"},
+    {"constant": true,"inputs": [],"name": "WhiteListAddress","outputs": [{"internalType": "address","name": "","type": "address"} ],"payable": false,"stateMutability": "view","type": "function"},
+    {"constant": true,"inputs": [],"name": "TotalAmount","outputs": [{"internalType": "uint256","name": "","type": "uint256"} ],"payable": false,"stateMutability": "view","type": "function"},
+    {"constant": true,"inputs": [{"internalType": "address","name": "user","type": "address"}],"name": "UserInfo","outputs": [{"internalType": "uint256","name": "","type": "uint256"}, {"internalType": "bool","name": "","type": "bool"}],"payable": false,"stateMutability": "view","type": "function"},
+    {"constant": true,"inputs": [],"name": "AddressList","outputs": [{"internalType": "address[]","name": "","type": "address[]"}],"payable": false,"stateMutability": "view","type": "function"},
+    {"constant": true,"inputs": [{"internalType": "address","name": "_user","type": "address"}],"name": "HasHarvest","outputs": [{"internalType": "bool","name": "","type": "bool"}],"payable": false,"stateMutability": "view","type": "function"},
+    {"constant": true,"inputs": [{"internalType": "address","name": "_user","type": "address"}],"name": "GetUserAllocation","outputs": [{"internalType": "uint256","name": "","type": "uint256"} ],"payable": false,"stateMutability": "view","type": "function"},
+    {"constant": true,"inputs": [{"internalType": "address","name": "_user","type": "address"}],"name": "GetOfferingAmount","outputs": [{"internalType": "uint256","name": "","type": "uint256"}],"payable": false,"stateMutability": "view","type": "function"},
+    {"constant": true,"inputs": [{"internalType": "address","name": "_user","type": "address"}],"name": "GetRefundingAmount","outputs": [{"internalType": "uint256","name": "","type": "uint256"}],"payable": false,"stateMutability": "view","type": "function"},
+    {"constant": true,"inputs": [{"internalType": "address","name": "_user","type": "address"}],"name": "CheckWhiteList","outputs": [{"internalType": "bool","name": "","type": "bool"}],"payable": false,"stateMutability": "view","type": "function"},
+
+    {"inputs": [{"internalType": "uint256","name": "projectOffer","type": "uint256"}], "name": "SetOfferingAmount","outputs": [],"stateMutability": "nonpayable","type": "function"},
+    {"inputs": [{"internalType": "uint256","name": "projectRaising","type": "uint256"}], "name": "SetRaisingAmount","outputs": [],"stateMutability": "nonpayable","type": "function"},
+    {"inputs": [{"internalType": "uint256","name": "payAmount","type": "uint256"}, {"internalType": "uint256","name": "offerAmount","type": "uint256"}], "name": "FinalWithdraw","outputs": [],"stateMutability": "nonpayable","type": "function"}
+
+]

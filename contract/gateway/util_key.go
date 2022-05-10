@@ -1,7 +1,7 @@
 package gateway
 
 import (
-	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/meverselabs/meverse/common/hash"
 )
 
 var (

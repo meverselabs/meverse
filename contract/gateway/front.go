@@ -1,9 +1,9 @@
 package gateway
 
 import (
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/amount"
-	"github.com/fletaio/fleta_v2/core/types"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
+	"github.com/meverselabs/meverse/core/types"
 )
 
 func (cont *GatewayContract) Front() interface{} {

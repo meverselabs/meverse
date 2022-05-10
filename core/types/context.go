@@ -3,9 +3,9 @@ package types
 import (
 	"math/big"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/amount"
-	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
+	"github.com/meverselabs/meverse/common/hash"
 	"github.com/pkg/errors"
 )
 
@@ -160,6 +160,12 @@ func (ctx *Context) ProcessReward(inctx *Context, b *Block) (map[common.Address]
 func (ctx *Context) DeployContract(owner common.Address, ClassID uint64, Args []byte) (Contract, error) {
 	ctx.isLatestHash = false
 	return ctx.Top().DeployContract(owner, ClassID, Args)
+}
+
+// DeployContract deploy contract to the chain with address
+func (ctx *Context) DeployContractWithAddress(owner common.Address, ClassID uint64, addr common.Address, Args []byte) (Contract, error) {
+	ctx.isLatestHash = false
+	return ctx.Top().DeployContractWithAddress(owner, ClassID, addr, Args)
 }
 
 // Data returns the data from the top snapshot

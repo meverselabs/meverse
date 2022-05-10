@@ -3,8 +3,8 @@ package types
 import (
 	"math/big"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/hash"
 )
 
 // Provider defines functions that loads chain data from the chain

@@ -3,7 +3,7 @@ package chain
 import (
 	"bytes"
 
-	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/meverselabs/meverse/common/hash"
 	"github.com/pkg/errors"
 )
 

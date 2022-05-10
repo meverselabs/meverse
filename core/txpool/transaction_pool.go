@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/hash"
-	"github.com/fletaio/fleta_v2/common/queue"
-	"github.com/fletaio/fleta_v2/core/types"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/common/queue"
+	"github.com/meverselabs/meverse/core/types"
 	"github.com/pkg/errors"
 )
 

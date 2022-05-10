@@ -1,8 +1,8 @@
 package types
 
 import (
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/amount"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
 )
 
 type contextCache struct {

@@ -3,8 +3,8 @@ package node
 import (
 	"bytes"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/core/types"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/core/types"
 )
 
 type RoundState int

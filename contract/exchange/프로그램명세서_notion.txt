@@ -1,0 +1,560 @@
+# Meverse DEX Contract 프로그램 명세서
+
+# Meverse DEX Contract 프로그램 명세서
+
+# Package : exchange
+
+위치 /contract/exchange
+
+1. factory
+    
+    factory contract
+    
+2. trade 
+    1. stableswap contract 
+    2. uniswap contract 
+    3. test code 
+        
+        contract 내 private 함수 테스트 
+        
+3. router 
+    
+    router contract 
+    
+4. util : library
+5. ztest 
+    
+    테스트 코드 
+    
+
+# Contract
+
+## factory
+
+- Reader Functions
+    
+    ```go
+    Owner()                         common.Address                        // owner 조회
+    
+    GetPair(                                                              // pair Contract Address  조회 
+    	token0, token1 common.Address
+    ) common.Address                                                      
+    
+    AllPairs()                      []common.Address                      // 모든 pair 주소 조회
+    
+    AllPairsLength()                uint16                                // pair 개수 조회
+    ```
+    
+- Writer Functions
+    
+    ```go
+    CreatePairUni(
+    	   tokenA, tokenB, payToken   common.Address,                      // pair를 구성하는 tokenA, tokenB, 결제토큰 payToken 
+         name, symbol               string,                              // token  name, symbol : pair토큰 자체가 Token
+         owner, winner              common.Address,                      // owner, winner
+         fee, adminFee, winnerFee   uint64,                              // fee - LP fee,  adminFee, winnerFee
+         classID                    uint64)                              // 생성할 contract ClassID
+    ) common.Address                                  onlyOwner          // pairAddress
+    
+    CreatePairStable(
+    	   tokenA, tokenB, payToken   common.Address,     
+         name, symbol               string,             
+         owner, winner              common.Address,     
+         fee, adminFee, winnerFee   uint64,             
+         amp                        uint64,                               // 초기 Amplification Paramter ~ 360*2
+                                                                            // 2개 일때 170 3개 일때 720
+         classID                    uint64)             
+    ) common.Address                                   onlyOwner          // 위의 pair Address와 같으나 UniSwap은 pair로 StableSwap swap으로 표현
+    
+    SetOwner(_owner common.Address)                    onlyOwner          // owner Setting
+    ```
+    
+
+## swap
+
+### lp Token - Token
+
+참조소스 : uniswap/v2-core/contracts/UniswapV2ERC20.sol, curvefi/curve-contract/contracts/tokens/base/CurveToken*.vy
+
+```go
+Name() string 
+Symbol() string
+
+TotalSupply() *amount.Amount
+
+Decimals() *big.Int
+
+BalanceOf(from common.Address) *amount.Amount
+
+Transfer(To common.Address, Amount *amount.Amount)
+
+Allowance(owner, spender common.Address) *amount.Amount
+Approve(To common.Address, Amount *amount.Amount)
+
+IncreaseAllowance(spender common.Address, addAmount *amount.Amount) 
+DecreaseAllowance(spender common.Address, subtractAmount *amount.Amount)
+
+TransferFrom(From common.Address, To common.Address, Amount *amount.Amount)   // Allowance가 MaxUint256(2^256-1)로 설정되어 있는 경우 Allowance는 줄지 않음 
+     
+```
+
+### exchange  : 공통
+
+참조 소스 : curvefi/curve-contract/contracts/pool-template/base/SwapTemplateBase.vy
+
+- Reader Function
+    
+    ```go
+    ExType()                      uint8                                    // exchange Type : UNI(1), STABLE(2)
+    
+    Factory()                     common.Address                           // factory Address
+    
+    Owner()                       common.Address
+    Winner()                      common.Address                           // winner : Winner's Farm의 경우 Admin Fee를 나눠 가짐
+    FutureOwner()                 common.Address                           // CommitTransferOwnerWinner를 통해 설정
+    FutureWinner()                common.Address
+    TransferOwnerWinnerDeadline() uint64                                   // ApplyTransferOwnerWinner를 통해 변경사항을 반영할 수 있는 최종시간 
+    
+    Fee()                         uint64
+    FutureFee()                   uint64
+    AdminFee()                    uint64
+    FutureAdminFee()              uint64
+    WinnerFee()                   uint64
+    FutureWinnerFee()             uint64
+    AdminActionsDeadline()        uint64                                    // ApplyNewFee 를 통해 변경사항을 반영할 수 있는 최종시간
+    
+    NTokens()                     uint8                                     // pool에서 교환되는 token 개수 
+    **Tokens**()                      []common.Address                          // tokens 배열 
+    PayToken()                    common.Address                            // 결제 token
+    PayTokenIndex(                                                          // 결제 token Index
+    		token common.Address
+    )                             uint8                                     
+    
+    IsKilled()                    bool                                      // KillMe 호출 여부 
+    
+    BlockTimestampLast()          uint64                                    // balance 가 update 된 최종시간
+    ```
+    
+- Writer Function
+    
+    ```go
+    CommitNewFee(                                       // 새로운 Fee 설정   
+    		new_fee          uint64,                        // LP Fee         Fee <= MAX_FEE                50%
+    		new_admin_fee    uint64,                        // Admin Fee      AdminFee <= MAX_ADMIN_FEE    100%
+        new_winner_fee   uint64                         // Winner Fee     WinnerFee <= MaX_WINNER_FEE  100%   
+        delay            uint64                         // delay 시간 (단위 sec, 86400 = 1일)
+    )                                  onlyOwner
+    ApplyNewFee()                      onlyOwner        // delay 후에 수수료 변경 적용
+    RevertNewFee()                     onlyOwner        // delay 전에 그 전상태로 되돌림 
+    
+    CommitTransferOwnerWinner(                          // 새로운 Owner, Winner 설정 
+        new_owner       common.Address,                 // ZeroAdress 불가 
+        new_winner      common.Address                  // ZeroAddress 가능
+        delay           uint64                          // delay 시간 (단위 sec, 86400 = 1일)
+    )                                  onlyOwner
+    ApplyTransferOwnerWinner()         onlyOwner        // delay 후에 owner, winner 변경 적용
+    RevertTransferOwnerWinner()        onlyOwner        // delay 전에 그 전상태로 되돌림 
+    
+    KillMe()                           onlyOwner        // 일부 기능 작동 불가 
+    UnkillMe()                         onlyOwner        // KillMe 상태를 되돌림 
+    ```
+    
+
+### stableswap
+
+참조 소스 : curvefi/curve-contract/contracts/pool-template/base/SwapTemplateBase.vy
+
+- Parameter
+    
+    ```go
+    TokenIndex(token common.Address)   uint8                                    // tokenIndex
+    
+    Rates()                           []*big.Int                                // token 끼리  decimal이 다를 경우 사용하는 변수
+    PrecisionMul()                    []uint64                                  // token 끼리  decimal이 다를 경우 사용하는 변수
+    
+    Reserves()                        []*amount.Amount, uint64                  // 현재 swap contract token reserve, 최종 update BlockTimeStamp
+    AdminBalances(i uint8)            *amount.Amount                            // i-th token admin Fee 잔고
+    
+    InitialA()                        *big.Int 
+    FutureA()                         *big.Int 
+    
+    InitialATime()                    uint64 
+    FutureATime()                     uint64 
+    
+    A()                               *big.Int
+    APrecise()                        *big.Int
+    
+    GetVirtualPrice()                 *amount.Amount
+    
+    WithdrawAdminFees(                                                         // AdminFee Owner와 Winner에게 지급
+    )  []*amount.Amount, []*amount.Amount                        onlyOwner     // owner, winner 에게 지급 되는 각각의 배열 
+    DonateAdminFees()                                            onlyOwner     // AdminFee 를 balaces에 추가, Uniswap의 경우 Sync와 같은 기능
+    
+    RampA(
+    		_future_A       *big.Int, 
+    		_future_time     uint64
+    )                                                             onlyOwner     // A값 상승
+    StopRampA()                                                   onlyOwner     // A값 상승을 멈춤 
+    ```
+    
+- Liqudity & Swap
+    
+    ```go
+    CalcLPTokenAmount(                                    // tokens 를 deposit 또는 withdraw할때 mint 또는 burn 되는 LP Token 양 계산
+    		_amounts []       *amount.Amount,                 // deposit 또는 withdraw 하는 tokens 배열
+    		_is_deposit       bool                            // true : deposit, false : withdraw
+    ) *amount.Amount, uint64                              // LPToken, deposit후 mint량 포함후 비중, withdraw시는 burn량 차감 전 (10^18 단위)
+    
+    AddLiqudity(                                          // deposit tokens, 맨 처음에는 모든 토큰 Deposit, Fee 징수
+    		_amounts           []*amount.Amount,              // deposit 하려는 tokens 배열 
+    		_min_mint_amount   *amount.Amount                 // mint LP Token 최소량
+    ) *amount.Amount                                      // 실제 Mint LP Token
+    
+    CalcWithdrawCoins(                                    // tokens 를 deposit 또는 withdraw할때 mint 또는 burn 되는 LP Token 양 계산
+    		_amount                 *amount.Amount,           // burn LP Token
+    ) []*amount.Amount                                    // withdraw tokens
+    
+    RemoveLiquidity(                                      // burn LP token에 따라 현재 deposit 되어 있는 tokens 양에 비례하여 반환, Fee 징수 없음
+    		_amount                 *amount.Amount,           // burn LP Token
+    		_min_amounts          []*amount.Amount            // withdraw tokens mininum
+    ) []*amount.Amount                                    // withdraw tokens
+    
+    RemoveLiquidityImbalance(                             // 반환 받고자 하는 tokens 배열 값에 따른 LP Token Burn, Fee 징수
+    		_amounts              []*amount.Amount,           // 반환받고자 하는 tokens 배열 
+    	  _max_burn_amount        *amount.Amount            // burn LP Token 최대치 
+    ) *amount.Amount                                      // 실제 burn LP Token
+    
+    CalcWithdrawOneCoin(                                  // 한 코인만 반환 받고자 할때 계산
+    		_token_amount           *amount.Amount,           // burn LP Token
+    	  out                      uint8                    // tokens index 
+    ) (*amount.Amount, *amount.Amount,*amount.Amount)     // 실제 받는 token, 수수료, 현재 LP Token Total Supply 
+    
+    RemoveLiquidityOneCoin(                               // 한코인만 반환하고자 할때, Fee 징수
+    		_token_amount           *amount.Amount,               
+    		out                      uint8,                   // 받고자하는 token index                 
+    		_min_amount             *amount.Amount            // 받고자 하는 token의 최소량
+    ) *amount.Amount                                      // 실제 받는 token
+    
+    GetDy(                                                // 교환되는 양 계산
+    		in, out                  uint8,                   // token indexes : in, out
+    		dx                      *amount.Amount            // in token amount 
+    ) *amount.Amoun                                       // out token amount, fee, adminfee 
+    
+    Exchange(                                             // Out Token Amount 에  Fee 부과
+    		in, out                  uint8,                   // token indexes
+    		dx                      *amount.Amount,           // in token amount
+    		_min_dy                 *amount.Amount            // in token amount minimum
+    ) *amount.Amount
+    ```
+    
+
+### uniswap
+
+참조 소스 : uniswap/v2-core/contracts/UniswapV2Pair.sol
+
+- Parameter
+    
+    ```go
+    Token0()                 common.Address               // Token0 Address
+    Token1()                 common.Address               // Token1 Address
+    
+    Reserve0()               *amount.Amount               // Token0 Reserve
+    Reserve1()               *amount.Amount               // Token1 Reserve
+    
+    Reserves(                                             // 현재 pair contract token reserve, 최종 update BlockTimeStamp
+    )	*amount.Amount, *amount.Amoutn, uint64      
+    
+    Price0CumulativeLast()   *amount.Amount               // token0 time-averaged price relative to token1 
+    Price1CumulativeLast()   *amount.Amount               // token1 time-averaged price relative to token0
+    KLast()                  *amount.Amount               // 최종 K값 (= reserve0 * reserve 1),  AdminFee 가 있는 경우만 값이 존재
+    
+    GetMintAdminFee(                                      // mint 될 adminFee 계산 
+    		_reserve0, _reserve1                              // 현재 reserve0, 1 
+    ) *amount.Amount                                      // mint될 lpToken
+    MintedAdminBalance()      *amount.Amount              // admin lpToken balance (아직 mint되지 않은 값 포함 안됌)
+    AdminBalance()            *amount.Amount              // admin lpToken balance (아직 mint되지 않은 값까지 포함) = MintedAdminBalance + GetMintAdminFee
+    ```
+    
+- Liquidity & Swap
+    
+    ```go
+    Mint(                                                  // AddLiquidity, 보내진 token값은 balance와 reserve차이로 계산됨
+    		to                          common.Address         // LP Token이 주어지는 주소
+    ) *amount.Amount                                       // 최종 mint되는 LPT token 값
+    
+    Burn(                                                  // RemoveLiquidity, 보내진 LP token은 balance를 통해 계산됨
+    	  to                          common.Address         // tokens가 주어지는 주소
+    ) *amount.Amount, *amount.Amount                       // 반환 되는 tokens 값
+    
+    Swap(                                                  // 토큰 교환, 보내진 token은 balance를 통해 계산됨
+                                                           // to가 contract인경우 to의 FlashSwapCall 함수를 수행할 때 두 token이 필요한 경우도 가능
+    		amount0Out, amount1Out      *amount.Amount,        // 교환된 token 값
+    		to common.Address,                                 // 교환된 token이 주어지는 주소
+        data []byte                                        // to가 contract인경우 to의 FlashSwapCall 함수가 수행할때 인수 (calldata)
+    ) 
+    
+    WithdrawAdminFees(                                     // AdminFee Owne와 Winner에게 지급 (mintFee 포함)
+                                                           // Owner가 LP인 경우 LP까지 환산되므로 Owner는 LP와 주소가 달라야 한다.
+    )  *amount.Amount, *amount.Amount, *amount.Amount, *amount.Amount, *amount.Amount    onlyOwner     
+                                                           // burn lpToken, 실제 교환된 adminFee token0, token1, winnerFee token0, token1
+    
+    Skim(to common.Address)               onlyOwner        // 현재 balance와 reserve가 다른 경우 그 차액만큼을 to 에게 지불 
+    
+    Sync()                                onlyOwner        // 현재 balance와 reserve가 다른 경우 reserve를 balance와 같게 함, 실질적으로 DonateAdminFee 같은 기능
+    ```
+    
+
+## router
+
+참조 소스 : uniswap/v2-periphery/contracts/UniswapV2Router01.sol
+
+```go
+Factory()                              common.Address                                       // factory 조회
+                                                          onlyUniSwap
+GetAmountsOut(                                                                              // 여러 Exchange를 거친 output 양 
+		amountIn                          *amount.Amount, 
+		path                             []common.Address                                       // path = [tokenA, tokenB, tokenC, ....]
+) []*amount.Amount                                                                          // 각 단계에서 필요한 양
+
+UniGetAmountsIn(                                                                            // 여러 Exchange를 거쳐저 최종적으로 amountOut을 얻기 위해 투입해야 하는 양     
+		amountOut                         *amount.Amount, 
+		path                             []common.Address
+) []*amount.Amount                                                        onlyUniSwap       // 각 단계에서 필요한 양
+
+UniGetLPTokenAmount(                                                                        // tokens deposit 시 mint LP Token 양 계산
+		tokenA, tokenB                     common.Address,                                      // pair를 구성하는 tokens
+		amountADesired, amountBDesired    *amount.Amount,                                       // 각각의 원하는 deposit 양  
+) *amount.Amount, uint64                                                                    // LPToken, deposit후 발행량 포함 대비 비중(10^18 단위)
+
+UniAddLiquidity(	                                                                          // AddLiqudity 
+		tokenA, tokenB                     common.Address,                                      // pair를 구성하는 tokens
+		amountADesired, amountBDesired    *amount.Amount,                                       // 각각의 원하는 deposit 양  
+	  amountAMin, amountBMin            *amount.Amount,                                       // 각각의 최소 deposit 조건 
+) *amount.Amount, *amount.Amount, *amount.Amount, common.Address          onlyUniSwap       // 실제 Deposit된 tokenA, tokenB, minted LP Token, pair Address 
+
+UniGetLPTokenAmountOneCoin(                                                                 // ont token deposit 시 mint LP Token 양 계산
+		tokenA, tokenB                     common.Address,                                      // pair를 구성하는 tokens
+    tokenIn                            common.Address,                                      // doposit 하려는 token
+		amountDesired                     *amount.Amount                                        // 원하는 deposit 양  
+) *amount.Amount, uint64                                                                    // LPToken, deposit후 발행량 포함 대비 비중(10^18 단위)
+
+UniAddLiquidityOneCoin(	                                                                    // AddLiqudity - 계산공식 아래 참조
+		tokenA, tokenB                     common.Address,                                      // pair를 구성하는 tokens
+    tokenIn                            common.Address                                       // doposit 하려는 token
+		amountDesired                     *amount.Amount,                                       // 원하는 deposit 양  
+	  amountMin                         *amount.Amount,                                       // 최소 deposit 조건 
+) *amount.Amount, *amount.Amount, common.Address                          onlyUniSwap       // 실제 Deposit된 token 양, minted LP Token, pair Address 
+```
+
+- UniRemoveLiquidityOneCoin  swap Amount 계산공식
+    1. Swap :  input $x$,  output Amount  $y_{out} = {\frac {x * (1 - f) * y_0} {x_0 + x * (1-f)}}$   : 수수료 반영
+    2. Swap 이후 Reserve  $x_0 + x$,    $\frac{x_0*y_0}{x_0 + x}$
+    3. AddLiquidity Optimal 하기 위해서는  $\frac{y_{out}}{A - x} = \frac{y’}{x’} = \frac{\frac{x_0*y_0}{x_0 + x}}{x_0 + x}$  식이 성립해야 함  ($A$ : onecoin input)
+        
+        f = 0 인 경우 $x = \sqrt{x_0^2 + x_0A} - x_0$
+        
+        f 가 존재하는 경우 삼차방정식의 해를 구해야 함
+        
+            $(1-f)x^3 + 3(1-f)x_0*x^2 + ((2-f)x_0 - (1-f)A)*x_0*x - A*x_0^2 = 0$  
+        
+
+```go
+UniGetWithdrawAmount(                                                                       // tokens withdraw 시 양 계산
+		tokenA, tokenB                     common.Address,                                      // pair를 구성하는 tokens
+		liquidity                         *amount.Amount,                                       // depsoit LP Token
+) *amount.Amount, *amount.Amount, *amount.Amount                                            // 계산된 withdraw tokens 양, 중간에 mint lpToken
+
+UniRemoveLiquidity(                                                                         
+		tokenA, tokenB                     common.Address,                                      // pair를 구성하는 tokens
+		liquidity                         *amount.Amount,                                       // depsoit LP Token
+		amountAMin, amountBMin            *amount.Amount,                                       // 원하는 최소 output tokens
+) *amount.Amount, *amount.Amount                                          onlyUniSwap       // 실제 withdraw tokens 양
+
+UniGetWithdrawAmountOneCoin(                                                                // token withdraw 시 양 계산
+		tokenA, tokenB                     common.Address,                                      // pair를 구성하는 tokens
+		liquidity                         *amount.Amount,                                       // depsoit LP Token
+    tokenOut                           common.Address,                                      // 받고자 하는 token
+) *amount.Amount, *amount.Amount                                                            // 계산된 withdraw tokens 양, 중간에 mint lpToken
+
+UniRemoveLiquidityOneCoin(                                                                  
+		tokenA, tokenB                     common.Address,                                      // pair를 구성하는 tokens
+		liquidity                         *amount.Amount,                                       // depsoit LP Token
+    tokenOut                           common.Address,                                      // 받고자 하는 token
+		amountMin                         *amount.Amount,                                       // 원하는 최소 output token
+) *amount.Amount                                                          onlyUniSwap       // 실제 withdraw tokens 양
+
+SwapExactTokensForTokens(
+		amountIn                          *amount.Amount,                                       // input 
+    amountOutMin                      *amount.Amount,                                       // output 최소 조건 
+		path                             []common.Address,                                      // 교환 경로 
+) []*amount.Amount                                                                          // 각 단계별 output 배열 
+
+UniSwapTokensForExactTokens(
+		amountOut                         *amount.Amount,                                       // 원하는 output 
+		amountInMax                       *amount.Amount,                                       // input 최대 조건 
+		path                             []common.Address,                                      // 교환 경로 
+) []*amount.Amount                                                        onlyUniSwap       // 각 단계별 input 배열
+```
+
+# 업무 Process
+
+### Contract 생성
+
+1. UniSwap  - 꼭 factory를 통해서만 가능하다
+2. StableSwap(N=2) 생성 - factory가 없어도 생성 가능하다. factory를 통해 생성되는 경우  router.SwapExactTokensForTokens을 통해 chain swap이 가능해진다
+3. StableSwap의 경우 N > 2인 경우 직접 생성
+    
+    ```go
+    type StableSwapConstruction struct {
+    		Name             string
+    		Symbol           string
+    	
+    		Factory          common.Address
+    		NTokens          uint8
+    		Tokens           []common.Address
+    		PayToken         common.Address
+    		Owner            common.Address
+    		Winner           common.Address
+    		Fee              uint64
+    		AdminFee         uint64
+    		WinnerFee        uint64
+    		Amp              *big.Int
+    	
+    		PrecisionMul     []uint64 
+    		Rates            []*big.Int
+    	}
+    ```
+    
+
+### Liquidity
+
+1. Uniswap
+    - Router의 UniAddLiquidity, UniRemoveLiquidity를 수행함
+    
+        조회 : UniGetLPTokenAmount, UniGetWithdrawAmount 
+    
+
+ 2. Stableswap 
+
+- AddLiquidity - 맨 처음 (LP token supply = 0 인 경우)을 제외하고 한 token으로도 가능,  수수료 부과 O
+    
+     조회 : CalcLPTokenAmount(is_deposit = true) 
+    
+- RemoveLiquidity - 현재 reserve에 비례하여 token withdraw, 수수료 부과 X
+    
+     조회 : CalcLPTokenAmount(is_deposit = false) 를 통해 수행전 값 조회 
+    
+- RemoveLiqudityImbalance - 원하는 token 배열 입력 , 수수료 부과 O
+    
+    조회 :  CalcWithdrawCoins
+    
+- RemoveLiqudityOneCoin - 한개의 token으로 withdraw, 수수료 부과 O
+    
+    조회 : CalcWithdrawOneCoin
+    
+
+### Swap, Exchange
+
+1. Uniswap 
+    
+    router의 SwapExactTokensForTokens, UniSwapTokensForExactTokens을 통해 수행 
+    
+2. StableSwap 
+
+     Exchange 함수를 통해 수행 
+
+1. Chain Swap : 교환 경로에 Uniswap과 StableSwap이 섞여 있는 경우와 UniSwap 또는 StableSwap 단일 형태로 구성되어 있는 경우 모두
+
+     router의 SwapExactTokensForTokens를 통해 수행 
+
+1. 참조 
+    
+    chainswap_test.go 소스코드 참조
+    
+
+### Owner, Winner  변경
+
+1. CommitTransferOwnerWinner 함수를 통해 설정 
+    
+    owner - ZeroAddress 불가, winner - ZeroAddress 가능
+    
+2. 설정시간(delay) 후에  ApplyTransferOwnerWinner 함수를 호출하여 변경
+3. 설정시간(delay)이 지나기 전에 RevertTransferOwnerWinner 함수를 통해 예전값 복귀 가능
+
+### Fee, AdminFee, WinnerFee
+
+- 정의
+    
+     1. Fee :  0 ≤ Fee  ≤ MAX_FEE / FEE_DENOMINATOR(= $10^{10}$)  
+    
+    - 부과시점 : Uniswap :  교환(swap) 전 token에 부과,  Stableswap : 교환(exchange) 후 token에 부과
+    - 지급대상 : LP (Liquid Provider)
+    - stableswap의 경우 LP에게도 부과
+        1. AddLiqudity, RemoveLiqudityImbalance,  RemoveLiquidityOneCoin 의 경우 부과  
+        2. RemoveLiqudity에는 부과되지 않음 (현재 Deposit된 tokens 비례 만큼 Remove 하기 때문)
+        3.  수수료율 
+            
+            AddLiqudity, RemoveLiqudityImbalance :  $\frac{N}{4*(N-1)}$로 부과됨 → Fee 요율보다 많이 부과
+            
+            N > 2 인 경우 $\frac{1}{N}$ 보다 큼  :  N = 2  ->  $\frac{1}{2}$  ,  N = 3  ->  $\frac{3}{8}$,  N= 4 -> $\frac{1}{3}$
+            
+            RemoveLiquidity : Fee 요율 만큼 부과
+            
+    1. AdminFee :   Fee의 일부  ( Fee * AdminFee / FEE_DENOMINATOR ) 를 owner와 winner에게 지급되는 수수료 
+    2. WinnerFee :  Admin Fee의 일부 (  AdminFee * WinnerFee / FEE_DENOMINATOR) 를 Winner에게 지급
+- 요율 변경
+    1. commitNewFee 함수를 통해 설정 
+    
+           Fee            ≤   MAX_FEE
+    
+           AdminFee  ≤   MAX_ADMIN_FEE
+    
+           WinnerFee  ≤  MAX_WINNER_FEE 
+    
+    1. 설정시간(delay) 후에  ApplyNewFee 함수를 호출하여 변경
+    2. 설정시간(delay)이 지나기 전에 revertNewFee 함수를 통해 예전값 복귀 가능
+- 지급
+    1. Fee : RemoveLiquidity (RemoveLiquidityImbalance, RemoveLiquidityOneCoin) 함수를 통해 LP를 찾을 때 같이 지급됨  
+        
+        여러 코인으로 지급 됨
+        
+    2. withdrawAdminFees 함수를 통해  owner, winner에게 지급됨    
+
+### Kill
+
+1. KillMe를 실행
+    - Uniswap(Router) - Mint(UniAddLiquidity), swap(SwapExactTokensToTokens, UniSwapTokensToExactTokens) 불가 Burn(UniRemoveLiqudity) 만 가능
+    - Stableswap - AddLiqudity, RemoveLiquidityImbalance, RemoveLiqudityOneCoin 불가, RemoveLiquidity만 가능
+2. UnKillMe를 통해 기능 복귀
+
+# Test
+
+- test 코드 위치
+    1. exchange/trade  : package내 private function 테스트
+        
+         참조소스 : curve-contract/tests/token 
+        
+    2. exchange/ztest
+    
+         참조소스 : curve-contract/tests,  uniswap/v2-core, v2-periphery/test 
+    
+- ginkgo   : [https://onsi.github.io/ginkgo/](https://onsi.github.io/ginkgo/)     +  gomega : [https://onsi.github.io/gomega/](https://onsi.github.io/gomega/)
+- 실행 : 위 두 디렉토리 안에서 명령어 ginkgo, ginkgo -v (verbose mode)
+    
+              또는 ztest/ztest_all.sh (2개 동시 실행)
+    
+
+## 참고자료
+
+1. Uniswap vs Stableswap : swap data  
+    
+     Uniswap,  Stableswap (A=50), Stableswap(A=100)
+    
+
+    
+
+![스크린샷, 2022-04-08 13-59-55.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/c4bb2016-0674-4160-aa0e-b4672b4ed366/스크린샷_2022-04-08_13-59-55.png)
+
+## 변경 이력
+
+2022.04.08.  v 1.0

@@ -1,6 +1,6 @@
 package node
 
-import "github.com/fletaio/fleta_v2/cmd/config/go-toml"
+import "github.com/meverselabs/meverse/cmd/config/go-toml"
 
 var (
 	DEBUG = false

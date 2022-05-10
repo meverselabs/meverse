@@ -1,9 +1,9 @@
 package p2p
 
 import (
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/hash"
-	"github.com/fletaio/fleta_v2/core/types"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/core/types"
 )
 
 // Status represents the status of the peer

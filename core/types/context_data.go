@@ -5,10 +5,10 @@ import (
 	"encoding/hex"
 	"strconv"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/amount"
-	"github.com/fletaio/fleta_v2/common/bin"
-	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
+	"github.com/meverselabs/meverse/common/bin"
+	"github.com/meverselabs/meverse/common/hash"
 	"github.com/pkg/errors"
 )
 
@@ -64,12 +64,10 @@ func (ctd *ContextData) IsAdmin(addr common.Address) bool {
 		return is
 	} else if ctd.Parent != nil {
 		is := ctd.Parent.IsAdmin(addr)
-		ctd.AdminMap[addr] = is
 		ctd.size += 21 //uint32(common.Sizeof(reflect.TypeOf(addr))) + uint32(common.Sizeof(reflect.TypeOf(is)))
 		return is
 	} else {
 		is := ctd.cache.IsAdmin(addr)
-		ctd.AdminMap[addr] = is
 		ctd.size += 21 //uint32(common.Sizeof(reflect.TypeOf(addr))) + uint32(common.Sizeof(reflect.TypeOf(is)))
 		return is
 	}
@@ -202,8 +200,32 @@ func (ctd *ContextData) DeployContract(sender common.Address, ClassID uint64, Ar
 	copy(base[1:], sender[:])
 	copy(base[1+common.AddressLength:], bin.Uint64Bytes(ClassID))
 	copy(base[1+common.AddressLength+8:], bin.Uint32Bytes(ctd.NextSeq()))
+	height := ctd.cache.ctx.TargetHeight()
+	if height > 0 {
+		bs := bin.Uint32Bytes(height)
+		base = append(base, bs...)
+	}
 	h := hash.Hash(base)
 	addr := common.BytesToAddress(h[12:])
+	cd := &ContractDefine{
+		Address: addr,
+		Owner:   sender,
+		ClassID: ClassID,
+	}
+	cont, err := CreateContract(cd)
+	if err != nil {
+		return nil, err
+	}
+	ctd.ContractDefineMap[addr] = cd
+	if err := cont.OnCreate(ctd.cache.ctx.ContractContext(cont, addr), Args); err != nil {
+		return nil, err
+	}
+	ctd.size += 68 // uint32(common.Sizeof(reflect.TypeOf(addr))) + uint32(common.Sizeof(reflect.TypeOf(cd)))
+	return cont, nil
+}
+
+// DeployContract deploy contract to the chain with address
+func (ctd *ContextData) DeployContractWithAddress(sender common.Address, ClassID uint64, addr common.Address, Args []byte) (Contract, error) {
 	cd := &ContractDefine{
 		Address: addr,
 		Owner:   sender,

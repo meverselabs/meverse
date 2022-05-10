@@ -4,10 +4,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/p2p/peer"
-	"github.com/fletaio/fleta_v2/p2p/peermessage"
-	"github.com/fletaio/fleta_v2/p2p/storage"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/p2p/peer"
+	"github.com/meverselabs/meverse/p2p/peermessage"
+	"github.com/meverselabs/meverse/p2p/storage"
 	"github.com/pkg/errors"
 )
 

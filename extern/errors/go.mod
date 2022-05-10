@@ -1,4 +1,4 @@
-module github.com/fletaio/fleta_v2/extern/errors
+module github.com/meverselabs/meverse/extern/errors
 
 go 1.17
 

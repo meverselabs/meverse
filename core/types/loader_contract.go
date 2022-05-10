@@ -1,6 +1,6 @@
 package types
 
-import "github.com/fletaio/fleta_v2/common"
+import "github.com/meverselabs/meverse/common"
 
 // ContractLoader defines functions that loads state data from the target chain
 type ContractLoader interface {

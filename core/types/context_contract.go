@@ -3,8 +3,8 @@ package types
 import (
 	"math/big"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/hash"
 )
 
 // ContractContext is an context for the contract
@@ -65,6 +65,12 @@ func (cc *ContractContext) ContractData(name []byte) []byte {
 	return cc.ctx.Top().Data(cc.cont, common.Address{}, name)
 }
 
+// DeployContract deploy contract to the chain
+func (cc *ContractContext) DeployContractWithAddress(owner common.Address, ClassID uint64, addr common.Address, Args []byte) (Contract, error) {
+	cc.ctx.isLatestHash = false
+	return cc.ctx.Top().DeployContractWithAddress(owner, ClassID, addr, Args)
+}
+
 // SetContractData inserts the contract data to the top snapshot
 func (cc *ContractContext) SetContractData(name []byte, value []byte) {
 	cc.ctx.Top().SetData(cc.cont, common.Address{}, name, value)
@@ -98,4 +104,9 @@ func (cc *ContractContext) AddAddrSeq(addr common.Address) {
 // NextSeq returns the next squence number
 func (cc *ContractContext) NextSeq() uint32 {
 	return cc.ctx.Top().NextSeq()
+}
+
+// IsContract returns is the contract
+func (cc *ContractContext) IsContract(addr common.Address) bool {
+	return cc.ctx.Top().IsContract(addr)
 }

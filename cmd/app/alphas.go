@@ -1,6 +1,6 @@
 package app
 
-import "github.com/fletaio/fleta_v2/common"
+import "github.com/meverselabs/meverse/common"
 
 func genesisAlphas() []common.Address {
 	return []common.Address{

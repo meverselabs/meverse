@@ -9,16 +9,19 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/fletaio/fleta_v2/cmd/app"
-	"github.com/fletaio/fleta_v2/cmd/closer"
-	"github.com/fletaio/fleta_v2/cmd/config"
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/hash"
-	"github.com/fletaio/fleta_v2/common/key"
-	"github.com/fletaio/fleta_v2/core/chain"
-	"github.com/fletaio/fleta_v2/core/piledb"
-	"github.com/fletaio/fleta_v2/core/types"
-	"github.com/fletaio/fleta_v2/p2p"
+	"github.com/meverselabs/meverse/cmd/app"
+	"github.com/meverselabs/meverse/cmd/closer"
+	"github.com/meverselabs/meverse/cmd/config"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/common/key"
+	"github.com/meverselabs/meverse/core/chain"
+	"github.com/meverselabs/meverse/core/piledb"
+	"github.com/meverselabs/meverse/core/types"
+	"github.com/meverselabs/meverse/p2p"
+	"github.com/meverselabs/meverse/service/apiserver"
+	"github.com/meverselabs/meverse/service/apiserver/viewchain"
+	"github.com/meverselabs/meverse/service/txsearch"
 )
 
 // Config is a configuration for the cmd
@@ -136,6 +139,10 @@ func main() {
 	}
 
 	cn := chain.NewChain(ObserverKeys, st, "")
+	rpcapi := apiserver.NewAPIServer()
+	ts := txsearch.NewTxSearch(cfg.StoreRoot+"/_txsearch", rpcapi, st, cn, cfg.InitHeight)
+	cn.MustAddService(ts)
+	cn.MustAddService(rpcapi)
 
 	if cfg.InitHeight == 0 {
 		if err := cn.Init(app.Genesis()); err != nil {
@@ -170,6 +177,9 @@ func main() {
 	}
 	cm.RemoveAll()
 	cm.Add("node", nd)
+
+	go rpcapi.Run(":8541")
+	viewchain.NewViewchain(rpcapi, ts, cn, st, nd)
 
 	go nd.Run(":" + strconv.Itoa(cfg.Port))
 	cm.Wait()

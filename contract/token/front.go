@@ -3,9 +3,9 @@ package token
 import (
 	"math/big"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/amount"
-	"github.com/fletaio/fleta_v2/core/types"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
+	"github.com/meverselabs/meverse/core/types"
 )
 
 func (cont *TokenContract) Front() interface{} {
@@ -42,8 +42,8 @@ func (f *front) SetMinter(cc *types.ContractContext, To common.Address, Is bool)
 	return f.cont.SetMinter(cc, To, Is)
 }
 
-func (f *front) Approve(cc *types.ContractContext, To common.Address, Amount *amount.Amount) {
-	f.cont.Approve(cc, To, Amount)
+func (f *front) Approve(cc *types.ContractContext, To common.Address, Amount *amount.Amount) error {
+	return f.cont.Approve(cc, To, Amount)
 }
 
 func (f *front) TransferFrom(cc *types.ContractContext, From common.Address, To common.Address, Amount *amount.Amount) error {
@@ -54,6 +54,12 @@ func (f *front) SetGateway(cc *types.ContractContext, Gateway common.Address, Is
 }
 func (f *front) TokenInRevert(cc *types.ContractContext, Platform string, ercHash string, to common.Address, Amount *amount.Amount) error {
 	return f.cont.TokenInRevert(cc, Platform, ercHash, to, Amount)
+}
+func (f *front) SetRouter(cc *types.ContractContext, router common.Address, path []common.Address) error {
+	return f.cont.SetRouter(cc, router, path)
+}
+func (f *front) SwapToMainToken(cc *types.ContractContext, amt *amount.Amount) (*amount.Amount, error) {
+	return f.cont.SwapToMainToken(cc, amt)
 }
 
 //////////////////////////////////////////////////

@@ -24,3 +24,7 @@ func (s *ServiceBase) OnBlockConnected(b *Block, loader Loader) {
 // OnTransactionInPoolExpired called when a transaction in pool is expired
 func (s *ServiceBase) OnTransactionInPoolExpired(txs []*Transaction) {
 }
+
+// OnTransactionFail called when a transaction in pool is expired
+func (s *ServiceBase) OnTransactionFail(height uint32, txs []*Transaction, err []error) {
+}

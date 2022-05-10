@@ -3,8 +3,8 @@ package chain
 import (
 	"io"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/bin"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/bin"
 )
 
 // DeployContractData defines data of deploy contract tx
@@ -22,6 +22,9 @@ func (s *DeployContractData) WriteTo(w io.Writer) (int64, error) {
 	if sum, err := sw.Uint64(w, s.ClassID); err != nil {
 		return sum, err
 	}
+	if sum, err := sw.Bytes(w, s.Args); err != nil {
+		return sum, err
+	}
 	return sw.Sum(), nil
 }
 
@@ -31,6 +34,9 @@ func (s *DeployContractData) ReadFrom(r io.Reader) (int64, error) {
 		return sum, err
 	}
 	if sum, err := sr.Uint64(r, &s.ClassID); err != nil {
+		return sum, err
+	}
+	if sum, err := sr.Bytes(r, &s.Args); err != nil {
 		return sum, err
 	}
 	return sr.Sum(), nil

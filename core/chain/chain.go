@@ -7,13 +7,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/bin"
-	"github.com/fletaio/fleta_v2/common/hash"
-	"github.com/fletaio/fleta_v2/core/piledb"
-	"github.com/fletaio/fleta_v2/core/prefix"
-	"github.com/fletaio/fleta_v2/core/types"
 	"github.com/google/uuid"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/bin"
+	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/core/piledb"
+	"github.com/meverselabs/meverse/core/prefix"
+	"github.com/meverselabs/meverse/core/types"
 	"github.com/pkg/errors"
 )
 
@@ -81,7 +81,7 @@ func (cn *Chain) Init(genesisContextData *types.ContextData) error {
 		}
 	}
 
-	log.Println("Chain loaded", cn.store.Height(), ctx.PrevHash().String())
+	//log.Println("Chain loaded", cn.store.Height(), ctx.PrevHash().String())
 
 	cn.isInit = true
 	return nil
@@ -129,7 +129,7 @@ func (cn *Chain) InitWith(InitGenesisHash hash.Hash256, initHash hash.Hash256, i
 		}
 	}
 
-	log.Println("Chain loaded", cn.store.Height(), ctx.PrevHash().String())
+	//log.Println("Chain loaded", cn.store.Height(), ctx.PrevHash().String())
 
 	cn.isInit = true
 	return nil
@@ -308,7 +308,7 @@ func (cn *Chain) ValidateSignature(bh *types.Header, sigs []common.Signature) er
 
 func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context) error {
 	if b.Header.ContextHash != ctx.Hash() {
-		log.Println("CONNECT", ctx.Dump())
+		log.Println("CONNECT", ctx.Hash(), b.Header.ContextHash, ctx.Dump())
 		panic("")
 		return errors.WithStack(ErrInvalidContextHash)
 	}
@@ -363,12 +363,12 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context, sm ma
 				ctx.Revert(sn)
 				return errors.WithStack(ErrInvalidAdminAddress)
 			}
-			if err := cn.ExecuteTransaction(ctx, tx, TXID); err != nil {
+			if _, err := cn.ExecuteTransaction(ctx, tx, TXID); err != nil {
 				ctx.Revert(sn)
 				return err
 			}
 		} else {
-			if _, err := ExecuteContractTx(ctx, tx, TxSigners[i]); err != nil {
+			if err := ExecuteContractTx(ctx, tx, TxSigners[i], TXID); err != nil {
 				ctx.Revert(sn)
 				return err
 			}
@@ -490,26 +490,36 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block, SigMap map[hash.H
 	return TxSigners, TxHashes[1:], nil
 }
 
-func (cn *Chain) ExecuteTransaction(ctx *types.Context, tx *types.Transaction, TXID string) error {
+func (cn *Chain) ExecuteTransaction(ctx *types.Context, tx *types.Transaction, TXID string) ([]*types.Event, error) {
 	switch tx.Method {
 	case "Admin.Add":
-		return ctx.SetAdmin(common.BytesToAddress(tx.Args), true)
+		return nil, ctx.SetAdmin(common.BytesToAddress(tx.Args), true)
 	case "Admin.Remove":
-		return ctx.SetAdmin(common.BytesToAddress(tx.Args), false)
+		return nil, ctx.SetAdmin(common.BytesToAddress(tx.Args), false)
 	case "Generator.Add":
-		return ctx.SetGenerator(common.BytesToAddress(tx.Args), true)
+		return nil, ctx.SetGenerator(common.BytesToAddress(tx.Args), true)
 	case "Generator.Remove":
-		return ctx.SetGenerator(common.BytesToAddress(tx.Args), false)
+		return nil, ctx.SetGenerator(common.BytesToAddress(tx.Args), false)
 	case "Contract.Deploy":
 		data := &DeployContractData{}
 		if _, err := data.ReadFrom(bytes.NewReader(tx.Args)); err != nil {
-			return err
+			return nil, err
 		}
-		if _, err := ctx.DeployContract(data.Owner, data.ClassID, data.Args); err != nil {
-			return err
+		if cont, err := ctx.DeployContract(data.Owner, data.ClassID, data.Args); err != nil {
+			return nil, err
+		} else {
+			addr := cont.Address()
+			_, i, err := types.ParseTransactionID(TXID)
+			if err != nil {
+				return nil, err
+			}
+			return []*types.Event{{
+				Index:  i,
+				Type:   types.EventTagTxMsg,
+				Result: bin.TypeWriteAll(addr),
+			}}, nil
 		}
-		return nil
 	default:
-		return errors.WithStack(ErrUnknownTransactionMethod)
+		return nil, errors.WithStack(ErrUnknownTransactionMethod)
 	}
 }

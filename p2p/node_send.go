@@ -3,7 +3,7 @@ package p2p
 import (
 	"time"
 
-	"github.com/fletaio/fleta_v2/common"
+	"github.com/meverselabs/meverse/common"
 )
 
 func (nd *Node) sendMessage(Priority int, Target common.PublicKey, m Serializable) {

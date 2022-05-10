@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fletaio/fleta_v2/common/hash"
+	"github.com/meverselabs/meverse/common/hash"
 	"github.com/pkg/errors"
 )
 
@@ -31,7 +31,7 @@ type DB struct {
 func Open(path string, initHash hash.Hash256, InitHeight uint32, InitTimestamp uint64) (*DB, error) {
 	os.MkdirAll(path, os.ModePerm)
 
-	start := time.Now()
+	//start := time.Now()
 	var MinHeight uint32
 	MaxHeight := InitHeight
 	pileMap := map[uint32]*Pile{}
@@ -71,7 +71,7 @@ func Open(path string, initHash hash.Hash256, InitHeight uint32, InitTimestamp u
 			}
 		}
 	}
-	log.Println("PileDB is opened in", time.Since(start))
+	//log.Println("PileDB is opened in", time.Since(start))
 	db := &DB{
 		path:          path,
 		piles:         piles,

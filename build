@@ -1,0 +1,9 @@
+cd cmd/generator
+go build
+mv generator ../built/
+cd ../node
+go build
+mv node ../built/
+cd ../observer
+go build
+mv observer ../built/

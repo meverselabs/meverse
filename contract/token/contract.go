@@ -7,9 +7,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/amount"
-	"github.com/fletaio/fleta_v2/core/types"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
+	"github.com/meverselabs/meverse/core/types"
 )
 
 type TokenContract struct {
@@ -72,7 +72,7 @@ func (cont *TokenContract) addBalance(cc *types.ContractContext, addr common.Add
 func (cont *TokenContract) subBalance(cc *types.ContractContext, addr common.Address, am *amount.Amount) error {
 	bal := cont.BalanceOf(cc, addr)
 	if bal.Less(am) {
-		return errors.Errorf("invalid transfer amount %v less then %v", am.String(), bal)
+		return errors.Errorf("invalid transfer amount %v less then %v", am.String(), bal.String())
 	}
 	bal = bal.Sub(am)
 	if bal.IsZero() {
@@ -133,6 +133,22 @@ func (cont *TokenContract) SubCollectedFee(cc *types.ContractContext, am *amount
 }
 
 func (cont *TokenContract) Transfer(cc *types.ContractContext, To common.Address, Amount *amount.Amount) error {
+	if cc.From() == common.ZeroAddr {
+		return errors.New("Token: TRANSFER_FROM_ZEROADDRESS")
+	}
+
+	if To == common.ZeroAddr {
+		return errors.New("Token: TRANSFER_TO_ZEROADDRESS")
+	}
+
+	fromBalance := cont.BalanceOf(cc, cc.From())
+	if fromBalance.Cmp(Amount.Int) < 0 {
+		return errors.New("Token: TRANSFER_EXCEED_BALANCE")
+	}
+
+	if Amount.IsZero() {
+		return nil
+	}
 	if err := cont.subBalance(cc, cc.From(), Amount); err != nil {
 		return err
 	}
@@ -148,7 +164,10 @@ func (cont *TokenContract) Mint(cc *types.ContractContext, To common.Address, Am
 	if cc.From() != cont.Master() && !isMinter {
 		return errors.New("not token minter")
 	}
-	return cont.addBalance(cc, To, Amount)
+	if Amount.IsPlus() {
+		return cont.addBalance(cc, To, Amount)
+	}
+	return nil
 }
 
 func (cont *TokenContract) MintBatch(cc *types.ContractContext, Tos []common.Address, Amounts []*amount.Amount) error {
@@ -188,19 +207,39 @@ func (cont *TokenContract) SetMinter(cc *types.ContractContext, To common.Addres
 	return nil
 }
 
-func (cont *TokenContract) Approve(cc *types.ContractContext, To common.Address, Amount *amount.Amount) {
-	cc.SetAccountData(cc.From(), MakeAllowanceTokenKey(To), Amount.Bytes())
+func (cont *TokenContract) Approve(cc *types.ContractContext, spender common.Address, Amount *amount.Amount) error {
+	if cc.From() == common.ZeroAddr {
+		return errors.New("Token: APPROVE_FROM_ZEROADDRESS")
+	}
+
+	if spender == common.ZeroAddr {
+		return errors.New("Token: APPROVE_TO_ZEROADDRESS")
+	}
+
+	if Amount.IsMinus() {
+		return errors.New("Token: APPROVE_NEGATIVE_AMOUNT")
+	}
+
+	cont._approve(cc, cc.From(), spender, Amount)
+	return nil
+}
+
+func (cont *TokenContract) _approve(cc *types.ContractContext, owner common.Address, spender common.Address, Amount *amount.Amount) {
+	cc.SetAccountData(owner, MakeAllowanceTokenKey(spender), Amount.Bytes())
 }
 
 func (cont *TokenContract) TransferFrom(cc *types.ContractContext, From common.Address, To common.Address, Amount *amount.Amount) error {
+	if Amount.IsZero() {
+		return nil
+	}
 	balance := cont.BalanceOf(cc, From)
 	if Amount.Cmp(balance.Int) > 0 {
-		return errors.New("the token holding quantity is insufficient")
+		return errors.Errorf("the token holding quantity is insufficient balance: %v Amount: %v From: %v cont: %v", balance.String(), Amount.String(), From.String(), cont.addr.String())
 	}
 
 	allowedValue := cont.Allowance(cc, From, cc.From())
 	if Amount.Cmp(allowedValue.Int) > 0 {
-		return errors.New("the token allowance is insufficient")
+		return errors.Errorf("the token allowance is insufficient token: %v fom: %v to: %v Amount: %v allowedValue: %v", cont.addr.String(), From.String(), To.String(), Amount, allowedValue)
 	}
 	nAllow := allowedValue.Sub(Amount)
 	cc.SetAccountData(From, MakeAllowanceTokenKey(To), nAllow.Bytes())
@@ -226,6 +265,7 @@ func (cont *TokenContract) TokenInRevert(cc *types.ContractContext, Platform str
 	if err := cont.addBalance(cc, cc.From(), Amount); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -254,6 +294,73 @@ func (cont *TokenContract) SetGateway(cc *types.ContractContext, Gateway common.
 	return nil
 }
 
+func (cont *TokenContract) SetRouter(cc *types.ContractContext, router common.Address, path []common.Address) error {
+	if cc.From() != cont.Master() {
+		log.Println("err not token master")
+		return errors.New("not token master")
+	}
+
+	cc.SetContractData([]byte{tagRouterAddress}, router[:])
+	bs := make([]byte, common.AddressLength*len(path))
+	for i, addr := range path {
+		copy(bs[i*common.AddressLength:], addr[:])
+	}
+	cc.SetContractData([]byte{tagRouterPaths}, bs)
+	return nil
+}
+
+func (cont *TokenContract) SwapToMainToken(cc *types.ContractContext, amt *amount.Amount) (*amount.Amount, error) {
+	var router common.Address
+	{
+		bs := cc.ContractData([]byte{tagRouterAddress})
+		if len(bs) == 0 {
+			return nil, errors.New("this token not supported swap to fee token")
+		}
+		copy(router[:], bs)
+	}
+
+	var path []common.Address
+	{
+		bs := cc.ContractData([]byte{tagRouterPaths})
+		if len(bs) == 0 {
+			return nil, errors.New("this token not supported swap to fee token")
+		}
+		path = make([]common.Address, len(bs)/common.AddressLength)
+		for i := 0; i < len(bs); i += common.AddressLength {
+			path[i/common.AddressLength] = common.BytesToAddress(bs[i : i+common.AddressLength])
+		}
+	}
+
+	mt := *cc.MainToken()
+	if cont.addr == mt {
+		return nil, errors.New("this is fee token")
+	}
+
+	err := cont.Transfer(cc, cont.addr, amt)
+	if err != nil {
+		return nil, err
+	}
+
+	cont._approve(cc, cont.addr, router, amt)
+	var swapAmt *amount.Amount
+	if is, err := cc.Exec(cc, router, "SwapExactTokensForTokens", []interface{}{amt, amount.NewAmount(0, 0), path}); err != nil {
+		return nil, err
+	} else {
+		if len(is) < 1 {
+			return nil, errors.New("invalid swap result")
+		} else if swapResult, ok := is[0].([]*amount.Amount); !ok {
+			return nil, errors.New("invalid swap result depth 2")
+		} else if len(swapResult) < 2 {
+			return nil, errors.New("invalid swap result count")
+		} else {
+			swapAmt = swapResult[len(swapResult)-1]
+		}
+	}
+
+	_, err = cc.Exec(cc, *cc.MainToken(), "Transfer", []interface{}{cc.From(), swapAmt})
+	return swapAmt, err
+}
+
 //////////////////////////////////////////////////
 // Public Reader Functions
 //////////////////////////////////////////////////
@@ -266,7 +373,6 @@ func (cont *TokenContract) Symbol(cc types.ContractLoader) string {
 	return string(cc.ContractData([]byte{tagTokenSymbol}))
 }
 
-// todo
 func (cont *TokenContract) TotalSupply(cc types.ContractLoader) *amount.Amount {
 	cdbs := cc.ContractData([]byte{tagCollectedFee})
 	CollectedFee := amount.NewAmountFromBytes(cdbs)

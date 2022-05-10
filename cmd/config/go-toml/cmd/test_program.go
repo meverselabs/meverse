@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/fletaio/fleta_v2/cmd/config/go-toml"
+	"github.com/meverselabs/meverse/cmd/config/go-toml"
 )
 
 func main() {

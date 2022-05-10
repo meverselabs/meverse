@@ -4,8 +4,8 @@ import (
 	"io"
 	"math/big"
 
-	"github.com/fletaio/fleta_v2/common/amount"
-	"github.com/fletaio/fleta_v2/common/bin"
+	"github.com/meverselabs/meverse/common/amount"
+	"github.com/meverselabs/meverse/common/bin"
 )
 
 type GatewayPolicy struct {

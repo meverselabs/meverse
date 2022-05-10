@@ -3,8 +3,8 @@ package node
 import (
 	"time"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/p2p"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/p2p"
 )
 
 func (fr *GeneratorNode) sendMessage(Priority int, Target common.PublicKey, m p2p.Serializable) {

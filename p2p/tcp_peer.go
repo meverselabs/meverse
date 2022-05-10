@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/fletaio/fleta_v2/common/bin"
+	"github.com/meverselabs/meverse/common/bin"
 )
 
 // TCPPeer manages send and recv of the connection

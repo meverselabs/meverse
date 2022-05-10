@@ -13,10 +13,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/core/types"
-	"github.com/fletaio/fleta_v2/extern/txparser"
-	"github.com/fletaio/fleta_v2/service/txsearch"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/core/types"
+	"github.com/meverselabs/meverse/extern/txparser"
+	"github.com/meverselabs/meverse/service/txsearch"
 	"golang.org/x/crypto/sha3"
 )
 

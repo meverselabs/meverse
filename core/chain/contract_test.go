@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/amount"
-	"github.com/fletaio/fleta_v2/common/bin"
-	"github.com/fletaio/fleta_v2/common/hash"
-	"github.com/fletaio/fleta_v2/common/key"
-	"github.com/fletaio/fleta_v2/common/testapp"
-	"github.com/fletaio/fleta_v2/core/piledb"
-	"github.com/fletaio/fleta_v2/core/types"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
+	"github.com/meverselabs/meverse/common/bin"
+	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/common/key"
+	"github.com/meverselabs/meverse/common/testapp"
+	"github.com/meverselabs/meverse/core/piledb"
+	"github.com/meverselabs/meverse/core/types"
 )
 
 func TestExecuteContractTx(t *testing.T) {

@@ -7,14 +7,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fletaio/fleta_v2/common"
-	"github.com/fletaio/fleta_v2/common/hash"
-	"github.com/fletaio/fleta_v2/common/key"
-	"github.com/fletaio/fleta_v2/core/chain"
-	"github.com/fletaio/fleta_v2/p2p"
-	"github.com/fletaio/fleta_v2/p2p/peer"
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo"
+	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/common/key"
+	"github.com/meverselabs/meverse/core/chain"
+	"github.com/meverselabs/meverse/p2p"
+	"github.com/meverselabs/meverse/p2p/peer"
 	"github.com/pkg/errors"
 )
 
