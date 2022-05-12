@@ -20,7 +20,6 @@ import (
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/meverselabs/meverse/node"
 	"github.com/meverselabs/meverse/service/apiserver"
-	"github.com/meverselabs/meverse/service/apiserver/metamaskrelay"
 	"github.com/meverselabs/meverse/service/apiserver/viewchain"
 	"github.com/meverselabs/meverse/service/txsearch"
 )
@@ -202,7 +201,6 @@ func main() {
 	cm.RemoveAll()
 	cm.Add("formulator", fr)
 
-	metamaskrelay.NewMetamaskRelay(rpcapi, ts, cn, fr)
 	go rpcapi.Run(":8541")
 	viewchain.NewViewchain(rpcapi, ts, cn, st, fr)
 

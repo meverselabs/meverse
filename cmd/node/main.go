@@ -149,6 +149,7 @@ func main() {
 			panic(err)
 		}
 	} else {
+		app.RegisterContractClass()
 		if err := cn.InitWith(InitGenesisHash, InitHash, cfg.InitHeight, cfg.InitTimestamp); err != nil {
 			panic(err)
 		}
