@@ -11,6 +11,7 @@ InitHeight = 0
 InitHash = ""
 InitTimestamp = 0
 Port = 22001
+RPCPort = 8541
 StoreRoot = "./ndata"
 # NodeKeyHex = "NODE_KEY_HEX_HERE OR REMOVE"
 ServiceName = "meverse_account"

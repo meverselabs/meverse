@@ -20,6 +20,7 @@ import (
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/meverselabs/meverse/p2p"
 	"github.com/meverselabs/meverse/service/apiserver"
+	"github.com/meverselabs/meverse/service/apiserver/metamaskrelay"
 	"github.com/meverselabs/meverse/service/apiserver/viewchain"
 	"github.com/meverselabs/meverse/service/txsearch"
 )
@@ -34,6 +35,7 @@ type Config struct {
 	InitHeight      uint32
 	InitTimestamp   uint64
 	Port            int
+	RPCPort         int
 	StoreRoot       string
 }
 
@@ -179,7 +181,8 @@ func main() {
 	cm.RemoveAll()
 	cm.Add("node", nd)
 
-	go rpcapi.Run(":8541")
+	metamaskrelay.NewMetamaskRelay(rpcapi, ts, cn, nd)
+	go rpcapi.Run(":" + strconv.Itoa(cfg.RPCPort))
 	viewchain.NewViewchain(rpcapi, ts, cn, st, nd)
 
 	go nd.Run(":" + strconv.Itoa(cfg.Port))
