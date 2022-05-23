@@ -534,7 +534,7 @@ var _ = Describe("Uni Front Tx", func() {
 			Expect(is[0].(common.Address)).To(Equal(charlie))
 		})
 
-		It("WithdrawAdminFees, AdminBalance, Skim, Sync", func() {
+		It("WithdrawAdminFees2, AdminBalance, Skim, Sync", func() {
 			uniAddInitialLiquidity(ctx, alice)
 			aliceLPBalance, _ := tokenBalanceOf(ctx, pair, alice)
 			uniMint(ctx, bob)
@@ -567,12 +567,12 @@ var _ = Describe("Uni Front Tx", func() {
 			ctx, err = Sleep(cn, ctx, tx, step, aliceKey)
 			Expect(err).To(Succeed())
 
-			// WithdrawAdminFees(cc *types.ContractContext)
+			// WithdrawAdminFees2(cc *types.ContractContext)
 			tx = &types.Transaction{
 				ChainID:   ctx.ChainID(),
 				Timestamp: ctx.LastTimestamp(),
 				To:        pair,
-				Method:    "WithdrawAdminFees",
+				Method:    "WithdrawAdminFees2",
 				Args:      bin.TypeWriteAll(),
 			}
 			ctx, err = Sleep(cn, ctx, tx, step, aliceKey)

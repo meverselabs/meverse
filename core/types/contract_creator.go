@@ -15,17 +15,7 @@ var gContractNameMap = map[uint64]string{}
 // IMPORTANT: RegisterContractType must be called only at initialization time
 // and never have to called concurrently with CreateContract, IsValidClassID, ContractName functions
 func RegisterContractType(cont Contract) (uint64, error) {
-	rt := reflect.TypeOf(cont)
-	for rt.Kind() == reflect.Ptr {
-		rt = rt.Elem()
-	}
-	name := rt.Name()
-	if pkgPath := rt.PkgPath(); len(pkgPath) > 0 {
-		pkgPath = strings.Replace(pkgPath, "meverselabs/meverse", "fletaio/fleta_v2", -1)
-		name = pkgPath + "." + name
-	}
-	h := hash.Hash([]byte(name))
-	ClassID := bin.Uint64(h[len(h)-8:])
+	name, rt, ClassID := _getContractClassID(cont)
 
 	if v, has := gContractNameMap[ClassID]; has {
 		if name != v {
@@ -39,16 +29,24 @@ func RegisterContractType(cont Contract) (uint64, error) {
 	return ClassID, nil
 }
 
-func UpgrageContractType(cont Contract, ClassID uint64) (uint64, error) {
+func _getContractClassID(cont Contract) (string, reflect.Type, uint64) {
 	rt := reflect.TypeOf(cont)
 	for rt.Kind() == reflect.Ptr {
 		rt = rt.Elem()
 	}
-	if _, has := gContractNameMap[ClassID]; !has {
-		return 0, errors.WithStack(ErrNotExistContract)
+	name := rt.Name()
+	if pkgPath := rt.PkgPath(); len(pkgPath) > 0 {
+		pkgPath = strings.Replace(pkgPath, "meverselabs/meverse", "fletaio/fleta_v2", -1)
+		name = pkgPath + "." + name
 	}
-	gContractTypeMap[ClassID] = rt
-	return ClassID, nil
+	h := hash.Hash([]byte(name))
+	ClassID := bin.Uint64(h[len(h)-8:])
+	return name, rt, ClassID
+}
+
+func GetContractClassID(cont Contract) (string, uint64) {
+	name, _, ClassID := _getContractClassID(cont)
+	return name, ClassID
 }
 
 func CreateContract(cd *ContractDefine) (Contract, error) {

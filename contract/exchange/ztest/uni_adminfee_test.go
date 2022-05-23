@@ -62,7 +62,7 @@ var _ = Describe("WithdrawAminFee", func() {
 				Expect(tokenTotalSupply(ctx, pair)).To(Equal(lpTotalSupply.Sub(liquidity).Add(expectedMintAmount)))
 				Expect(tokenBalanceOf(ctx, pair, alice)).To(Equal(lpOwnerBalance.Sub(liquidity).Add(expectedMintAmount)))
 
-				Exec(ctx, alice, pair, "WithdrawAdminFees", []interface{}{})
+				Exec(ctx, alice, pair, "WithdrawAdminFees2", []interface{}{})
 				Expect(ViewAmount(ctx, pair, "MintedAdminBalance")).To(Equal(ZeroAmount))
 				Expect(ViewAmount(ctx, pair, "AdminBalance")).To(Equal(ZeroAmount))
 				Expect(tokenTotalSupply(ctx, pair)).To(Equal(lpTotalSupply.Sub(liquidity)))
@@ -87,7 +87,7 @@ var _ = Describe("WithdrawAminFee", func() {
 				Expect(tokenTotalSupply(ctx, pair)).To(Equal(lpTotalSupply.Sub(liquidity).Add(expectedMintAmount)))
 				Expect(tokenBalanceOf(ctx, pair, alice)).To(Equal(lpOwnerBalance.Sub(liquidity).Add(expectedMintAmount)))
 
-				Exec(ctx, alice, pair, "WithdrawAdminFees", []interface{}{})
+				Exec(ctx, alice, pair, "WithdrawAdminFees2", []interface{}{})
 				Expect(ViewAmount(ctx, pair, "MintedAdminBalance")).To(Equal(ZeroAmount))
 				Expect(ViewAmount(ctx, pair, "AdminBalance")).To(Equal(ZeroAmount))
 				Expect(tokenTotalSupply(ctx, pair)).To(Equal(lpTotalSupply.Sub(liquidity)))
@@ -174,7 +174,7 @@ var _ = Describe("WithdrawAminFee", func() {
 				Expect(tokenBalanceOf(ctx, pair, bob)).To(Equal(expectedMintAmount))
 				Expect(tokenTotalSupply(ctx, pair)).To(Equal(lpTotalSupply.Sub(liquidity1).Add(expectedMintAmount)))
 
-				_, err = Exec(ctx, bob, pair, "WithdrawAdminFees", []interface{}{})
+				_, err = Exec(ctx, bob, pair, "WithdrawAdminFees2", []interface{}{})
 				Expect(ViewAmount(ctx, pair, "MintedAdminBalance")).To(Equal(ZeroAmount))
 				Expect(ViewAmount(ctx, pair, "AdminBalance")).To(Equal(ZeroAmount))
 				Expect(tokenTotalSupply(ctx, pair)).To(Equal(lpTotalSupply.Sub(liquidity1)))
@@ -251,7 +251,7 @@ var _ = Describe("WithdrawAminFee", func() {
 							Expect(expectedLPAmount).To(Equal(Zero))
 						}
 
-						is, err = Exec(ctx, alice, pair, "WithdrawAdminFees", []interface{}{})
+						is, err = Exec(ctx, alice, pair, "WithdrawAdminFees2", []interface{}{})
 						Expect(err).To(Succeed())
 						Expect(is[0].(*amount.Amount)).To(Equal(lpAmount))
 						Expect(tokenTotalSupply(ctx, pair)).To(Equal(lpTotalSupply))
@@ -283,19 +283,21 @@ var _ = Describe("WithdrawAminFee", func() {
 		})
 
 		It("payToken : token0,1", func() {
-			_fee := uint64(40000000)
-			_adminFee := uint64(5000000000)
-			_winnerFee := uint64(5000000000)
-			lp := charlie
+			_fee := uint64(30000000)
+			_adminFee := uint64(10000000000)
+			_winnerFee := uint64(0)
+			lp := eve
 
-			for _, payToken := range uniTokens {
+			for k := 0; k < 2; k++ {
+
 				beforeEach()
-				is, err := Exec(genesis, admin, factoryAddr, "CreatePairUni", []interface{}{uniTokens[0], uniTokens[1], payToken, _PairName, _PairSymbol, alice, charlie, _Fee, _AdminFee, _WinnerFee, _WhiteList, _GroupId, classMap["UniSwap"]})
+				payToken := uniTokens[k]
+				is, err := Exec(genesis, admin, factoryAddr, "CreatePairUni", []interface{}{token0, token1, payToken, _PairName, _PairSymbol, alice, charlie, _fee, _adminFee, _winnerFee, _WhiteList, _GroupId, classMap["UniSwap"]})
 				Expect(err).To(Succeed())
 				pair = is[0].(common.Address)
 				cn, cdx, ctx, _ = initChain(genesis, admin)
 				ctx, _ = Sleep(cn, ctx, nil, uint64(time.Now().UnixNano())/uint64(time.Second), aliceKey)
-				ctx, _ = setFees(cn, ctx, pair, _fee, _adminFee, _winnerFee, uint64(86400), aliceKey)
+
 				uniAddInitialLiquidity(ctx, lp)
 				uniMint(ctx, bob)
 				tokenApprove(ctx, token0, bob, routerAddr)
@@ -336,7 +338,7 @@ var _ = Describe("WithdrawAminFee", func() {
 					expectedWinnerFee0 := MulDivC(adminFee0.Int, big.NewInt(int64(_winnerFee)), trade.FEE_DENOMINATOR)
 					expectedOwnerFee0 := Sub(adminFee0.Int, expectedWinnerFee0)
 
-					is, err = Exec(ctx, alice, pair, "WithdrawAdminFees", []interface{}{})
+					is, err = Exec(ctx, alice, pair, "WithdrawAdminFees2", []interface{}{})
 					Expect(err).To(Succeed())
 					Expect(is[0].(*amount.Amount)).To(Equal(lpAmount))
 					ownerFee0 := is[1].(*amount.Amount)
@@ -357,7 +359,7 @@ var _ = Describe("WithdrawAminFee", func() {
 					expectedWinnerFee1 := MulDivCC(adminFee1.Int, int64(_winnerFee), trade.FEE_DENOMINATOR)
 					expectedOwnerFee1 := Sub(adminFee1.Int, expectedWinnerFee1)
 
-					is, err = Exec(ctx, alice, pair, "WithdrawAdminFees", []interface{}{})
+					is, err = Exec(ctx, alice, pair, "WithdrawAdminFees2", []interface{}{})
 					Expect(err).To(Succeed())
 					Expect(is[0].(*amount.Amount)).To(Equal(lpAmount))
 					ownerFee0 := is[1].(*amount.Amount)
@@ -370,6 +372,34 @@ var _ = Describe("WithdrawAminFee", func() {
 					Expect(winnerFee0).To(Equal(ZeroAmount))
 					Expect(winnerFee1).To(Equal(ToAmount(expectedWinnerFee1)))
 				}
+
+				// 22.05.09 에러 대응 추가 start
+				balance0, _ := tokenBalanceOf(ctx, token0, pair)
+				balance1, _ := tokenBalanceOf(ctx, token1, pair)
+				is, _ = Exec(ctx, alice, pair, "Reserves", []interface{}{})
+				Expect(is[0].([]*amount.Amount)[0]).To(Equal(balance0))
+				Expect(is[0].([]*amount.Amount)[1]).To(Equal(balance1))
+
+				for k := 0; k < 10; k++ { // 각각 10회
+					_, err := Exec(ctx, bob, routerAddr, "SwapExactTokensForTokens", []interface{}{swapAmount, ZeroAmount, []common.Address{token0, token1}})
+					Expect(err).To(Succeed())
+
+					_, err = Exec(ctx, bob, routerAddr, "SwapExactTokensForTokens", []interface{}{swapAmount, ZeroAmount, []common.Address{token1, token0}})
+					Expect(err).To(Succeed())
+				}
+
+				is, err = Exec(ctx, alice, pair, "WithdrawAdminFees2", []interface{}{})
+
+				balance0, _ = tokenBalanceOf(ctx, token0, pair)
+				balance1, _ = tokenBalanceOf(ctx, token1, pair)
+				is, _ = Exec(ctx, alice, pair, "Reserves", []interface{}{})
+				Expect(is[0].([]*amount.Amount)[0]).To(Equal(balance0))
+				Expect(is[0].([]*amount.Amount)[1]).To(Equal(balance1))
+
+				_, err = Exec(ctx, alice, pair, "Skim", []interface{}{alice})
+				Expect(err).To(Succeed())
+
+				// 22.05.09 에러 대응 추가 end
 
 				RemoveChain(cdx)
 				afterEach()

@@ -249,6 +249,46 @@ func (tc *TestContext) SendTx(mkey key.Key, to common.Address, method string, pa
 	return nil, nil
 }
 
+func (tc *TestContext) ReadTx(mkey key.Key, to common.Address, method string, params ...interface{}) (interface{}, error) {
+	tx := &types.Transaction{
+		ChainID:   ChainID,
+		Timestamp: tc.Ctx.LastTimestamp(),
+		To:        to,
+		Method:    method,
+	}
+
+	tx.Args = bin.TypeWriteAll(params...)
+
+	ins, err := bin.TypeReadAll(tx.Args, len(params))
+	if err != nil {
+		log.Println(ins, err)
+		return nil, err
+	}
+
+	n := tc.Ctx.Snapshot()
+	ens, err := chain.ExecuteContractTxWithEvent(tc.Ctx, tx, mkey.PublicKey().Address(), "000000000000")
+	tc.Ctx.Revert(n)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 0; i < len(ens); i++ {
+		en := ens[i]
+		if en.Type == types.EventTagTxMsg {
+			ins, err := bin.TypeReadAll(en.Result, 1)
+			if err != nil {
+				return nil, err
+			}
+			return ins, nil
+		} else if en.Type == types.EventTagCallHistory {
+			bf := bytes.NewBuffer(en.Result)
+			mc := &types.MethodCallEvent{}
+			mc.ReadFrom(bf)
+		}
+	}
+	return nil, nil
+}
+
 func (tc *TestContext) MakeTx(mkey key.Key, to common.Address, method string, params ...interface{}) (interface{}, error) {
 	infs, err := tc.SendTx(mkey, to, method, params...)
 	if len(infs) > 0 {

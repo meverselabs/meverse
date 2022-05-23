@@ -14,6 +14,8 @@ import (
 	"github.com/meverselabs/meverse/contract/exchange/factory"
 	"github.com/meverselabs/meverse/contract/exchange/router"
 	"github.com/meverselabs/meverse/contract/exchange/trade"
+	"github.com/meverselabs/meverse/contract/external/deployer"
+	"github.com/meverselabs/meverse/contract/external/engin"
 	"github.com/meverselabs/meverse/contract/formulator"
 	"github.com/meverselabs/meverse/contract/gateway"
 	"github.com/meverselabs/meverse/contract/nft721"
@@ -217,6 +219,9 @@ func RegisterContractClass() map[string]uint64 {
 	registerContractClass(&depositpool.DepositPoolContract{}, "DepositUSDT", ClassMap)
 
 	registerContractClass(&nft721.NFT721Contract{}, "NFT721", ClassMap)
+
+	registerContractClass(&engin.EnginContract{}, "Engin", ClassMap)
+	registerContractClass(&deployer.DeployerContract{}, "EnginDeployer", ClassMap)
 	return ClassMap
 }
 func registerContractClass(cont types.Contract, className string, ClassMap map[string]uint64) {

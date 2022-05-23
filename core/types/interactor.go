@@ -3,12 +3,13 @@ package types
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"math/big"
 	"reflect"
+	"strings"
 
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/common/amount"
+	"github.com/meverselabs/meverse/common/hash"
 	"github.com/pkg/errors"
 )
 
@@ -32,8 +33,8 @@ type interactor struct {
 	saveEvent bool
 }
 
-var bigIntType = reflect.TypeOf(&big.Int{})
-var amountType = reflect.TypeOf(&amount.Amount{})
+var bigIntType = reflect.TypeOf(&big.Int{}).String()
+var amountType = reflect.TypeOf(&amount.Amount{}).String()
 
 func NewInteractor(ctx *Context, cont Contract, cc *ContractContext, TXID string, saveEvent bool) IInteractor {
 	_, i, _ := ParseTransactionID(TXID)
@@ -62,138 +63,50 @@ func (i *interactor) Exec(Cc *ContractContext, ContAddr common.Address, MethodNa
 	ecc := i.currentContractContext(Cc, ContAddr)
 
 	var en *Event
-	if i.saveEvent {
-		en = i.addCallEvent(ecc, ContAddr, MethodName, Args)
-	}
-
-	rMethod, err := i.methodByName(ContAddr, MethodName)
+	cont, err := i.getContract(ContAddr)
 	if err != nil {
 		return nil, err
 	}
 
-	if rMethod.Type().NumIn() != len(Args)+1 {
-		log.Println("MethodName in Exec", MethodName)
-		log.Println("Args in Exec", Args)
-		return nil, errors.Errorf("invalid inputs count got %v want %v", len(Args), rMethod.Type().NumIn()-1)
-	}
-	if rMethod.Type().NumIn() < 1 {
-		return nil, errors.New("not found")
-	}
-	in := make([]reflect.Value, rMethod.Type().NumIn())
-	in[0] = reflect.ValueOf(ecc)
-	for i, v := range Args {
-		param := reflect.ValueOf(v)
-		mType := rMethod.Type().In(i + 1)
+	/*
+		SetOwner(cc *types.ContractContext, NewOwner common.Address) error {
+		Update(cc *types.ContractContext, contract []byte) error {
+		ContractInvoke(cc *types.ContractContext, method string, params []interface{}) ([]interface{}, error) {
+		IsUpdateable(cc *types.ContractContext) bool {
+	*/
 
-		if param.Type() != mType {
-			if param.Kind() == reflect.Array && mType.Kind() == reflect.Slice {
-				l := param.Type().Len()
-				bs := []byte{}
-				for i := 0; i < l; i++ {
-					val := param.Index(i).Interface()
-					b := val.(byte)
-					bs = append(bs, b)
-				}
-				param = reflect.ValueOf(bs)
-				if param.Type() != mType {
-					return nil, errors.Errorf("invalid input type(%v) get %v want %v", i, param.Type(), mType)
-				}
-			} else {
-				//fmt.Printf("parm.Type() in Exec: %v", param.Type())
-				//fmt.Printf("mType in Exec : %v", mType)
-				switch param.Type().String() + mType.String() {
-				case bigIntType.String() + amountType.String():
-					param = reflect.ValueOf(amount.NewAmountFromBytes(v.(*big.Int).Bytes()))
-				case amountType.String() + bigIntType.String():
-					param = reflect.ValueOf(big.NewInt(0).SetBytes(v.(*amount.Amount).Bytes()))
-				case bigIntType.String() + reflect.Uint.String():
-					param = reflect.ValueOf(uint(v.(*big.Int).Uint64()))
-				case bigIntType.String() + reflect.Uint8.String():
-					param = reflect.ValueOf(uint8(v.(*big.Int).Uint64()))
-				case bigIntType.String() + reflect.Uint16.String():
-					param = reflect.ValueOf(uint16(v.(*big.Int).Uint64()))
-				case bigIntType.String() + reflect.Uint32.String():
-					param = reflect.ValueOf(uint32(v.(*big.Int).Uint64()))
-				case bigIntType.String() + reflect.Uint64.String():
-					param = reflect.ValueOf(v.(*big.Int).Uint64())
-
-				case bigIntType.String() + reflect.Int.String():
-					param = reflect.ValueOf(int(v.(*big.Int).Int64()))
-				case bigIntType.String() + reflect.Int8.String():
-					param = reflect.ValueOf(int8(v.(*big.Int).Int64()))
-				case bigIntType.String() + reflect.Int16.String():
-					param = reflect.ValueOf(int16(v.(*big.Int).Int64()))
-				case bigIntType.String() + reflect.Int32.String():
-					param = reflect.ValueOf(int32(v.(*big.Int).Int64()))
-				case bigIntType.String() + reflect.Int64.String():
-					param = reflect.ValueOf(v.(*big.Int).Int64())
-				case "[]interface {}[]common.Address":
-					if tv, ok := v.([]interface{}); ok {
-						as := []common.Address{}
-						for _, t := range tv {
-							addr, ok := t.(common.Address)
-							if !ok {
-								return nil, errors.Errorf("invalid input addr type(%v) get %v want %v(%v)", i, param.Type(), mType, mType.String())
-							}
-							as = append(as, addr)
-						}
-						param = reflect.ValueOf(as)
-					} else {
-						return nil, errors.Errorf("invalid input addrs type(%v) get %v want %v(%v)", i, param.Type(), mType, mType.String())
-					}
-				case "[]interface {}[]string":
-					if tv, ok := v.([]interface{}); ok {
-						as := []string{}
-						for _, t := range tv {
-							addr, ok := t.(string)
-							if !ok {
-								if str, ok := t.(fmt.Stringer); !ok {
-									trfv := reflect.ValueOf(t)
-									return nil, errors.Errorf("invalid input addr type get %v(%v, %v) want string", t, trfv.Type().String(), trfv.Kind().String())
-								} else {
-									addr = str.String()
-								}
-							}
-							as = append(as, addr)
-						}
-						param = reflect.ValueOf(as)
-					} else {
-						return nil, errors.Errorf("invalid input addrs type(%v) get %v want %v(%v)", i, param.Type(), mType, mType.String())
-					}
-				case "[]interface {}[]*amount.Amount":
-					if tv, ok := v.([]interface{}); ok {
-						as := []*amount.Amount{}
-						for _, t := range tv {
-							addr, ok := t.(*amount.Amount)
-							if !ok {
-								trfv := reflect.ValueOf(t)
-								return nil, errors.Errorf("invalid input addr type get %v(%v, %v) want *amount.Amount", t, trfv.Type().String(), trfv.Kind().String())
-							}
-							as = append(as, addr)
-						}
-						param = reflect.ValueOf(as)
-					} else {
-						return nil, errors.Errorf("invalid input addrs type(%v) get %v want %v(%v)", i, param.Type(), mType, mType.String())
-					}
-				case "[]*big.Int[]*amount.Amount":
-					if tv, ok := v.([]*big.Int); ok {
-						as := []*amount.Amount{}
-						for _, t := range tv {
-							as = append(as, amount.NewAmountFromBytes(t.Bytes()))
-						}
-						param = reflect.ValueOf(as)
-					} else {
-						return nil, errors.Errorf("invalid input addrs type(%v) get %v want %v(%v)", i, param.Type(), mType, mType.String())
-					}
-
-				default:
-					cy := param.Type().String() + mType.String()
-					return nil, errors.Errorf("invalid input (%v) type(%v) get %v want %v(%v)", cy, i, param.Type(), mType, mType.String())
-				}
-			}
+	var is interface{} = cont
+	if _, ok := is.(InvokeableContract); ok &&
+		(MethodName != "InitContract" &&
+			MethodName != "IsUpdateable" &&
+			MethodName != "Update" &&
+			MethodName != "ContractInvoke" &&
+			MethodName != "SetOwner") {
+		Args = []interface{}{
+			MethodName,
+			Args,
 		}
-		in[i+1] = param
+		MethodName = "ContractInvoke"
 	}
+
+	if i.saveEvent {
+		en = i.addCallEvent(ecc, ContAddr, MethodName, Args)
+	}
+
+	rMethod, err := i.methodByName(cont, ContAddr, MethodName)
+	if err != nil {
+		return nil, err
+	}
+
+	// in := make([]reflect.Value, rMethod.Type().NumIn())
+	// in[0] = reflect.ValueOf(ecc)
+	//fmt.Printf("parm.Type() in Exec: %v", param.Type())
+	//fmt.Printf("mType in Exec : %v", mType)
+	in, err := ContractInputsConv(Args, rMethod)
+	if err != nil {
+		return nil, err
+	}
+	in = append([]reflect.Value{reflect.ValueOf(ecc)}, in...)
 
 	sn := ecc.ctx.Snapshot()
 
@@ -202,7 +115,10 @@ func (i *interactor) Exec(Cc *ContractContext, ContAddr common.Address, MethodNa
 			v := recover()
 			if v != nil {
 				fmt.Println(v)
-				err = errors.New("occur error call method(" + MethodName + ") of contract(" + ContAddr.String() + ") message: " + fmt.Sprintf("%v", v))
+				if MethodName == "ContractInvoke" && len(Args) > 0 {
+					MethodName = fmt.Sprintf("ci %v", Args[0])
+				}
+				err = fmt.Errorf("occur error call method(%v) of contract(%v) message: %v", MethodName, ContAddr.String(), v)
 			}
 		}()
 		return rMethod.Call(in), nil
@@ -226,6 +142,197 @@ func (i *interactor) Exec(Cc *ContractContext, ContAddr common.Address, MethodNa
 	}
 
 	return params, err
+}
+
+func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Value, error) {
+	if rMethod.Type().NumIn() != len(Args)+1 {
+		return nil, errors.Errorf("invalid inputs count got %v want %v", len(Args), rMethod.Type().NumIn()-1)
+	}
+	if rMethod.Type().NumIn() < 1 {
+		return nil, errors.New("not found")
+	}
+	in := make([]reflect.Value, len(Args))
+	for i, v := range Args {
+		param := reflect.ValueOf(v)
+		mType := rMethod.Type().In(i + 1)
+
+		if param.Type() != mType {
+			if param.Kind() == reflect.Array && mType.Kind() == reflect.Slice {
+				l := param.Type().Len()
+				bs := []byte{}
+				for i := 0; i < l; i++ {
+					rvc := param.Index(i)
+					if !rvc.CanInterface() {
+						return nil, errors.Errorf("array type only support bytes. index(%v) get not interface %v want %v", i, rvc.Type(), mType)
+					}
+					val := rvc.Interface()
+					b, ok := val.(byte)
+					if !ok {
+						return nil, errors.Errorf("array type only support bytes. index(%v) get not byte %v want %v", i, val, mType)
+					}
+					bs = append(bs, b)
+				}
+				param = reflect.ValueOf(bs)
+				if param.Type() != mType {
+					return nil, errors.Errorf("array type only support bytes. index(%v) get %v want %v", i, param.Type(), mType)
+				}
+			} else {
+				switch param.Type().String() {
+				case bigIntType:
+					switch mType.String() {
+					case amountType:
+						param = reflect.ValueOf(amount.NewAmountFromBytes(v.(*big.Int).Bytes()))
+					case reflect.Uint.String():
+						param = reflect.ValueOf(uint(v.(*big.Int).Uint64()))
+					case reflect.Uint8.String():
+						param = reflect.ValueOf(uint8(v.(*big.Int).Uint64()))
+					case reflect.Uint16.String():
+						param = reflect.ValueOf(uint16(v.(*big.Int).Uint64()))
+					case reflect.Uint32.String():
+						param = reflect.ValueOf(uint32(v.(*big.Int).Uint64()))
+					case reflect.Uint64.String():
+						param = reflect.ValueOf(v.(*big.Int).Uint64())
+					case reflect.Int.String():
+						param = reflect.ValueOf(int(v.(*big.Int).Int64()))
+					case reflect.Int8.String():
+						param = reflect.ValueOf(int8(v.(*big.Int).Int64()))
+					case reflect.Int16.String():
+						param = reflect.ValueOf(int16(v.(*big.Int).Int64()))
+					case reflect.Int32.String():
+						param = reflect.ValueOf(int32(v.(*big.Int).Int64()))
+					case reflect.Int64.String():
+						param = reflect.ValueOf(v.(*big.Int).Int64())
+					}
+				case amountType:
+					switch mType.String() {
+					case bigIntType:
+						param = reflect.ValueOf(big.NewInt(0).SetBytes(v.(*amount.Amount).Bytes()))
+					}
+				case "[]interface {}":
+					if tv, ok := v.([]interface{}); ok {
+						switch mType.String() {
+						case "[]common.Address":
+							as := []common.Address{}
+							for _, t := range tv {
+								addr, ok := t.(common.Address)
+								if !ok {
+									return nil, errors.Errorf("invalid input addr type(%v) get %v want %v(%v)", i, param.Type(), mType, mType.String())
+								}
+								as = append(as, addr)
+							}
+							param = reflect.ValueOf(as)
+						case "[]string":
+							as := []string{}
+							for _, t := range tv {
+								addr, ok := t.(string)
+								if !ok {
+									if str, ok := t.(fmt.Stringer); !ok {
+										trfv := reflect.ValueOf(t)
+										return nil, errors.Errorf("invalid input addr type get %v(%v, %v) want string", t, trfv.Type().String(), trfv.Kind().String())
+									} else {
+										addr = str.String()
+									}
+								}
+								as = append(as, addr)
+							}
+							param = reflect.ValueOf(as)
+						case "[]*amount.Amount":
+							as := []*amount.Amount{}
+							for _, t := range tv {
+								addr, ok := t.(*amount.Amount)
+								if !ok {
+									trfv := reflect.ValueOf(t)
+									return nil, errors.Errorf("invalid input addr type get %v(%v, %v) want *amount.Amount", t, trfv.Type().String(), trfv.Kind().String())
+								}
+								as = append(as, addr)
+							}
+							param = reflect.ValueOf(as)
+						}
+					}
+				case "[]*big.Int":
+					if tv, ok := v.([]*big.Int); ok {
+						switch mType.String() {
+						case "[]*amount.Amount":
+							as := []*amount.Amount{}
+							for _, t := range tv {
+								as = append(as, amount.NewAmountFromBytes(t.Bytes()))
+							}
+							param = reflect.ValueOf(as)
+						}
+					}
+				case "string":
+					if tv, ok := v.(string); ok {
+						switch mType.String() {
+						case "bool":
+							if strings.ToLower(tv) == "true" {
+								param = reflect.ValueOf(true)
+							} else {
+								param = reflect.ValueOf(false)
+							}
+						case "common.Hash":
+							param = reflect.ValueOf(hash.HexToHash(tv))
+						case "common.Address":
+							param = reflect.ValueOf(common.HexToAddress(tv))
+						case "*amount.Amount":
+							if am, err := amount.ParseAmount(tv); err == nil {
+								param = reflect.ValueOf(am)
+							}
+						default:
+							if bi, ok := big.NewInt(0).SetString(tv, 10); ok {
+								switch mType.String() {
+								case "*big.Int":
+									param = reflect.ValueOf(bi)
+								case "int":
+									param = reflect.ValueOf(int(bi.Int64()))
+								case "int8":
+									param = reflect.ValueOf(int8(bi.Int64()))
+								case "int16":
+									param = reflect.ValueOf(int16(bi.Int64()))
+								case "int32":
+									param = reflect.ValueOf(int32(bi.Int64()))
+								case "int64":
+									param = reflect.ValueOf(int64(bi.Int64()))
+								case "uint":
+									param = reflect.ValueOf(uint(bi.Uint64()))
+								case "uint8":
+									param = reflect.ValueOf(uint8(bi.Uint64()))
+								case "uint16":
+									param = reflect.ValueOf(uint16(bi.Uint64()))
+								case "uint32":
+									param = reflect.ValueOf(uint32(bi.Uint64()))
+								case "uint64":
+									param = reflect.ValueOf(uint64(bi.Uint64()))
+								}
+							}
+						}
+					}
+				case "[]byte":
+					if bs, ok := v.([]byte); ok {
+						switch mType.String() {
+						case "common.Hash":
+							h := hash.Hash256{}
+							copy(h[:], bs)
+							param = reflect.ValueOf(h)
+						case "common.Address":
+							param = reflect.ValueOf(common.BytesToAddress(bs))
+						case "*amount.Amount":
+							param = reflect.ValueOf(amount.NewAmountFromBytes(bs))
+						case "*big.Int":
+							param = reflect.ValueOf(big.NewInt(0).SetBytes(bs))
+						}
+					}
+				default:
+				}
+			}
+		}
+		if param.Type() != mType {
+			cy := param.Type().String() + mType.String()
+			return nil, errors.Errorf("invalid input view(%v) type(%v) get %v want %v(%v)", cy, i, param.Type(), mType, mType.String())
+		}
+
+		in[i] = param
+	}
+	return in, nil
 }
 
 func (i *interactor) EventList() []*Event {
@@ -294,23 +401,7 @@ func (i *interactor) insertResultEvent(en *Event, Results []interface{}, Err err
 	return err
 }
 
-func (i *interactor) methodByName(Addr common.Address, MethodName string) (reflect.Value, error) {
-	var cont Contract
-	if _cont, ok := i.conMap[Addr]; ok {
-		cont = _cont
-	} else {
-		_cont, err := i.ctx.Contract(Addr)
-		if err != nil {
-			return reflect.Value{}, err
-		}
-		i.conMap[Addr] = _cont
-		cont = _cont
-	}
-	rt := reflect.TypeOf(cont)
-	for rt.Kind() == reflect.Ptr {
-		rt = rt.Elem()
-	}
-
+func (i *interactor) methodByName(cont Contract, Addr common.Address, MethodName string) (reflect.Value, error) {
 	_cont := cont.Front()
 
 	method, err := contractMethod(_cont, Addr, MethodName)
@@ -318,6 +409,21 @@ func (i *interactor) methodByName(Addr common.Address, MethodName string) (refle
 		return reflect.Value{}, err
 	}
 	return method, nil
+}
+
+func (i *interactor) getContract(Addr common.Address) (Contract, error) {
+	var cont Contract
+	if _cont, ok := i.conMap[Addr]; ok {
+		cont = _cont
+	} else {
+		_cont, err := i.ctx.Contract(Addr)
+		if err != nil {
+			return nil, err
+		}
+		i.conMap[Addr] = _cont
+		cont = _cont
+	}
+	return cont, nil
 }
 
 func contractMethod(cont interface{}, addr common.Address, MethodName string) (reflect.Value, error) {

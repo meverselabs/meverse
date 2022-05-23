@@ -112,7 +112,7 @@ var _ = Describe("WhiteList", func() {
 			})
 		})
 
-		Describe("WithdrawAdminFees", func() {
+		Describe("WithdrawAdminFees2", func() {
 			expectedOwnerFee := []*amount.Amount{amount.NewAmount(0, 3744403031754912), amount.NewAmount(0, 0)}
 			expectedWinnerFee := []*amount.Amount{amount.NewAmount(0, 3744403031754911), amount.NewAmount(0, 0)}
 
@@ -142,7 +142,7 @@ var _ = Describe("WhiteList", func() {
 				}
 
 				lpAmount, _ := ViewAmount(ctx, pair, "AdminBalance")
-				is, err = Exec(ctx, alice, pair, "WithdrawAdminFees", []interface{}{})
+				is, err = Exec(ctx, alice, pair, "WithdrawAdminFees2", []interface{}{})
 				Expect(err).To(Succeed())
 				Expect(is[0].(*amount.Amount)).To(Equal(lpAmount))
 				ownerFee0 := is[1].(*amount.Amount)
@@ -182,7 +182,7 @@ var _ = Describe("WhiteList", func() {
 				}
 
 				lpAmount, _ := ViewAmount(ctx, pair, "AdminBalance")
-				is, err = Exec(ctx, eve, pair, "WithdrawAdminFees", []interface{}{})
+				is, err = Exec(ctx, eve, pair, "WithdrawAdminFees2", []interface{}{})
 				Expect(err).To(Succeed())
 				Expect(is[0].(*amount.Amount)).To(Equal(lpAmount))
 				ownerFee0 := is[1].(*amount.Amount)

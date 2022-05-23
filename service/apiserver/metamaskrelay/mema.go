@@ -211,20 +211,12 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain
 	})
 
 	s.Set("eth_getTransactionReceipt", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
-		txhash, _ := arg.String(0)
-		log.Println("eth_getTransactionReceipt", txhash)
-
-		cleaned := strings.Replace(txhash, "0x", "", -1)
-
-		bs, err := hex.DecodeString(cleaned)
+		txhash, err := arg.String(0)
 		if err != nil {
 			return nil, err
 		}
-		var hs hash.Hash256
-		if len(hs) != len(bs) {
-			return nil, errors.Errorf("invalid hash length want 32, got %v", len(bs))
-		}
-		copy(hs[:], bs[:])
+		log.Println("eth_getTransactionReceipt", txhash)
+		hs := hash.HexToHash(txhash)
 
 		TxID, err := ts.TxIndex(hs)
 		if err != nil {
@@ -261,12 +253,8 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain
 			return nil, errors.New("invalid txhash")
 		}
 		tx := b.Body.Transactions[TxID.Index]
-		if !tx.IsEtherType {
-			return nil, errors.New("invalid txhash")
-		}
 
 		bHash := bin.MustWriterToHash(&b.Header)
-
 		m := map[string]interface{}{
 			// "cumulativeGasUsed": "0x1f4b698",
 			// "gasUsed":           "0x6a20",
@@ -289,6 +277,65 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain
 		return m, nil
 	})
 
+	s.Set("eth_getTransactionByHash", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+		txhash, err := arg.String(0)
+		if err != nil {
+			return nil, err
+		}
+		hash.HexToHash(txhash)
+		hs := hash.HexToHash(txhash)
+		TxID, err := ts.TxIndex(hs)
+		if err != nil {
+			return nil, err
+		}
+		if TxID.Err != nil {
+			return nil, TxID.Err
+		}
+
+		return getTransaction(m, TxID.Height, TxID.Index)
+	})
+	s.Set("eth_getBlockTransactionCountByNumber", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+		heightHex, err := arg.String(0)
+		if err != nil {
+			return nil, err
+		}
+		heightHex = strings.ReplaceAll(heightHex, "0x", "")
+		height, err := strconv.ParseUint(heightHex, 16, 64)
+		if err != nil {
+			return nil, err
+		}
+
+		b, err := m.cn.Provider().Block(uint32(height))
+		if err != nil {
+			return nil, err
+		}
+		return fmt.Sprintf("0x%x", len(b.Body.Transactions)), nil
+	})
+	s.Set("eth_getTransactionByBlockNumberAndIndex", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+		heightHex, err := arg.String(0)
+		if err != nil {
+			return nil, err
+		}
+		heightHex = strings.ReplaceAll(heightHex, "0x", "")
+		height64, err := strconv.ParseUint(heightHex, 16, 64)
+		if err != nil {
+			return nil, err
+		}
+		height := uint32(height64)
+		indexHex, err := arg.String(1)
+		if err != nil {
+			return nil, err
+		}
+		indexHex = strings.ReplaceAll(indexHex, "0x", "")
+		index64, err := strconv.ParseUint(indexHex, 16, 16)
+		if err != nil {
+			return nil, err
+		}
+		index := uint16(index64)
+
+		return getTransaction(m, height, index)
+	})
+
 	s.Set("eth_call", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 		param, _ := arg.Map(0)
 		h, _ := arg.String(1)
@@ -307,6 +354,58 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain
 		return m.ethCall(h, to, data, from)
 	})
 }
+
+func getTransaction(m *metamaskRelay, height uint32, index uint16) (interface{}, error) {
+	b, err := m.cn.Provider().Block(height)
+	if err != nil {
+		return nil, err
+	}
+	bHash := bin.MustWriterToHash(&b.Header)
+
+	if int(index) >= len(b.Body.Transactions) {
+		return nil, errors.New("invalid txhash")
+	}
+	tx := b.Body.Transactions[index]
+	sig := b.Body.TransactionSignatures[index]
+
+	to := tx.To.String()
+	var (
+		value string
+		nonce string
+		input string
+	)
+	if tx.IsEtherType {
+		etx, _, err := txparser.EthTxFromRLP(tx.Args)
+		if err != nil {
+			return nil, err
+		}
+		value = fmt.Sprintf("0x%v", etx.Value().String())
+		nonce = fmt.Sprintf("0x%x", etx.Nonce())
+		input = fmt.Sprintf("0x%v", hex.EncodeToString(etx.Data()))
+	} else {
+		value = "0x0"
+		nonce = fmt.Sprintf("0x%x", tx.Seq)
+		input = fmt.Sprintf("0x%v%v", hex.EncodeToString([]byte(tx.Method)), hex.EncodeToString(tx.Args))
+	}
+
+	return map[string]interface{}{
+		"blockHash":        bHash.String(),
+		"blockNumber":      fmt.Sprintf("0x%x", height),
+		"from":             tx.From.String(),
+		"gas":              "0x1f4b698",
+		"gasPrice":         "0x71e0e496c",
+		"hash":             tx.Hash().String(),
+		"input":            input,
+		"nonce":            nonce,
+		"to":               to,
+		"transactionIndex": fmt.Sprintf("0x%x", index),
+		"value":            value,
+		"v":                "0x" + hex.EncodeToString(sig[64:]),
+		"r":                "0x" + hex.EncodeToString(sig[:32]),
+		"s":                "0x" + hex.EncodeToString(sig[32:64]),
+	}, nil
+}
+
 func (m *metamaskRelay) returnMemaBlock(hei uint64, fullTx bool) (interface{}, error) {
 	b, err := m.cn.Provider().Block(uint32(hei))
 	if err != nil {

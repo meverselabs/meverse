@@ -124,6 +124,16 @@ var _ = Describe("Senario", func() {
 		Expect(err).To(Succeed())
 		GPrintln("17", is[0], is[1])
 
+		// 18. WithdrawAdminFees2
+		is, err = Exec(ctx, alice, pair, "WithdrawAdminFees2", []interface{}{})
+		Expect(err).To(Succeed())
+		GPrintln("18", is[0], is[1], is[2], is[3], is[4])
+
+		// 19. UniAddLiquidityOneCoin (MEFI, MEV, MEV, 1, 0)
+		is, err = Exec(ctx, alice, routerAddr, "UniAddLiquidityOneCoin", []interface{}{MEFI, MEV, MEV, amount.NewAmount(1, 0), ZeroAmount})
+		Expect(err).To(Succeed())
+		GPrintln("19", is[0], is[1])
+
 		RemoveChain(cdx)
 		afterEach()
 	})
@@ -231,6 +241,16 @@ var _ = Describe("Senario", func() {
 		Expect(err).To(Succeed())
 		GPrintln("17", is[0], is[1])
 
+		// 18. WithdrawAdminFees2
+		is, err = Exec(ctx, alice, pair, "WithdrawAdminFees2", []interface{}{})
+		Expect(err).To(Succeed())
+		GPrintln("18", is[0], is[1], is[2], is[3], is[4])
+
+		// 19. UniAddLiquidityOneCoin (MEV, USDT, MEV, 1, 0)
+		is, err = Exec(ctx, alice, routerAddr, "UniAddLiquidityOneCoin", []interface{}{MEV, USDT, MEV, amount.NewAmount(1, 0), ZeroAmount})
+		Expect(err).To(Succeed())
+		GPrintln("19", is[0], is[1])
+
 		RemoveChain(cdx)
 		afterEach()
 	})
@@ -334,6 +354,16 @@ var _ = Describe("Senario", func() {
 		is, err = Exec(ctx, alice, swap, "Reserves", []interface{}{})
 		Expect(err).To(Succeed())
 		GPrintln("15", is[0], is[1])
+
+		// 16. WithdrawAdminFees
+		is, err = Exec(ctx, alice, pair, "WithdrawAdminFees", []interface{}{})
+		Expect(err).To(Succeed())
+		GPrintln("16", is[0], is[1])
+
+		// 17. AddLiquidity ([10,0], 0)
+		is, err = Exec(ctx, alice, swap, "AddLiquidity", []interface{}{[]*amount.Amount{amount.NewAmount(10, 0), ZeroAmount}, ZeroAmount})
+		Expect(err).To(Succeed())
+		GPrintln("17", is[0])
 
 		RemoveChain(cdx)
 		afterEach()
@@ -441,6 +471,16 @@ var _ = Describe("Senario", func() {
 		is, err = Exec(ctx, alice, pair, "Reserves", []interface{}{})
 		Expect(err).To(Succeed())
 		GPrintln("17", is[0], is[1])
+
+		// 18. WithdrawAdminFees2
+		is, err = Exec(ctx, alice, pair, "WithdrawAdminFees2", []interface{}{})
+		Expect(err).To(Succeed())
+		GPrintln("18", is[0], is[1], is[2], is[3], is[4])
+
+		// 19. UniAddLiquidityOneCoin (PT, MEV, PT, 1, 0)
+		is, err = Exec(ctx, alice, routerAddr, "UniAddLiquidityOneCoin", []interface{}{PT, MEV, PT, amount.NewAmount(1, 0), ZeroAmount})
+		Expect(err).To(Succeed())
+		GPrintln("19", is[0], is[1])
 
 		RemoveChain(cdx)
 		afterEach()

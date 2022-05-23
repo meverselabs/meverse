@@ -483,7 +483,8 @@ func (self *Exchange) revertNewWhiteList(cc *types.ContractContext) error {
 	return nil
 }
 
-// onlyOwner
+// onlyOwner,  divide adminFee to owner and winner according to winnerfee
+// not token0, token1 but tokens[]
 func (self *Exchange) _divideFee(cc *types.ContractContext, _adminFees []*big.Int) ([]*big.Int, []*big.Int, error) {
 	N := self.nTokens(cc)
 	tokens := self.tokens(cc)

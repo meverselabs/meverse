@@ -246,6 +246,10 @@ func (f *UniSwapFront) WithdrawAdminFees(cc *types.ContractContext) (*amount.Amo
 	}
 	return ToAmount(burnAmount), ToAmount(adminFee0), ToAmount(adminFee1), ToAmount(winnerFee0), ToAmount(winnerFee1), err
 }
+func (f *UniSwapFront) WithdrawAdminFees2(cc *types.ContractContext) (*amount.Amount, *amount.Amount, *amount.Amount, *amount.Amount, *amount.Amount, error) {
+	burnAmount, adminFee0, adminFee1, winnerFee0, winnerFee1, err := f.cont.withdrawAdminFees2(cc)
+	return ToAmount(burnAmount), ToAmount(adminFee0), ToAmount(adminFee1), ToAmount(winnerFee0), ToAmount(winnerFee1), err
+}
 func (f *UniSwapFront) Skim(cc *types.ContractContext, to common.Address) error {
 	return f.cont.skim(cc, to)
 }

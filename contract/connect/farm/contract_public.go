@@ -3,7 +3,6 @@ package farm
 import (
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/core/types"
@@ -76,7 +75,6 @@ func (cont *FarmContract) UpdatePool(cc *types.ContractContext, _pid uint64) err
 			return err
 		}
 		// CherryToken(CherryAddr).mint(address(this), CherryReward);
-		log.Println(multiplier, CherryReward.String())
 		if _, err := cc.Exec(cc, FarmToken, "Mint", []interface{}{cont.addr, CherryReward}); err != nil {
 			return err
 		}
@@ -251,8 +249,6 @@ func (cont *FarmContract) Withdraw(cc *types.ContractContext, _pid uint64, _want
 		if err != nil {
 			return err
 		}
-		f := cc.From()
-		log.Println(f.String(), user.Shares.String(), _wantAmt.String(), sharesRemoved.String())
 	}
 
 	user.RewardDebt = user.Shares.Mul(pool.AccTokenPerShare)

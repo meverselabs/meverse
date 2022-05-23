@@ -12,9 +12,10 @@ cmd/generator/generator
 cmd/observer/observer
 cmd/node/node
 cmd/keymake
-cmd/testnet
-cmd/sendtx
 bin
 tdata/
-zipcontext
 cmd/mainnetcachecontext
+contract/plugin/test/plugin/
+*.so
+*.sh
+cmd/testnet/testnet_ips.txt

@@ -466,6 +466,88 @@ func (self *UniSwap) sync(cc *types.ContractContext) error {
 }
 
 // stableswap과 logic 동일
+func (self *UniSwap) withdrawAdminFees2(cc *types.ContractContext) (*big.Int, *big.Int, *big.Int, *big.Int, *big.Int, error) {
+	self.Lock()
+	defer self.Unlock()
+
+	if err := self.onlyOwner(cc); err != nil { // only owner
+		return nil, nil, nil, nil, nil, err
+	}
+
+	_reserve0 := self.reserve0(cc)
+	_reserve1 := self.reserve1(cc)
+	feeOn := self._mintAdminFee(cc, _reserve0, _reserve1)
+	adminBalance := self.mintedAdminBalance(cc)
+
+	if adminBalance.Cmp(Zero) <= 0 {
+		return adminBalance, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil
+	}
+
+	if err := SafeTransfer(cc, self.addr, self.addr, adminBalance); err != nil { // self.addr = pair
+		return nil, nil, nil, nil, nil, err
+	}
+
+	_token0, _token1 := self.token0(cc), self.token1(cc)
+	amount0, amount1, balance0, balance1, err := self._burnBeforeTransfer(cc, _token0, _token1, feeOn) // reserve 변경됨
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	self.setAdminBalance(cc, Zero)
+
+	payToken := self.payToken(cc)
+	if payToken != ZeroAddress {
+		fee, err := self.feeAddress(cc, cc.From())
+		if err != nil {
+			return nil, nil, nil, nil, nil, err
+		}
+		if payToken == _token0 { // token1 in -> token0 out
+			outAmt0, err := UniGetAmountOut(fee, amount1, balance1, balance0)
+			if err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			if !(outAmt0.Cmp(balance0) < 0) {
+				return nil, nil, nil, nil, nil, errors.New("Exchange: INSUFFICIENT_LIQUIDITY")
+			}
+			err = self._update(cc, Sub(balance0, outAmt0), Add(balance1, amount1), _reserve0, _reserve1)
+			if err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			amount0 = Add(amount0, outAmt0)
+			amount1 = big.NewInt(0)
+		} else if payToken == _token1 { // token0 in -> token1 out
+			outAmt1, err := UniGetAmountOut(fee, amount0, balance0, balance1)
+			if err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			if !(outAmt1.Cmp(_reserve1) < 0) {
+				return nil, nil, nil, nil, nil, errors.New("Exchange: INSUFFICIENT_LIQUIDITY")
+			}
+			if err := self._update(cc, Add(balance0, amount0), Sub(balance1, outAmt1), _reserve0, _reserve1); err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			amount0 = big.NewInt(0)
+			amount1 = Add(amount1, outAmt1)
+		} else {
+			return nil, nil, nil, nil, nil, errors.New("Exchange: PAYTOKEN_NOT_EXIST")
+		}
+	}
+
+	tokens := self.tokens(cc)
+	var adminFees []*big.Int
+	if tokens[0] == _token0 {
+		adminFees = []*big.Int{amount0, amount1}
+	} else {
+		adminFees = []*big.Int{amount1, amount0}
+	}
+
+	ownnerFees, winnerFees, err := self._divideFee(cc, adminFees)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	return adminBalance, ownnerFees[0], ownnerFees[1], winnerFees[0], winnerFees[1], nil
+}
+
+// stableswap과 logic 동일
 func (self *UniSwap) withdrawAdminFees(cc *types.ContractContext) (*big.Int, *big.Int, *big.Int, *big.Int, *big.Int, error) {
 	self.Lock()
 	defer self.Unlock()

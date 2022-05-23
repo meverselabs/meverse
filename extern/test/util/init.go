@@ -14,6 +14,8 @@ import (
 	"github.com/meverselabs/meverse/contract/exchange/factory"
 	"github.com/meverselabs/meverse/contract/exchange/router"
 	"github.com/meverselabs/meverse/contract/exchange/trade"
+	"github.com/meverselabs/meverse/contract/external/deployer"
+	"github.com/meverselabs/meverse/contract/external/engin"
 	"github.com/meverselabs/meverse/contract/formulator"
 	"github.com/meverselabs/meverse/contract/gateway"
 	"github.com/meverselabs/meverse/contract/token"
@@ -78,6 +80,8 @@ func init() {
 	RegisterContractClass(&bridge.BridgeContract{}, "Bridge")
 	RegisterContractClass(&whitelist.WhiteListContract{}, "WhiteList")
 	RegisterContractClass(&imo.ImoContract{}, "IMO")
+	RegisterContractClass(&engin.EnginContract{}, "EnginContract")
+	RegisterContractClass(&deployer.DeployerContract{}, "DeployerContract")
 
 	for i := 0; i < 5; i++ {
 		pk, err := key.NewMemoryKeyFromString(ChainID, Obstrs[i])
