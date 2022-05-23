@@ -3,6 +3,7 @@ InitHeight = 0
 InitHash = ""
 InitTimestamp = 0
 Port = 22001
+RPCPort = 8541
 StoreRoot = "./fdata"
 GeneratorKeyHex = "GENERATOR_KEY_HEX_HERE"
 UseWSS = false
