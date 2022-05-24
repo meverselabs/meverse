@@ -119,7 +119,7 @@ func (cont *DeployerContract) InitContract(cc *types.ContractContext, contract [
 	return eg.InitContract(ecc, contract, params)
 }
 
-func (cont *DeployerContract) ContractInvoke(cc *types.ContractContext, method string, params []interface{}) ([]interface{}, error) {
+func (cont *DeployerContract) ContractInvoke(cc *types.ContractContext, method string, params []interface{}) (interface{}, error) {
 	eg, ecc, err := cont.getEngin(cc)
 	if err != nil {
 		return nil, err

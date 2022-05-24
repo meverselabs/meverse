@@ -31,7 +31,7 @@ func (f *front) InitContract(cc *types.ContractContext, contract []byte, params 
 	return f.cont.InitContract(cc, contract, params)
 }
 
-func (f *front) ContractInvoke(cc *types.ContractContext, method string, params []interface{}) ([]interface{}, error) {
+func (f *front) ContractInvoke(cc *types.ContractContext, method string, params []interface{}) (interface{}, error) {
 	return f.cont.ContractInvoke(cc, method, params)
 }
 
