@@ -7,8 +7,8 @@ sed -e "s/InitGenesisHash = \"\"/$(sed '1!d' _config.toml)/" config.toml > confi
 sed -e "s/InitHeight = 0/$(sed '2!d' _config.toml)/" config.toml > config.toml_ && mv config.toml_ config.toml
 sed -e "s/InitHash = \"\"/$(sed '3!d' _config.toml)/" config.toml > config.toml_ && mv config.toml_ config.toml
 sed -e "s/InitTimestamp = 0/$(sed '4!d' _config.toml)/" config.toml > config.toml_ && mv config.toml_ config.toml
-sed -e "s/RPCPort = 8541/RPCPort = 10008/" config.toml > config.toml_ && mv config.toml_ config.toml
+# sed -e "s/RPCPort = 8541/RPCPort = 8541/" config.toml > config.toml_ && mv config.toml_ config.toml
 go build
-./node
 rm -r _config.toml
 rm -r zipcontext
+./node

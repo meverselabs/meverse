@@ -17,5 +17,4 @@ tdata/
 cmd/mainnetcachecontext
 contract/plugin/test/plugin/
 *.so
-*.sh
 cmd/testnet/testnet_ips.txt
