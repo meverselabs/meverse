@@ -454,7 +454,7 @@ func NewViewchain(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain.Cha
 			err = chain.ExecuteContractTx(ctx, tx, From, txid)
 		}
 		if err != nil {
-			log.Printf("%+v\n", err)
+			// log.Printf("%+v\n", err)
 			return nil, err
 		}
 		ctx.Revert(n)

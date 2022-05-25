@@ -13,9 +13,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	ecommon "github.com/ethereum/go-ethereum/common"
+	etypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 
 	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/common/bin"
 	"github.com/meverselabs/meverse/common/hash"
 	"github.com/meverselabs/meverse/contract/token"
@@ -370,20 +372,25 @@ func getTransaction(m *metamaskRelay, height uint32, index uint16) (interface{},
 
 	to := tx.To.String()
 	var (
-		value string
+		value string = "0x0"
 		nonce string
 		input string
 	)
+
+	mainToken := m.cn.NewContext().MainToken()
+	mto, amt, err := getMainTokenSend(*mainToken, tx)
+	if err == nil {
+		to = mto.String()
+		value = fmt.Sprintf("0x%v", hex.EncodeToString(amt.Bytes()))
+	}
 	if tx.IsEtherType {
 		etx, _, err := txparser.EthTxFromRLP(tx.Args)
 		if err != nil {
 			return nil, err
 		}
-		value = fmt.Sprintf("0x%v", etx.Value().String())
 		nonce = fmt.Sprintf("0x%x", etx.Nonce())
 		input = fmt.Sprintf("0x%v", hex.EncodeToString(etx.Data()))
 	} else {
-		value = "0x0"
 		nonce = fmt.Sprintf("0x%x", tx.Seq)
 		input = fmt.Sprintf("0x%v%v", hex.EncodeToString([]byte(tx.Method)), hex.EncodeToString(tx.Args))
 	}
@@ -404,6 +411,58 @@ func getTransaction(m *metamaskRelay, height uint32, index uint16) (interface{},
 		"r":                "0x" + hex.EncodeToString(sig[:32]),
 		"s":                "0x" + hex.EncodeToString(sig[32:64]),
 	}, nil
+}
+
+func getMainTokenSend(MainToken common.Address, tx *types.Transaction) (to common.Address, amt *big.Int, err error) {
+	if tx.IsEtherType {
+		var etx *etypes.Transaction
+		etx, _, err = txparser.EthTxFromRLP(tx.Args)
+		if err != nil {
+			return
+		}
+		eData := etx.Data()
+		if etx.Value().Cmp(amount.ZeroCoin.Int) > 0 && tx.To != MainToken && len(eData) == 0 {
+			to = tx.To
+			amt = etx.Value()
+			return
+		} else if len(eData) > 0 && strings.EqualFold(etx.To().String(), MainToken.String()) {
+			var m abi.Method
+			for _, m = range txparser.FuncSigs[hex.EncodeToString(etx.Data()[:4])] {
+				break
+			}
+			if strings.ToLower(m.Name) == "transfer" {
+				var data []interface{}
+				data, err = txparser.Inputs(eData)
+				to, amt, err = getTransferParam(data, err)
+				return
+			}
+		}
+	} else if strings.EqualFold(tx.To.String(), MainToken.String()) {
+		data, _err := bin.TypeReadAll(tx.Args, -1)
+		to, amt, err = getTransferParam(data, _err)
+		return
+	}
+	err = errors.New("is not maintoken transfer")
+	return
+}
+
+func getTransferParam(data []interface{}, _err error) (to common.Address, amt *big.Int, err error) {
+	if err != nil {
+		return common.Address{}, nil, err
+	}
+	if len(data) != 2 {
+		return common.Address{}, nil, errors.New("invalid param")
+	}
+	var ok bool
+	if to, ok = data[0].(common.Address); !ok {
+		return common.Address{}, nil, errors.New("invalid address param")
+	}
+	if am, ok := data[1].(*amount.Amount); !ok {
+		return common.Address{}, nil, errors.New("invalid amount param")
+	} else {
+		amt = am.Int
+	}
+	return
 }
 
 func (m *metamaskRelay) returnMemaBlock(hei uint64, fullTx bool) (interface{}, error) {
