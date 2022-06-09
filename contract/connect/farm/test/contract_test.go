@@ -17,7 +17,7 @@ func init() {
 }
 
 func TestExecuteContractTx(t *testing.T) {
-	tc := util.NewTestContext(int(0))
+	tc := util.NewTestContext()
 
 	tokenContArgs := &token.TokenContractConstruction{
 		Name:   "FarmToken",

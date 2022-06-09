@@ -27,8 +27,14 @@ type UniSwapFront struct {
 func (f *UniSwapFront) Name(cc types.ContractLoader) string {
 	return f.cont.name(cc)
 }
+func (f *UniSwapFront) SetName(cc *types.ContractContext, name string) error {
+	return f.cont.setName(cc, name)
+}
 func (f *UniSwapFront) Symbol(cc types.ContractLoader) string {
 	return f.cont.symbol(cc)
+}
+func (f *UniSwapFront) SetSymbol(cc *types.ContractContext, symbol string) error {
+	return f.cont.setSymbol(cc, symbol)
 }
 func (f *UniSwapFront) TotalSupply(cc types.ContractLoader) *amount.Amount {
 	return ToAmount(f.cont.totalSupply(cc))
@@ -185,6 +191,9 @@ func (f *UniSwapFront) AdminBalance(cc types.ContractLoader) *amount.Amount {
 // //////////////////////////////////////////////////
 // // Exchange : public writer Functions
 // //////////////////////////////////////////////////
+func (f *UniSwapFront) SetPayToken(cc *types.ContractContext, _token common.Address) error {
+	return f.cont.setPayToken(cc, _token)
+}
 func (f *UniSwapFront) CommitNewFee(cc *types.ContractContext, new_fee, new_admin_fee, new_winner_fee, deadline uint64) error {
 	return f.cont.commitNewFee(cc, new_fee, new_admin_fee, new_winner_fee, deadline)
 }

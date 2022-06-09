@@ -77,6 +77,84 @@ var _ = Describe("Router", func() {
 			}
 		})
 
+		It("UniAddLiquidity : Initial Supply", func() {
+			fees := []uint64{0, 30000000, 100000000, trade.MAX_FEE} // 0, 30bp, 10%, 50%
+			adminFees := []uint64{0, 5000000000, trade.MAX_FEE}     // 0, 50%, 100%
+			winnerFees := []uint64{0, 5000000000, trade.MAX_FEE}    // 0, 50%, 100%
+
+			for _, fee := range fees {
+				for _, adminFee := range adminFees {
+					for _, winnerFee := range winnerFees {
+
+						beforeEachUni()
+						cn, cdx, ctx, _ = initChain(genesis, admin)
+						ctx, _ = Sleep(cn, ctx, nil, uint64(time.Now().UnixNano())/uint64(time.Second), aliceKey)
+						ctx, _ = setFees(cn, ctx, pair, fee, adminFee, winnerFee, uint64(86400), aliceKey)
+						uniMint(ctx, alice)
+
+						token0Amount := amount.NewAmount(1, 0)
+						token1Amount := amount.NewAmount(4, 0)
+
+						expectedLiquidity := amount.NewAmount(2, 0)
+
+						tokenApprove(ctx, token0, alice, routerAddr)
+						tokenApprove(ctx, token1, alice, routerAddr)
+						is, err := Exec(ctx, alice, routerAddr, "UniAddLiquidity", []interface{}{token0, token1, token0Amount, token1Amount, ZeroAmount, ZeroAmount})
+						Expect(err).To(Succeed())
+						Expect(is[0].(*amount.Amount)).To(Equal(token0Amount))
+						Expect(is[1].(*amount.Amount)).To(Equal(token1Amount))
+
+						// BalanceOf
+						Expect(tokenBalanceOf(ctx, token0, pair)).To(Equal(token0Amount))
+						Expect(tokenBalanceOf(ctx, token1, pair)).To(Equal(token1Amount))
+						Expect(tokenBalanceOf(ctx, pair, common.ZeroAddr)).To(Equal(_ML))
+						Expect(tokenBalanceOf(ctx, pair, alice)).To(Equal(expectedLiquidity.Sub(_ML)))
+
+						RemoveChain(cdx)
+						afterEach()
+					}
+				}
+			}
+		})
+
+		It("UniAddLiquidity : Price", func() {
+
+			beforeEachUni()
+			cn, cdx, ctx, _ = initChain(genesis, admin)
+			ctx, _ = Sleep(cn, ctx, nil, uint64(time.Now().UnixNano())/uint64(time.Second), aliceKey)
+			uniMint(ctx, alice)
+
+			token0Amount := amount.NewAmount(1, 0)
+			token1Amount := amount.NewAmount(4, 0)
+
+			tokenApprove(ctx, token0, alice, routerAddr)
+			tokenApprove(ctx, token1, alice, routerAddr)
+			is, err := Exec(ctx, alice, routerAddr, "UniAddLiquidity", []interface{}{token0, token1, token0Amount, token1Amount, ZeroAmount, ZeroAmount})
+			Expect(err).To(Succeed())
+			Expect(is[0].(*amount.Amount)).To(Equal(token0Amount))
+			Expect(is[1].(*amount.Amount)).To(Equal(token1Amount))
+
+			is, err = Exec(ctx, alice, pair, "Reserves", []interface{}{})
+			reserve0 := is[0].([]*amount.Amount)[0]
+			reserve1 := is[0].([]*amount.Amount)[1]
+
+			priceBefore := reserve0.Div(reserve1)
+
+			is, err = Exec(ctx, alice, routerAddr, "UniAddLiquidity", []interface{}{token0, token1, token0Amount, token0Amount, ZeroAmount, ZeroAmount})
+			Expect(err).To(Succeed())
+
+			is, err = Exec(ctx, alice, pair, "Reserves", []interface{}{})
+			reserve0 = is[0].([]*amount.Amount)[0]
+			reserve1 = is[0].([]*amount.Amount)[1]
+
+			priceAfter := reserve0.Div(reserve1)
+
+			Expect(priceAfter).To(Equal(priceBefore))
+
+			RemoveChain(cdx)
+			afterEach()
+		})
+
 		It("AddLiquidity, UniGetLPTokenAmount : negative input", func() {
 			beforeEachUni()
 

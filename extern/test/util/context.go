@@ -1,6 +1,8 @@
 package util
 
 import (
+	"sync"
+
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/core/chain"
 	"github.com/meverselabs/meverse/core/types"
@@ -13,11 +15,17 @@ type TestContext struct {
 	MainToken common.Address
 }
 
-func NewTestContext(idx int) *TestContext {
+var idx int
+var idxLock sync.Mutex
+
+func NewTestContext() *TestContext {
+	idxLock.Lock()
 	tc := &TestContext{
 		Idx: idx,
 		Ctx: types.NewEmptyContext(),
 	}
+	idx++
+	idxLock.Unlock()
 
 	tc.MainToken = tc.InitMainToken(Admin, ClassMap)
 

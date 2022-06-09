@@ -504,6 +504,19 @@ func (m *metamaskRelay) TransmuteTx(rlp string) (*types.Transaction, common.Sign
 		return nil, nil, err
 	}
 
+	isInvokeable := false
+	{
+		ctx := m.cn.NewContext()
+		var cont interface{}
+		cont, err = ctx.Contract(*etx.To())
+		if err != nil {
+			return nil, nil, err
+		}
+		if _, ok := cont.(types.InvokeableContract); ok {
+			isInvokeable = true
+		}
+	}
+
 	var method string
 	if len(etx.Data()) >= 4 {
 		var m abi.Method
@@ -513,7 +526,11 @@ func (m *metamaskRelay) TransmuteTx(rlp string) (*types.Transaction, common.Sign
 		if m.Name == "" {
 			return nil, nil, errors.New("not exist abi")
 		}
-		method = strings.ToUpper(string(m.Name[0])) + m.Name[1:]
+		if isInvokeable {
+			method = m.Name
+		} else {
+			method = strings.ToUpper(string(m.Name[0])) + m.Name[1:]
+		}
 	}
 	if method == "" {
 		var m abi.Method
@@ -521,7 +538,11 @@ func (m *metamaskRelay) TransmuteTx(rlp string) (*types.Transaction, common.Sign
 			break
 		}
 		name := m.Name
-		method = strings.ToUpper(string(name[0])) + name[1:]
+		if isInvokeable {
+			method = name
+		} else {
+			method = strings.ToUpper(string(name[0])) + name[1:]
+		}
 	}
 
 	gp := etx.GasPrice()
@@ -600,7 +621,7 @@ func (m *metamaskRelay) ethCall(height, to, data, from string) (interface{}, err
 			caller := viewchain.NewViewCaller(m.cn)
 			output, err := caller.Execute(toAddr, from, abiM.Name, obj)
 			if err != nil {
-				_err = err
+				_err = fmt.Errorf("%v call %v method %v", err.Error(), toAddr, abiM.Name)
 				continue
 			}
 

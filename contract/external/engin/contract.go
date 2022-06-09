@@ -175,6 +175,9 @@ func (cont *EnginContract) loadEngin(cc *types.ContractContext, Name string, Ver
 //////////////////////////////////////////////////
 
 func (cont *EnginContract) addEngin(cc *types.ContractContext, Name string, Description string, EnginURL string) error {
+	if cc.From() != cont.master {
+		return errors.New("not owner")
+	}
 	if len(EnginURL) == 0 {
 		return errors.New("engin not provided")
 	}

@@ -27,8 +27,14 @@ type StableSwapFront struct {
 func (f *StableSwapFront) Name(cc types.ContractLoader) string {
 	return f.cont.name(cc)
 }
+func (f *StableSwapFront) SetName(cc *types.ContractContext, name string) error {
+	return f.cont.setName(cc, name)
+}
 func (f *StableSwapFront) Symbol(cc types.ContractLoader) string {
 	return f.cont.symbol(cc)
+}
+func (f *StableSwapFront) SetSymbol(cc *types.ContractContext, symbol string) error {
+	return f.cont.setSymbol(cc, symbol)
 }
 func (f *StableSwapFront) TotalSupply(cc types.ContractLoader) *amount.Amount {
 	return ToAmount(f.cont.totalSupply(cc))
@@ -169,6 +175,9 @@ func (f *StableSwapFront) AdminBalances(cc *types.ContractContext, idx uint8) (*
 // //////////////////////////////////////////////////
 // // Exchange : public writer Functions
 // //////////////////////////////////////////////////
+func (f *StableSwapFront) SetPayToken(cc *types.ContractContext, _token common.Address) error {
+	return f.cont.setPayToken(cc, _token)
+}
 func (f *StableSwapFront) CommitNewFee(cc *types.ContractContext, new_fee, new_admin_fee, new_winner_fee, deadline uint64) error {
 	return f.cont.commitNewFee(cc, new_fee, new_admin_fee, new_winner_fee, deadline)
 }

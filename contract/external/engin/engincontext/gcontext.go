@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/core/types"
 )
 
@@ -116,5 +117,14 @@ func (pc *EnginContextContract) IsContract(addr string) bool {
 }
 
 func (pc *EnginContextContract) Exec(Addr string, MethodName string, Args []interface{}) ([]interface{}, error) {
-	return pc.cc.Exec(pc.cc, common.HexToAddress(Addr), MethodName, Args)
+	is, err := pc.cc.Exec(pc.cc, common.HexToAddress(Addr), MethodName, Args)
+	if err != nil {
+		return nil, err
+	}
+	for i, v := range is {
+		if am, ok := v.(*amount.Amount); ok {
+			is[i] = am.Int
+		}
+	}
+	return is, nil
 }

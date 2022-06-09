@@ -24,8 +24,8 @@ func (self *UniSwap) OnCreate(cc *types.ContractContext, Args []byte) error {
 		return err
 	}
 
-	cc.SetContractData([]byte{tagTokenName}, []byte(data.Name))
-	cc.SetContractData([]byte{tagTokenSymbol}, []byte(data.Symbol))
+	self._setName(cc, data.Name)
+	self._setSymbol(cc, data.Symbol)
 
 	cc.SetContractData([]byte{tagExType}, []byte{byte(UNI)})
 	cc.SetContractData([]byte{tagFactory}, data.Factory[:])
@@ -105,6 +105,20 @@ func (self *UniSwap) adminBalance(cc types.ContractLoader) *big.Int {
 //////////////////////////////////////////////////
 // UniSwap Contract : setter function
 //////////////////////////////////////////////////
+func (self *UniSwap) setName(cc *types.ContractContext, name string) error {
+	if err := self.onlyOwner(cc); err != nil { // only owner
+		return err
+	}
+	self._setName(cc, name)
+	return nil
+}
+func (self *UniSwap) setSymbol(cc *types.ContractContext, symbol string) error {
+	if err := self.onlyOwner(cc); err != nil { // only owner
+		return err
+	}
+	self._setSymbol(cc, symbol)
+	return nil
+}
 func (self *UniSwap) setReserve0(cc *types.ContractContext, reserve0 *big.Int) {
 	cc.SetContractData([]byte{tagUniReserve0}, reserve0.Bytes())
 }

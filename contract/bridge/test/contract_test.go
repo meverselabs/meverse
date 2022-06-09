@@ -26,8 +26,8 @@ func init() {
 
 }
 
-func setupTest(index int) *util.TestContext {
-	tc := util.NewTestContext(index)
+func setupTest() *util.TestContext {
+	tc := util.NewTestContext()
 
 	banker = util.Users[0]
 	bankerKey = util.UserKeys[0]
@@ -74,7 +74,7 @@ func setupTest(index int) *util.TestContext {
 }
 
 func TestSendToGatewayTx(t *testing.T) {
-	tc := setupTest(0)
+	tc := setupTest()
 	// token, amt, path []common.Address, toChain string, summary []byte
 	_, err := tc.MakeTx(util.UserKeys[3], bridgeAddr, "SendToGateway", tc.MainToken, amount.NewAmount(10, 0), []common.Address{}, "POLYGON", []byte("MEVERSE/POLYGON/MEV"))
 	if err == nil {
@@ -113,7 +113,7 @@ func TestSendToGatewayTx(t *testing.T) {
 }
 
 func TestSend1Mev(t *testing.T) {
-	tc := setupTest(1)
+	tc := setupTest()
 
 	TAG := "TestSend1Mev "
 

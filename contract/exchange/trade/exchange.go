@@ -337,6 +337,13 @@ func (self *Exchange) _setPayToken(cc *types.ContractContext, _token common.Addr
 	}
 	return errors.New("Exchange: NOT_EXIST_PAYTOKEN")
 }
+func (self *Exchange) setPayToken(cc *types.ContractContext, _token common.Address) error {
+	if err := self.onlyOwner(cc); err != nil { // only owner
+		return err
+	}
+	return self._setPayToken(cc, _token)
+}
+
 func (self *Exchange) _setFee(cc *types.ContractContext, _fee uint64) error {
 	if _fee > MAX_FEE {
 		return errors.New("Exchange: FEE_EXCEED_MAXFEE")

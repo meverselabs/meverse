@@ -34,7 +34,7 @@ func getContClassID(rt reflect.Type) uint64 {
 }
 
 func TestSwapMaintokenTx(t *testing.T) {
-	tc := util.NewTestContext(int(1))
+	tc := util.NewTestContext()
 
 	tokenAddr := tc.MakeToken("TestToken", "TEST", "10000")
 	log.Println("Test Token Addr", tokenAddr) // 0xadCAdf65B8A05e5Fbc0cfB0dEe8De2d2BAa16bDf

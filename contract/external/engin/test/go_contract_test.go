@@ -18,7 +18,7 @@ func init() {
 }
 
 func TestGoContractTx(t *testing.T) {
-	tc := util.NewTestContext(0)
+	tc := util.NewTestContext()
 
 	e := echo.New()
 	e.Static("/bin", "bin")

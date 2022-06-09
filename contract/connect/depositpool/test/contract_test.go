@@ -42,7 +42,7 @@ var poolAddr common.Address
 func scenario(point uint8, t *testing.T) (inf interface{}, err error) {
 	util.RegisterContractClass(&depositpool.DepositPoolContract{}, "JsContract")
 
-	tc := util.NewTestContext(int(point))
+	tc := util.NewTestContext()
 	tokenAddr = tc.MakeToken("TestToken", "TESTTOKEN", "1000000")
 
 	tokenContArgs := &depositpool.DepositPoolContractConstruction{

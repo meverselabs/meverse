@@ -51,18 +51,21 @@ func (m *ViewCaller) Execute(addr common.Address, from, method string, inputs []
 	return m._execute(contract, cc, method, inputs)
 }
 
-func (m *ViewCaller) MultiExecute(addr common.Address, from string, methods []string, inputss [][]interface{}) ([][]interface{}, error) {
-	contract, cc, err := m.getCallContract(addr, from)
-	if err != nil {
-		return nil, err
+func (m *ViewCaller) MultiExecute(addr []common.Address, from string, methods []string, inputss [][]interface{}) ([][]interface{}, error) {
+	if len(addr) != len(inputss) {
+		return nil, errors.New("not match params count")
 	}
-
 	if len(methods) != len(inputss) {
 		return nil, errors.New("not match params count")
 	}
 
 	result := make([][]interface{}, len(methods))
 	for i, method := range methods {
+		contract, cc, err := m.getCallContract(addr[i], from)
+		if err != nil {
+			return nil, err
+		}
+
 		r, err := m._execute(contract, cc, method, inputss[i])
 		if err != nil {
 			return nil, err
@@ -95,7 +98,6 @@ func (m *ViewCaller) _execute(contract reflect.Value, cc *types.ContractContext,
 	if len(method) < 1 {
 		return nil, errors.New("invalid method name")
 	}
-	method = strings.ToUpper(string(method[0])) + method[1:]
 	var is interface{} = contract.Interface()
 	if _, ok := is.(types.InvokeableContract); ok &&
 		(method != "InitContract" &&
@@ -108,6 +110,8 @@ func (m *ViewCaller) _execute(contract reflect.Value, cc *types.ContractContext,
 			inputs,
 		}
 		method = "ContractInvoke"
+	} else {
+		method = strings.ToUpper(string(method[0])) + method[1:]
 	}
 
 	rMethod := contract.MethodByName(method)
@@ -143,7 +147,10 @@ func (m *ViewCaller) _execute(contract reflect.Value, cc *types.ContractContext,
 		vi := v.Interface()
 		if mtype.Out(i).Kind() == reflect.Interface && mtype.Out(i).Implements(errType) {
 			if _err, ok := vi.(error); ok {
-				err = _err
+				if method == "ContractInvoke" && len(inputs) > 0 {
+					method = fmt.Sprintf("%v", inputs[0])
+				}
+				err = fmt.Errorf("%v method %v", _err.Error(), method)
 			}
 			continue
 		}

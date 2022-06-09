@@ -48,7 +48,7 @@ func (cont *DeployerContract) OnCreate(cc *types.ContractContext, Args []byte) e
 	if data.Updateable {
 		cc.SetContractData([]byte{tagUpdateable}, []byte{1})
 	} else {
-		cc.SetContractData([]byte{tagUpdateable}, []byte{0})
+		cc.SetContractData([]byte{tagUpdateable}, []byte{})
 	}
 	return nil
 }
@@ -92,8 +92,7 @@ func (cont *DeployerContract) Update(cc *types.ContractContext, EnginName string
 		return errors.New("is not owner")
 	}
 
-	updateable := cc.ContractData([]byte{tagUpdateable})
-	if len(updateable) == 0 || updateable[0] != 1 {
+	if !isUpdateable(cc) {
 		return errors.New("is not updateable contract")
 	}
 
@@ -123,6 +122,11 @@ func (cont *DeployerContract) ContractInvoke(cc *types.ContractContext, method s
 	eg, ecc, err := cont.getEngin(cc)
 	if err != nil {
 		return nil, err
+	}
+	for i, v := range params {
+		if am, ok := v.(*amount.Amount); ok {
+			params[i] = am.Int
+		}
 	}
 	res, err := eg.ContractInvoke(ecc, method, params)
 	if err != nil {
@@ -158,7 +162,7 @@ func (cont *DeployerContract) getEngin(cc *types.ContractContext) (types.IEngin,
 // Public Reader Functions
 //////////////////////////////////////////////////
 
-func (cont *DeployerContract) IsUpdateable(cc *types.ContractContext) bool {
+func isUpdateable(cc *types.ContractContext) bool {
 	updateable := cc.ContractData([]byte{tagUpdateable})
 	if len(updateable) == 0 || updateable[0] != 1 {
 		return false

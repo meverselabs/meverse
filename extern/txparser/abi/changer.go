@@ -9,20 +9,42 @@ import (
 	"strings"
 )
 
-var fileName = "DepositUSDT"
+var fileName = "MarketOP"
 
 var read = `
-Holder(cc *types.ContractContext) *big.Int {
-Holders(cc *types.ContractContext) []common.Address {
-IsHolder(cc *types.ContractContext, addr common.Address) bool {
+getItemSuggestionInfos(nftAddress common.Address, tokenId *big.Int, currency string) string {
+getMarketDataContractAddress() common.Address {
+getMarketFee() *big.Int {
+marketFee() *big.Int {
+getRoyaltyFee() *big.Int {
+royaltyFee() *big.Int {
+
+setOwner(addr common.Address) {
+setManager(addr common.Address) {
+transferFrom(nftAddress common.Address, owner common.Address, to common.Address, tokenId *big.Int) {
+suggestItemToBuyWithSuggester(nftAddress common.Address, tokenId *big.Int, suggestBiddingPrice *big.Int, currency string) {
+cancelItemToBuyWithSuggester(nftAddress common.Address, tokenId *big.Int, currency string, suggestBiddingPrice *big.Int) {
+acceptItemToBuyWithSeller(nftAddress common.Address, tokenId *big.Int, suggestedBiddingPrice *big.Int, currency string) {
+registerMarketItem(nftAddress common.Address, tokenId *big.Int, buyNowPrice *big.Int, currency string, openTimeUtc uint32, closeTimeUtc uint32) {
+cancelMarketItem(nftAddress common.Address, tokenId *big.Int) {
+buyNowWithToken(nftAddress common.Address, tokenId *big.Int, amount *big.Int, currency string) {
+setMarketFee(newFee *big.Int) {
+setRoyaltyFee(newFee *big.Int) {
+setMandatoryMarketDataContract(marketData common.Address) {
+approveFeesForERC20Token(currency string) {
+collectFees(currency string) {
+	
+getMarketItem(token common.Address, tokenId *big.Int) string {
+getERC20Contract(currency string) common.Address {
+getFoundationAdminAddress(token common.Address) common.Address {
+getFoundationRoyalty(wallet common.Address, currency string) *big.Int {
+totalMarketCollectionItems(token common.Address) *big.Int {
+isTokenRegistered(token common.Address, tokenId *big.Int) bool {
+getMarketOperationAddress() common.Address {
 `
 
 var write = `
-Deposit(cc *types.ContractContext) error {
-Withdraw(cc *types.ContractContext) error {
-LockDeposit(cc *types.ContractContext) error {
-UnlockWithdraw(cc *types.ContractContext) error {
-ReclaimToken(cc *types.ContractContext, token common.Address, amt *amount.Amount) error {
+setERC20Contract(currency string, token common.Address) {
 `
 
 var reg = []string{
@@ -37,9 +59,11 @@ var reg = []string{
 	`(?:([a-zA-Z0-9_]+) (common.Address))`,
 	`{"internalType": "address","name": "$1","type": "address"}`,
 	`(?:([a-zA-Z0-9_]+) (hash.Hash256))`,
-	`{"internalType": "bytes32","name": "$1","type": "bytes32"}`,
+	`{"internalType": "uint256","name": "$1","type": "uint256"}`,
 	`(?:([a-zA-Z0-9_]+) (\[\]common.Address))`,
 	`{"internalType": "address[]","name": "$1","type": "address[]"}`,
+	`(?:([a-zA-Z0-9_]+) (\[\]hash.Hash256))`,
+	`{"internalType": "uint256[]","name": "$1","type": "uint256[]"}`,
 	`(?:([a-zA-Z0-9_]+) (string))`,
 	`{"internalType": "tokenString","name": "$1","type": "tokenString"}`,
 	`(?:([a-zA-Z0-9_]+) (\*amount.Amount|\*big.Int|uint[0-9]+))`,
@@ -52,8 +76,10 @@ var reg = []string{
 	`{"internalType": "tokenBool","name": "$1","type": "tokenBool"}`,
 	`(?:(\[\]common.Address))`,
 	`{"internalType": "address[]","name": "","type": "address[]"}`,
+	`(?:(\[\]hash.Hash256))`,
+	`{"internalType": "uint256[]","name": "","type": "uint256[]"}`,
 	`(?:(hash.Hash256))`,
-	`{"internalType": "bytes32","name": "","type": "bytes32"}`,
+	`{"internalType": "uint256","name": "","type": "uint256"}`,
 	`(?:(common.Address))`,
 	`{"internalType": "address","name": "","type": "address"}`,
 	`(?:( string))`,

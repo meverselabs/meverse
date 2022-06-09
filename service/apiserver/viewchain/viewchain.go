@@ -220,11 +220,11 @@ func NewViewchain(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain.Cha
 	})
 
 	s.Set("multi_call", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
-		contract, err := arg.String(0)
+		contract, err := arg.Array(0)
 		if err != nil {
 			return nil, errors.New("need contract address")
 		}
-		methods, err := arg.Array(1)
+		method, err := arg.Array(1)
 		if err != nil {
 			return nil, errors.New("method not allow")
 		}
@@ -242,11 +242,30 @@ func NewViewchain(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain.Cha
 			if ps, ok := p.([]interface{}); ok {
 				paramss[i] = ps
 			} else {
-				paramss[i] = []interface{}{}
+				paramss[i] = []interface{}{ps}
 			}
 		}
 		from, _ := arg.String(3)
-		return v.MultiCall(contract, from, methods, paramss)
+
+		if len(contract) != len(method) {
+			return nil, errors.New("not matched contract method pair")
+		}
+		contracts := []string{}
+		methods := []string{}
+		for i, icont := range contract {
+			cont, ok := icont.(string)
+			if !ok {
+				return nil, errors.New("invalid contract param(not string)")
+			}
+			methodStr, ok := method[i].(string)
+			if !ok {
+				return nil, errors.New("invalid method param(not string)")
+			}
+			contracts = append(contracts, cont)
+			methods = append(methods, methodStr)
+		}
+
+		return v.MultiCall(contracts, from, methods, paramss)
 	})
 
 	s.Set("calcRewardPower", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
@@ -480,32 +499,32 @@ func (v *viewchain) getTokenBalanceOf(conAddr common.Address, addr common.Addres
 	return "", errors.New("not match contract")
 }
 
-func (v *viewchain) MultiCall(contract, from string, methods []interface{}, paramss [][]interface{}) (interface{}, error) {
-	toAddr, err := common.ParseAddress(contract)
-	if err != nil {
-		return nil, err
-	}
+func (v *viewchain) MultiCall(contract []string, from string, methods []string, paramss [][]interface{}) (interface{}, error) {
 	caller := NewViewCaller(v.cn)
 	arrMethods := []string{}
-	for _, imethod := range methods {
-		if method, ok := imethod.(string); ok {
-			var abiM abi.Method
-			for _, abiM = range txparser.FuncSigs[method] {
-				break
-			}
-			if abiM.StateMutability == "view" {
-				inputCount := len(abiM.Inputs)
-				for i := 0; i < inputCount; i++ {
-					am := abiM.Inputs[i]
-					log.Println("viewcall", am.Name, am.Type.String())
-				}
-			}
-			arrMethods = append(arrMethods, method)
-		} else {
-			return nil, errors.New("method must string type")
+	toAddrs := []common.Address{}
+	for _, addrStr := range contract {
+		toAddr, err := common.ParseAddress(addrStr)
+		if err != nil {
+			return nil, err
 		}
+		toAddrs = append(toAddrs, toAddr)
 	}
-	output, err := caller.MultiExecute(toAddr, from, arrMethods, paramss)
+	for _, method := range methods {
+		var abiM abi.Method
+		for _, abiM = range txparser.FuncSigs[method] {
+			break
+		}
+		if abiM.StateMutability == "view" {
+			inputCount := len(abiM.Inputs)
+			for i := 0; i < inputCount; i++ {
+				am := abiM.Inputs[i]
+				log.Println("viewcall", am.Name, am.Type.String())
+			}
+		}
+		arrMethods = append(arrMethods, method)
+	}
+	output, err := caller.MultiExecute(toAddrs, from, arrMethods, paramss)
 	if err != nil {
 		return nil, err
 	}

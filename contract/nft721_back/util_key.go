@@ -18,8 +18,7 @@ var (
 	tagNFTOwner           = byte(0x08)
 	tagTokenApprove       = byte(0x09)
 	tagTokenApproveForAll = byte(0x10)
-	tagBaseURI            = byte(0x11)
-	tagTokenURI           = byte(0x12)
+	tagTokenURI           = byte(0x11)
 )
 
 func makeNFTKey(key byte, body []byte) []byte {
@@ -43,7 +42,4 @@ func makeTokenApproveKey(i hash.Hash256) []byte {
 }
 func makeTokenApproveForAllKey(_owner common.Address, _operator common.Address) []byte {
 	return makeNFTKey(tagTokenApproveForAll, append(_owner[:], _operator[:]...))
-}
-func makeTokenURIKey(tokenID hash.Hash256) []byte {
-	return makeNFTKey(tagTokenURI, tokenID[:])
 }

@@ -39,9 +39,6 @@ func (f *front) Symbol(cc *types.ContractContext) string {
 func (f *front) TokenURI(cc *types.ContractContext, _tokenId hash.Hash256) string {
 	return f.cont.tokenURI(cc, _tokenId)
 }
-func (f *front) BaseURI(cc *types.ContractContext) string {
-	return f.cont.baseURI(cc)
-}
 
 /// @notice Count all NFTs assigned to an owner
 /// @dev NFTs assigned to the zero address are considered invalid, and this
@@ -124,16 +121,8 @@ func (f *front) Burn(cc *types.ContractContext, nftID hash.Hash256) error {
 /// @dev Throws if `_tokenId` is not a valid NFT. URIs are defined in RFC
 ///  3986. The URI may point to a JSON file that conforms to the "ERC721
 ///  Metadata JSON Schema".
-func (f *front) SetBaseURI(cc *types.ContractContext, uri string) error {
-	return f.cont.setBaseURI(cc, uri)
-}
-
-/// @notice A distinct Uniform Resource Identifier (URI) for a given asset.
-/// @dev Throws if `_tokenId` is not a valid NFT. URIs are defined in RFC
-///  3986. The URI may point to a JSON file that conforms to the "ERC721
-///  Metadata JSON Schema".
-func (f *front) SetTokenURI(cc *types.ContractContext, tokenID hash.Hash256, uri string) error {
-	return f.cont.setTokenURI(cc, tokenID, uri)
+func (f *front) SetTokenURI(cc *types.ContractContext, _tokenId hash.Hash256, uri string) error {
+	return f.cont.setTokenURI(cc, _tokenId, uri)
 }
 
 //////////////////////////////////////////////////
@@ -188,8 +177,4 @@ func (f *front) Approve(cc *types.ContractContext, _approved common.Address, _to
 /// @param _approved True if the operator is approved, false to revoke approval
 func (f *front) SetApprovalForAll(cc *types.ContractContext, _operator common.Address, _approved bool) {
 	setApprovalForAll(cc, _operator, _approved)
-}
-
-func (f *front) PrintContractData(cc *types.ContractContext, addr common.Address) {
-	printContractData(cc, addr)
 }

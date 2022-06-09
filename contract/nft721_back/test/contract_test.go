@@ -27,7 +27,7 @@ func TestName(t *testing.T) {
 	_name := "TestNFT"
 	_symbol := "TNFT"
 
-	tc := util.NewTestContext(0)
+	tc := util.NewTestContext()
 	nftAddr := tc.DeployContract(&nft721.NFT721Contract{}, &nft721.NFT721ContractConstruction{
 		Name:   _name,
 		Symbol: _symbol,
@@ -66,7 +66,7 @@ func _testMint3NFT(t *testing.T, i int) (nftAddr common.Address, tc *util.TestCo
 	_name := "TestNFT"
 	_symbol := "TNFT"
 
-	tc = util.NewTestContext(i)
+	tc = util.NewTestContext()
 	nftAddr = tc.DeployContract(&nft721.NFT721Contract{}, &nft721.NFT721ContractConstruction{
 		Name:   _name,
 		Symbol: _symbol,
@@ -256,7 +256,7 @@ func TestApprove(t *testing.T) {
 	_name := "TestNFT"
 	_symbol := "TNFT"
 
-	tc := util.NewTestContext(4)
+	tc := util.NewTestContext()
 	nftAddr := tc.DeployContract(&nft721.NFT721Contract{}, &nft721.NFT721ContractConstruction{
 		Name:   _name,
 		Symbol: _symbol,
@@ -319,7 +319,7 @@ func TestSetApprovalForAll(t *testing.T) {
 	_name := "TestNFT"
 	_symbol := "TNFT"
 
-	tc := util.NewTestContext(5)
+	tc := util.NewTestContext()
 	nftAddr := tc.DeployContract(&nft721.NFT721Contract{}, &nft721.NFT721ContractConstruction{
 		Name:   _name,
 		Symbol: _symbol,
@@ -445,7 +445,7 @@ func TestSafeTransferFrom(t *testing.T) {
 	_name := "TestNFT"
 	_symbol := "TNFT"
 
-	tc := util.NewTestContext(6)
+	tc := util.NewTestContext()
 	nftAddr := tc.DeployContract(&nft721.NFT721Contract{}, &nft721.NFT721ContractConstruction{
 		Name:   _name,
 		Symbol: _symbol,
@@ -520,7 +520,7 @@ func TestMintBatch(t *testing.T) {
 	_name := "TestNFT"
 	_symbol := "TNFT"
 
-	tc := util.NewTestContext(7)
+	tc := util.NewTestContext()
 	nftAddr := tc.DeployContract(&nft721.NFT721Contract{}, &nft721.NFT721ContractConstruction{
 		Name:   _name,
 		Symbol: _symbol,
@@ -554,62 +554,4 @@ func TestMintBatch(t *testing.T) {
 			t.Error(TAG, addr, "!=", util.Users[i])
 		}
 	}
-}
-
-func TestBurnAll(t *testing.T) {
-	util.RegisterContractClass(&nft721.NFT721Contract{}, "NFT721")
-	TAG := "MINTTEST"
-
-	_name := "TestNFT"
-	_symbol := "TNFT"
-
-	tc := util.NewTestContext(8)
-	nftAddr := tc.DeployContract(&nft721.NFT721Contract{}, &nft721.NFT721ContractConstruction{
-		Name:   _name,
-		Symbol: _symbol,
-		Owner:  util.Admin,
-	})
-
-	inf, err := tc.MakeTx(util.AdminKey, nftAddr, "Mint", big.NewInt(10))
-	if err != nil {
-		t.Error(TAG, err, inf)
-	}
-	is, ok := inf.([]interface{})
-	if !ok {
-		t.Error(TAG, "no result")
-	}
-	if len(is) != 10 {
-		t.Error(TAG, "not match mint result")
-		return
-	}
-	_, ok = is[0].(hash.Hash256)
-	if !ok {
-		t.Error(TAG, "not nft id")
-	}
-
-	for i, h := range is {
-		hs := h.(hash.Hash256)
-		if !ok {
-			t.Error(TAG, "not nft id")
-		}
-		inf, err := tc.MakeTx(util.AdminKey, nftAddr, "Burn", hs)
-		if err != nil {
-			t.Error(TAG, err, inf)
-		}
-		inf, err = tc.ReadTx(util.AdminKey, nftAddr, "PrintContractData", util.Admin)
-		if err != nil {
-			t.Error(TAG, err, inf)
-		}
-		log.Println("***-******", i)
-	}
-	inf, err = tc.MakeTx(util.AdminKey, nftAddr, "Mint", big.NewInt(10))
-	if err != nil {
-		t.Error(TAG, err, inf)
-	}
-
-	inf, err = tc.ReadTx(util.AdminKey, nftAddr, "PrintContractData", util.Admin)
-	if err != nil {
-		t.Error(TAG, err, inf)
-	}
-
 }

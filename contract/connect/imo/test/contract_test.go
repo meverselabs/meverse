@@ -17,7 +17,7 @@ func init() {
 }
 
 func TestExecuteContractTx(t *testing.T) {
-	tc := util.NewTestContext(0)
+	tc := util.NewTestContext()
 
 	// 프로잭트 토큰 생성
 	tokenContArgs := &token.TokenContractConstruction{

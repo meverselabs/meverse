@@ -69,6 +69,38 @@ var _ = Describe("Token", func() {
 			Expect(balance.Cmp(big.NewInt(0)) == 0).To(BeTrue())
 		})
 
+		It("SetName, onlyOwner", func() {
+
+			name := "__New_Name"
+
+			is, err := Exec(genesis, alice, pair, "SetName", []interface{}{name})
+			Expect(err).To(Succeed())
+
+			is, err = Exec(genesis, alice, pair, "Name", []interface{}{})
+			Expect(err).To(Succeed())
+			Expect(is[0].(string)).To(Equal(name))
+
+			is, err = Exec(genesis, bob, pair, "SetName", []interface{}{name})
+			Expect(err).To(MatchError("Exchange: FORBIDDEN"))
+
+		})
+
+		It("SetSymbol, onlyOwner", func() {
+
+			symbol := "__New_Symbol"
+
+			is, err := Exec(genesis, alice, pair, "SetSymbol", []interface{}{symbol})
+			Expect(err).To(Succeed())
+
+			is, err = Exec(genesis, alice, pair, "Symbol", []interface{}{})
+			Expect(err).To(Succeed())
+			Expect(is[0].(string)).To(Equal(symbol))
+
+			is, err = Exec(genesis, bob, pair, "SetSymbol", []interface{}{symbol})
+			Expect(err).To(MatchError("Exchange: FORBIDDEN"))
+
+		})
+
 		Describe("Approve", func() {
 
 			It("allowance without approve", func() {
@@ -478,6 +510,38 @@ var _ = Describe("Token", func() {
 			balance, err := tokenBalanceOf(genesis, swap, bob)
 			Expect(err).To(Succeed())
 			Expect(balance.Cmp(big.NewInt(0)) == 0).To(BeTrue())
+		})
+
+		It("SetName, onlyOwner", func() {
+
+			name := "__New_Name"
+
+			is, err := Exec(genesis, alice, swap, "SetName", []interface{}{name})
+			Expect(err).To(Succeed())
+
+			is, err = Exec(genesis, alice, swap, "Name", []interface{}{})
+			Expect(err).To(Succeed())
+			Expect(is[0].(string)).To(Equal(name))
+
+			is, err = Exec(genesis, bob, swap, "SetName", []interface{}{name})
+			Expect(err).To(MatchError("Exchange: FORBIDDEN"))
+
+		})
+
+		It("SetSymbol, onlyOwner", func() {
+
+			symbol := "__New_Symbol"
+
+			is, err := Exec(genesis, alice, swap, "SetSymbol", []interface{}{symbol})
+			Expect(err).To(Succeed())
+
+			is, err = Exec(genesis, alice, swap, "Symbol", []interface{}{})
+			Expect(err).To(Succeed())
+			Expect(is[0].(string)).To(Equal(symbol))
+
+			is, err = Exec(genesis, bob, swap, "SetSymbol", []interface{}{symbol})
+			Expect(err).To(MatchError("Exchange: FORBIDDEN"))
+
 		})
 
 		Describe("Approve", func() {

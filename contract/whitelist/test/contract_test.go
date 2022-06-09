@@ -39,7 +39,7 @@ func TestWhiteList(t *testing.T) {
 	util.RegisterContractClass(&whitelist.WhiteListContract{}, "WhiteList")
 	TAG := "WHITELISTTEST"
 
-	tc := util.NewTestContext(0)
+	tc := util.NewTestContext()
 	whiteListAddr := tc.DeployContract(&whitelist.WhiteListContract{}, &whitelist.WhiteListContractConstruction{})
 	log.Println(whiteListAddr)
 
@@ -111,7 +111,7 @@ func TestEmptyWhiteList(t *testing.T) {
 	util.RegisterContractClass(&whitelist.WhiteListContract{}, "WhiteList")
 	TAG := "WHITELISTTEST"
 
-	tc := util.NewTestContext(1)
+	tc := util.NewTestContext()
 	whiteListAddr := tc.DeployContract(&whitelist.WhiteListContract{}, &whitelist.WhiteListContractConstruction{})
 	log.Println(whiteListAddr)
 

@@ -36,5 +36,5 @@ func (f *front) ContractInvoke(cc *types.ContractContext, method string, params 
 }
 
 func (f *front) IsUpdateable(cc *types.ContractContext) bool {
-	return f.cont.IsUpdateable(cc)
+	return isUpdateable(cc)
 }

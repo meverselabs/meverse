@@ -2,6 +2,7 @@ package types
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -87,6 +88,8 @@ func (i *interactor) Exec(Cc *ContractContext, ContAddr common.Address, MethodNa
 			Args,
 		}
 		MethodName = "ContractInvoke"
+	} else {
+		MethodName = strings.ToUpper(string(MethodName[0])) + MethodName[1:]
 	}
 
 	if i.saveEvent {
@@ -207,6 +210,8 @@ func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Va
 					switch mType.String() {
 					case bigIntType:
 						param = reflect.ValueOf(big.NewInt(0).SetBytes(v.(*amount.Amount).Bytes()))
+					case "string":
+						param = reflect.ValueOf(big.NewInt(0).SetBytes(v.(*amount.Amount).Bytes()).String())
 					}
 				case "[]interface {}":
 					if tv, ok := v.([]interface{}); ok {
@@ -274,8 +279,15 @@ func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Va
 						case "common.Address":
 							param = reflect.ValueOf(common.HexToAddress(tv))
 						case "*amount.Amount":
-							if am, err := amount.ParseAmount(tv); err == nil {
+							bi, ok := big.NewInt(0).SetString(tv, 10)
+							if ok {
+								am := &amount.Amount{Int: bi}
 								param = reflect.ValueOf(am)
+							}
+						case "[]byte", "[]uint8":
+							bs, err := hex.DecodeString(tv)
+							if err == nil {
+								param = reflect.ValueOf(bs)
 							}
 						default:
 							if bi, ok := big.NewInt(0).SetString(tv, 10); ok {
@@ -306,7 +318,7 @@ func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Va
 							}
 						}
 					}
-				case "[]byte":
+				case "[]byte", "[]uint8":
 					if bs, ok := v.([]byte); ok {
 						switch mType.String() {
 						case "common.Hash":

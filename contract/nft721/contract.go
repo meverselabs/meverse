@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"math/big"
 	"strings"
 
@@ -89,15 +90,25 @@ func symbol(cc *types.ContractContext) string {
 ///  3986. The URI may point to a JSON file that conforms to the "ERC721
 ///  Metadata JSON Schema".
 func (cont *NFT721Contract) tokenURI(cc *types.ContractContext, _tokenId hash.Hash256) string {
-	bs := cc.ContractData([]byte{tagTokenURI})
+	strID := hex.EncodeToString(_tokenId.Bytes())
+	idstr := fmt.Sprintf("%064v", strID)
+	body := ""
+
+	bs := cc.ContractData(makeTokenURIKey(_tokenId))
+	if len(bs) != 0 {
+		body = string(bs)
+	} else {
+		body = cont.baseURI(cc)
+	}
+	return strings.Replace(body, "{id}", idstr, -1)
+}
+
+func (cont *NFT721Contract) baseURI(cc *types.ContractContext) string {
+	bs := cc.ContractData([]byte{tagBaseURI})
 	if len(bs) == 0 {
 		return ""
 	}
-	strID := hex.EncodeToString(_tokenId.Bytes())
-	idstr := fmt.Sprintf("%064v", strID)
-
-	uri := string(bs)
-	return strings.Replace(uri, "{id}", idstr, -1)
+	return string(bs)
 }
 
 /// @notice Count all NFTs assigned to an owner
@@ -169,7 +180,10 @@ func tokenByIndex(cc *types.ContractContext, _index *big.Int) hash.Hash256 {
 /// @return The token identifier for the `_index`th NFT assigned to `_owner`,
 ///   (sort order not specified)
 func tokenOfOwnerByIndex(cc *types.ContractContext, _owner common.Address, _index *big.Int) hash.Hash256 {
-	return hash.Hash256{}
+	lastNFTbs := cc.AccountData(_owner, makeIndexNFTKey(_index))
+	lastNFTID := hash.Hash256{}
+	copy(lastNFTID[:], lastNFTbs)
+	return lastNFTID
 }
 
 //////////////////////////////////////////////////
@@ -326,6 +340,7 @@ func removeNFT(cc *types.ContractContext, nftID hash.Hash256, burnIndex *big.Int
 		lastNFTID := tokenByIndex(cc, lastIndex)
 		setNFTIndex(cc, lastNFTID, burnIndex)
 	}
+	cc.SetContractData(makeIndexNFTKey(lastIndex), nil)
 	cc.SetContractData([]byte{tagNFTCount}, lastIndex.Bytes())
 }
 
@@ -346,19 +361,27 @@ func removeNFTAccount(cc *types.ContractContext, nftID hash.Hash256) error {
 	if burnIndex.Cmp(lastIndex) != 0 {
 		lastNFTID := tokenOfOwnerByIndex(cc, addr, lastIndex)
 		setNFTAccountIndex(cc, addr, lastNFTID, burnIndex)
-	} else {
-		cc.SetAccountData(addr, makeIndexNFTKey(lastIndex), nil)
 	}
+	cc.SetAccountData(addr, makeIndexNFTKey(lastIndex), nil)
 	cc.SetAccountData(addr, []byte{tagNFTCount}, lastIndex.Bytes())
 	return nil
 }
 
-func (cont *NFT721Contract) setTokenURI(cc *types.ContractContext, _tokenId hash.Hash256, uri string) error {
+func (cont *NFT721Contract) setBaseURI(cc *types.ContractContext, uri string) error {
 	if !isOwner(cc) {
-		return errors.New("doesn't have mint permission")
+		return errors.New("doesn't have setBaseURI permission")
 	}
 
-	cc.SetContractData([]byte{tagTokenURI}, []byte(uri))
+	cc.SetContractData([]byte{tagBaseURI}, []byte(uri))
+	return nil
+}
+
+func (cont *NFT721Contract) setTokenURI(cc *types.ContractContext, tokenID hash.Hash256, uri string) error {
+	if !isOwner(cc) {
+		return errors.New("doesn't have setTokenURI permission")
+	}
+
+	cc.SetContractData(makeTokenURIKey(tokenID), []byte(uri))
 	return nil
 }
 
@@ -470,4 +493,20 @@ func setApprovalForAll(cc *types.ContractContext, _operator common.Address, _app
 	} else {
 		cc.SetContractData(makeTokenApproveForAllKey(cc.From(), _operator), nil)
 	}
+}
+
+func printContractData(cc *types.ContractContext, addr common.Address) {
+	log.Println("printContractData start")
+	for i := int64(0); i < 10; i++ {
+		bi := big.NewInt(i)
+		hs := tokenByIndex(cc, bi)
+		log.Println(hs.String())
+	}
+	log.Println("printContractData end and addr start")
+	for i := int64(0); i < 10; i++ {
+		bi := big.NewInt(i)
+		hs := tokenOfOwnerByIndex(cc, addr, bi)
+		log.Println(hs.String())
+	}
+	log.Println("printContractData end")
 }

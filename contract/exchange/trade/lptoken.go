@@ -48,6 +48,12 @@ func (self *LPToken) allowance(cc types.ContractLoader, owner, spender common.Ad
 //////////////////////////////////////////////////
 // LPToken Contract : private writer function
 //////////////////////////////////////////////////
+func (self *LPToken) _setName(cc *types.ContractContext, name string) {
+	cc.SetContractData([]byte{tagTokenName}, []byte(name))
+}
+func (self *LPToken) _setSymbol(cc *types.ContractContext, symbol string) {
+	cc.SetContractData([]byte{tagTokenSymbol}, []byte(symbol))
+}
 func (self *LPToken) _mint(cc *types.ContractContext, to common.Address, amount *big.Int) error {
 	if amount.Cmp(Zero) < 0 {
 		return errors.New("LPToken: MINT_NEGATIVE_AMOUNT")

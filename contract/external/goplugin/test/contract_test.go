@@ -18,7 +18,7 @@ import (
 func TestMain(t *testing.T) {
 	util.RegisterContractClass(&goplugin.PluginContract{}, "PluginContract")
 
-	tc := util.NewTestContext(0)
+	tc := util.NewTestContext()
 
 	dat, err := os.ReadFile("./token.so")
 	if err != nil {
