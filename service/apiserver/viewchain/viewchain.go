@@ -624,6 +624,8 @@ func (v *viewchain) Search(searchMap map[common.Address]map[string]bool, start, 
 			m := map[string]string{
 				"Contract": mc.To.String(),
 				"Method":   mc.Method,
+				"Height":   fmt.Sprintf("%v", b.Header.Height),
+				"Index":    fmt.Sprintf("%v", e.Index),
 			}
 			args, err := json.Marshal(mc.Args)
 			if err == nil {
