@@ -3,6 +3,7 @@ package viewchain
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/big"
@@ -268,6 +269,67 @@ func NewViewchain(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain.Cha
 		return v.MultiCall(contracts, from, methods, paramss)
 	})
 
+	s.Set("search", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+		contract, err := arg.Array(0)
+		if err != nil {
+			return nil, errors.New("need contract address")
+		}
+		method, err := arg.Array(1)
+		if err != nil {
+			return nil, errors.New("method not allow")
+		}
+		startBlock, err := arg.Uint32(2)
+		if err != nil {
+			return nil, errors.New("startBlock not allow")
+		}
+		lastBlock, err := arg.Uint32(3)
+		if err != nil {
+			lastBlockStr, _ := arg.String(3)
+			if lastBlockStr == "latest" {
+				lastBlock = st.TargetHeight()
+			} else {
+				return nil, errors.New("method not allow")
+			}
+		}
+		if len(contract) != len(method) {
+			return nil, errors.New("not matched contract method pair")
+		}
+		if startBlock > lastBlock {
+			startBlock, lastBlock = lastBlock, startBlock
+		}
+		if lastBlock-startBlock > 1024 {
+			return nil, errors.New("search ragne less then 1024")
+		}
+		th := st.TargetHeight()
+		if startBlock > th || lastBlock > th {
+			return nil, fmt.Errorf("current block height is %v. requested further heights", th)
+		}
+		smap := map[common.Address]map[string]bool{}
+		// contracts := []common.Address{}
+		// methods := []string{}
+		for i, icont := range contract {
+			cont, ok := icont.(string)
+			if !ok {
+				return nil, errors.New("invalid contract param(not string)")
+			}
+			methodStr, ok := method[i].(string)
+			if !ok {
+				return nil, errors.New("invalid method param(not string)")
+			}
+			contAddr := common.HexToAddress(cont)
+			var m map[string]bool
+			if m, ok = smap[contAddr]; !ok {
+				m = map[string]bool{}
+				smap[contAddr] = m
+			}
+			m[strings.ToLower(methodStr)] = true
+			// contracts = append(contracts, common.HexToAddress(cont))
+			// methods = append(methods, methodStr)
+		}
+
+		return v.Search(smap, startBlock, lastBlock), nil
+	})
+
 	s.Set("calcRewardPower", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 		contract, err := arg.String(0)
 		if err != nil {
@@ -529,6 +591,53 @@ func (v *viewchain) MultiCall(contract []string, from string, methods []string, 
 		return nil, err
 	}
 	return output, nil
+}
+
+// map[common.Address]map[string]bool{}
+func (v *viewchain) Search(searchMap map[common.Address]map[string]bool, start, end uint32) (txList []map[string]string) {
+	txList = []map[string]string{}
+	for i := start; i <= end; i++ {
+		b, err := v.st.Block(i)
+		if err != nil {
+			continue
+		}
+
+		for _, e := range b.Body.Events {
+			if e.Type != types.EventTagCallHistory {
+				continue
+			}
+			bf := bytes.NewBuffer(e.Result)
+			mc := &types.MethodCallEvent{}
+			if _, err := mc.ReadFrom(bf); err != nil {
+				continue
+			}
+			sm, ok := searchMap[mc.To]
+			if !ok {
+				continue
+			}
+			if _, ok := sm[strings.ToLower(mc.Method)]; !ok {
+				continue
+			}
+			if len(b.Body.Transactions) <= int(e.Index) {
+				continue
+			}
+			m := map[string]string{
+				"Contract": mc.To.String(),
+				"Method":   mc.Method,
+			}
+			args, err := json.Marshal(mc.Args)
+			if err == nil {
+				m["Args"] = string(args)
+			}
+			result, err := json.Marshal(mc.Result)
+			if err == nil {
+				m["Result"] = string(result)
+			}
+
+			txList = append(txList, m)
+		}
+	}
+	return
 }
 
 func (v *viewchain) Call(contract, from, method string, params []interface{}) (interface{}, error) {

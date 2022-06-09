@@ -265,3 +265,6 @@ func (f *UniSwapFront) Skim(cc *types.ContractContext, to common.Address) error 
 func (f *UniSwapFront) Sync(cc *types.ContractContext) error {
 	return f.cont.sync(cc)
 }
+func (f *UniSwapFront) TokenTransfer(cc *types.ContractContext, token, to common.Address, amt *amount.Amount) error {
+	return f.cont.tokenTransfer(cc, token, to, amt)
+}

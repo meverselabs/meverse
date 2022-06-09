@@ -291,3 +291,6 @@ func (f *StableSwapFront) Exchange(cc *types.ContractContext, in, out uint8, dx,
 	result, err := f.cont.exchange(cc, in, out, dx.Int, _min_dy.Int, from)
 	return ToAmount(result), err
 }
+func (f *StableSwapFront) TokenTransfer(cc *types.ContractContext, token, to common.Address, amt *amount.Amount) error {
+	return f.cont.tokenTransfer(cc, token, to, amt)
+}

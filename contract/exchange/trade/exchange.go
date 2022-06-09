@@ -603,3 +603,22 @@ func (self *Exchange) unkillMe(cc *types.ContractContext) error {
 func (self *Exchange) _setBlockTimestampLast(cc *types.ContractContext, blockTimestampLast uint64) {
 	cc.SetContractData([]byte{tagBlockTimestampLast}, bin.Uint64Bytes(blockTimestampLast))
 }
+
+// tokenTranfer : emergency use
+func (self *Exchange) tokenTransfer(cc *types.ContractContext, token, to common.Address, amt *amount.Amount) error {
+	if err := self.onlyOwner(cc); err != nil { //  only owner
+		return err
+	}
+
+	N := self.nTokens(cc)
+	tokens := self.tokens(cc)
+
+	for i := uint8(0); i < N; i++ {
+		if tokens[i] == token {
+			_, err := cc.Exec(cc, token, "Transfer", []interface{}{to, amt})
+			return err
+		}
+	}
+
+	return errors.New("Exchange: NOT_EXIST_TOKEN")
+}
