@@ -282,6 +282,16 @@ func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Va
 							am, err := amount.ParseAmount(tv)
 							if err == nil {
 								param = reflect.ValueOf(am)
+							} else {
+								tv2 := strings.Replace(tv, "0x", "", -1)
+								if len(tv2)%2 == 1 {
+									tv2 = "0" + tv2
+								}
+								var bs []byte
+								if bs, err = hex.DecodeString(tv2); err == nil {
+									am = amount.NewAmountFromBytes(bs)
+									param = reflect.ValueOf(am)
+								}
 							}
 						case "[]byte", "[]uint8":
 							bs, err := hex.DecodeString(tv)
