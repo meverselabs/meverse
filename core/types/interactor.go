@@ -279,9 +279,8 @@ func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Va
 						case "common.Address":
 							param = reflect.ValueOf(common.HexToAddress(tv))
 						case "*amount.Amount":
-							bi, ok := big.NewInt(0).SetString(tv, 10)
-							if ok {
-								am := &amount.Amount{Int: bi}
+							am, err := amount.ParseAmount(tv)
+							if err == nil {
 								param = reflect.ValueOf(am)
 							}
 						case "[]byte", "[]uint8":

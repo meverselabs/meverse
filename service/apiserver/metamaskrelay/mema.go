@@ -509,11 +509,10 @@ func (m *metamaskRelay) TransmuteTx(rlp string) (*types.Transaction, common.Sign
 		ctx := m.cn.NewContext()
 		var cont interface{}
 		cont, err = ctx.Contract(*etx.To())
-		if err != nil {
-			return nil, nil, err
-		}
-		if _, ok := cont.(types.InvokeableContract); ok {
-			isInvokeable = true
+		if err == nil {
+			if _, ok := cont.(types.InvokeableContract); ok {
+				isInvokeable = true
+			}
 		}
 	}
 
