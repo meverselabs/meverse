@@ -274,7 +274,7 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain
 			"logsBloom":         logsBloom,
 			"type":              "0x2",
 			"status":            "0x1", //TODO 성공 1 실패 0
-			"data":              map[string]string{"test": "success"},
+			"data":              map[string]string{},
 		}
 		return m, nil
 	})
@@ -355,6 +355,12 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain
 		}
 		return m.ethCall(h, to, data, from)
 	})
+	s.Set("web3_clientVersion", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+		return viewchain.GetVersion(), nil
+	})
+	s.Set("eth_clientVersion", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+		return viewchain.GetVersion(), nil
+	})
 }
 
 func getTransaction(m *metamaskRelay, height uint32, index uint16) (interface{}, error) {
@@ -427,8 +433,9 @@ func getMainTokenSend(MainToken common.Address, tx *types.Transaction) (to commo
 			return
 		} else if len(eData) > 0 && strings.EqualFold(etx.To().String(), MainToken.String()) {
 			var m abi.Method
-			for _, m = range txparser.FuncSigs[hex.EncodeToString(etx.Data()[:4])] {
-				break
+			m, err = txparser.Abi(hex.EncodeToString(etx.Data()[:4]))
+			if err != nil {
+				return
 			}
 			if strings.ToLower(m.Name) == "transfer" {
 				var data []interface{}
@@ -505,8 +512,8 @@ func (m *metamaskRelay) TransmuteTx(rlp string) (*types.Transaction, common.Sign
 	}
 
 	isInvokeable := false
+	ctx := m.cn.NewContext()
 	{
-		ctx := m.cn.NewContext()
 		var cont interface{}
 		cont, err = ctx.Contract(*etx.To())
 		if err == nil {
@@ -518,9 +525,9 @@ func (m *metamaskRelay) TransmuteTx(rlp string) (*types.Transaction, common.Sign
 
 	var method string
 	if len(etx.Data()) >= 4 {
-		var m abi.Method
-		for _, m = range txparser.FuncSigs[hex.EncodeToString(etx.Data()[:4])] {
-			break
+		m, err := txparser.Abi(hex.EncodeToString(etx.Data()[:4]))
+		if err != nil {
+			return nil, nil, err
 		}
 		if m.Name == "" {
 			return nil, nil, errors.New("not exist abi")
@@ -533,8 +540,9 @@ func (m *metamaskRelay) TransmuteTx(rlp string) (*types.Transaction, common.Sign
 	}
 	if method == "" {
 		var m abi.Method
-		for _, m = range txparser.FuncSigs["transfer(address,uint256)"] {
-			break
+		m, err = txparser.Abi("69ca02dd")
+		if err != nil {
+			return nil, nil, err
 		}
 		name := m.Name
 		if isInvokeable {
@@ -603,39 +611,69 @@ func (m *metamaskRelay) ethCall(height, to, data, from string) (interface{}, err
 	if strings.Index(data, "0x") == 0 {
 		data = data[2:]
 	}
-	abiMs := txparser.FuncSigs[data[:8]]
+
+	caller := viewchain.NewViewCaller(m.cn)
+
+	abiMs := txparser.Abis(toAddr, data[:8])
+	// abiMs : map[string]abi.Method
+	if len(abiMs) == 0 {
+		if !txparser.AbiCaches[toAddr.String()] {
+			txparser.AbiCaches[toAddr.String()] = true
+			if rawabi, err := caller.Execute(toAddr, from, "abis", []interface{}{}); err == nil && len(rawabi) > 0 {
+				if abis, ok := rawabi[0].([]interface{}); ok {
+					strs := []string{}
+					for _, funcStr := range abis {
+						if f, ok := funcStr.(string); ok {
+							strs = append(strs, f)
+						}
+					}
+					bs := []byte("[" + strings.Join(strs, ",") + "]")
+					reader := bytes.NewReader(bs)
+					if abi, err := abi.JSON(reader); err == nil {
+						for _, m := range abi.Methods {
+							txparser.AddAbi(m)
+						}
+					}
+				}
+			}
+			abiMs = txparser.Abis(toAddr, data[:8])
+		}
+	}
 	var _err error
 	for _, abiM := range abiMs {
-		if abiM.StateMutability == "view" {
-			bs, err := hex.DecodeString(data)
-			if err != nil {
-				_err = err
-				continue
-			}
-			obj, err := txparser.Inputs(bs)
-			if err != nil {
-				_err = err
-				continue
-			}
-			caller := viewchain.NewViewCaller(m.cn)
-			output, err := caller.Execute(toAddr, from, abiM.Name, obj)
-			if err != nil {
-				_err = fmt.Errorf("%v call %v method %v", err.Error(), toAddr, abiM.Name)
-				continue
-			}
-
-			bs, err = txparser.Outputs(abiM.Sig, output)
-			if err != nil {
-				_err = err
-				continue
-			}
-			return "0x" + hex.EncodeToString(bs), nil
+		v, err := execWithAbi(caller, from, toAddr, abiM, data)
+		if err != nil {
+			_err = err
+		} else {
+			return v, nil
 		}
 	}
 	if _err != nil {
 		return nil, _err
 	}
 	return nil, errors.New("func not found")
+}
+
+func execWithAbi(caller *viewchain.ViewCaller, from string, toAddr ecommon.Address, abiM abi.Method, data string) (interface{}, error) {
+	bs, err := hex.DecodeString(data)
+	if err != nil {
+		return nil, err
+	}
+	obj, err := txparser.Inputs(bs)
+	if err != nil {
+		return nil, err
+	}
+	output, err := caller.Execute(toAddr, from, abiM.Name, obj)
+	if err != nil {
+		err = fmt.Errorf("%v call %v method %v", err.Error(), toAddr, abiM.Name)
+		return nil, err
+	}
+
+	bs, err = txparser.Outputs(abiM.Sig, output)
+	if err != nil {
+		return nil, err
+	}
+	return "0x" + hex.EncodeToString(bs), nil
 }
 
 func makeStringResponse(str string) string {

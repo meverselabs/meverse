@@ -12,6 +12,9 @@ import (
 
 // RecoverPubkey recover the public key using the hash value and the signature
 func RecoverPubkey(chainid *big.Int, h hash.Hash256, s Signature) (PublicKey, error) {
+	if len(s) < 64 {
+		return PublicKey{}, errors.New("invalid signature size")
+	}
 	sig := make([]byte, 64)
 	copy(sig[:], s[:64])
 	vs := make([]byte, len(s[64:]))

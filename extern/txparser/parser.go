@@ -19,7 +19,8 @@ import (
 )
 
 var (
-	FuncSigs          map[string]map[string]abi.Method
+	funcSigs          map[string]map[string]abi.Method
+	AbiCaches         map[string]bool
 	SUPPORTSINTERFACE string = ERCFuncSignature("supportsInterface(bytes4)")
 	NAME              string = ERCFuncSignature("name()")
 	SYMBOL            string = ERCFuncSignature("symbol()")
@@ -60,7 +61,8 @@ safeBatchTransferFrom(address,address,uint256[],uint256[],bytes)
 */
 
 func init() {
-	FuncSigs = map[string]map[string]abi.Method{}
+	funcSigs = map[string]map[string]abi.Method{}
+	AbiCaches = map[string]bool{}
 	ercs := [][]byte{
 		IERC20,
 		IERC721,
@@ -86,25 +88,42 @@ func init() {
 		if err != nil {
 			panic(err)
 		}
-		for name, m := range a.Methods {
-			outputArr := make([]string, len(m.Outputs))
-			for i, o := range m.Outputs {
-				outputArr[i] = o.Type.String()
-			}
-			output := strings.Join(outputArr, ",")
-
-			outMap := FuncSigs[m.Sig]
-			if outMap == nil {
-				outMap = map[string]abi.Method{}
-			}
-			outMap[output] = m
-
-			FuncSigs[m.Sig] = outMap
-			FuncSigs[hex.EncodeToString(m.ID)] = outMap
-			name = name + ""
-			// log.Println(name, m.Name, m.RawName, m.Sig, hex.EncodeToString(m.ID))
+		for _, m := range a.Methods {
+			AddAbi(m)
 		}
 	}
+}
+
+func AddAbi(m abi.Method) {
+	outputArr := make([]string, len(m.Outputs))
+	for i, o := range m.Outputs {
+		outputArr[i] = o.Type.String()
+	}
+	output := strings.Join(outputArr, ",")
+
+	outMap := funcSigs[m.Sig]
+	if outMap == nil {
+		outMap = map[string]abi.Method{}
+		funcSigs[m.Sig] = outMap
+		funcSigs[hex.EncodeToString(m.ID)] = outMap
+	}
+	outMap[output] = m
+
+	// name = name + ""
+	// log.Println(name, m.Name, m.RawName, m.Sig, hex.EncodeToString(m.ID))
+}
+
+func Abi(method string) (abi.Method, error) {
+	ms := funcSigs[method]
+	var m abi.Method
+	for _, m = range ms {
+		break
+	}
+	return m, nil
+}
+
+func Abis(cont common.Address, method string) map[string]abi.Method {
+	return funcSigs[method]
 }
 
 func Inputs(data []byte) ([]interface{}, error) {
@@ -113,7 +132,7 @@ func Inputs(data []byte) ([]interface{}, error) {
 	}
 	method := hex.EncodeToString(data[:4])
 
-	ms := FuncSigs[method]
+	ms := funcSigs[method]
 	var m abi.Method
 	for _, m = range ms {
 		break
@@ -126,7 +145,7 @@ func Inputs(data []byte) ([]interface{}, error) {
 }
 
 func Outputs(method string, data []interface{}) ([]byte, error) {
-	ms := FuncSigs[method]
+	ms := funcSigs[method]
 	for i, v := range data {
 		if a, ok := v.(*amount.Amount); ok {
 			data[i] = a.Int
@@ -192,23 +211,25 @@ func Outputs(method string, data []interface{}) ([]byte, error) {
 				}
 			case abi.StringTy:
 				switch t := data[i].(type) {
+				case string:
+					data[i] = t
 				case []byte:
 					data[i] = string(t)
+				case fmt.Stringer:
+					data[i] = t.String()
 				}
-			case abi.SliceTy:
-				panic("abi.SliceTy")
-				// typ := reflect.SliceOf(ot.Type.Elem.GetType())
-				// cont := reflect.New(typ).Interface()
-			case abi.ArrayTy:
-				panic("abi.ArrayTy")
-				// typ := reflect.ArrayOf(ot.Type.Size, ot.Type.Elem.GetType())
-				// cont := reflect.New(typ).Interface()
+			case abi.SliceTy, abi.ArrayTy:
+				if s, ok := data[i].([]interface{}); ok {
+					sts := []string{}
+					for _, v := range s {
+						sts = append(sts, fmt.Sprintf("%v", v))
+					}
+					data[i] = sts
+				}
 			case abi.AddressTy:
 				if s, ok := data[i].(string); ok {
 					data[i] = common.HexToAddress(s)
 				}
-			// case abi.FixedBytesTy:
-			// 	return reflect.ArrayOf(t.Size, reflect.TypeOf(byte(0)))
 			case abi.BytesTy:
 				if s, ok := data[i].(string); ok {
 					data[i], err = hex.DecodeString(s)
@@ -242,39 +263,56 @@ func Outputs(method string, data []interface{}) ([]byte, error) {
 
 func reflectIntType(unsigned bool, size int, data interface{}) (i interface{}, err error) {
 	s := fmt.Sprintf("%v", data)
+	base := 10
+	if strings.Contains(s, "0x") {
+		base = 16
+		s = strings.Replace(s, "0x", "", -1)
+	}
 
 	if unsigned {
 		var ui uint64
 		switch size {
 		case 8:
-			ui, err = strconv.ParseUint(s, 10, 8)
+			ui, err = strconv.ParseUint(s, base, 8)
 			i = big.NewInt(0).SetUint64(uint64(ui))
 		case 16:
-			ui, err = strconv.ParseUint(s, 10, 16)
+			ui, err = strconv.ParseUint(s, base, 16)
 			i = big.NewInt(0).SetUint64(uint64(ui))
 		case 32:
-			ui, err = strconv.ParseUint(s, 10, 32)
+			ui, err = strconv.ParseUint(s, base, 32)
 			i = big.NewInt(0).SetUint64(uint64(ui))
-		case 64, 256:
-			ui, err = strconv.ParseUint(s, 10, 64)
+		case 64:
+			ui, err = strconv.ParseUint(s, base, 64)
 			i = big.NewInt(0).SetUint64(uint64(ui))
+		case 256:
+			if bi, ok := big.NewInt(0).SetString(s, base); ok {
+				i = bi
+			} else {
+				err = errors.New("invalid bigInt value")
+			}
 		}
 		return
 	}
 	var si int64
 	switch size {
 	case 8:
-		si, err = strconv.ParseInt(s, 10, 8)
+		si, err = strconv.ParseInt(s, base, 8)
 		i = big.NewInt(0).SetInt64(int64(si))
 	case 16:
-		si, err = strconv.ParseInt(s, 10, 16)
+		si, err = strconv.ParseInt(s, base, 16)
 		i = big.NewInt(0).SetInt64(int64(si))
 	case 32:
-		si, err = strconv.ParseInt(s, 10, 32)
+		si, err = strconv.ParseInt(s, base, 32)
 		i = big.NewInt(0).SetInt64(int64(si))
-	case 64, 256:
-		si, err = strconv.ParseInt(s, 10, 64)
+	case 64:
+		si, err = strconv.ParseInt(s, base, 64)
 		i = big.NewInt(0).SetInt64(int64(si))
+	case 256:
+		if bi, ok := big.NewInt(0).SetString(s, base); ok {
+			i = bi
+		} else {
+			err = errors.New("invalid bigInt value")
+		}
 	}
 	return
 }

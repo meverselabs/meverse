@@ -15,6 +15,7 @@ var (
 	tagFormulatorCount      = byte(0x13)
 	tagFormulatorSaleAmount = byte(0x14)
 	tagFormulatorApprove    = byte(0x15)
+	tagFormulatorApproveAll = byte(0x16)
 	tagStakingAmount        = byte(0x20)
 	tagStakingAmountNumber  = byte(0x21)
 	tagStakingAmountReverse = byte(0x22)
@@ -37,6 +38,9 @@ func makeSaleAmountKey(addr common.Address) []byte {
 }
 func makeApproveKey(addr common.Address) []byte {
 	return makeFormulatorKey(tagFormulatorApprove, addr)
+}
+func makeApproveAllKey(addr common.Address) []byte {
+	return makeFormulatorKey(tagFormulatorApproveAll, addr)
 }
 
 func toStakingAmountKey(addr common.Address) []byte {

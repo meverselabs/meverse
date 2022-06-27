@@ -93,10 +93,13 @@ function MarketItemData(serial) {
 }
 
 function onlyManager() {
-    let com = Mev.ContractData(MANAGER)
-    if (address(Mev.From()) != com) {
+    if (!isManager()) {
         throw `onlyManager ${Mev.From()} ${com}`
     }
+}
+function isManager() {
+    let com = Mev.ContractData(MANAGER)
+    return address(Mev.From()) == com 
 }
 
 function onlyOwner() {
@@ -181,7 +184,7 @@ function suggestItemToBuyWithSuggester(nftAddress, tokenId, suggestBiddingPrice,
     // IERC20 erc20Contract = _marketData.getERC20Contract(currency);
     let erc20Contract = Mev.Exec(_marketData(), "getERC20Contract", [currency])
     erc20Contract = address(erc20Contract)
-    require(erc20Contract != address(0), "NftMarket.suggestItemToBuy: Currency contract not registered");
+    require(erc20Contract != address(0), "NftMarket.suggestItemToBuy: Currency contract not registered currency:"+currency);
     let allowance = Mev.Exec(erc20Contract, "allowance", [_msgSender(), address(Mev.This())])
     allowance = BigInt(allowance)
     require(suggestBiddingPrice <= allowance, "NftMarket.suggestItemToBuy: is not allowanced");
@@ -199,9 +202,15 @@ function suggestItemToBuyWithSuggester(nftAddress, tokenId, suggestBiddingPrice,
 }
 
 function cancelItemToBuyWithSuggester(nftAddress, tokenId, currency, suggestBiddingPrice) {
-    // _marketData.cancelItemToBuy(_msgSender(), nftAddress, tokenId, currency, suggestBiddingPrice);\
+    // _marketData.cancelItemToBuy(_msgSender(), nftAddress, tokenId, currency, suggestBiddingPrice);
     nftAddress = address(nftAddress)
     suggestBiddingPrice = BigInt(suggestBiddingPrice)
+    
+    let erc20Contract = Mev.Exec(_marketData(), "getERC20Contract", [currency])
+    erc20Contract = address(erc20Contract)
+    require(erc20Contract != address(0), "NftMarket.registerMarketItem: NOT_SUPPORTED_CURRECY");
+
+
     Mev.Exec(_marketData(), "cancelItemToBuy", [_msgSender(), nftAddress, tokenId, currency, suggestBiddingPrice])
     // emit MarketItemSuggestionCanceled(_msgSender(), nftAddress, tokenId, suggestBiddingPrice);
 }
@@ -209,6 +218,11 @@ function cancelItemToBuyWithSuggester(nftAddress, tokenId, currency, suggestBidd
 function acceptItemToBuyWithSeller(nftAddress, tokenId, suggestedBiddingPrice, currency) {
     nftAddress = address(nftAddress);
     tokenId = BigInt(tokenId)
+
+    let erc20Contract = Mev.Exec(_marketData(), "getERC20Contract", [currency])
+    erc20Contract = address(erc20Contract)
+    require(erc20Contract != address(0), "NftMarket.registerMarketItem: NOT_SUPPORTED_CURRECY");
+
     {
         let isApp = Mev.Exec(nftAddress, "isApprovedForAll", [_msgSender(), Mev.This()])
         require(isApp == "true", "NftMarket.acceptItemToBuy: NOT_APPROVED_OR_INVALID_TOKEN_ID");
@@ -219,9 +233,17 @@ function acceptItemToBuyWithSeller(nftAddress, tokenId, suggestedBiddingPrice, c
     }
     suggestedBiddingPrice = BigInt(suggestedBiddingPrice)
     // SuggestItem memory suggestItem = _marketData.getItemSuggestionInfo(nftAddress, tokenId, currency);
-    let suggestItem = Mev.Exec(_marketData(), "getItemSuggestionInfo", [nftAddress, tokenId, currency]);
-    suggestItem = new SuggestItem(suggestItem);
-    require(suggestedBiddingPrice == suggestItem.price, "NftMarket.acceptItemToBuy: Invalid price");
+    let siStr = Mev.Exec(_marketData(), "getItemSuggestionInfos", [nftAddress, tokenId, currency]);
+    let rawSi = JSON.parse(siStr)
+    let suggestItem = {};
+    for (var i in rawSi) {
+        let si = JSON.parse(rawSi[i])
+        if (suggestedBiddingPrice == BigInt(si.price)) {
+            suggestItem = new SuggestItem(JSON.stringify(si));
+        }
+    }
+    require(suggestItem.TypeOf == "SuggestItem", "NftMarket.acceptItemToBuy: Invalid suggestItem");
+    require(suggestItem.price == suggestedBiddingPrice, "NftMarket.acceptItemToBuy: Invalid price");
     // address adminAddress = _marketData.getFoundationAdminAddress(nftAddress);
     let adminAddress = Mev.Exec(_marketData(), "getFoundationAdminAddress", [nftAddress]);
     adminAddress = address(adminAddress)
@@ -268,7 +290,7 @@ function acceptItemToBuyWithSeller(nftAddress, tokenId, suggestedBiddingPrice, c
 function registerMarketItem(nftAddress, tokenId, buyNowPrice, currency, openTimeUtc, closeTimeUtc) {
     nftAddress = address(nftAddress)
     // address owner = nftAddress.ownerOf(tokenId);
-    let owner = Mev.Exec(nftAddress, "ownerOf", [tokenId]);
+    let owner = Mev.Exec(nftAddress, "ownerOf", [BigInt(tokenId)]);
     owner = address(owner)
     require(owner == _msgSender(), "NftMarket.registerMarketItem: NOT_OWNER");
     let isapp = Mev.Exec(nftAddress, "isApprovedForAll", [owner, Mev.This()]);
@@ -280,6 +302,10 @@ function registerMarketItem(nftAddress, tokenId, buyNowPrice, currency, openTime
     let isRegistered = Mev.Exec(_marketData(), "isTokenRegistered", [nftAddress, tokenId]);
     isRegistered = isRegistered=="true"
     
+    let erc20Contract = Mev.Exec(_marketData(), "getERC20Contract", [currency])
+    erc20Contract = address(erc20Contract)
+    require(erc20Contract != address(0), "NftMarket.registerMarketItem: NOT_SUPPORTED_CURRECY");
+
     // MarketItemData memory marketItem = _marketData.getMarketItem(address(nftAddress), tokenId);
     let marketItem = Mev.Exec(_marketData(), "getMarketItem", [nftAddress, tokenId]);
     marketItem = new MarketItemData(marketItem)
@@ -377,12 +403,18 @@ function collectFees(currency) {
 function _buyNow(nftAddress, tokenId, amount, currency) {
     nftAddress = address(nftAddress)
     amount = BigInt(amount)
+    tokenId = BigInt(tokenId)
     // MarketItemData memory marketItem = _marketData.getMarketItem(nftAddress, tokenId);
     let marketItem = Mev.Exec(_marketData(), "getMarketItem", [nftAddress, tokenId]);
     marketItem = new MarketItemData(marketItem)
-    require(marketItem.seller != address(0) && marketItem.state == State.OPEN , "NftMarket.buyNow: INVALID_AUCTION_STATE"); 
-    require(marketItem.currency == currency, "NftMarket.buyNow: INVALID_CURRENCY");
-    require(_msgSender() != marketItem.seller, "NftMarket.buyNow: INVALID_BUYER");
+
+    let erc20Contract = Mev.Exec(_marketData(), "getERC20Contract", [currency])
+    erc20Contract = address(erc20Contract)
+    require(erc20Contract != address(0), "NftMarket.buyNow: NOT_SUPPORTED_CURRECY");
+
+    require(marketItem.seller != address(0) && marketItem.state == State.OPEN , "NftMarket.buyNow: INVALID_AUCTION_STATE ("+marketItem.state+")"); 
+    require(marketItem.currency == currency, "NftMarket.buyNow: INVALID_CURRENCY ("+marketItem.currency+") and ("+currency+")");
+    require(_msgSender() != marketItem.seller, "NftMarket.buyNow: INVALID_BUYER ("+_msgSender()+") and ("+marketItem.seller+")");
     // require(block.timestamp < marketItem.closeTimeUtc, "NftMarket.buyNow: Item sale closed.");
     require(Mev.TargetHeight()-0 < marketItem.closeTimeUtc-0, "NftMarket.buyNow: Item sale closed." + typeof Mev.TargetHeight() + " : " + typeof marketItem.closeTimeUtc);
 
@@ -403,7 +435,7 @@ function _settle(marketItem, buyerAddress, amount, currency) {
     let adminAddress = Mev.Exec(_marketData(), "getFoundationAdminAddress", [nft]);
     adminAddress = address(adminAddress)
     // address nftOwner = nft.ownerOf(marketItem.nft.tokenId);
-    let nftOwner = Mev.Exec(nft, "ownerOf", [marketItem.nft.tokenId]);
+    let nftOwner = Mev.Exec(nft, "ownerOf", [BigInt(marketItem.nft.tokenId)]);
     nftOwner = address(nftOwner)
     
     require(adminAddress != address(0), "NftMarket._settle: foundation admin is not setted");
@@ -432,7 +464,7 @@ function _settle(marketItem, buyerAddress, amount, currency) {
         
         // transfer NFT to buyer (actual transfer)
         // marketItem.nft.tokenContract.transferFrom(address(marketItem.seller), buyerAddress, marketItem.nft.tokenId);
-        Mev.Exec(marketItem.nft.tokenContract, "transferFrom", [marketItem.seller, buyerAddress, marketItem.nft.tokenId])
+        Mev.Exec(marketItem.nft.tokenContract, "transferFrom", [marketItem.seller, buyerAddress, BigInt(marketItem.nft.tokenId)])
         require(totalAmountForMarket + remainAmount == amount, "NftMarket._settle: Not match amount and remainAmount + totalAmountForMarket");
     }
     {

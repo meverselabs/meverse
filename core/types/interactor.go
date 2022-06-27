@@ -180,154 +180,173 @@ func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Va
 					return nil, errors.Errorf("array type only support bytes. index(%v) get %v want %v", i, param.Type(), mType)
 				}
 			} else {
-				switch param.Type().String() {
-				case bigIntType:
+				switch pv := v.(type) {
+				case *big.Int:
 					switch mType.String() {
 					case amountType:
-						param = reflect.ValueOf(amount.NewAmountFromBytes(v.(*big.Int).Bytes()))
+						param = reflect.ValueOf(amount.NewAmountFromBytes(pv.Bytes()))
 					case reflect.Uint.String():
-						param = reflect.ValueOf(uint(v.(*big.Int).Uint64()))
+						param = reflect.ValueOf(uint(pv.Uint64()))
 					case reflect.Uint8.String():
-						param = reflect.ValueOf(uint8(v.(*big.Int).Uint64()))
+						param = reflect.ValueOf(uint8(pv.Uint64()))
 					case reflect.Uint16.String():
-						param = reflect.ValueOf(uint16(v.(*big.Int).Uint64()))
+						param = reflect.ValueOf(uint16(pv.Uint64()))
 					case reflect.Uint32.String():
-						param = reflect.ValueOf(uint32(v.(*big.Int).Uint64()))
+						param = reflect.ValueOf(uint32(pv.Uint64()))
 					case reflect.Uint64.String():
-						param = reflect.ValueOf(v.(*big.Int).Uint64())
+						param = reflect.ValueOf(pv.Uint64())
 					case reflect.Int.String():
-						param = reflect.ValueOf(int(v.(*big.Int).Int64()))
+						param = reflect.ValueOf(int(pv.Int64()))
 					case reflect.Int8.String():
-						param = reflect.ValueOf(int8(v.(*big.Int).Int64()))
+						param = reflect.ValueOf(int8(pv.Int64()))
 					case reflect.Int16.String():
-						param = reflect.ValueOf(int16(v.(*big.Int).Int64()))
+						param = reflect.ValueOf(int16(pv.Int64()))
 					case reflect.Int32.String():
-						param = reflect.ValueOf(int32(v.(*big.Int).Int64()))
+						param = reflect.ValueOf(int32(pv.Int64()))
 					case reflect.Int64.String():
-						param = reflect.ValueOf(v.(*big.Int).Int64())
+						param = reflect.ValueOf(pv.Int64())
+					case "common.Address":
+						param = reflect.ValueOf(common.BytesToAddress(pv.Bytes()))
+					case "hash.Hash256":
+						hs := hash.HexToHash(hex.EncodeToString(pv.Bytes()))
+						param = reflect.ValueOf(hs)
 					}
-				case amountType:
+				case *amount.Amount:
 					switch mType.String() {
 					case bigIntType:
-						param = reflect.ValueOf(big.NewInt(0).SetBytes(v.(*amount.Amount).Bytes()))
+						param = reflect.ValueOf(big.NewInt(0).SetBytes(pv.Bytes()))
 					case "string":
-						param = reflect.ValueOf(big.NewInt(0).SetBytes(v.(*amount.Amount).Bytes()).String())
+						param = reflect.ValueOf(big.NewInt(0).SetBytes(pv.Bytes()).String())
 					}
-				case "[]interface {}":
-					if tv, ok := v.([]interface{}); ok {
-						switch mType.String() {
-						case "[]common.Address":
-							as := []common.Address{}
-							for _, t := range tv {
-								addr, ok := t.(common.Address)
-								if !ok {
-									return nil, errors.Errorf("invalid input addr type(%v) get %v want %v(%v)", i, param.Type(), mType, mType.String())
-								}
-								as = append(as, addr)
+				case []interface{}:
+					switch mType.String() {
+					case "[]common.Address":
+						as := []common.Address{}
+						for _, t := range pv {
+							addr, ok := t.(common.Address)
+							if !ok {
+								return nil, errors.Errorf("invalid input addr type(%v) get %v want %v(%v)", i, param.Type(), mType, mType.String())
 							}
-							param = reflect.ValueOf(as)
-						case "[]string":
-							as := []string{}
-							for _, t := range tv {
-								addr, ok := t.(string)
-								if !ok {
-									if str, ok := t.(fmt.Stringer); !ok {
-										trfv := reflect.ValueOf(t)
-										return nil, errors.Errorf("invalid input addr type get %v(%v, %v) want string", t, trfv.Type().String(), trfv.Kind().String())
-									} else {
-										addr = str.String()
-									}
-								}
-								as = append(as, addr)
-							}
-							param = reflect.ValueOf(as)
-						case "[]*amount.Amount":
-							as := []*amount.Amount{}
-							for _, t := range tv {
-								addr, ok := t.(*amount.Amount)
-								if !ok {
+							as = append(as, addr)
+						}
+						param = reflect.ValueOf(as)
+					case "[]string":
+						as := []string{}
+						for _, t := range pv {
+							addr, ok := t.(string)
+							if !ok {
+								if str, ok := t.(fmt.Stringer); !ok {
 									trfv := reflect.ValueOf(t)
-									return nil, errors.Errorf("invalid input addr type get %v(%v, %v) want *amount.Amount", t, trfv.Type().String(), trfv.Kind().String())
+									return nil, errors.Errorf("invalid input addr type get %v(%v, %v) want string", t, trfv.Type().String(), trfv.Kind().String())
+								} else {
+									addr = str.String()
 								}
-								as = append(as, addr)
 							}
-							param = reflect.ValueOf(as)
+							as = append(as, addr)
 						}
-					}
-				case "[]*big.Int":
-					if tv, ok := v.([]*big.Int); ok {
-						switch mType.String() {
-						case "[]*amount.Amount":
-							as := []*amount.Amount{}
-							for _, t := range tv {
-								as = append(as, amount.NewAmountFromBytes(t.Bytes()))
+						param = reflect.ValueOf(as)
+					case "[]*amount.Amount":
+						as := []*amount.Amount{}
+						for _, t := range pv {
+							addr, ok := t.(*amount.Amount)
+							if !ok {
+								trfv := reflect.ValueOf(t)
+								return nil, errors.Errorf("invalid input addr type get %v(%v, %v) want *amount.Amount", t, trfv.Type().String(), trfv.Kind().String())
 							}
-							param = reflect.ValueOf(as)
+							as = append(as, addr)
 						}
+						param = reflect.ValueOf(as)
 					}
-				case "string":
-					if tv, ok := v.(string); ok {
-						switch mType.String() {
-						case "bool":
-							if strings.ToLower(tv) == "true" {
-								param = reflect.ValueOf(true)
-							} else {
-								param = reflect.ValueOf(false)
+				case []*big.Int:
+					switch mType.String() {
+					case "[]*amount.Amount":
+						as := []*amount.Amount{}
+						for _, t := range pv {
+							as = append(as, amount.NewAmountFromBytes(t.Bytes()))
+						}
+						param = reflect.ValueOf(as)
+					}
+				case uint8:
+					if mType.String() == "*big.Int" {
+						param = reflect.ValueOf(big.NewInt(0).SetInt64(int64(pv)))
+					}
+				case uint16:
+					if mType.String() == "*big.Int" {
+						param = reflect.ValueOf(big.NewInt(0).SetInt64(int64(pv)))
+					}
+				case uint32:
+					if mType.String() == "*big.Int" {
+						param = reflect.ValueOf(big.NewInt(0).SetInt64(int64(pv)))
+					}
+				case uint64:
+					if mType.String() == "*big.Int" {
+						param = reflect.ValueOf(big.NewInt(0).SetInt64(int64(pv)))
+					}
+				case string:
+					switch mType.String() {
+					case "bool":
+						if strings.ToLower(pv) == "true" {
+							param = reflect.ValueOf(true)
+						} else {
+							param = reflect.ValueOf(false)
+						}
+					case "common.Hash":
+						param = reflect.ValueOf(hash.HexToHash(pv))
+					case "common.Address":
+						param = reflect.ValueOf(common.HexToAddress(pv))
+					case "*amount.Amount":
+						am, err := amount.ParseAmount(pv)
+						if err == nil {
+							param = reflect.ValueOf(am)
+						} else {
+							tv2 := strings.Replace(pv, "0x", "", -1)
+							if len(tv2)%2 == 1 {
+								tv2 = "0" + tv2
 							}
-						case "common.Hash":
-							param = reflect.ValueOf(hash.HexToHash(tv))
-						case "common.Address":
-							param = reflect.ValueOf(common.HexToAddress(tv))
-						case "*amount.Amount":
-							am, err := amount.ParseAmount(tv)
-							if err == nil {
+							var bs []byte
+							if bs, err = hex.DecodeString(tv2); err == nil {
+								am = amount.NewAmountFromBytes(bs)
 								param = reflect.ValueOf(am)
-							} else {
-								tv2 := strings.Replace(tv, "0x", "", -1)
-								if len(tv2)%2 == 1 {
-									tv2 = "0" + tv2
-								}
-								var bs []byte
-								if bs, err = hex.DecodeString(tv2); err == nil {
-									am = amount.NewAmountFromBytes(bs)
-									param = reflect.ValueOf(am)
-								}
 							}
-						case "[]byte", "[]uint8":
-							bs, err := hex.DecodeString(tv)
-							if err == nil {
-								param = reflect.ValueOf(bs)
-							}
-						default:
-							if bi, ok := big.NewInt(0).SetString(tv, 10); ok {
-								switch mType.String() {
-								case "*big.Int":
-									param = reflect.ValueOf(bi)
-								case "int":
-									param = reflect.ValueOf(int(bi.Int64()))
-								case "int8":
-									param = reflect.ValueOf(int8(bi.Int64()))
-								case "int16":
-									param = reflect.ValueOf(int16(bi.Int64()))
-								case "int32":
-									param = reflect.ValueOf(int32(bi.Int64()))
-								case "int64":
-									param = reflect.ValueOf(int64(bi.Int64()))
-								case "uint":
-									param = reflect.ValueOf(uint(bi.Uint64()))
-								case "uint8":
-									param = reflect.ValueOf(uint8(bi.Uint64()))
-								case "uint16":
-									param = reflect.ValueOf(uint16(bi.Uint64()))
-								case "uint32":
-									param = reflect.ValueOf(uint32(bi.Uint64()))
-								case "uint64":
-									param = reflect.ValueOf(uint64(bi.Uint64()))
-								}
+						}
+					case "[]byte", "[]uint8":
+						bs, err := hex.DecodeString(pv)
+						if err == nil {
+							param = reflect.ValueOf(bs)
+						}
+					default:
+						bi, ok := big.NewInt(0).SetString(pv, 10)
+						if !ok {
+							bi, ok = big.NewInt(0).SetString(strings.Replace(pv, "0x", "", -1), 16)
+						}
+						if ok {
+							switch mType.String() {
+							case "*big.Int":
+								param = reflect.ValueOf(bi)
+							case "int":
+								param = reflect.ValueOf(int(bi.Int64()))
+							case "int8":
+								param = reflect.ValueOf(int8(bi.Int64()))
+							case "int16":
+								param = reflect.ValueOf(int16(bi.Int64()))
+							case "int32":
+								param = reflect.ValueOf(int32(bi.Int64()))
+							case "int64":
+								param = reflect.ValueOf(int64(bi.Int64()))
+							case "uint":
+								param = reflect.ValueOf(uint(bi.Uint64()))
+							case "uint8":
+								param = reflect.ValueOf(uint8(bi.Uint64()))
+							case "uint16":
+								param = reflect.ValueOf(uint16(bi.Uint64()))
+							case "uint32":
+								param = reflect.ValueOf(uint32(bi.Uint64()))
+							case "uint64":
+								param = reflect.ValueOf(uint64(bi.Uint64()))
 							}
 						}
 					}
-				case "[]byte", "[]uint8":
+				case []byte:
 					if bs, ok := v.([]byte); ok {
 						switch mType.String() {
 						case "common.Hash":
@@ -379,10 +398,17 @@ func (i *interactor) getResults(mType reflect.Type, vs []reflect.Value) (params 
 
 func (i *interactor) addCallEvent(Cc *ContractContext, Addr common.Address, MethodName string, Args []interface{}) *Event {
 	mc := MethodCallEvent{
-		From:   Cc.From(),
-		To:     Addr,
-		Method: MethodName,
-		Args:   Args,
+		From: Cc.From(),
+		To:   Addr,
+	}
+
+	if MethodName == "ContractInvoke" && len(Args) == 2 {
+		mc.Method, _ = Args[0].(string)
+		mc.Args, _ = Args[1].([]interface{})
+	}
+	if mc.Method == "" {
+		mc.Method = MethodName
+		mc.Args = Args
 	}
 	bf := &bytes.Buffer{}
 	_, err := mc.WriteTo(bf)

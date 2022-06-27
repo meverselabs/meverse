@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/big"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/meverselabs/meverse/common"
@@ -148,7 +149,8 @@ func _testMint3NFT(t *testing.T, i int) (nftAddr common.Address, tc *util.TestCo
 		t.Error(TAG, "not match mint result")
 		return
 	}
-	nftid, ok := is[0].(*big.Int)
+	str := is[0].(string)
+	nftid, ok := big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 	if !ok {
 		t.Error(TAG, "not nft id", is[0], ":")
 		return
@@ -172,7 +174,8 @@ func _testMint3NFT(t *testing.T, i int) (nftAddr common.Address, tc *util.TestCo
 		return
 	}
 	for _, i := range is {
-		nftid, ok := i.(*big.Int)
+		str := i.(string)
+		nftid, ok := big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 		if !ok {
 			t.Error(TAG, "not nft id", nftid, "2")
 		}
@@ -185,7 +188,9 @@ func _testMint3NFT(t *testing.T, i int) (nftAddr common.Address, tc *util.TestCo
 		t.Error(TAG, err, inf)
 		return
 	}
-	bi, ok := inf.(*big.Int)
+
+	str = inf.(string)
+	bi, ok := big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 	if !ok {
 		t.Error(TAG, "no bigint")
 		return
@@ -199,7 +204,9 @@ func _testMint3NFT(t *testing.T, i int) (nftAddr common.Address, tc *util.TestCo
 		t.Error(TAG, err, inf)
 		return
 	}
-	adminBal, ok := inf.(*big.Int)
+
+	str = inf.(string)
+	adminBal, ok := big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 	if !ok {
 		t.Error(TAG, "no bigint")
 		return
@@ -228,7 +235,8 @@ func TestBurn(t *testing.T) {
 		return
 	}
 
-	nftid, ok := inf.(*big.Int)
+	str := inf.(string)
+	nftid, ok := big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 	if !ok {
 		t.Error(TAG, "not nft id")
 		return
@@ -246,7 +254,8 @@ func TestBurn(t *testing.T) {
 		return
 	}
 
-	nftid2, ok := inf.(*big.Int)
+	str = inf.(string)
+	nftid2, ok := big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 	if !ok {
 		t.Error(TAG, "not nft id")
 		return
@@ -262,7 +271,9 @@ func TestBurn(t *testing.T) {
 		t.Error(TAG, err, inf)
 		return
 	}
-	bi, ok := inf.(*big.Int)
+
+	str = inf.(string)
+	bi, ok := big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 	if !ok {
 		t.Error(TAG, "no bigint")
 		return
@@ -276,7 +287,8 @@ func TestBurn(t *testing.T) {
 		t.Error(TAG, err, inf)
 		return
 	}
-	adminBal, ok := inf.(*big.Int)
+	str = inf.(string)
+	adminBal, ok := big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 	if !ok {
 		t.Error(TAG, "no bigint")
 		return
@@ -293,7 +305,8 @@ func TestBurn(t *testing.T) {
 			return
 		}
 
-		nftid, ok := inf.(*big.Int)
+		str = inf.(string)
+		nftid, ok := big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 		if !ok {
 			t.Error(TAG, "no nft")
 			return
@@ -311,7 +324,8 @@ func TestBurn(t *testing.T) {
 		t.Error(TAG, err, inf)
 		return
 	}
-	bi, ok = inf.(*big.Int)
+	str = inf.(string)
+	bi, ok = big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 	if !ok {
 		t.Error(TAG, "no bigint")
 		return
@@ -325,7 +339,8 @@ func TestBurn(t *testing.T) {
 		t.Error(TAG, err, inf)
 		return
 	}
-	adminBal, ok = inf.(*big.Int)
+	str = inf.(string)
+	adminBal, ok = big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 	if !ok {
 		t.Error(TAG, "no bigint")
 		return
@@ -375,7 +390,8 @@ func TestApprove(t *testing.T) {
 		t.Error(TAG, "not match mint result")
 		return
 	}
-	tokenID, ok := is[0].(*big.Int)
+	str := is[0].(string)
+	tokenID, ok := big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 	if !ok {
 		t.Error(TAG, "not nft id")
 		return
@@ -456,7 +472,12 @@ func TestSetApprovalForAll(t *testing.T) {
 	}
 	tokenIDs := make([]*big.Int, 10)
 	for i, h := range is {
-		tokenIDs[i] = h.(*big.Int)
+		str := h.(string)
+		var ok bool
+		tokenIDs[i], ok = big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
+		if !ok {
+			panic(str + " is not bigInt")
+		}
 	}
 
 	inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "totalSupply")
@@ -604,7 +625,12 @@ func TestSafeTransferFrom(t *testing.T) {
 	}
 	tokenIDs := make([]*big.Int, 10)
 	for i, h := range is {
-		tokenIDs[i] = h.(*big.Int)
+		str := h.(string)
+		var ok bool
+		tokenIDs[i], ok = big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
+		if !ok {
+			panic(str + " is not bigInt")
+		}
 	}
 
 	inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "totalSupply")
@@ -678,7 +704,12 @@ func TestMintBatch(t *testing.T) {
 	}
 	tokenIDs := make([]*big.Int, len(is))
 	for i, h := range is {
-		tokenIDs[i] = h.(*big.Int)
+		str := h.(string)
+		var ok bool
+		tokenIDs[i], ok = big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
+		if !ok {
+			panic(str + " is not bigInt")
+		}
 	}
 
 	for i, tokenID := range tokenIDs {
@@ -725,7 +756,8 @@ func TestBurnAndMint(t *testing.T) {
 		return
 	}
 
-	bi, ok := is[0].(*big.Int)
+	str := is[0].(string)
+	bi, ok := big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 	if !ok {
 		t.Error(TAG, "not nft id")
 		return
@@ -752,7 +784,8 @@ func TestBurnAndMint(t *testing.T) {
 	}
 	// tc.ReadTx(util.AdminKey, nftAddr, "PrintContractData", util.Admin)
 
-	bi2, ok := is[0].(*big.Int)
+	str = is[0].(string)
+	bi2, ok := big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 	if !ok {
 		t.Error(TAG, "not nft id")
 		return
@@ -802,7 +835,8 @@ func TestBurnAll(t *testing.T) {
 	firstI := p.getInt(tc.ReadTx(util.AdminKey, nftAddr, "totalSupply"))
 
 	for _, h := range is {
-		bi, ok := h.(*big.Int)
+		str := h.(string)
+		bi, ok := big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 		if !ok {
 			t.Error(TAG, "not nft id")
 			return
@@ -859,9 +893,10 @@ func (p *pError) getInt(inf interface{}, err error) int {
 		panic("no result")
 	}
 
-	if i, err := strconv.Atoi(fmt.Sprintf("%v", is[0])); err == nil {
-		return i
+	bi, ok := big.NewInt(0).SetString(strings.Replace(fmt.Sprintf("%v", is[0]), "0x", "", -1), 16)
+	if !ok {
+		p.t.Error(p.TAG, "no result")
+		panic("no result")
 	}
-	p.t.Error(p.TAG, "no result")
-	panic("no result")
+	return int(bi.Int64())
 }

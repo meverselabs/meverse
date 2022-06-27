@@ -207,7 +207,11 @@ function _erc20ContractsKey(CurrencyType) {
     return ERC20CONTRACTSKEY+CurrencyType
 }
 function _erc20Contracts(CurrencyType) {
-    return Mev.ContractData(_erc20ContractsKey(CurrencyType))
+    let addr = Mev.ContractData(_erc20ContractsKey(CurrencyType))
+    if (addr == "") {
+        throw "not supported currency("+CurrencyType+")"
+    }
+    return address(addr)
 }
 function _setErc20Contracts(CurrencyType, addr) {
     Mev.SetContractData(_erc20ContractsKey(CurrencyType), address(addr))
@@ -294,18 +298,21 @@ function cancelItemToBuy(suggester, nftAddress, tokenId, currency, suggestBiddin
     tokenId = BigInt(tokenId)
 
     let list = _suggestedPriceList(nftAddress, tokenId, currency);
+    list = JSON.parse(list)
     let len = list.length;
     let index = 0;
     for (let i = 0; i < len; i ++) {
-        if (list[i].buyer == suggester && list[i].price == suggestBiddingPrice) {
+        if (address(list[i].buyer) == address(suggester) && BigInt(list[i].price) == BigInt(suggestBiddingPrice)) {
             index = i;
-            break;
+            if (index >= 0) {
+                _removeArray(nftAddress, tokenId, currency, index);
+                // emit MarketItemSuggestionCanceled(suggester, nftAddress, tokenId, suggestBiddingPrice);
+                return
+            }
         }
     }
-    if (index >= 0) {
-        _removeArray(nftAddress, tokenId, currency, index);
-        // emit MarketItemSuggestionCanceled(suggester, nftAddress, tokenId, suggestBiddingPrice);
-    }
+
+    throw "not exist biddingPrice"
 }
 
 function acceptItemSuggestion(seller, nftAddress, tokenId, suggestBiddingPrice, currency)  {
@@ -416,11 +423,10 @@ function approveFeesForERC20Token(spender, currency) {
     onlyMarket()
     spender = address(spender)
     require(spender != address(0), "Invaild spender");
-    require( address(_erc20Contracts[currency]) != address(0), "Invalid Currency" );
-    
-    let amount = _feeBalance(currency);
     let erc20Addr = _erc20Contracts(currency)
+    require( erc20Addr != address(0), "Invalid Currency" );
 
+    let amount = _feeBalance(currency);
     Mev.Exec(erc20Addr, "approve", [spender, amount])
 
     // emit FeesForERC20TokenApproved(spender, amount, currency);
@@ -469,9 +475,6 @@ function _transfer(to, amount, currency) {
 function _removeArray(nftAddress, tokenId, currency, index) {
     let list = _suggestedPriceList(nftAddress, tokenId, currency);
     list = JSON.parse(list)
-    for (let i = index; i < list.length -1; i++) {
-        list[i] = list[i + 1];
-    }
-    list.pop();
+    list.splice(index,1);
     _setSuggestedPriceList(nftAddress, tokenId, currency, list)
 }

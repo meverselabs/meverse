@@ -12,13 +12,14 @@ import (
 var fileName = "MarketOP"
 
 var read = `
-getItemSuggestionInfos(nftAddress common.Address, tokenId *big.Int, currency string) string {
+isManager() bool {
+getItemSuggestionInfos(nftAddress common.Address, tokenId *big.Int, currency string) []string {
 getMarketDataContractAddress() common.Address {
 getMarketFee() *big.Int {
-marketFee() *big.Int {
 getRoyaltyFee() *big.Int {
-royaltyFee() *big.Int {
+`
 
+var write = `
 setOwner(addr common.Address) {
 setManager(addr common.Address) {
 transferFrom(nftAddress common.Address, owner common.Address, to common.Address, tokenId *big.Int) {
@@ -33,18 +34,6 @@ setRoyaltyFee(newFee *big.Int) {
 setMandatoryMarketDataContract(marketData common.Address) {
 approveFeesForERC20Token(currency string) {
 collectFees(currency string) {
-	
-getMarketItem(token common.Address, tokenId *big.Int) string {
-getERC20Contract(currency string) common.Address {
-getFoundationAdminAddress(token common.Address) common.Address {
-getFoundationRoyalty(wallet common.Address, currency string) *big.Int {
-totalMarketCollectionItems(token common.Address) *big.Int {
-isTokenRegistered(token common.Address, tokenId *big.Int) bool {
-getMarketOperationAddress() common.Address {
-`
-
-var write = `
-setERC20Contract(currency string, token common.Address) {
 `
 
 var reg = []string{
@@ -64,8 +53,10 @@ var reg = []string{
 	`{"internalType": "address[]","name": "$1","type": "address[]"}`,
 	`(?:([a-zA-Z0-9_]+) (\[\]hash.Hash256))`,
 	`{"internalType": "uint256[]","name": "$1","type": "uint256[]"}`,
+	`(?:([a-zA-Z0-9_]+) (\[\]string))`,
+	`{"internalType": "tokenZtring[]","name": "$1","type": "tokenZtring[]"}`,
 	`(?:([a-zA-Z0-9_]+) (string))`,
-	`{"internalType": "tokenString","name": "$1","type": "tokenString"}`,
+	`{"internalType": "tokenZtring","name": "$1","type": "tokenZtring"}`,
 	`(?:([a-zA-Z0-9_]+) (\*amount.Amount|\*big.Int|uint[0-9]+))`,
 	`{"internalType": "uint256","name": "$1","type": "uint256"}`,
 	`(?:([a-zA-Z0-9_]+) (\[\]\*amount.Amount|\[\]\*big.Int|\[\]uint[0-9]+))`,
@@ -82,6 +73,8 @@ var reg = []string{
 	`{"internalType": "uint256","name": "","type": "uint256"}`,
 	`(?:(common.Address))`,
 	`{"internalType": "address","name": "","type": "address"}`,
+	`(?:(\[\]string))`,
+	` {"internalType": "string[]","name": "","type": "string[]"}`,
 	`(?:( string))`,
 	` {"internalType": "string","name": "","type": "string"}`,
 	`(?:(\[\]\*amount.Amount|\[\]\*big.Int|\[\]uint8|\[\]uint16|\[\]uint32|\[\]uint64))`,
@@ -92,7 +85,9 @@ var reg = []string{
 	`{"internalType": "bytes32","name": "","type": "bytes32"}`,
 	`(?:(bool))`,
 	`{"internalType": "bool","name": "","type": "bool"}`,
-	`(?:(tokenString))`,
+	`(?:(tokenZtring\[\]))`,
+	`string[]`,
+	`(?:(tokenZtring))`,
 	`string`,
 	`(?:(tokenBool))`,
 	`bool`,
@@ -151,6 +146,17 @@ func main() {
 	dat, err := json.Marshal(ms)
 	if err != nil {
 		panic(err)
+	}
+
+	if funcFile, err := os.Create("./" + fileName + ".func"); err != nil {
+		panic(err)
+	} else {
+		fmt.Fprintln(funcFile, "-read")
+		fmt.Fprintln(funcFile, string(read))
+		fmt.Fprintln(funcFile, "-write")
+		fmt.Fprintln(funcFile, string(write))
+		funcFile.Sync()
+		funcFile.Close()
 	}
 
 	if jsonFile, err := os.Create("./" + fileName + ".json"); err != nil {

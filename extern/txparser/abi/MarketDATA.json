@@ -1,9 +1,4 @@
-[
-    {
-        "inputs": [
-            {
-                "internalType": "string",
-                "name": "currency",
+[{"inputs":[{"internalType":"string","name": "currency",
                 "type": "string"
             },
             {
@@ -13,6 +8,37 @@
             }
         ],
         "name": "setERC20Contract",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "nftAddress",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "adminAddress",
+                "type": "address"
+            }
+        ],
+        "name": "setFoundationAdminAddress",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "market",
+                "type": "address"
+            }
+        ],
+        "name": "setMandatoryInitContract",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"

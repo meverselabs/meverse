@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math/big"
+	"strings"
 
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/common/amount"
@@ -23,7 +24,7 @@ func initEngin() (tc *util.TestContext, egAddr common.Address) {
 
 	_, err := tc.MakeTx(util.AdminKey, egAddr, "AddEngin", "JSContractEngin", "javascript vm on meverse verseion 0.1.0", url)
 	if err != nil {
-		panic("error not expect")
+		panic(err)
 	}
 	_, err = tc.ReadTx(util.AdminKey, egAddr, "EnginVersion", "JSContractEngin")
 	if err != nil {
@@ -65,14 +66,13 @@ func deployToken(tc *util.TestContext, _name string, _symbol string) common.Addr
 	return tc.DeployContract(ContType, ContArgs)
 }
 
-func setupMarketCont(marketFeeStr, royaltyFeeStr string) (tc *util.TestContext, egAddr, dataAddr, marketAddr common.Address) {
+func setupMarketCont(marketFeeStr, royaltyFeeStr, dataPath, operationPath string) (tc *util.TestContext, egAddr, dataAddr, marketAddr common.Address) {
 	tc, egAddr = initEngin()
 
 	{
-		bs, err := ioutil.ReadFile("../market_data.js")
+		bs, err := ioutil.ReadFile(dataPath)
 		if err != nil {
 			panic(err)
-			return
 		}
 
 		inf, err := tc.MakeTx(util.AdminKey, egAddr, "DeploryContract", "JSContractEngin", "1", bs, []interface{}{util.Admin.String()}, true)
@@ -91,7 +91,7 @@ func setupMarketCont(marketFeeStr, royaltyFeeStr string) (tc *util.TestContext, 
 	}
 
 	{
-		bs, err := ioutil.ReadFile("../market_operation.js")
+		bs, err := ioutil.ReadFile(operationPath)
 		if err != nil {
 			panic(err)
 		}
@@ -143,7 +143,12 @@ func mintNFT(tc *util.TestContext, nftAddr common.Address, addrs ...common.Addre
 		if err != nil {
 			panic(err)
 		}
-		tokenIDs[i] = h.(*big.Int)
+		str := h.(string)
+		str = strings.Replace(str, "0x", "", -1)
+		tokenIDs[i], ok = big.NewInt(0).SetString(str, 16)
+		if !ok {
+			panic(str + " is can not conv big.Int")
+		}
 	}
 	return tokenIDs
 }

@@ -831,7 +831,12 @@ func (cont *FormulatorContract) TransferFrom(cc *types.ContractContext, From com
 	}
 
 	Approved := cont.GetApproved(cc, TokenID)
-	if cc.From() != Approved {
+	owner, err := cont.OwnerOf(cc, TokenID)
+	if err != nil {
+		return err
+	}
+	isApproved := cont.IsApprovedForAll(cc, owner, cc.From())
+	if cc.From() != Approved && !isApproved && owner != cc.From() {
 		return errors.WithStack(ErrNotFormulatorApproved)
 	}
 	if (To == common.Address{}) {
@@ -1024,13 +1029,17 @@ func (cont *FormulatorContract) GetApproved(cc types.ContractLoader, TokenID com
 	return approvedTo
 }
 
-func (cont *FormulatorContract) URI(cc types.ContractLoader, _id *big.Int) string {
+func (cont *FormulatorContract) tokenURI(cc types.ContractLoader, _id *big.Int) string {
+	uri := cont.URI(cc)
 	strID := hex.EncodeToString(_id.Bytes())
 	idstr := fmt.Sprintf("%064v", strID)
 
-	bs := cc.ContractData([]byte{tagUri})
-	uri := string(bs)
 	return strings.Replace(uri, "{id}", idstr, -1)
+}
+
+func (cont *FormulatorContract) URI(cc types.ContractLoader) string {
+	bs := cc.ContractData([]byte{tagUri})
+	return string(bs)
 }
 
 func (cont *FormulatorContract) SupportsInterface(cc types.ContractLoader, interfaceID []byte) bool {
@@ -1055,6 +1064,31 @@ func (cont *FormulatorContract) TokenByIndex(cc types.ContractLoader, _id uint32
 	return big.NewInt(0).SetBytes(fr.TokenID[:]), nil
 }
 
+func (cont *FormulatorContract) TokenByRange(cc types.ContractLoader, from, to uint32) ([]*big.Int, error) {
+	ts := cont.TotalSupply(cc)
+	if from >= ts {
+		from = ts - 1
+	}
+	if to >= ts {
+		to = ts - 1
+	}
+	if from > to {
+		return nil, errors.New("from less than to")
+	}
+
+	bis := []*big.Int{}
+	for _id := from; _id <= to; _id++ {
+		var addr common.Address
+		copy(addr[:], cc.ContractData(toFormulatorReverseKey(_id)))
+		fr, err := cont._formulator(cc, addr)
+		if err != nil {
+			return nil, err
+		}
+		bis = append(bis, big.NewInt(0).SetBytes(fr.TokenID[:]))
+	}
+	return bis, nil
+}
+
 func (cont *FormulatorContract) TokenOfOwnerByIndex(cc types.ContractLoader, _owner common.Address, _index uint32) (*big.Int, error) {
 	var userCount uint32 = 0
 	if bs := cc.ContractData([]byte{tagFormulatorCount}); len(bs) > 0 {
@@ -1075,4 +1109,65 @@ func (cont *FormulatorContract) TokenOfOwnerByIndex(cc types.ContractLoader, _ow
 		}
 	}
 	return nil, errors.New("not exist")
+}
+
+func (cont *FormulatorContract) TokenOfOwnerByRange(cc types.ContractLoader, _owner common.Address, from, to uint32) ([]*big.Int, error) {
+	ts := cont.BalanceOf(cc, _owner)
+	if from > to {
+		return nil, errors.New("from less than to")
+	}
+	if from >= ts {
+		from = ts
+	}
+	if to >= ts {
+		to = ts
+	}
+	if from > to {
+		return nil, errors.New("from less than to")
+	}
+
+	bis := []*big.Int{}
+	for _id := from; _id <= to; _id++ {
+	}
+
+	var userCount uint32 = 0
+	if bs := cc.ContractData([]byte{tagFormulatorCount}); len(bs) > 0 {
+		Count := bin.Uint32(bs)
+		for i := uint32(0); i < Count; i++ {
+			var addr common.Address
+			copy(addr[:], cc.ContractData(toFormulatorReverseKey(i)))
+			fr, err := cont._formulator(cc, addr)
+			if err != nil {
+				return nil, err
+			}
+			if fr.Owner == _owner {
+				if from <= userCount {
+					bid := big.NewInt(0).SetBytes(fr.TokenID[:])
+					bis = append(bis, bid)
+				}
+				userCount++
+				if to > userCount {
+					break
+				}
+				// if _index == userCount {
+				// }
+			}
+		}
+	}
+	return bis, nil
+}
+
+func (cont *FormulatorContract) SetApprovalForAll(cc *types.ContractContext, _operator common.Address, _approved bool) {
+	if _approved {
+		cc.SetAccountData(cc.From(), makeApproveAllKey(_operator), []byte{1})
+	} else {
+		cc.SetAccountData(cc.From(), makeApproveAllKey(_operator), nil)
+	}
+}
+func (cont *FormulatorContract) IsApprovedForAll(cc types.ContractLoader, _owner common.Address, _operator common.Address) bool {
+	bs := cc.AccountData(_owner, makeApproveAllKey(_operator))
+	if len(bs) == 0 || bs[0] != 1 {
+		return false
+	}
+	return true
 }

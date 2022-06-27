@@ -288,6 +288,21 @@
     },
     {
         "constant": true,
+        "inputs": [],
+        "name": "isManager",
+        "outputs": [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "constant": true,
         "inputs": [
             {
                 "internalType": "address",
@@ -308,9 +323,9 @@
         "name": "getItemSuggestionInfos",
         "outputs": [
             {
-                "internalType": "string",
+                "internalType": "string[]",
                 "name": "",
-                "type": "string"
+                "type": "string[]"
             }
         ],
         "payable": false,

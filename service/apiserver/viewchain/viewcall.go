@@ -2,11 +2,14 @@ package viewchain
 
 import (
 	"fmt"
+	"math/big"
 	"reflect"
+	"runtime"
 	"strings"
 
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/core/chain"
+	"github.com/meverselabs/meverse/core/prefix"
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/pkg/errors"
 )
@@ -154,9 +157,33 @@ func (m *ViewCaller) _execute(contract reflect.Value, cc *types.ContractContext,
 			}
 			continue
 		}
-		result = append(result, vi)
+		switch v := vi.(type) {
+		case *big.Int:
+			result = append(result, v.String())
+		case []*big.Int:
+			res := []string{}
+			for _, bi := range v {
+				res = append(res, bi.String())
+			}
+			result = append(result, res)
+		default:
+			result = append(result, vi)
+		}
 	}
 	return result, err
+}
+
+func GetVersion() string {
+	sb := strings.Builder{}
+	sb.WriteString("MEVerse/")
+	sb.WriteString(prefix.ClientVersion)
+	sb.WriteString("/")
+	sb.WriteString(runtime.GOOS)
+	sb.WriteString("-")
+	sb.WriteString(runtime.GOARCH)
+	sb.WriteString("/")
+	sb.WriteString(runtime.Version())
+	return sb.String()
 }
 
 // var (

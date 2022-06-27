@@ -1,0 +1,16 @@
+-read
+
+getMarketItem(token common.Address, tokenId *big.Int) string {
+getERC20Contract(currency string) common.Address {
+getFoundationAdminAddress(token common.Address) common.Address {
+getFoundationRoyalty(wallet common.Address, currency string) *big.Int {
+totalMarketCollectionItems(token common.Address) *big.Int {
+isTokenRegistered(token common.Address, tokenId *big.Int) bool {
+getMarketOperationAddress() common.Address {
+
+-write
+
+setERC20Contract(currency string, token common.Address) {
+setFoundationAdminAddress(nftAddress common.Address, adminAddress common.Address) {
+setMandatoryInitContract(market common.Address) {
+

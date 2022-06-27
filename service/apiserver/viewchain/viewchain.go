@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/pkg/errors"
 
 	"github.com/meverselabs/meverse/common"
@@ -22,7 +21,6 @@ import (
 	"github.com/meverselabs/meverse/contract/token"
 	"github.com/meverselabs/meverse/core/chain"
 	"github.com/meverselabs/meverse/core/types"
-	"github.com/meverselabs/meverse/extern/txparser"
 	"github.com/meverselabs/meverse/service/apiserver"
 	"github.com/meverselabs/meverse/service/txsearch"
 )
@@ -267,6 +265,64 @@ func NewViewchain(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain.Cha
 		}
 
 		return v.MultiCall(contracts, from, methods, paramss)
+	})
+
+	s.Set("searchMap", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+		searchMap, err := arg.Map(0)
+		if err != nil {
+			return nil, errors.New("need contract address")
+		}
+		startBlock, err := arg.Uint32(1)
+		if err != nil {
+			return nil, fmt.Errorf("startBlock(%v) not allow", err)
+		}
+		lastBlock, err := arg.Uint32(2)
+		if err != nil {
+			lastBlockStr, _ := arg.String(2)
+			if lastBlockStr == "latest" {
+				lastBlock = st.TargetHeight()
+			} else {
+				return nil, errors.New("method not allow")
+			}
+		}
+		th := st.TargetHeight()
+		if startBlock > th {
+			startBlock = th
+		}
+		if lastBlock > th {
+			lastBlock = th
+		}
+		if startBlock > lastBlock {
+			startBlock, lastBlock = lastBlock, startBlock
+		}
+		if lastBlock-startBlock > 1024 {
+			return nil, errors.New("search ragne less then 1024")
+		}
+		smap := map[common.Address]map[string]bool{}
+		for cont, methods := range searchMap {
+			var m map[string]bool
+			var ok bool
+			contAddr := common.HexToAddress(cont)
+			if m, ok = smap[contAddr]; !ok {
+				m = map[string]bool{}
+				smap[contAddr] = m
+			}
+			if methodStr, ok := methods.(string); ok {
+				m[strings.ToLower(methodStr)] = true
+			} else if methodArr, ok := methods.([]interface{}); ok {
+				for _, s := range methodArr {
+					if methodStr, ok = s.(string); ok {
+						m[strings.ToLower(methodStr)] = true
+					}
+				}
+			} else if methodArr, ok := methods.([]string); ok {
+				for _, methodStr := range methodArr {
+					m[strings.ToLower(methodStr)] = true
+				}
+			}
+		}
+
+		return v.Search(smap, startBlock, lastBlock), nil
 	})
 
 	s.Set("search", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
@@ -542,6 +598,9 @@ func NewViewchain(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain.Cha
 
 		return tx.Hash().String(), in.AddTx(tx, sig)
 	})
+	s.Set("clientVersion", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+		return GetVersion(), nil
+	})
 }
 
 func (v *viewchain) getTokenBalanceOf(conAddr common.Address, addr common.Address) (string, error) {
@@ -563,7 +622,6 @@ func (v *viewchain) getTokenBalanceOf(conAddr common.Address, addr common.Addres
 
 func (v *viewchain) MultiCall(contract []string, from string, methods []string, paramss [][]interface{}) (interface{}, error) {
 	caller := NewViewCaller(v.cn)
-	arrMethods := []string{}
 	toAddrs := []common.Address{}
 	for _, addrStr := range contract {
 		toAddr, err := common.ParseAddress(addrStr)
@@ -572,21 +630,7 @@ func (v *viewchain) MultiCall(contract []string, from string, methods []string, 
 		}
 		toAddrs = append(toAddrs, toAddr)
 	}
-	for _, method := range methods {
-		var abiM abi.Method
-		for _, abiM = range txparser.FuncSigs[method] {
-			break
-		}
-		if abiM.StateMutability == "view" {
-			inputCount := len(abiM.Inputs)
-			for i := 0; i < inputCount; i++ {
-				am := abiM.Inputs[i]
-				log.Println("viewcall", am.Name, am.Type.String())
-			}
-		}
-		arrMethods = append(arrMethods, method)
-	}
-	output, err := caller.MultiExecute(toAddrs, from, arrMethods, paramss)
+	output, err := caller.MultiExecute(toAddrs, from, methods, paramss)
 	if err != nil {
 		return nil, err
 	}
@@ -621,11 +665,18 @@ func (v *viewchain) Search(searchMap map[common.Address]map[string]bool, start, 
 			if len(b.Body.Transactions) <= int(e.Index) {
 				continue
 			}
+			tx := b.Body.Transactions[e.Index]
+
 			m := map[string]string{
 				"Contract": mc.To.String(),
+				"From":     mc.From.String(),
+				"TxFrom":   tx.From.String(),
+				"TxTo":     tx.To.String(),
 				"Method":   mc.Method,
 				"Height":   fmt.Sprintf("%v", b.Header.Height),
 				"Index":    fmt.Sprintf("%v", e.Index),
+				"Hash":     tx.Hash().String(),
+				"TXID":     types.TransactionID(b.Header.Height, e.Index),
 			}
 			args, err := json.Marshal(mc.Args)
 			if err == nil {
@@ -646,17 +697,6 @@ func (v *viewchain) Call(contract, from, method string, params []interface{}) (i
 	toAddr, err := common.ParseAddress(contract)
 	if err != nil {
 		return nil, err
-	}
-	var abiM abi.Method
-	for _, abiM = range txparser.FuncSigs[method] {
-		break
-	}
-	if abiM.StateMutability == "view" {
-		inputCount := len(abiM.Inputs)
-		for i := 0; i < inputCount; i++ {
-			am := abiM.Inputs[i]
-			log.Println("viewcall", am.Name, am.Type.String())
-		}
 	}
 	caller := NewViewCaller(v.cn)
 	output, err := caller.Execute(toAddr, from, method, params)

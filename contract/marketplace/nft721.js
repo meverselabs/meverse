@@ -12,47 +12,6 @@ const tagNFTOwner            = "10"
 const tagTokenApprove        = "11"
 const tagTokenApproveForAll  = "12"
 
-// function require(condition, reson) {
-//     if (!condition) {
-//         throw reson
-//     }
-// }
-
-// function address(addrRow) {
-//     let bigIntAddr;
-//     switch (typeof addrRow) {
-//         case "string":
-//             if (addrRow.indexOf("0x") == -1 && addrRow != "") {
-//                 addrRow = "0x" + addrRow
-//             }
-//             bigIntAddr = BigInt(addrRow);
-//             break;
-//         case "bigint":
-//             bigIntAddr = addrRow
-//             break;
-//         case "number":
-//             bigIntAddr = BigInt(addrRow)
-//             break;
-//         default:
-//             throw `invalid address type(${typeof addrRow}, ${addrRow})`
-//     }
-
-//     if (bigIntAddr < 0) {
-//         throw "invalid address value" + addrRow
-//     }
-//     var hex = bigIntAddr.toString(16);
-//     if (hex.length % 2) {
-//         hex = '0' + hex;
-//     }
-
-//     return "0x"+hex.padStart(40, '0');
-// }
-
-// function _msgSender() {
-//     return Mev.From()
-// }
-
-
 //////////////////////////////////////////////////
 // Public Functions
 //////////////////////////////////////////////////
@@ -74,12 +33,6 @@ function symbol() {
 	return Mev.ContractData(tagSYMBOL)
 }
 
-/// @notice An abbreviated name for NFTs in this contract
-function tesrsrer() {
-	return "symboldsfawef"
-}
-
-
 function supportsInterface(interfaceID) {
 	Mev.Log("supportsInterface", interfaceID)
     if (interfaceID == "[1 255 9 a7]") {
@@ -93,8 +46,8 @@ function supportsInterface(interfaceID) {
 ///  3986. The URI may point to a JSON file that conforms to the "ERC721
 ///  Metadata JSON Schema".
 function tokenURI(_tokenId) {
-	_tokenId = Bigint(_tokenId)
-	let body = Mev.ContractData(makeTokenURIKey(_tokenId))
+	_tokenId = BigInt(_tokenId)
+	let body = Mev.ContractData(_makeTokenURIKey(_tokenId))
 	if (body == "") {
 		body = baseURI()
 	}
@@ -133,7 +86,7 @@ function balanceOf(_owner)  {
 /// @return The address of the owner of the NFT
 function ownerOf(_tokenId) {
 	_tokenId = BigInt(_tokenId)
-	return address(Mev.ContractData(makeNFTOwnerKey(_tokenId)))
+	return address(Mev.ContractData(_makeNFTOwnerKey(_tokenId)))
 }
 
 /// @notice Get the approved address for a single NFT
@@ -142,7 +95,7 @@ function ownerOf(_tokenId) {
 /// @return The approved address for this NFT, or the zero address if there is none
 function getApproved(_tokenId) {
 	_tokenId = BigInt(_tokenId)
-    let addr = Mev.ContractData(makeTokenApproveKey(_tokenId))
+    let addr = Mev.ContractData(_makeTokenApproveKey(_tokenId))
 	return address(addr)
 }
 
@@ -151,7 +104,7 @@ function getApproved(_tokenId) {
 /// @param _operator The address that acts on behalf of the owner
 /// @return True if `_operator` is an approved operator for `_owner`, false otherwise
 function isApprovedForAll(_owner, _operator) {
-    let bs =  Mev.ContractData(makeTokenApproveForAllKey(_owner, _operator))
+    let bs =  Mev.ContractData(_makeTokenApproveForAllKey(_owner, _operator))
 	if (bs == "") {
 		return false
 	}
@@ -161,8 +114,8 @@ function isApprovedForAll(_owner, _operator) {
 /// @notice Count NFTs tracked by this contract
 /// @return A count of valid NFTs tracked by this contract, where each one of
 ///  them has an assigned and queryable owner not equal to the zero address
-function totalSupply()  {
-	return BigInt(Mev.ContractData(tagNFTCount))
+function totalSupply() {
+	return "0x"+BigInt(Mev.ContractData(tagNFTCount)).toString(16)
 }
 
 /// @notice Enumerate valid NFTs
@@ -171,8 +124,47 @@ function totalSupply()  {
 /// @return The token identifier for the `_index`th NFT,
 ///  (sort order not specified)
 function tokenByIndex(_index) {
-    let inx = Mev.ContractData(makeIndexNFTKey(_index))
-	return BigInt(inx)
+    let inx = Mev.ContractData(_makeIndexNFTKey(_index))
+	if (inx == "") {
+		throw "not exist"
+	}
+	inx = BigInt(inx).toString(16)
+	if (inx.length % 2 == 1) {
+		return "0x0"+inx
+	}
+	return "0x"+inx
+}
+
+function tokenByRange(start, end) {
+	start = BigInt(start)
+	end = BigInt(end)
+
+	if (start > end) {
+		[start, end] = [end, start]
+	}
+
+	let total = BigInt(Mev.ContractData(tagNFTCount))-1n
+	if (end > total) {
+		end = total
+	}
+	if (end > total) {
+		end = total
+	}
+
+	let list = []
+	for (var i = start; i <= end ; i++) {
+		let inx = Mev.ContractData(_makeIndexNFTKey(i))
+		if (inx == "") {
+			throw "not exist ("+i+") index nft"
+		}
+		inx = BigInt(inx).toString(16)
+		if (inx.length % 2 == 1) {
+			list.push("0x0"+inx)
+		}
+		list.push("0x"+inx)
+	}
+
+	return list
 }
 
 /// @notice Enumerate NFTs assigned to an owner
@@ -182,8 +174,49 @@ function tokenByIndex(_index) {
 /// @param _index A counter less than `balanceOf(_owner)`
 /// @return The token identifier for the `_index`th NFT assigned to `_owner`,
 ///   (sort order not specified)
-function tokenOfOwnerByIndex(_owner, _index ) {
-	return BigInt(Mev.AccountData(_owner, makeIndexNFTKey(_index)))
+function tokenOfOwnerByIndex(_owner, _index) {
+	let inx = Mev.AccountData(address(_owner), _makeIndexNFTKey(_index))
+	if (inx == "") {
+		throw "not exist"
+	}
+	inx = BigInt(inx).toString(16)
+	if (inx.length % 2 == 1) {
+		return "0x0"+inx
+	}
+	return "0x"+inx
+}
+
+function tokenOfOwnerByRange(_owner, start, end) {
+	start = BigInt(start)
+	end = BigInt(end)
+
+	if (start > end) {
+		[start, end] = [end, start]
+	}
+
+	
+	let total = balanceOf(_owner)-1n
+	if (end > total) {
+		end = total
+	}
+	if (end > total) {
+		end = total
+	}
+
+	let list = []
+	for (var i = start; i <= end ; i++) {
+
+		let inx = Mev.AccountData(address(_owner), _makeIndexNFTKey(i))
+		if (inx == "") {
+			throw "not exist ("+i+") index nft"
+		}
+		inx = BigInt(inx).toString(16)
+		if (inx.length % 2 == 1) {
+			list.push("0x0"+inx)
+		}
+		list.push("0x"+inx)
+	}
+	return list
 }
 
 //////////////////////////////////////////////////
@@ -204,22 +237,20 @@ function mint(count) {
 	let hs = []
 	while (nc < limit) {
 		let nftID = _mintNFTWithIndex(Mev.This(), nc)
-		addNFTAccount(Mev.From(), nftID)
+		_addNFTAccount(Mev.From(), nftID)
 		nc++
 		hs.push(nftID)
 	}
-	return hs
+	return JSON.stringify(hs)
 }
 
 function mintWithID(nftID) {
     require(isOwner(), "doesn't have mint permission")
 
 	let nc = BigInt(Mev.ContractData(tagNFTCount))
-	let hs = []
 	nftID = _mintNFTWithIndex(Mev.This(), nc, nftID)
-	addNFTAccount(Mev.From(), nftID)
-	hs.push(nftID)
-	return hs
+	_addNFTAccount(Mev.From(), nftID)
+	return nftID
 }
 
 function mintBatch(addrsStg) {
@@ -229,14 +260,15 @@ function mintBatch(addrsStg) {
     require(count > 0, "mint count must over then 0")
     
 	let hs = mint(count)
+	hs = JSON.parse(hs)
     require(hs.length == addrs.length, "not enough mint count")
 	for (var i = 0 ; i < addrs.length ; i++) {
 		transferFrom(Mev.From(), addrs[i], hs[i])
 	}
-	return hs
+	return JSON.stringify(hs)
 }
 
-function makeNFTID(seedAddr, nftID) {
+function _makeNFTID(seedAddr, nftID) {
 	let key = BigInt(Mev.ContractData(tagNFTMakeIndex))
 	key++
 
@@ -253,91 +285,91 @@ function makeNFTID(seedAddr, nftID) {
 }
 
 function _mintNFTWithIndex(seedAddr, nc, nftID) {
-    nftID = makeNFTID(seedAddr, nftID)
+    nftID = _makeNFTID(seedAddr, nftID)
 
-	let indexbs = Mev.ContractData(makeIndexNFTKey(nc))
+	let indexbs = Mev.ContractData(_makeIndexNFTKey(nc))
     require(indexbs == "", "try mint duplicate index")
-    let mintKey = makeNFTIndexKey(nftID)
+    let mintKey = _makeNFTIndexKey(nftID)
 	let nftbs = Mev.ContractData(mintKey)
     require(nftbs == "", "try mint duplicate nft")
 
-	setNFTIndex(nftID, nc)
+	_setNFTIndex(nftID, nc)
 	Mev.SetContractData(tagNFTCount, nc + 1n)
 	return nftID
 }
 
-function setNFTIndex(nftID, nc) {
+function _setNFTIndex(nftID, nc) {
     nc = BigInt(nc)
-	Mev.SetContractData(makeNFTIndexKey(nftID), nc)
-	Mev.SetContractData(makeIndexNFTKey(nc), nftID)
+	Mev.SetContractData(_makeNFTIndexKey(nftID), nc)
+	Mev.SetContractData(_makeIndexNFTKey(nc), nftID)
 }
 
-function addNFTAccount(addr, nftID) {
+function _addNFTAccount(addr, nftID) {
     addr = address(addr)
 	let nc = BigInt(Mev.AccountData(addr, tagNFTCount))
 
-	let indexbs = Mev.AccountData(addr, makeIndexNFTKey(nc))
+	let indexbs = Mev.AccountData(addr, _makeIndexNFTKey(nc))
     require(indexbs == "", "try mint duplicate index")
-	let nftbs = Mev.AccountData(addr, makeNFTIndexKey(nftID))
+	let nftbs = Mev.AccountData(addr, _makeNFTIndexKey(nftID))
     require(nftbs == "", "try mint duplicate nft")
 
-	setNFTAccountIndex(addr, nftID, nc)
+	_setNFTAccountIndex(addr, nftID, nc)
 	Mev.SetAccountData(addr, tagNFTCount, nc + 1n)
 
-	Mev.SetContractData(makeNFTOwnerKey(nftID), addr)
+	Mev.SetContractData(_makeNFTOwnerKey(nftID), addr)
 }
 
-function setNFTAccountIndex(addr, nftID, nc) {
+function _setNFTAccountIndex(addr, nftID, nc) {
     nc = BigInt(nc)
-	Mev.SetAccountData(addr, makeNFTIndexKey(nftID), nc)
-	Mev.SetAccountData(addr, makeIndexNFTKey(nc), nftID)
+	Mev.SetAccountData(addr, _makeNFTIndexKey(nftID), nc)
+	Mev.SetAccountData(addr, _makeIndexNFTKey(nc), nftID)
 }
 
 function burn(nftID) {
     require(isOwner(), "doesn't have burn permission")
     
-    let burnkey = makeNFTIndexKey(nftID)
+    let burnkey = _makeNFTIndexKey(nftID)
     let indexbs = Mev.ContractData(burnkey)
     require(indexbs != "", "not exist nft")
 
     let burnIndex = BigInt(indexbs)
 
-	removeNFT(nftID, burnIndex)
-	return removeNFTAccount(nftID)
+	_removeNFT(nftID, burnIndex)
+	return _removeNFTAccount(nftID)
 }
 
-function removeNFT(nftID, burnIndex ) {
+function _removeNFT(nftID, burnIndex ) {
     burnIndex = BigInt(burnIndex)
 	let lastIndex = totalSupply()
-    lastIndex = lastIndex-1n
+    lastIndex = BigInt(lastIndex)-1n
 
-	Mev.SetContractData(makeNFTIndexKey(nftID), "")
+	Mev.SetContractData(_makeNFTIndexKey(nftID), "")
 
 	if (burnIndex != lastIndex) {
-		let lastNFTID = tokenByIndex(lastIndex)
-		setNFTIndex(lastNFTID, burnIndex)
+		let lastNFTID = BigInt(tokenByIndex(lastIndex))
+		_setNFTIndex(lastNFTID, burnIndex)
 	}
-	Mev.SetContractData(makeIndexNFTKey(lastIndex), "")
+	Mev.SetContractData(_makeIndexNFTKey(lastIndex), "")
 	Mev.SetContractData(tagNFTCount, lastIndex)
 }
 
-function removeNFTAccount(nftID) {
+function _removeNFTAccount(nftID) {
 	let addr = ownerOf(nftID)
 
-	let indexbs = Mev.AccountData(addr, makeNFTIndexKey(nftID))
+	let indexbs = Mev.AccountData(addr, _makeNFTIndexKey(nftID))
     require(indexbs != "", "not exist nft")
 	let burnIndex = BigInt(indexbs)
 
 	let lastIndex = balanceOf(addr)
     lastIndex = lastIndex - 1n
 
-	Mev.SetAccountData(addr, makeNFTIndexKey(nftID), "")
+	Mev.SetAccountData(addr, _makeNFTIndexKey(nftID), "")
 
     if (burnIndex != lastIndex) {
-		let lastNFTID = tokenOfOwnerByIndex(addr, lastIndex)
-		setNFTAccountIndex(addr, lastNFTID, burnIndex)
+		let lastNFTID = BigInt(tokenOfOwnerByIndex(addr, lastIndex))
+		_setNFTAccountIndex(addr, lastNFTID, burnIndex)
 	}
-	Mev.SetAccountData(addr, makeIndexNFTKey(lastIndex), "")
+	Mev.SetAccountData(addr, _makeIndexNFTKey(lastIndex), "")
 	Mev.SetAccountData(addr, tagNFTCount, lastIndex)
 }
 
@@ -348,7 +380,7 @@ function setBaseURI(uri) {
 
 function setTokenURI(tokenID, uri) {
     require(isOwner(), "doesn't have setTokenURI permission")
-	Mev.SetContractData(makeTokenURIKey(tokenID), uri)
+	Mev.SetContractData(_makeTokenURIKey(tokenID), uri)
 }
 
 //////////////////////////////////////////////////
@@ -387,12 +419,12 @@ function transferFrom(_from, _to, _tokenId) {
 	_tokenId = BigInt(_tokenId)
 	_from = address(_from)
 	_to = address(_to)
-    checkTransferPermission(_tokenId, _from, _to)
-    removeNFTAccount(_tokenId)
-    addNFTAccount(_to, _tokenId)
+    _checkTransferPermission(_tokenId, _from, _to)
+    _removeNFTAccount(_tokenId)
+    _addNFTAccount(_to, _tokenId)
 }
 
-function checkTransferPermission(_tokenId, _from, _to) {
+function _checkTransferPermission(_tokenId, _from, _to) {
     require(address(_to) != address(0), "to is the zero address")
     let owner = ownerOf(_tokenId)
     require(address(_from) == owner, "from is not the current owner")
@@ -418,7 +450,7 @@ function checkTransferPermission(_tokenId, _from, _to) {
 /// @param _tokenId The NFT to approve
 function approve(_approved, _tokenId) {
     require(ownerOf(_tokenId) == address(Mev.From()), "not token owner")
-	Mev.SetContractData(makeTokenApproveKey(_tokenId), address(_approved))
+	Mev.SetContractData(_makeTokenApproveKey(_tokenId), address(_approved))
 }
 
 /// @notice Enable or disable approval for a third party ("operator") to manage
@@ -429,10 +461,10 @@ function approve(_approved, _tokenId) {
 /// @param _approved True if the operator is approved, false to revoke approval
 function setApprovalForAll(_operator, _approved) {
 	if (_approved === true || _approved == "true" ) {
-        let key = makeTokenApproveForAllKey(Mev.From(), _operator)
+        let key = _makeTokenApproveForAllKey(Mev.From(), _operator)
 		Mev.SetContractData(key, 1)
 	} else {
-		Mev.SetContractData(makeTokenApproveForAllKey(Mev.From(), _operator), "")
+		Mev.SetContractData(_makeTokenApproveForAllKey(Mev.From(), _operator), "")
 	}
 }
 
@@ -457,28 +489,28 @@ function PrintContractData(addr) {
  * 
  *********************************/
 
-function makeNFTKey(key, body) {
+function _makeNFTKey(key, body) {
 	return key+""+BigInt(body).toString(16)
 }
 
-function makeNFTIndexKey(k) {
+function _makeNFTIndexKey(k) {
     k = BigInt(k)
-	return makeNFTKey(tagNFTIndex, k)
+	return _makeNFTKey(tagNFTIndex, k)
 }
-function makeIndexNFTKey(i) {
-	return makeNFTKey(tagIndexNFT, BigInt(i))
+function _makeIndexNFTKey(i) {
+	return _makeNFTKey(tagIndexNFT, BigInt(i))
 }
-function makeNFTOwnerKey(tokenID) {
-	return makeNFTKey(tagNFTOwner, BigInt(tokenID))
+function _makeNFTOwnerKey(tokenID) {
+	return _makeNFTKey(tagNFTOwner, BigInt(tokenID))
 }
-function makeTokenApproveKey(i) {
+function _makeTokenApproveKey(i) {
     i = BigInt(i)
-	return makeNFTKey(tagTokenApprove, i)
+	return _makeNFTKey(tagTokenApprove, i)
 }
-function makeTokenApproveForAllKey(_owner, _operator) {
-	return makeNFTKey(tagTokenApproveForAll, BigInt(_owner)*10000000000000000000000000000000000000000n + BigInt(_operator))
+function _makeTokenApproveForAllKey(_owner, _operator) {
+	return _makeNFTKey(tagTokenApproveForAll, BigInt(_owner)*10000000000000000000000000000000000000000n + BigInt(_operator))
 }
-function makeTokenURIKey(tokenID) {
+function _makeTokenURIKey(tokenID) {
 	tokenID = BigInt(tokenID)
-	return makeNFTKey(tagTokenURI, tokenID)
+	return _makeNFTKey(tagTokenURI, tokenID)
 }

@@ -110,6 +110,9 @@ func (f *front) Formulator(cc types.ContractLoader, _tokenID common.Address) (ui
 func (f *front) TokenByIndex(cc types.ContractLoader, _id uint32) (*big.Int, error) {
 	return f.cont.TokenByIndex(cc, _id)
 }
+func (f *front) TokenByRange(cc types.ContractLoader, from, to uint32) ([]*big.Int, error) {
+	return f.cont.TokenByRange(cc, from, to)
+}
 
 func (f *front) StakingAmount(cc types.ContractLoader, HyperAddress common.Address, StakingAddress common.Address) *amount.Amount {
 	return f.cont.StakingAmount(cc, HyperAddress, StakingAddress)
@@ -148,7 +151,7 @@ func (f *front) Decimals(cc types.ContractLoader) *big.Int {
 }
 
 func (f *front) Uri(cc types.ContractLoader, _id *big.Int) string {
-	return f.cont.URI(cc, _id)
+	return f.cont.tokenURI(cc, _id)
 }
 
 /// @notice A distinct Uniform Resource Identifier (URI) for a given asset.
@@ -156,7 +159,11 @@ func (f *front) Uri(cc types.ContractLoader, _id *big.Int) string {
 ///  3986. The URI may point to a JSON file that conforms to the "ERC721
 ///  Metadata JSON Schema".
 func (f *front) TokenURI(cc types.ContractLoader, _id *big.Int) string {
-	return f.cont.URI(cc, _id)
+	return f.cont.tokenURI(cc, _id)
+}
+
+func (f *front) BaseURI(cc types.ContractLoader) string {
+	return f.cont.URI(cc)
 }
 
 func (f *front) SupportsInterface(cc types.ContractLoader, interfaceID []byte) bool {
@@ -172,4 +179,14 @@ func (f *front) SupportsInterface(cc types.ContractLoader, interfaceID []byte) b
 ///   (sort order not specified)
 func (f *front) TokenOfOwnerByIndex(cc types.ContractLoader, _owner common.Address, _index uint32) (*big.Int, error) {
 	return f.cont.TokenOfOwnerByIndex(cc, _owner, _index)
+}
+func (f *front) TokenOfOwnerByRange(cc types.ContractLoader, _owner common.Address, from, to uint32) ([]*big.Int, error) {
+	return f.cont.TokenOfOwnerByRange(cc, _owner, from, to)
+}
+
+func (f *front) SetApprovalForAll(cc *types.ContractContext, _operator common.Address, _approved bool) {
+	f.cont.SetApprovalForAll(cc, _operator, _approved)
+}
+func (f *front) IsApprovedForAll(cc types.ContractLoader, _owner common.Address, _operator common.Address) bool {
+	return f.cont.IsApprovedForAll(cc, _owner, _operator)
 }

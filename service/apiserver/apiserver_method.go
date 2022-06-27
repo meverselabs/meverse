@@ -113,6 +113,11 @@ func (s *APIServer) Run(BindAddress string) error {
 		}
 		// }
 	})
+
+	s.e.GET("/health", func(c echo.Context) error {
+		return c.NoContent(http.StatusOK)
+	})
+
 	for i := 0; i < 50; i++ {
 		go func() {
 			for r := range reqCh {
