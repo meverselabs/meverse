@@ -1146,7 +1146,7 @@ func (cont *FormulatorContract) TokenOfOwnerByRange(cc types.ContractLoader, _ow
 					bis = append(bis, bid)
 				}
 				userCount++
-				if to > userCount {
+				if to <= userCount {
 					break
 				}
 				// if _index == userCount {
