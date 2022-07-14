@@ -45,6 +45,18 @@ type metamaskRelay struct {
 	nd      INode
 }
 
+var gasPrice *big.Int
+var gasPriceMax *big.Int
+var estimateGas *big.Int
+var estimateGasMax *big.Int
+
+func init() {
+	gasPrice, _ = big.NewInt(0).SetString("E8D4A51000", 16)
+	gasPriceMax, _ = big.NewInt(0).SetString("E8D5A51000", 16)
+	estimateGas, _ = big.NewInt(0).SetString("0186A0", 16)
+	estimateGasMax, _ = big.NewInt(0).SetString("0286A0", 16)
+}
+
 func NewMetamaskRelay(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain.Chain, nd INode) {
 	m := &metamaskRelay{
 		api:     api,
@@ -132,15 +144,24 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain
 		}
 		return rv, nil
 	})
+
 	s.Set("eth_gasPrice", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 		// return "0x3B9ACA00", nil
-		return "0xE8D4A51000", nil
+		gasPrice.Add(gasPrice, big.NewInt(1))
+		if gasPrice.Cmp(gasPriceMax) > 0 {
+			gasPrice, _ = big.NewInt(0).SetString("E8D4A51000", 16)
+		}
+		return "0x" + hex.EncodeToString(gasPrice.Bytes()), nil
 	})
 
 	s.Set("eth_estimateGas", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+		estimateGas.Add(estimateGas, big.NewInt(1))
+		if estimateGas.Cmp(estimateGasMax) > 0 {
+			estimateGas, _ = big.NewInt(0).SetString("0186A0", 16)
+		}
 		// return "0xcf08", nil 79500
 		// return "0x1DCD6500", nil
-		return "0x0186A0", nil
+		return "0x" + hex.EncodeToString(estimateGas.Bytes()), nil
 	})
 
 	s.Set("eth_getCode", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
@@ -170,8 +191,8 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain
 			return nil, err
 		}
 
-		TxHash := tx.Hash()
-		pubkey, err := common.RecoverPubkey(tx.ChainID, TxHash, sig)
+		// TxHash := tx.HashNoSig()
+		pubkey, err := common.RecoverPubkey(tx.ChainID, tx.Message(), sig)
 		if err != nil {
 			return nil, err
 		}
@@ -187,8 +208,25 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain
 		}
 		// if err != nil && !strings.Contains(err.Error(), "invalid signer sequence siger seq") {
 		if err != nil {
-			log.Printf("%+v\n", err)
-			return nil, err
+			if strings.Contains(err.Error(), "invalid signer sequence siger") {
+				// invalid signer sequence siger seq 0, got 1
+				str := strings.Replace(err.Error(), "invalid signer sequence siger seq ", "", -1)
+				str = strings.Replace(str, " got ", "", -1)
+				strs := strings.Split(str, ",")
+				if len(strs) != 2 {
+					log.Println(From.String())
+					return nil, err
+				}
+				seq, _ := strconv.Atoi(strs[0])
+				get, _ := strconv.Atoi(strs[1])
+				if seq >= get {
+					log.Printf("%+v\n", err)
+					return nil, err
+				}
+			} else {
+				log.Printf("%+v\n", err)
+				return nil, err
+			}
 		}
 		ctx.Revert(n)
 
@@ -198,8 +236,8 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain
 		}
 
 		// m.ts.AddTXPool(hash) TODO
-		log.Println("eth_sendRawTransaction done", tx.Hash().String(), rlp)
-		return tx.Hash().String(), nil
+		log.Println("eth_sendRawTransaction done", tx.HashSig().String(), rlp)
+		return tx.HashSig().String(), nil
 	})
 
 	s.Set("eth_getTransactionCount", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
@@ -224,7 +262,6 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain
 		if err != nil {
 			return nil, err
 		}
-
 		if TxID.Err != nil {
 			b, err := m.cn.Provider().Block(TxID.Height)
 			if err != nil {
@@ -262,7 +299,7 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain
 			// "gasUsed":           "0x6a20",
 			"blockHash":         bHash.String(),
 			"blockNumber":       fmt.Sprintf("0x%x", TxID.Height),
-			"transactionHash":   tx.Hash(),
+			"transactionHash":   tx.Hash(m.chainID, TxID.Height),
 			"transactionIndex":  fmt.Sprintf("0x%x", TxID.Index),
 			"from":              tx.From.String(),
 			"to":                tx.To.String(),
@@ -407,7 +444,7 @@ func getTransaction(m *metamaskRelay, height uint32, index uint16) (interface{},
 		"from":             tx.From.String(),
 		"gas":              "0x1f4b698",
 		"gasPrice":         "0x71e0e496c",
-		"hash":             tx.Hash().String(),
+		"hash":             tx.Hash(m.chainID, height).String(),
 		"input":            input,
 		"nonce":            nonce,
 		"to":               to,
@@ -483,7 +520,7 @@ func (m *metamaskRelay) returnMemaBlock(hei uint64, fullTx bool) (interface{}, e
 
 	txs := []string{}
 	for _, tx := range b.Body.Transactions {
-		txs = append(txs, tx.Hash().String())
+		txs = append(txs, tx.Hash(m.chainID, b.Header.Height).String())
 	}
 
 	return map[string]interface{}{
@@ -525,17 +562,46 @@ func (m *metamaskRelay) TransmuteTx(rlp string) (*types.Transaction, common.Sign
 
 	var method string
 	if len(etx.Data()) >= 4 {
-		m, err := txparser.Abi(hex.EncodeToString(etx.Data()[:4]))
+		mabi, err := txparser.Abi(hex.EncodeToString(etx.Data()[:4]))
 		if err != nil {
 			return nil, nil, err
 		}
-		if m.Name == "" {
-			return nil, nil, errors.New("not exist abi")
+		if mabi.Name == "" {
+			if !txparser.AbiCaches[etx.To().String()] {
+				caller := viewchain.NewViewCaller(m.cn)
+				txparser.AbiCaches[etx.To().String()] = true
+				if rawabi, err := caller.Execute(*etx.To(), common.Address{}.String(), "abis", []interface{}{}); err == nil && len(rawabi) > 0 {
+					if abis, ok := rawabi[0].([]interface{}); ok {
+						strs := []string{}
+						for _, funcStr := range abis {
+							if f, ok := funcStr.(string); ok {
+								strs = append(strs, f)
+							}
+						}
+						bs := []byte("[" + strings.Join(strs, ",") + "]")
+						reader := bytes.NewReader(bs)
+						if abi, err := abi.JSON(reader); err == nil {
+							for _, m := range abi.Methods {
+								txparser.AddAbi(m)
+							}
+						}
+					}
+				}
+				mabi, err = txparser.Abi(hex.EncodeToString(etx.Data()[:4]))
+				if err != nil {
+					return nil, nil, err
+				}
+				if mabi.Name == "" {
+					return nil, nil, errors.New("not exist abi")
+				}
+			} else {
+				return nil, nil, errors.New("not exist abi")
+			}
 		}
 		if isInvokeable {
-			method = m.Name
+			method = mabi.Name
 		} else {
-			method = strings.ToUpper(string(m.Name[0])) + m.Name[1:]
+			method = strings.ToUpper(string(mabi.Name[0])) + mabi.Name[1:]
 		}
 	}
 	if method == "" {
@@ -568,6 +634,16 @@ func (m *metamaskRelay) TransmuteTx(rlp string) (*types.Transaction, common.Sign
 		IsEtherType: true,
 		GasPrice:    gp,
 	}
+
+	// if isInvokeable {
+	// 	data, _, err := types.TxArg(ctx, tx)
+	// 	if err != nil {
+	// 		return nil, nil, err
+	// 	}
+	// 	tx.IsEtherType = false
+	// 	tx.Args = append(bin.TypeWriteAll(data), tx.Args...)
+	// }
+
 	return tx, sig, nil
 }
 

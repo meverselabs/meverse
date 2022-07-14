@@ -455,7 +455,8 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block, SigMap map[hash.H
 			go func(sidx int, txs []*types.Transaction) {
 				defer wg.Done()
 				for q, tx := range txs {
-					TxHash := tx.Hash()
+					// TxHash := tx.HashNoSig()
+					TxHash := tx.Hash(b.Header.ChainID, b.Header.Height)
 					TxHashes[sidx+q+1] = TxHash
 					hasSigner := false
 					if SigMap != nil {
@@ -466,7 +467,7 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block, SigMap map[hash.H
 					}
 					if !hasSigner {
 						sig := b.Body.TransactionSignatures[sidx+q]
-						pubkey, err := common.RecoverPubkey(tx.ChainID, TxHash, sig)
+						pubkey, err := common.RecoverPubkey(tx.ChainID, tx.Message(), sig)
 						if err != nil {
 							errs <- err
 							return

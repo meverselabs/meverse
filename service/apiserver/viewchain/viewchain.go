@@ -456,7 +456,7 @@ func NewViewchain(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain.Cha
 			bsw := bin.TypeWriteAll(tx.Method, tx.To, tim, bs)
 			tx.Args = bs
 			strResult := hex.EncodeToString(bsw)
-			return []interface{}{tx.Hash().String(), strResult}, nil
+			return []interface{}{tx.HashSig().String(), strResult}, nil
 
 		case "Transfer":
 			toStr, err := arg.String(2)
@@ -476,7 +476,7 @@ func NewViewchain(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain.Cha
 			bsw := bin.TypeWriteAll(tx.Method, tx.To, tim, bs)
 			tx.Args = bs
 			strResult := hex.EncodeToString(bsw)
-			return []interface{}{tx.Hash().String(), strResult}, nil
+			return []interface{}{tx.HashSig().String(), strResult}, nil
 		case "TokenIndexIn":
 			Platform, err := arg.String(2)
 			if err != nil {
@@ -505,7 +505,7 @@ func NewViewchain(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain.Cha
 			bsw := bin.TypeWriteAll(tx.Method, tx.To, tim, bs)
 
 			return []interface{}{
-				tx.Hash().String(),
+				tx.HashSig().String(),
 				hex.EncodeToString(bsw),
 			}, nil
 		case "TokenLeave":
@@ -525,7 +525,7 @@ func NewViewchain(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain.Cha
 			tx.Args = bs
 			bsw := bin.TypeWriteAll(tx.Method, tx.To, tim, bs)
 			strResult := hex.EncodeToString(bsw)
-			return []interface{}{tx.Hash().String(), strResult}, nil
+			return []interface{}{tx.HashSig().String(), strResult}, nil
 		}
 		return nil, errors.New("not support tx")
 	})
@@ -575,8 +575,8 @@ func NewViewchain(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain.Cha
 		// GasPrice    *big.Int
 		// IsEtherType bool
 
-		TxHash := tx.Hash()
-		pubkey, err := common.RecoverPubkey(tx.ChainID, TxHash, sig)
+		// TxHash := tx.Hash()
+		pubkey, err := common.RecoverPubkey(tx.ChainID, tx.Message(), sig)
 		if err != nil {
 			return nil, err
 		}
@@ -596,7 +596,7 @@ func NewViewchain(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain.Cha
 		}
 		ctx.Revert(n)
 
-		return tx.Hash().String(), in.AddTx(tx, sig)
+		return tx.Hash(ctx.ChainID(), st.Height()).String(), in.AddTx(tx, sig)
 	})
 	s.Set("clientVersion", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 		return GetVersion(), nil
@@ -675,7 +675,7 @@ func (v *viewchain) Search(searchMap map[common.Address]map[string]bool, start, 
 				"Method":   mc.Method,
 				"Height":   fmt.Sprintf("%v", b.Header.Height),
 				"Index":    fmt.Sprintf("%v", e.Index),
-				"Hash":     tx.Hash().String(),
+				"Hash":     tx.Hash(b.Header.ChainID, b.Header.Height).String(),
 				"TXID":     types.TransactionID(b.Header.Height, e.Index),
 			}
 			args, err := json.Marshal(mc.Args)

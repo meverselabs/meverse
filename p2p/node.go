@@ -311,12 +311,13 @@ func (nd *Node) Run(BindAddress string) {
 			b := item.(*types.Block)
 			sm := map[hash.Hash256]common.Address{}
 			for _, tx := range b.Body.Transactions {
-				TxHash := tx.Hash()
+				TxHash := tx.Hash(nd.ChainID, b.Header.Height)
 				item := nd.txpool.Get(TxHash)
 				if item != nil {
 					sm[TxHash] = item.Signer
 				}
 			}
+			// 11687091
 			if err := nd.cn.ConnectBlock(b, sm); err != nil {
 				log.Printf("%+v\n", err)
 				panic(err)
@@ -513,7 +514,7 @@ func (nd *Node) handlePeerMessage(ID string, m interface{}) error {
 				}
 			}
 			sig := msg.Signatures[i]
-			TxHash := tx.Hash()
+			TxHash := tx.Hash(nd.ChainID, nd.cn.Provider().Height())
 			if !nd.txpool.IsExist(TxHash) {
 				nd.txWaitQ.Push(TxHash, &TxMsgItem{
 					TxHash: TxHash,
@@ -573,7 +574,7 @@ func (nd *Node) AddTx(tx *types.Transaction, sig common.Signature) error {
 		}
 	}
 
-	TxHash := tx.Hash()
+	TxHash := tx.Hash(nd.ChainID, nd.cn.Provider().Height())
 	ctx := nd.cn.NewContext()
 	if ctx.IsUsedTimeSlot(slot, string(TxHash[:])) {
 		return errors.WithStack(types.ErrUsedTimeSlot)
@@ -601,8 +602,8 @@ func (nd *Node) PushTx(tx *types.Transaction, sig common.Signature) error {
 		}
 	}
 
-	TxHash := tx.Hash()
-	pubkey, err := common.RecoverPubkey(tx.ChainID, TxHash, sig)
+	TxHash := tx.Hash(nd.ChainID, nd.cn.Provider().Height())
+	pubkey, err := common.RecoverPubkey(tx.ChainID, tx.Message(), sig)
 	if err != nil {
 		return err
 	}
@@ -626,7 +627,7 @@ func (nd *Node) addTx(TxHash hash.Hash256, tx *types.Transaction, sig common.Sig
 	if nd.txpool.IsExist(TxHash) {
 		return errors.WithStack(txpool.ErrExistTransaction)
 	}
-	pubkey, err := common.RecoverPubkey(tx.ChainID, TxHash, sig)
+	pubkey, err := common.RecoverPubkey(tx.ChainID, tx.Message(), sig)
 	if err != nil {
 		return err
 	}
@@ -708,7 +709,7 @@ func (nd *Node) tryRequestBlocks() {
 
 func (nd *Node) cleanPool(b *types.Block) {
 	for _, tx := range b.Body.Transactions {
-		TxHash := tx.Hash()
+		TxHash := tx.Hash(nd.ChainID, b.Header.Height)
 		nd.txpool.Remove(TxHash, tx)
 		nd.txQ.Remove(string(TxHash[:]))
 	}

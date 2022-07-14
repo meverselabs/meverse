@@ -146,7 +146,7 @@ func (fr *GeneratorNode) handlePeerMessage(ID string, m interface{}) error {
 				}
 			}
 			sig := msg.Signatures[i]
-			TxHash := tx.Hash()
+			TxHash := tx.Hash(fr.ChainID, fr.lastGenHeight)
 			if !fr.txpool.IsExist(TxHash) {
 				fr.txWaitQ.Push(TxHash, &p2p.TxMsgItem{
 					TxHash: TxHash,

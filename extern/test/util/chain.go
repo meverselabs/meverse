@@ -116,7 +116,7 @@ func (tc *TestContext) AddBlock(seconds uint64, txs []*types.Transaction, signer
 	bc := chain.NewBlockCreator(tc.Cn, tc.Ctx, Generator, TimeoutCount, nextTimestamp, 0)
 	for i, tx := range txs {
 		if tx != nil {
-			sig, err := signer[i].Sign(tx.Hash())
+			sig, err := signer[i].Sign(tx.HashSig())
 			if err != nil {
 				return hash.HexToHash(""), err
 			}

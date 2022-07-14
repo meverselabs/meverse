@@ -1219,7 +1219,7 @@ func (st *Store) InitTimeSlot() error {
 						mp = map[string]bool{}
 						st.timeSlotMap[slot] = mp
 					}
-					TxHash := tx.Hash()
+					TxHash := tx.Hash(st.chainID, bh.Height)
 					mp[string(TxHash[:])] = true
 				}
 			}

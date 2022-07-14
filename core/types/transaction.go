@@ -133,7 +133,49 @@ func (s *Transaction) ReadFrom(r io.Reader) (int64, error) {
 	return sr.Sum(), nil
 }
 
-func (s *Transaction) Hash() (h hash.Hash256) {
+func (s *Transaction) Hash(ChainID *big.Int, height uint32) (h hash.Hash256) {
+	if s.IsEtherType {
+		etx, _, err := txparser.EthTxFromRLP(s.Args)
+		if err != nil {
+			fmt.Println("Transaction hash read Value error")
+			return
+		}
+		var ci uint64 = ChainID.Uint64()
+		if (ci == 4759 && height < 11708220) || (ci == 7518 && height < 25298976) || (ci == 0xffff && height == 0) {
+			signer := etypes.NewLondonSigner(etx.ChainId())
+			h = signer.Hash(etx)
+		} else {
+			h = etx.Hash()
+		}
+	} else {
+		var err error
+		h, _, err = bin.WriterToHash(s.withOutFrom())
+		if err != nil {
+			fmt.Println("Transaction hash error", err)
+		}
+	}
+	return
+}
+
+func (s *Transaction) HashSig() (h hash.Hash256) {
+	if s.IsEtherType {
+		etx, _, err := txparser.EthTxFromRLP(s.Args)
+		if err != nil {
+			fmt.Println("Transaction hash read Value error")
+			return
+		}
+		h = etx.Hash()
+	} else {
+		var err error
+		h, _, err = bin.WriterToHash(s.withOutFrom())
+		if err != nil {
+			fmt.Println("Transaction hash error", err)
+		}
+	}
+	return
+}
+
+func (s *Transaction) Message() (h hash.Hash256) {
 	if s.IsEtherType {
 		etx, _, err := txparser.EthTxFromRLP(s.Args)
 		if err != nil {

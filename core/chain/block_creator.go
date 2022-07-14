@@ -49,12 +49,13 @@ func NewBlockCreator(cn *Chain, ctx *types.Context, Generator common.Address, Ti
 
 // AddTx validates, executes and adds transactions
 func (bc *BlockCreator) AddTx(tx *types.Transaction, sig common.Signature) error {
-	TxHash := tx.Hash()
-	pubkey, err := common.RecoverPubkey(tx.ChainID, TxHash, sig)
+	// TxHash := tx.Hash()
+	pubkey, err := common.RecoverPubkey(tx.ChainID, tx.Message(), sig)
 	if err != nil {
 		return err
 	}
 	tx.From = pubkey.Address()
+	TxHash := tx.Hash(tx.ChainID, bc.b.Header.Height)
 	return bc.UnsafeAddTx(TxHash, tx, sig, tx.From)
 }
 
@@ -160,7 +161,7 @@ func _executeContractTx(ctx *types.Context, tx *types.Transaction, signer common
 	if tx.UseSeq {
 		seq := ctx.AddrSeq(signer)
 		if seq != tx.Seq {
-			return nil, nil, errors.Errorf("invalid signer sequence siger seq %v, got %v", seq, tx.Seq)
+			return nil, nil, errors.Errorf("invalid signer sequence siger %v seq %v, got %v", signer, seq, tx.Seq)
 		}
 		ctx.AddAddrSeq(signer)
 	}

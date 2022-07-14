@@ -115,7 +115,7 @@ func AddBlock(cn *chain.Chain, ctx *types.Context, tx *types.Transaction, signer
 
 	bc := chain.NewBlockCreator(cn, ctx, Generator, TimeoutCount, ctx.LastTimestamp(), 0)
 	if tx != nil {
-		sig, err := signer.Sign(tx.Hash())
+		sig, err := signer.Sign(tx.HashSig())
 		if err != nil {
 			return hash.HexToHash(""), err
 		}

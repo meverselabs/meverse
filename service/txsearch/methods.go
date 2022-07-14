@@ -145,7 +145,7 @@ func (t *TxSearch) Tx(height uint32, index uint16) (map[string]interface{}, erro
 	tx := b.Body.Transactions[int(index)]
 
 	m := map[string]interface{}{
-		"Hash":        tx.Hash().String(),
+		"Hash":        tx.Hash(tx.ChainID, height).String(),
 		"Height":      height,
 		"Index":       index,
 		"ChainID":     tx.ChainID,
@@ -704,7 +704,7 @@ func (t *TxSearch) BridgeTxList(contStr common.Address, height uint32, to string
 		bHash := bin.MustWriterToHash(&b.Header)
 		res["blockNumber"] = fmt.Sprintf("%v", b.Header.Height)
 		res["timeStamp"] = fmt.Sprintf("%v", b.Header.Timestamp/1000)
-		res["hash"] = tx.Hash().String()
+		res["hash"] = tx.Hash(tx.ChainID, b.Header.Height).String()
 		res["nonce"] = fmt.Sprintf("%v", tx.Seq)
 		res["blockHash"] = bHash.String()
 		res["transactionIndex"] = fmt.Sprintf("%v", i)

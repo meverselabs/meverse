@@ -57,7 +57,7 @@ func (t *TxSearch) ReadBlock(b *types.Block) (err error) {
 	for i, tx := range b.Body.Transactions {
 		TXID := types.TransactionIDBytes(b.Header.Height, uint16(i))
 		TxTag := fmt.Sprintln("tx height:", b.Header.Height, "index:", i)
-		l = append(l, &readB{tagTxHash, tx.Hash().Bytes(), TXID, TxTag})
+		l = append(l, &readB{tagTxHash, tx.Hash(b.Header.ChainID, b.Header.Height).Bytes(), TXID, TxTag})
 
 		t.saveTx(indexMap, index41Map, batch, tx, b.Header.Height, TXID)
 	}

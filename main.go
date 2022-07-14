@@ -226,7 +226,7 @@ func main() {
 					Method:    "Transfer",
 					Args:      bs,
 				}
-				sig, err := userKey.Sign(tx.Hash())
+				sig, err := userKey.Sign(tx.HashSig())
 				if err != nil {
 					panic(err)
 				}
@@ -245,7 +245,7 @@ func main() {
 						Method:    "CreateSigma",
 						Args:      bs,
 					}
-					sig, err := userKey.Sign(tx.Hash())
+					sig, err := userKey.Sign(tx.HashSig())
 					if err != nil {
 						panic(err)
 					}
@@ -264,7 +264,7 @@ func main() {
 						Method:    "CreateOmega",
 						Args:      bs,
 					}
-					sig, err := userKey.Sign(tx.Hash())
+					sig, err := userKey.Sign(tx.HashSig())
 					if err != nil {
 						panic(err)
 					}
@@ -283,7 +283,7 @@ func main() {
 					Method:    "Stake",
 					Args:      bin.TypeWriteAll(frkeys[0].PublicKey().Address(), amount.NewAmount(200000, 0)),
 				}
-				sig, err := userKey.Sign(tx.Hash())
+				sig, err := userKey.Sign(tx.HashSig())
 				if err != nil {
 					panic(err)
 				}
