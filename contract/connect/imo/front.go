@@ -50,6 +50,10 @@ func (f *front) FinalWithdraw(cc *types.ContractContext, payAmount *amount.Amoun
 	return f.cont.finalWithdraw(cc, payAmount, offerAmount)
 }
 
+func (f *front) UsdcReclaim(cc *types.ContractContext) error {
+	return f.cont.usdcReclaim(cc)
+}
+
 //////////////////////////////////////////////////
 // Public Reader Functions
 //////////////////////////////////////////////////
@@ -68,6 +72,9 @@ func (f *front) ProjectOffering(cc *types.ContractContext) *amount.Amount {
 }
 func (f *front) ProjectRaising(cc *types.ContractContext) *amount.Amount {
 	return f.cont.ProjectRaising(cc)
+}
+func (f *front) PayLimit(cc *types.ContractContext) *amount.Amount {
+	return f.cont.PayLimit(cc)
 }
 func (f *front) StartBlock(cc *types.ContractContext) uint32 {
 	return f.cont.StartBlock(cc)

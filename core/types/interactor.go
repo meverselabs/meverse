@@ -7,12 +7,15 @@ import (
 	"math/big"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/common/hash"
 	"github.com/pkg/errors"
 )
+
+var ExecLock sync.Mutex
 
 var errType = reflect.TypeOf((*error)(nil)).Elem()
 
@@ -69,13 +72,6 @@ func (i *interactor) Exec(Cc *ContractContext, ContAddr common.Address, MethodNa
 		return nil, err
 	}
 
-	/*
-		SetOwner(cc *types.ContractContext, NewOwner common.Address) error {
-		Update(cc *types.ContractContext, contract []byte) error {
-		ContractInvoke(cc *types.ContractContext, method string, params []interface{}) ([]interface{}, error) {
-		IsUpdateable(cc *types.ContractContext) bool {
-	*/
-
 	var is interface{} = cont
 	if _, ok := is.(InvokeableContract); ok &&
 		(MethodName != "InitContract" &&
@@ -101,10 +97,6 @@ func (i *interactor) Exec(Cc *ContractContext, ContAddr common.Address, MethodNa
 		return nil, err
 	}
 
-	// in := make([]reflect.Value, rMethod.Type().NumIn())
-	// in[0] = reflect.ValueOf(ecc)
-	//fmt.Printf("parm.Type() in Exec: %v", param.Type())
-	//fmt.Printf("mType in Exec : %v", mType)
 	in, err := ContractInputsConv(Args, rMethod)
 	if err != nil {
 		return nil, err
@@ -149,7 +141,7 @@ func (i *interactor) Exec(Cc *ContractContext, ContAddr common.Address, MethodNa
 
 func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Value, error) {
 	if rMethod.Type().NumIn() != len(Args)+1 {
-		return nil, errors.Errorf("invalid inputs count got %v want %v", len(Args), rMethod.Type().NumIn()-1)
+		return nil, errors.Errorf("invalid inputs count got %v want %v (%v)", len(Args), rMethod.Type().NumIn()-1, Args)
 	}
 	if rMethod.Type().NumIn() < 1 {
 		return nil, errors.New("not found")
@@ -229,6 +221,19 @@ func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Va
 							}
 							as = append(as, addr)
 						}
+						// as := []common.Address{}
+						// for _, t := range pv {
+						// 	switch addr := t.(type) {
+						// 	case common.Address:
+						// 		as = append(as, addr)
+						// 	case string:
+						// 		as = append(as, common.HexToAddress(addr))
+						// 	case *big.Int:
+						// 		as = append(as, common.BytesToAddress(addr.Bytes()))
+						// 	default:
+						// 		return nil, errors.Errorf("invalid input addr type(%v) get %v want %v(%v)", i, param.Type(), mType, mType.String())
+						// 	}
+						// }
 						param = reflect.ValueOf(as)
 					case "[]string":
 						as := []string{}

@@ -148,6 +148,8 @@ func ExecuteContractTx(ctx *types.Context, tx *types.Transaction, signer common.
 }
 
 func _executeContractTx(ctx *types.Context, tx *types.Transaction, signer common.Address, TXID string) (types.IInteractor, []interface{}, error) {
+	types.ExecLock.Lock()
+	defer types.ExecLock.Unlock()
 	s := ctx.GetPCSize()
 
 	_, _, err := types.ParseTransactionID(TXID)

@@ -45,6 +45,7 @@ func (cont *ImoContract) OnCreate(cc *types.ContractContext, Args []byte) error 
 	cc.SetContractData([]byte{tagProjectToken}, data.ProjectToken.Bytes())
 	cc.SetContractData([]byte{tagProjectOffering}, data.ProjectOffering.Bytes())
 	cc.SetContractData([]byte{tagProjectRaising}, data.ProjectRaising.Bytes())
+	cc.SetContractData([]byte{tagPayLimit}, data.PayLimit.Bytes())
 	cc.SetContractData([]byte{tagStartBlock}, bin.Uint32Bytes(data.StartBlock))
 	cc.SetContractData([]byte{tagEndBlock}, bin.Uint32Bytes(data.EndBlock))
 	cc.SetContractData([]byte{tagHarvestFeeFactor}, bin.Uint16Bytes(data.HarvestFeeFactor))
@@ -83,6 +84,10 @@ func (cont *ImoContract) ProjectOffering(cc *types.ContractContext) *amount.Amou
 }
 func (cont *ImoContract) ProjectRaising(cc *types.ContractContext) *amount.Amount {
 	bs := cc.ContractData([]byte{tagProjectRaising})
+	return amount.NewAmountFromBytes(bs)
+}
+func (cont *ImoContract) PayLimit(cc *types.ContractContext) *amount.Amount {
+	bs := cc.ContractData([]byte{tagPayLimit})
 	return amount.NewAmountFromBytes(bs)
 }
 func (cont *ImoContract) StartBlock(cc *types.ContractContext) uint32 {
@@ -183,6 +188,12 @@ func (cont *ImoContract) GetOfferingAmount(cc *types.ContractContext, _user comm
 	}
 	return amount.NewAmount(0, 0), nil
 }
+
+// 154712.32612364
+// 98000
+// 1400000
+
+// 0.000000857856664206
 
 // get the amount of lp token you will be refunded
 func (cont *ImoContract) GetRefundingAmount(cc *types.ContractContext, _user common.Address) (*amount.Amount, error) {

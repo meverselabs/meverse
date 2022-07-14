@@ -41,6 +41,7 @@ type ImoContractConstruction struct {
 	ProjectToken     common.Address
 	ProjectOffering  *amount.Amount
 	ProjectRaising   *amount.Amount
+	PayLimit         *amount.Amount
 	StartBlock       uint32
 	EndBlock         uint32
 	HarvestFeeFactor uint16 //max 10000
@@ -63,6 +64,9 @@ func (s *ImoContractConstruction) WriteTo(w io.Writer) (int64, error) {
 		return sum, err
 	}
 	if sum, err := sw.Amount(w, s.ProjectRaising); err != nil {
+		return sum, err
+	}
+	if sum, err := sw.Amount(w, s.PayLimit); err != nil {
 		return sum, err
 	}
 	if sum, err := sw.Uint32(w, s.StartBlock); err != nil {
@@ -98,6 +102,9 @@ func (s *ImoContractConstruction) ReadFrom(r io.Reader) (int64, error) {
 		return sum, err
 	}
 	if sum, err := sr.Amount(r, &s.ProjectRaising); err != nil {
+		return sum, err
+	}
+	if sum, err := sr.Amount(r, &s.PayLimit); err != nil {
 		return sum, err
 	}
 	if sum, err := sr.Uint32(r, &s.StartBlock); err != nil {

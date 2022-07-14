@@ -61,6 +61,12 @@ func (f *front) SetRouter(cc *types.ContractContext, router common.Address, path
 func (f *front) SwapToMainToken(cc *types.ContractContext, amt *amount.Amount) (*amount.Amount, error) {
 	return f.cont.SwapToMainToken(cc, amt)
 }
+func (f *front) SetName(cc *types.ContractContext, name string) {
+	f.cont.SetName(cc, name)
+}
+func (f *front) SetSymbol(cc *types.ContractContext, symbol string) {
+	f.cont.SetSymbol(cc, symbol)
+}
 
 //////////////////////////////////////////////////
 // Public Reader Functions

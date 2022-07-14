@@ -2,6 +2,7 @@ package token
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"math/big"
 
@@ -70,6 +71,9 @@ func (cont *TokenContract) addBalance(cc *types.ContractContext, addr common.Add
 }
 
 func (cont *TokenContract) subBalance(cc *types.ContractContext, addr common.Address, am *amount.Amount) error {
+	if !am.IsPlus() {
+		return errors.Errorf("invalid transfer amount %v", am.String())
+	}
 	bal := cont.BalanceOf(cc, addr)
 	if bal.Less(am) {
 		return errors.Errorf("invalid transfer amount %v less then %v", am.String(), bal.String())
@@ -141,9 +145,13 @@ func (cont *TokenContract) Transfer(cc *types.ContractContext, To common.Address
 		return errors.New("Token: TRANSFER_TO_ZEROADDRESS")
 	}
 
+	if Amount.IsMinus() {
+		return errors.New("minus amount")
+	}
+
 	fromBalance := cont.BalanceOf(cc, cc.From())
 	if fromBalance.Cmp(Amount.Int) < 0 {
-		return errors.New("Token: TRANSFER_EXCEED_BALANCE")
+		return fmt.Errorf("Token: TRANSFER_EXCEED_BALANCE %v %v", fromBalance.String(), Amount.String())
 	}
 
 	if Amount.IsZero() {
@@ -156,13 +164,16 @@ func (cont *TokenContract) Transfer(cc *types.ContractContext, To common.Address
 }
 
 func (cont *TokenContract) Burn(cc *types.ContractContext, am *amount.Amount) error {
+	if am.IsMinus() {
+		return errors.New("minus amount")
+	}
 	return cont.subBalance(cc, cc.From(), am)
 }
 
 func (cont *TokenContract) Mint(cc *types.ContractContext, To common.Address, Amount *amount.Amount) error {
 	isMinter := cont.IsMinter(cc, cc.From())
 	if cc.From() != cont.Master() && !isMinter {
-		return errors.New("not token minter")
+		return errors.New(cc.From().String() + ": not token minter")
 	}
 	if Amount.IsPlus() {
 		return cont.addBalance(cc, To, Amount)
@@ -239,7 +250,7 @@ func (cont *TokenContract) TransferFrom(cc *types.ContractContext, From common.A
 
 	allowedValue := cont.Allowance(cc, From, cc.From())
 	if Amount.Cmp(allowedValue.Int) > 0 {
-		return errors.Errorf("the token allowance is insufficient token: %v fom: %v to: %v Amount: %v allowedValue: %v", cont.addr.String(), From.String(), To.String(), Amount, allowedValue)
+		return errors.Errorf("the token allowance is insufficient token: %v cc.From: %v form: %v to: %v Amount: %v allowedValue: %v", cont.addr.String(), cc.From().String(), From.String(), To.String(), Amount, allowedValue)
 	}
 	nAllow := allowedValue.Sub(Amount)
 	cc.SetAccountData(From, MakeAllowanceTokenKey(To), nAllow.Bytes())
@@ -359,6 +370,22 @@ func (cont *TokenContract) SwapToMainToken(cc *types.ContractContext, amt *amoun
 
 	_, err = cc.Exec(cc, *cc.MainToken(), "Transfer", []interface{}{cc.From(), swapAmt})
 	return swapAmt, err
+}
+
+func (cont *TokenContract) SetName(cc *types.ContractContext, name string) error {
+	if cc.From() != cont.Master() {
+		return errors.New("not token master")
+	}
+	cc.SetContractData([]byte{tagTokenName}, []byte(name))
+	return nil
+}
+
+func (cont *TokenContract) SetSymbol(cc *types.ContractContext, symbol string) error {
+	if cc.From() != cont.Master() {
+		return errors.New("not token master")
+	}
+	cc.SetContractData([]byte{tagTokenSymbol}, []byte(symbol))
+	return nil
 }
 
 //////////////////////////////////////////////////

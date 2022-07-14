@@ -122,6 +122,9 @@ func (cont *BridgeContract) sendToGateway(cc *types.ContractContext, token commo
 	// 	transferFee == transferFeeInfoToChain[toChain],
 	// 	"sendToGateway: fee is not valid"
 	// );
+	if !amt.IsPlus() {
+		return errors.New("sendToGateway: plus amount")
+	}
 	mt := cc.MainToken()
 	transferFee := cont.transferFeeInfoToChain(cc, toChain)
 	if bal, err := getBalanceOf(cc, *mt, cc.From()); err != nil {

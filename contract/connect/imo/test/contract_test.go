@@ -38,6 +38,7 @@ func TestExecuteContractTx(t *testing.T) {
 		ProjectToken:     tokenAddr,
 		ProjectOffering:  amount.MustParseAmount("1000"),
 		ProjectRaising:   amount.MustParseAmount("1000"),
+		PayLimit:         amount.MustParseAmount("1000"),
 		StartBlock:       10,
 		EndBlock:         100,
 		HarvestFeeFactor: 10000, //max 10000,

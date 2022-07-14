@@ -491,6 +491,9 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block, SigMap map[hash.H
 }
 
 func (cn *Chain) ExecuteTransaction(ctx *types.Context, tx *types.Transaction, TXID string) ([]*types.Event, error) {
+	types.ExecLock.Lock()
+	defer types.ExecLock.Unlock()
+
 	switch tx.Method {
 	case "Admin.Add":
 		return nil, ctx.SetAdmin(common.BytesToAddress(tx.Args), true)

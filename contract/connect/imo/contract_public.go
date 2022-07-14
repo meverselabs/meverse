@@ -25,18 +25,24 @@ func (cont *ImoContract) Deposit(cc *types.ContractContext, _amount *amount.Amou
 	}
 	// require (_amount > 0, 'need _amount > 0');
 	if !_amount.IsPlus() {
-		return errors.New("not imo time")
-	}
-	// lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
-	payToken := cont.PayToken(cc)
-	if _, err := cc.Exec(cc, payToken, "TransferFrom", []interface{}{cc.From(), cont.addr, _amount}); err != nil {
-		return err
+		return errors.New("need _amount > 0")
 	}
 
 	ui, err := cont._userInfo(cc, cc.From())
 	if err != nil {
 		return err
 	}
+	pl := cont.PayLimit(cc)
+	if len(pl.Int.Bytes()) > 0 && _amount.Add(ui.Amt).Cmp(pl.Int) > 0 {
+		return errors.New("over pay limit")
+	}
+
+	// lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
+	payToken := cont.PayToken(cc)
+	if _, err := cc.Exec(cc, payToken, "TransferFrom", []interface{}{cc.From(), cont.addr, _amount}); err != nil {
+		return err
+	}
+
 	// if userInfo[msg.sender].amount == 0 {
 	//   addressList.push(address(msg.sender))
 	// }
