@@ -141,7 +141,7 @@ func (i *interactor) Exec(Cc *ContractContext, ContAddr common.Address, MethodNa
 
 func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Value, error) {
 	if rMethod.Type().NumIn() != len(Args)+1 {
-		return nil, errors.Errorf("invalid inputs count got %v want %v (%v)", len(Args), rMethod.Type().NumIn()-1, Args)
+		return nil, errors.Errorf("invalid inputs count got %v want %v", len(Args), rMethod.Type().NumIn()-1)
 	}
 	if rMethod.Type().NumIn() < 1 {
 		return nil, errors.New("not found")
@@ -215,25 +215,24 @@ func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Va
 					case "[]common.Address":
 						as := []common.Address{}
 						for _, t := range pv {
-							addr, ok := t.(common.Address)
-							if !ok {
+							/*
+								addr, ok := t.(common.Address)
+								if !ok {
+									return nil, errors.Errorf("invalid input addr type(%v) get %v want %v(%v)", i, param.Type(), mType, mType.String())
+								}
+								as = append(as, addr)
+							*/
+							switch addr := t.(type) {
+							case common.Address:
+								as = append(as, addr)
+							case string:
+								as = append(as, common.HexToAddress(addr))
+							case *big.Int:
+								as = append(as, common.BytesToAddress(addr.Bytes()))
+							default:
 								return nil, errors.Errorf("invalid input addr type(%v) get %v want %v(%v)", i, param.Type(), mType, mType.String())
 							}
-							as = append(as, addr)
 						}
-						// as := []common.Address{}
-						// for _, t := range pv {
-						// 	switch addr := t.(type) {
-						// 	case common.Address:
-						// 		as = append(as, addr)
-						// 	case string:
-						// 		as = append(as, common.HexToAddress(addr))
-						// 	case *big.Int:
-						// 		as = append(as, common.BytesToAddress(addr.Bytes()))
-						// 	default:
-						// 		return nil, errors.Errorf("invalid input addr type(%v) get %v want %v(%v)", i, param.Type(), mType, mType.String())
-						// 	}
-						// }
 						param = reflect.ValueOf(as)
 					case "[]string":
 						as := []string{}
@@ -253,12 +252,33 @@ func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Va
 					case "[]*amount.Amount":
 						as := []*amount.Amount{}
 						for _, t := range pv {
-							addr, ok := t.(*amount.Amount)
-							if !ok {
-								trfv := reflect.ValueOf(t)
-								return nil, errors.Errorf("invalid input addr type get %v(%v, %v) want *amount.Amount", t, trfv.Type().String(), trfv.Kind().String())
+							/*
+								addr, ok := t.(*amount.Amount)
+								if !ok {
+									trfv := reflect.ValueOf(t)
+									return nil, errors.Errorf("invalid input addr type get %v(%v, %v) want *amount.Amount", t, trfv.Type().String(), trfv.Kind().String())
+								}
+								as = append(as, addr)
+							*/
+							switch amt := t.(type) {
+							case *amount.Amount:
+								as = append(as, amt)
+							case string:
+								trfv := reflect.ValueOf(pv)
+								if !strings.Contains(amt, "0x") {
+									return nil, errors.Errorf("invalid input addr type get %v(%v, %v) want []*amount.Amount", t, trfv.Type().String(), trfv.Kind().String())
+								}
+								tv2 := strings.Replace(amt, "0x", "", -1)
+								if len(tv2)%2 == 1 {
+									tv2 = "0" + tv2
+								}
+								if bs, err := hex.DecodeString(tv2); err != nil {
+									return nil, errors.Errorf("invalid input addr type get %v(%v, %v) want []*amount.Amount", t, trfv.Type().String(), trfv.Kind().String())
+								} else {
+									am := amount.NewAmountFromBytes(bs)
+									as = append(as, am)
+								}
 							}
-							as = append(as, addr)
 						}
 						param = reflect.ValueOf(as)
 					}
@@ -304,14 +324,16 @@ func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Va
 						if err == nil {
 							param = reflect.ValueOf(am)
 						} else {
-							tv2 := strings.Replace(pv, "0x", "", -1)
-							if len(tv2)%2 == 1 {
-								tv2 = "0" + tv2
-							}
-							var bs []byte
-							if bs, err = hex.DecodeString(tv2); err == nil {
-								am = amount.NewAmountFromBytes(bs)
-								param = reflect.ValueOf(am)
+							if strings.Contains(pv, "0x") {
+								tv2 := strings.Replace(pv, "0x", "", -1)
+								if len(tv2)%2 == 1 {
+									tv2 = "0" + tv2
+								}
+								var bs []byte
+								if bs, err = hex.DecodeString(tv2); err == nil {
+									am = amount.NewAmountFromBytes(bs)
+									param = reflect.ValueOf(am)
+								}
 							}
 						}
 					case "[]byte", "[]uint8":
@@ -372,7 +394,7 @@ func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Va
 		}
 		if param.Type() != mType {
 			cy := param.Type().String() + mType.String()
-			return nil, errors.Errorf("invalid input view(%v) type(%v) get %v want %v(%v)", cy, i, param.Type(), mType, mType.String())
+			return nil, errors.Errorf("invalid input view(%v) type(%v) get %v want %v(%v) value %v", cy, i, param.Type(), mType, mType.String(), v)
 		}
 
 		in[i] = param
