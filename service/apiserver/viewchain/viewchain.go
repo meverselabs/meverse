@@ -668,15 +668,16 @@ func (v *viewchain) Search(searchMap map[common.Address]map[string]bool, start, 
 			tx := b.Body.Transactions[e.Index]
 
 			m := map[string]string{
-				"Contract": mc.To.String(),
-				"From":     mc.From.String(),
-				"TxFrom":   tx.From.String(),
-				"TxTo":     tx.To.String(),
-				"Method":   mc.Method,
-				"Height":   fmt.Sprintf("%v", b.Header.Height),
-				"Index":    fmt.Sprintf("%v", e.Index),
-				"Hash":     tx.Hash(b.Header.ChainID, b.Header.Height).String(),
-				"TXID":     types.TransactionID(b.Header.Height, e.Index),
+				"Contract":  mc.To.String(),
+				"From":      mc.From.String(),
+				"TxFrom":    tx.From.String(),
+				"TxTo":      tx.To.String(),
+				"Method":    mc.Method,
+				"Height":    fmt.Sprintf("%v", b.Header.Height),
+				"Timestamp": fmt.Sprintf("%v", b.Header.Timestamp),
+				"Index":     fmt.Sprintf("%v", e.Index),
+				"Hash":      tx.Hash(b.Header.ChainID, b.Header.Height).String(),
+				"TXID":      types.TransactionID(b.Header.Height, e.Index),
 			}
 			args, err := json.Marshal(mc.Args)
 			if err == nil {
