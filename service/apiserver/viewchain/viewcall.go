@@ -93,6 +93,9 @@ func (m *ViewCaller) getCallContract(addr common.Address, from string) (contract
 }
 
 func (m *ViewCaller) _execute(contract reflect.Value, cc *types.ContractContext, method string, inputs []interface{}) ([]interface{}, error) {
+	types.ExecLock.Lock()
+	defer types.ExecLock.Unlock()
+
 	for _, v := range inputs {
 		if v == nil {
 			return nil, errors.New("nil params")

@@ -146,7 +146,7 @@ func (fr *GeneratorNode) handlePeerMessage(ID string, m interface{}) error {
 				}
 			}
 			sig := msg.Signatures[i]
-			TxHash := tx.Hash(fr.ChainID, fr.lastGenHeight)
+			TxHash := tx.HashSig()
 			if !fr.txpool.IsExist(TxHash) {
 				fr.txWaitQ.Push(TxHash, &p2p.TxMsgItem{
 					TxHash: TxHash,
@@ -165,7 +165,7 @@ func (fr *GeneratorNode) handlePeerMessage(ID string, m interface{}) error {
 		return nil
 	default:
 		panic(p2p.ErrUnknownMessage) //TEMP
-		return errors.WithStack(p2p.ErrUnknownMessage)
+		// return errors.WithStack(p2p.ErrUnknownMessage)
 	}
 	return nil
 }

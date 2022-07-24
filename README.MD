@@ -12,37 +12,35 @@ This v2 of FLETA blockchain provides more easy and convenient way to develop DAp
 ## Building the source
 
 ### Prerequisites
-Golang 1.12 or later<br/>
-C compiler(gcc, mingw etc.)<br/>
+Golang 1.18.2 or later<br/>
+C compiler(gcc 4.9.0 or later, mingw etc.)<br/>
 
 ### Step
 Open the Command line and enter the command below.
 
 Build Node(default, join to the testnet)
 ```
-$ git clone https://github.com/fletaio/fleta
-$ cd ./fleta/cmd/node
+$ git clone https://github.com/meverselabs/meverse
+$ cd ./meverse/cmd/node
 $ go build
 $ ./node
 ```
 
-Build Formulator(required to create formulator account for joining to the testnet as a observer)
+Build Generator(required to create generator account for joining to the testnet as a observer)
 ```
-$ git clone https://github.com/fletaio/fleta
-$ cd ./fleta/cmd/formulator
+$ git clone https://github.com/meverselabs/meverse
+$ cd ./meverse/cmd/generator
 $ go build
 $ ./formulator
 ```
 
 Build Observer(buildable, but cannot join to the testnet as a observer)
 ```
-$ git clone https://github.com/fletaio/fleta
-$ cd ./fleta/cmd/observer
+$ git clone https://github.com/meverselabs/meverse
+$ cd ./meverse/cmd/observer
 $ go build
 $ ./observer
 ```
-
-You can find FLETA binary in GOPATH/bin directory
 
 ## Environment
 
@@ -58,8 +56,8 @@ When the changing possibility of configurations and command sets are reduced, co
 |RAM|4 GB|Minimum 1 GB|
 |Disk|16 GB|Minimum 4 GB|
 
-All the requirements mentioned in this document are written based on FLETA’s full node. All requirements can be changed at the release stage.
-Currently, we can achieve 10,000 TPS with 36 6-core servers in global regions, and now we are developing our system to achieve 20,000 TPS, which is the objective of the project.
+All the requirements mentioned in this document are written based on MEVerse’s full node. All requirements can be changed at the release stage.
+Currently, we can achieve 7,000 TPS with 36 6-core servers in global regions, and now we are developing our system to achieve 20,000 TPS, which is the objective of the project.
 ##
 ### Configuration
 

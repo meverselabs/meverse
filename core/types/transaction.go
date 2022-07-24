@@ -32,6 +32,12 @@ type Transaction struct {
 	From common.Address
 }
 
+var legacyCheckHeight uint32
+
+func SetLegacyCheckHeight(l uint32) {
+	legacyCheckHeight = l
+}
+
 func NewTransaction(ctx *Context, _timeStamp string, _to common.Address, _method string, _args []byte) (*Transaction, error) {
 	timeStamp, err := strconv.ParseUint(_timeStamp, 10, 64)
 	if err != nil {
@@ -133,15 +139,14 @@ func (s *Transaction) ReadFrom(r io.Reader) (int64, error) {
 	return sr.Sum(), nil
 }
 
-func (s *Transaction) Hash(ChainID *big.Int, height uint32) (h hash.Hash256) {
+func (s *Transaction) Hash(height uint32) (h hash.Hash256) {
 	if s.IsEtherType {
 		etx, _, err := txparser.EthTxFromRLP(s.Args)
 		if err != nil {
 			fmt.Println("Transaction hash read Value error")
 			return
 		}
-		var ci uint64 = ChainID.Uint64()
-		if (ci == 4759 && height < 11708220) || (ci == 7518 && height < 25298976) || (ci == 0xffff && height == 0) {
+		if height < legacyCheckHeight {
 			signer := etypes.NewLondonSigner(etx.ChainId())
 			h = signer.Hash(etx)
 		} else {

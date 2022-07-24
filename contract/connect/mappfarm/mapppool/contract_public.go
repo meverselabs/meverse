@@ -1,4 +1,4 @@
-package pool
+package mapppool
 
 import (
 	"errors"
@@ -17,13 +17,13 @@ const (
 )
 
 // Receives new deposits from user
-func (cont *PoolContract) Deposit(cc *types.ContractContext, _userAddress common.Address, _wantAmt *amount.Amount) (*amount.Amount, error) {
+func (cont PoolContract) Deposit(cc *types.ContractContext, _userAddress common.Address, _wantAmt *amount.Amount) (*amount.Amount, error) {
 	if !_wantAmt.IsPlus() {
 		return nil, errors.New("wantAmt must plus")
 	}
-	if !cont.isFarm(cc) {
-		return nil, errors.New("ownable: Deposit are only possible using owner contract")
-	}
+	// if !cont.isFarm(cc) {
+	// 	return nil, errors.New("ownable: Deposit are only possible using owner contract")
+	// }
 	depositFeeFactor := cont.DepositFeeFactor(cc)
 	want := cont.Want(cc)
 	if depositFeeFactor > 0 && depositFeeFactor < factorMax {
@@ -48,54 +48,24 @@ func (cont *PoolContract) Deposit(cc *types.ContractContext, _userAddress common
 	}
 
 	// IERC20(wantAddress).safeTransferFrom(address(msg.sender),address(this),_wantAmt);
-	if _, err := cc.Exec(cc, want, "TransferFrom", []interface{}{cc.From(), cont.addr, _wantAmt}); err != nil {
+	if _, err := cc.Exec(cc, want, "TransferFrom", []interface{}{cc.From(), cont.Farm(cc), _wantAmt}); err != nil {
 		return nil, err
 	}
 
-	wantLockedTotal := cont.wantLockedTotal(cc)
-	if !cont.isHoldShares(cc) {
-		sharesTotal := cont.sharesTotal(cc)
-		sharesAdded := _wantAmt
-		// if (wantLockedTotal > 0 && sharesTotal > 0) {
-		// 	sharesAdded = _wantAmt
-		// 		.mul(sharesTotal)
-		// 		.div(wantLockedTotal);
-		// }
-		if wantLockedTotal.IsPlus() && sharesTotal.IsPlus() {
-			sharesAdded = _wantAmt.Mul(sharesTotal).Div(wantLockedTotal)
-		}
-
-		sharesTotal = sharesTotal.Add(sharesAdded)
-		cont.setSharesTotal(cc, sharesTotal)
-		wantLockedTotal = wantLockedTotal.Add(_wantAmt)
-		cont.setWantLockedTotal(cc, wantLockedTotal)
-		return sharesAdded, nil
-	} else {
-		wantLockedTotal = wantLockedTotal.Add(_wantAmt)
-		cont.setWantLockedTotal(cc, wantLockedTotal)
-		return _wantAmt, nil
-	}
+	wantLockedTotal := cont.WantLockedTotal(cc).Add(_wantAmt)
+	cont.setWantLockedTotal(cc, wantLockedTotal)
+	return _wantAmt, nil
 }
 
 func (cont *PoolContract) Withdraw(cc *types.ContractContext, _userAddress common.Address, _wantAmt *amount.Amount) (*amount.Amount, error) {
-	if !cont.isFarm(cc) {
-		return nil, errors.New("ownable: Withdraw are only possible using owner contract.")
-	}
+	// if !cont.isFarm(cc) {
+	// 	return nil, errors.New("ownable: Withdraw are only possible using owner contract.")
+	// }
 	if !_wantAmt.IsPlus() {
 		return nil, errors.New("_wantAmt <= 0")
 	}
 
-	wantLockedTotal := cont.wantLockedTotal(cc)
-	if !cont.isHoldShares(cc) {
-		sharesTotal := cont.sharesTotal(cc)
-		sharesRemoved := _wantAmt.Mul(sharesTotal).Div(wantLockedTotal)
-		if sharesRemoved.Cmp(sharesTotal.Int) > 0 {
-			sharesRemoved = sharesTotal
-		}
-		sharesTotal = sharesTotal.Sub(sharesRemoved)
-		cont.setSharesTotal(cc, sharesTotal)
-	}
-
+	wantLockedTotal := cont.WantLockedTotal(cc)
 	withdrawFeeFactor := cont.WithdrawFeeFactor(cc)
 	if withdrawFeeFactor < factorMax {
 		_wantAmt = _wantAmt.MulC(int64(withdrawFeeFactor)).DivC(int64(factorMax))
@@ -104,7 +74,7 @@ func (cont *PoolContract) Withdraw(cc *types.ContractContext, _userAddress commo
 	want := cont.Want(cc)
 
 	// wantAmt := IERC20(wantAddress).balanceOf(address(this))
-	if ins, err := cc.Exec(cc, want, "BalanceOf", []interface{}{cont.addr}); err != nil {
+	if ins, err := cc.Exec(cc, want, "BalanceOf", []interface{}{cont.Farm(cc)}); err != nil {
 		return nil, err
 	} else if len(ins) == 0 {
 		return nil, errors.New("invalid Want BalanceOf")
@@ -122,9 +92,9 @@ func (cont *PoolContract) Withdraw(cc *types.ContractContext, _userAddress commo
 	cont.setWantLockedTotal(cc, wantLockedTotal)
 
 	// IERC20(wantAddress).safeTransfer(cherryFarmAddress, _wantAmt)
-	farm := cont.Farm(cc)
-	if _, err := cc.Exec(cc, want, "Transfer", []interface{}{farm, _wantAmt}); err != nil {
-		return nil, err
-	}
+	// farm := cont.Farm(cc)
+	// if _, err := cc.Exec(cc, want, "Transfer", []interface{}{farm, _wantAmt}); err != nil {
+	// 	return nil, err
+	// }
 	return _wantAmt, nil
 }

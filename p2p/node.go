@@ -2,9 +2,12 @@ package p2p
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"math/big"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -311,17 +314,16 @@ func (nd *Node) Run(BindAddress string) {
 			b := item.(*types.Block)
 			sm := map[hash.Hash256]common.Address{}
 			for _, tx := range b.Body.Transactions {
-				TxHash := tx.Hash(nd.ChainID, b.Header.Height)
+				TxHash := tx.Hash(b.Header.Height)
 				item := nd.txpool.Get(TxHash)
 				if item != nil {
 					sm[TxHash] = item.Signer
 				}
 			}
-			// 11687091
 			if err := nd.cn.ConnectBlock(b, sm); err != nil {
 				log.Printf("%+v\n", err)
 				panic(err)
-				break
+				// break
 			}
 			nd.cleanPool(b)
 			// if nd.cn.Provider().Height()%100 == 0 {
@@ -514,7 +516,7 @@ func (nd *Node) handlePeerMessage(ID string, m interface{}) error {
 				}
 			}
 			sig := msg.Signatures[i]
-			TxHash := tx.Hash(nd.ChainID, nd.cn.Provider().Height())
+			TxHash := tx.HashSig()
 			if !nd.txpool.IsExist(TxHash) {
 				nd.txWaitQ.Push(TxHash, &TxMsgItem{
 					TxHash: TxHash,
@@ -533,9 +535,9 @@ func (nd *Node) handlePeerMessage(ID string, m interface{}) error {
 		return nil
 	default:
 		panic(ErrUnknownMessage) //TEMP
-		return errors.WithStack(ErrUnknownMessage)
+		// return errors.WithStack(ErrUnknownMessage)
 	}
-	return nil
+	// return nil
 }
 
 func (nd *Node) addBlock(b *types.Block) error {
@@ -574,7 +576,7 @@ func (nd *Node) AddTx(tx *types.Transaction, sig common.Signature) error {
 		}
 	}
 
-	TxHash := tx.Hash(nd.ChainID, nd.cn.Provider().Height())
+	TxHash := tx.HashSig()
 	ctx := nd.cn.NewContext()
 	if ctx.IsUsedTimeSlot(slot, string(TxHash[:])) {
 		return errors.WithStack(types.ErrUsedTimeSlot)
@@ -602,7 +604,7 @@ func (nd *Node) PushTx(tx *types.Transaction, sig common.Signature) error {
 		}
 	}
 
-	TxHash := tx.Hash(nd.ChainID, nd.cn.Provider().Height())
+	TxHash := tx.HashSig()
 	pubkey, err := common.RecoverPubkey(tx.ChainID, tx.Message(), sig)
 	if err != nil {
 		return err
@@ -632,10 +634,59 @@ func (nd *Node) addTx(TxHash hash.Hash256, tx *types.Transaction, sig common.Sig
 		return err
 	}
 	tx.From = pubkey.Address()
+
+	{
+		_ctx := nd.cn.NewContext()
+		n := _ctx.Snapshot()
+
+		if tx.UseSeq {
+			seq := _ctx.AddrSeq(tx.From)
+			if seq != tx.Seq {
+				if tx.Seq > seq {
+					return fmt.Errorf("future nonce. want %v, get %v signer %v ", seq, tx.Seq, tx.From)
+				}
+				return errors.Errorf("invalid signer sequence siger %v seq %v, got %v", tx.From, seq, tx.Seq)
+			}
+		}
+
+		txid := types.TransactionID(_ctx.TargetHeight(), 0)
+		if tx.To == common.ZeroAddr {
+			_, err = nd.cn.ExecuteTransaction(_ctx, tx, txid)
+		} else {
+			err = chain.TestContractWithOutSeq(_ctx, tx, tx.From)
+		}
+		// if err != nil && !strings.Contains(err.Error(), "invalid signer sequence siger seq") {
+		if err != nil {
+			if strings.Contains(err.Error(), "invalid signer sequence siger") {
+				str := strings.Replace(err.Error(), "invalid signer sequence siger ", "", -1)
+				str = strings.Replace(str, " got ", "", -1)
+				strs := strings.Split(str, " seq ")
+				if len(strs) != 2 {
+					return err
+				}
+				strs = strings.Split(strs[1], ",")
+				if len(strs) != 2 {
+					return err
+				}
+				seq, _ := strconv.Atoi(strs[0])
+				get, _ := strconv.Atoi(strs[1])
+				if seq >= get {
+					log.Printf("%+v\n", err)
+					return err
+				}
+				return fmt.Errorf("future nonce. want %v, get %v signer %v ", seq, tx.Seq, tx.From)
+			} else {
+				log.Printf("%+v\n", err)
+				return err
+			}
+		}
+		_ctx.Revert(n)
+	}
+
 	if err := nd.txpool.Push(TxHash, tx, sig, tx.From); err != nil {
 		return err
 	}
-	if tx.IsEtherType {
+	if tx.IsEtherType || tx.UseSeq {
 		cp := nd.cn.Provider()
 		seq := cp.AddrSeq(tx.From)
 		if tx.Seq < seq {
@@ -709,7 +760,7 @@ func (nd *Node) tryRequestBlocks() {
 
 func (nd *Node) cleanPool(b *types.Block) {
 	for _, tx := range b.Body.Transactions {
-		TxHash := tx.Hash(nd.ChainID, b.Header.Height)
+		TxHash := tx.HashSig()
 		nd.txpool.Remove(TxHash, tx)
 		nd.txQ.Remove(string(TxHash[:]))
 	}

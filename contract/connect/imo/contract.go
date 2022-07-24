@@ -189,12 +189,6 @@ func (cont *ImoContract) GetOfferingAmount(cc *types.ContractContext, _user comm
 	return amount.NewAmount(0, 0), nil
 }
 
-// 154712.32612364
-// 98000
-// 1400000
-
-// 0.000000857856664206
-
 // get the amount of lp token you will be refunded
 func (cont *ImoContract) GetRefundingAmount(cc *types.ContractContext, _user common.Address) (*amount.Amount, error) {
 	totalAmount := cont.TotalAmount(cc)

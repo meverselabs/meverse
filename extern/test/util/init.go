@@ -10,6 +10,7 @@ import (
 	"github.com/meverselabs/meverse/contract/bridge"
 	"github.com/meverselabs/meverse/contract/connect/farm"
 	"github.com/meverselabs/meverse/contract/connect/imo"
+	"github.com/meverselabs/meverse/contract/connect/mappfarm"
 	"github.com/meverselabs/meverse/contract/connect/pool"
 	"github.com/meverselabs/meverse/contract/exchange/factory"
 	"github.com/meverselabs/meverse/contract/exchange/router"
@@ -82,6 +83,7 @@ func init() {
 	RegisterContractClass(&imo.ImoContract{}, "IMO")
 	RegisterContractClass(&engin.EnginContract{}, "EnginContract")
 	RegisterContractClass(&deployer.DeployerContract{}, "DeployerContract")
+	RegisterContractClass(&mappfarm.FarmContract{}, "MappFarm")
 
 	for i := 0; i < 5; i++ {
 		pk, err := key.NewMemoryKeyFromString(ChainID, Obstrs[i])

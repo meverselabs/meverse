@@ -151,7 +151,7 @@ func (cont *TokenContract) Transfer(cc *types.ContractContext, To common.Address
 
 	fromBalance := cont.BalanceOf(cc, cc.From())
 	if fromBalance.Cmp(Amount.Int) < 0 {
-		return fmt.Errorf("Token: TRANSFER_EXCEED_BALANCE %v %v", fromBalance.String(), Amount.String())
+		return fmt.Errorf("Token: TRANSFER_EXCEED_BALANCE %v %v %v %v", cc.From().String(), To.String(), fromBalance.String(), Amount.String())
 	}
 
 	if Amount.IsZero() {

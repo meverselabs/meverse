@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"log"
 	"math/big"
 	"reflect"
 	"strconv"
@@ -145,7 +144,7 @@ func (t *TxSearch) Tx(height uint32, index uint16) (map[string]interface{}, erro
 	tx := b.Body.Transactions[int(index)]
 
 	m := map[string]interface{}{
-		"Hash":        tx.Hash(tx.ChainID, height).String(),
+		"Hash":        tx.Hash(height).String(),
 		"Height":      height,
 		"Index":       index,
 		"ChainID":     tx.ChainID,
@@ -574,7 +573,6 @@ func (t *TxSearch) TokenOutList(height uint32) (interface{}, error) {
 
 		is, err := bin.TypeReadAll(iter.Value(), -1)
 		if err != nil {
-			log.Println(is)
 			continue
 		}
 		TxID := is[0].([]byte)
@@ -704,7 +702,7 @@ func (t *TxSearch) BridgeTxList(contStr common.Address, height uint32, to string
 		bHash := bin.MustWriterToHash(&b.Header)
 		res["blockNumber"] = fmt.Sprintf("%v", b.Header.Height)
 		res["timeStamp"] = fmt.Sprintf("%v", b.Header.Timestamp/1000)
-		res["hash"] = tx.Hash(tx.ChainID, b.Header.Height).String()
+		res["hash"] = tx.Hash(b.Header.Height).String()
 		res["nonce"] = fmt.Sprintf("%v", tx.Seq)
 		res["blockHash"] = bHash.String()
 		res["transactionIndex"] = fmt.Sprintf("%v", i)

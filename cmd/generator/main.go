@@ -35,6 +35,7 @@ type Config struct {
 	InitHeight      uint32
 	InitTimestamp   uint64
 	Port            int
+	RPCPort         int
 	StoreRoot       string
 	UseWSS          bool
 }
@@ -170,6 +171,7 @@ func main() {
 			panic(err)
 		}
 	} else {
+		app.RegisterContractClass()
 		if err := cn.InitWith(InitGenesisHash, InitHash, cfg.InitHeight, cfg.InitTimestamp); err != nil {
 			panic(err)
 		}
@@ -201,7 +203,7 @@ func main() {
 	cm.RemoveAll()
 	cm.Add("formulator", fr)
 
-	go rpcapi.Run(":8541")
+	go rpcapi.Run(":" + strconv.Itoa(cfg.RPCPort))
 	viewchain.NewViewchain(rpcapi, ts, cn, st, fr)
 
 	go fr.Run(":" + strconv.Itoa(cfg.Port))

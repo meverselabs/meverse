@@ -10,6 +10,7 @@ import (
 	"github.com/meverselabs/meverse/contract/connect/depositpool"
 	"github.com/meverselabs/meverse/contract/connect/farm"
 	"github.com/meverselabs/meverse/contract/connect/imo"
+	"github.com/meverselabs/meverse/contract/connect/mappfarm"
 	"github.com/meverselabs/meverse/contract/connect/pool"
 	"github.com/meverselabs/meverse/contract/exchange/factory"
 	"github.com/meverselabs/meverse/contract/exchange/router"
@@ -195,6 +196,7 @@ func Genesis() *types.ContextData {
 		fmt.Println("formulatorAddress", formulatorAddress.String())
 		// formulatorAddress 0x75A098f86bAe71039217a879f064d034c59C3766
 	}
+	types.SetLegacyCheckHeight(25298976)
 	return genesis.Top()
 }
 
@@ -222,6 +224,8 @@ func RegisterContractClass() map[string]uint64 {
 
 	registerContractClass(&engin.EnginContract{}, "Engin", ClassMap)
 	registerContractClass(&deployer.DeployerContract{}, "EnginDeployer", ClassMap)
+
+	registerContractClass(&mappfarm.FarmContract{}, "MappFarm", ClassMap)
 	return ClassMap
 }
 func registerContractClass(cont types.Contract, className string, ClassMap map[string]uint64) {

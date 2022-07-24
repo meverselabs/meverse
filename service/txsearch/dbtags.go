@@ -1,7 +1,6 @@
 package txsearch
 
 import (
-	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/common/hash"
 )
 
@@ -20,13 +19,13 @@ var (
 	tagEventReward = byte(0x22)
 
 	//transaction
-	tagID            = byte(0x30)
-	tagTxHash        = byte(0x31)
-	tagDefault       = byte(0x32)
-	tagTransfer      = byte(0x33)
-	tagFail          = byte(0x34)
-	tagAddress       = byte(0x35)
-	tagContractUsers = byte(0x36)
+	tagID       = byte(0x30)
+	tagTxHash   = byte(0x31)
+	tagDefault  = byte(0x32)
+	tagTransfer = byte(0x33)
+	tagFail     = byte(0x34)
+	tagAddress  = byte(0x35)
+	// tagContractUsers = byte(0x36)
 
 	//gateway
 	tagTokenOut   = byte(0x40)
@@ -41,12 +40,12 @@ var (
 	//etc
 )
 
-func toKey(tag []byte, addr common.Address) []byte {
-	bs := make([]byte, 2+common.AddressLength)
-	copy(bs[:2], tag[:])
-	copy(bs[2:], addr[:])
-	return bs
-}
+// func toKey(tag []byte, addr common.Address) []byte {
+// 	bs := make([]byte, 2+common.AddressLength)
+// 	copy(bs[:2], tag[:])
+// 	copy(bs[2:], addr[:])
+// 	return bs
+// }
 
 func toTxFailKey(hash hash.Hash256) []byte {
 	bs := make([]byte, 1+len(hash))

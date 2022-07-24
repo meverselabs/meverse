@@ -9,31 +9,13 @@ import (
 	"strings"
 )
 
-var fileName = "MarketOP"
+var fileName = "Reveal"
 
 var read = `
-isManager() bool {
-getItemSuggestionInfos(nftAddress common.Address, tokenId *big.Int, currency string) []string {
-getMarketDataContractAddress() common.Address {
-getMarketFee() *big.Int {
-getRoyaltyFee() *big.Int {
 `
 
 var write = `
-setOwner(addr common.Address) {
-setManager(addr common.Address) {
-transferFrom(nftAddress common.Address, owner common.Address, to common.Address, tokenId *big.Int) {
-suggestItemToBuyWithSuggester(nftAddress common.Address, tokenId *big.Int, suggestBiddingPrice *big.Int, currency string) {
-cancelItemToBuyWithSuggester(nftAddress common.Address, tokenId *big.Int, currency string, suggestBiddingPrice *big.Int) {
-acceptItemToBuyWithSeller(nftAddress common.Address, tokenId *big.Int, suggestedBiddingPrice *big.Int, currency string) {
-registerMarketItem(nftAddress common.Address, tokenId *big.Int, buyNowPrice *big.Int, currency string, openTimeUtc uint32, closeTimeUtc uint32) {
-cancelMarketItem(nftAddress common.Address, tokenId *big.Int) {
-buyNowWithToken(nftAddress common.Address, tokenId *big.Int, amount *big.Int, currency string) {
-setMarketFee(newFee *big.Int) {
-setRoyaltyFee(newFee *big.Int) {
-setMandatoryMarketDataContract(marketData common.Address) {
-approveFeesForERC20Token(currency string) {
-collectFees(currency string) {
+reveal(strs []string) string {
 `
 
 var reg = []string{

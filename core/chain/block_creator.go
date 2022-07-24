@@ -49,13 +49,12 @@ func NewBlockCreator(cn *Chain, ctx *types.Context, Generator common.Address, Ti
 
 // AddTx validates, executes and adds transactions
 func (bc *BlockCreator) AddTx(tx *types.Transaction, sig common.Signature) error {
-	// TxHash := tx.Hash()
 	pubkey, err := common.RecoverPubkey(tx.ChainID, tx.Message(), sig)
 	if err != nil {
 		return err
 	}
 	tx.From = pubkey.Address()
-	TxHash := tx.Hash(tx.ChainID, bc.b.Header.Height)
+	TxHash := tx.HashSig()
 	return bc.UnsafeAddTx(TxHash, tx, sig, tx.From)
 }
 
@@ -80,7 +79,7 @@ func (bc *BlockCreator) UnsafeAddTx(TxHash hash.Hash256, tx *types.Transaction, 
 		bc.ctx.Commit(sn)
 
 		bc.b.Body.Transactions = append(bc.b.Body.Transactions, tx)
-		if ens != nil && len(ens) > 0 {
+		if len(ens) > 0 {
 			bc.b.Body.Events = append(bc.b.Body.Events, ens...)
 		}
 		bc.b.Body.TransactionSignatures = append(bc.b.Body.TransactionSignatures, sig)
@@ -151,7 +150,6 @@ func ExecuteContractTx(ctx *types.Context, tx *types.Transaction, signer common.
 func _executeContractTx(ctx *types.Context, tx *types.Transaction, signer common.Address, TXID string) (types.IInteractor, []interface{}, error) {
 	types.ExecLock.Lock()
 	defer types.ExecLock.Unlock()
-	s := ctx.GetPCSize()
 
 	_, _, err := types.ParseTransactionID(TXID)
 	if err != nil {
@@ -166,6 +164,44 @@ func _executeContractTx(ctx *types.Context, tx *types.Transaction, signer common
 		ctx.AddAddrSeq(signer)
 	}
 
+	return _execContractWithOutSeq(ctx, tx, signer, TXID)
+}
+
+func TestContractWithOutSeq(ctx *types.Context, tx *types.Transaction, signer common.Address) error {
+	types.ExecLock.Lock()
+	defer types.ExecLock.Unlock()
+
+	n := ctx.Snapshot()
+	defer ctx.Revert(n)
+
+	s := ctx.GetPCSize()
+	data, isSendValue, err := types.TxArg(ctx, tx)
+	if err != nil {
+		return err
+	}
+	var to common.Address = tx.To
+	if !ctx.IsContract(tx.To) || isSendValue {
+		data = append([]interface{}{tx.To}, data...)
+		to = *ctx.MainToken()
+	}
+	cont, err := ctx.Contract(to)
+	if err != nil {
+		return err
+	}
+	cc := ctx.ContractContext(cont, signer)
+	intr := types.NewInteractor(ctx, cont, cc, "000000000000", false)
+	cc.Exec = intr.Exec
+	_, err = intr.Exec(cc, to, tx.Method, data)
+	intr.Distroy()
+	if err != nil {
+		return err
+	}
+	useSize := ctx.GetPCSize() - s
+	return ChargeFee(ctx, useSize, signer)
+}
+
+func _execContractWithOutSeq(ctx *types.Context, tx *types.Transaction, signer common.Address, TXID string) (types.IInteractor, []interface{}, error) {
+	s := ctx.GetPCSize()
 	data, isSendValue, err := types.TxArg(ctx, tx)
 	if err != nil {
 		return nil, nil, err

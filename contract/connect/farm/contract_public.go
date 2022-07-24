@@ -2,7 +2,6 @@ package farm
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/core/types"
@@ -116,7 +115,6 @@ func (cont *FarmContract) Deposit(cc *types.ContractContext, _pid uint64, _wantA
 		}
 	}
 	if _wantAmt.IsPlus() {
-		fmt.Println("pool.Want, TransferFrom info :", pool.Want, cc.From(), cont.addr, _wantAmt)
 		if _, err := cc.Exec(cc, pool.Want, "TransferFrom", []interface{}{cc.From(), cont.addr, _wantAmt}); err != nil {
 			return err
 		}

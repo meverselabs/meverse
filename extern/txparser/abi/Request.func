@@ -1,0 +1,9 @@
+-read
+
+getInputCallRatio(*big.Int) *big.Int {
+
+-write
+
+requestStone(amt *amount.Amount) *big.Int {
+swapHistory(addr common.Address, start uint32, end uint32) string {
+

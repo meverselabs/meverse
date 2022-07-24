@@ -571,32 +571,8 @@ func NewViewchain(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain.Cha
 			tx.Seq = seq
 			tx.UseSeq = true
 		}
-		// //Input data
-		// GasPrice    *big.Int
-		// IsEtherType bool
 
-		// TxHash := tx.Hash()
-		pubkey, err := common.RecoverPubkey(tx.ChainID, tx.Message(), sig)
-		if err != nil {
-			return nil, err
-		}
-		From := pubkey.Address()
-
-		ctx := v.cn.NewContext()
-		n := ctx.Snapshot()
-		txid := types.TransactionID(ctx.TargetHeight(), 0)
-		if tx.To == common.ZeroAddr {
-			_, err = v.cn.ExecuteTransaction(ctx, tx, txid)
-		} else {
-			err = chain.ExecuteContractTx(ctx, tx, From, txid)
-		}
-		if err != nil {
-			// log.Printf("%+v\n", err)
-			return nil, err
-		}
-		ctx.Revert(n)
-
-		return tx.Hash(ctx.ChainID(), st.Height()).String(), in.AddTx(tx, sig)
+		return tx.HashSig().String(), in.AddTx(tx, sig)
 	})
 	s.Set("clientVersion", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 		return GetVersion(), nil
@@ -676,7 +652,7 @@ func (v *viewchain) Search(searchMap map[common.Address]map[string]bool, start, 
 				"Height":    fmt.Sprintf("%v", b.Header.Height),
 				"Timestamp": fmt.Sprintf("%v", b.Header.Timestamp),
 				"Index":     fmt.Sprintf("%v", e.Index),
-				"Hash":      tx.Hash(b.Header.ChainID, b.Header.Height).String(),
+				"Hash":      tx.Hash(b.Header.Height).String(),
 				"TXID":      types.TransactionID(b.Header.Height, e.Index),
 			}
 			args, err := json.Marshal(mc.Args)

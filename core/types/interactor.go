@@ -214,14 +214,14 @@ func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Va
 					switch mType.String() {
 					case "[]common.Address":
 						as := []common.Address{}
+						// for _, t := range pv {
+						// 	addr, ok := t.(common.Address)
+						// 	if !ok {
+						// 		return nil, errors.Errorf("invalid input addr type(%v) get %v want %v(%v)", i, param.Type(), mType, mType.String())
+						// 	}
+						// 	as = append(as, addr)
+						// }
 						for _, t := range pv {
-							/*
-								addr, ok := t.(common.Address)
-								if !ok {
-									return nil, errors.Errorf("invalid input addr type(%v) get %v want %v(%v)", i, param.Type(), mType, mType.String())
-								}
-								as = append(as, addr)
-							*/
 							switch addr := t.(type) {
 							case common.Address:
 								as = append(as, addr)
@@ -252,14 +252,6 @@ func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Va
 					case "[]*amount.Amount":
 						as := []*amount.Amount{}
 						for _, t := range pv {
-							/*
-								addr, ok := t.(*amount.Amount)
-								if !ok {
-									trfv := reflect.ValueOf(t)
-									return nil, errors.Errorf("invalid input addr type get %v(%v, %v) want *amount.Amount", t, trfv.Type().String(), trfv.Kind().String())
-								}
-								as = append(as, addr)
-							*/
 							switch amt := t.(type) {
 							case *amount.Amount:
 								as = append(as, amt)
@@ -279,6 +271,11 @@ func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Va
 									as = append(as, am)
 								}
 							}
+							// addr, ok := t.(*amount.Amount)
+							// if !ok {
+							// 	trfv := reflect.ValueOf(t)
+							// 	return nil, errors.Errorf("invalid input addr type get %v(%v, %v) want *amount.Amount", t, trfv.Type().String(), trfv.Kind().String())
+							// }
 						}
 						param = reflect.ValueOf(as)
 					}

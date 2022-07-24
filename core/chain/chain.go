@@ -310,7 +310,7 @@ func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context) err
 	if b.Header.ContextHash != ctx.Hash() {
 		log.Println("CONNECT", ctx.Hash(), b.Header.ContextHash, ctx.Dump())
 		panic("")
-		return errors.WithStack(ErrInvalidContextHash)
+		// return errors.WithStack(ErrInvalidContextHash)
 	}
 
 	if ctx.StackSize() > 1 {
@@ -455,8 +455,7 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block, SigMap map[hash.H
 			go func(sidx int, txs []*types.Transaction) {
 				defer wg.Done()
 				for q, tx := range txs {
-					// TxHash := tx.HashNoSig()
-					TxHash := tx.Hash(b.Header.ChainID, b.Header.Height)
+					TxHash := tx.Hash(b.Header.Height)
 					TxHashes[sidx+q+1] = TxHash
 					hasSigner := false
 					if SigMap != nil {

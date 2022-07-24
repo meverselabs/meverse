@@ -3,7 +3,6 @@ package txsearch
 import (
 	"encoding/binary"
 	"fmt"
-	"log"
 	"math/big"
 	"time"
 
@@ -57,7 +56,7 @@ func (t *TxSearch) ReadBlock(b *types.Block) (err error) {
 	for i, tx := range b.Body.Transactions {
 		TXID := types.TransactionIDBytes(b.Header.Height, uint16(i))
 		TxTag := fmt.Sprintln("tx height:", b.Header.Height, "index:", i)
-		l = append(l, &readB{tagTxHash, tx.Hash(b.Header.ChainID, b.Header.Height).Bytes(), TXID, TxTag})
+		l = append(l, &readB{tagTxHash, tx.Hash(b.Header.Height).Bytes(), TXID, TxTag})
 
 		t.saveTx(indexMap, index41Map, batch, tx, b.Header.Height, TXID)
 	}
@@ -155,7 +154,6 @@ func (t *TxSearch) saveTx(indexMap map[addrIndexKey]uint64, index41Map map[addr4
 func (t *TxSearch) _saveTx(indexMap map[addrIndexKey]uint64, index41Map map[addr41IndexKey]uint64, batch *leveldb.Batch, tx *types.Transaction, height uint32, TXID []byte) {
 	arg, _, err := types.TxArg(t.cn.NewContext(), tx)
 	if err != nil {
-		log.Println(err)
 		return
 	}
 

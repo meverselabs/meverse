@@ -64,7 +64,7 @@ func (t *TxSearch) OnTransactionInPoolExpired(txs []*types.Transaction) {
 // OnTransactionFail called when the tx fail
 func (t *TxSearch) OnTransactionFail(height uint32, txs []*types.Transaction, err []error) {
 	for i, tx := range txs {
-		t.db.Put(toTxFailKey(tx.Hash(t.st.ChainID(), height)), bin.TypeWriteAll(height, err[i].Error()), nil)
+		t.db.Put(toTxFailKey(tx.Hash(height)), bin.TypeWriteAll(height, err[i].Error()), nil)
 	}
 }
 

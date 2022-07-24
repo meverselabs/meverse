@@ -302,7 +302,7 @@ func (fr *GeneratorNode) handleObserverMessage(p peer.Peer, m interface{}, Retry
 	case *p2p.TransactionMessage:
 		for i, tx := range msg.Txs {
 			sig := msg.Signatures[i]
-			TxHash := tx.Hash(fr.ChainID, fr.lastGenHeight)
+			TxHash := tx.HashSig()
 			if !fr.txpool.IsExist(TxHash) {
 				fr.txWaitQ.Push(TxHash, &p2p.TxMsgItem{
 					TxHash: TxHash,
@@ -381,7 +381,7 @@ func (fr *GeneratorNode) updateByGenItem() {
 				}
 				sm := map[hash.Hash256]common.Address{}
 				for _, tx := range item.BlockGen.Block.Body.Transactions {
-					TxHash := tx.Hash(fr.ChainID, fr.lastGenHeight)
+					TxHash := tx.Hash(item.BlockGen.Block.Header.Height)
 					item := fr.txpool.Get(TxHash)
 					if item != nil {
 						sm[TxHash] = item.Signer
@@ -423,7 +423,7 @@ func (fr *GeneratorNode) updateByGenItem() {
 		} else {
 			sm := map[hash.Hash256]common.Address{}
 			for _, tx := range b.Body.Transactions {
-				TxHash := tx.Hash(fr.ChainID, fr.lastGenHeight)
+				TxHash := tx.Hash(b.Header.Height)
 				item := fr.txpool.Get(TxHash)
 				if item != nil {
 					sm[TxHash] = item.Signer

@@ -81,6 +81,8 @@ func init() {
 		NFT721,
 		MarketDATA,
 		MarketOP,
+		Reveal,
+		Request,
 	}
 	for _, v := range ercs {
 		reader := bytes.NewReader(v)

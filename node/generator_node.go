@@ -358,7 +358,7 @@ func (fr *GeneratorNode) Run(BindAddress string) {
 			if !isConnected {
 				sm := map[hash.Hash256]common.Address{}
 				for _, tx := range b.Body.Transactions {
-					TxHash := tx.Hash(fr.ChainID, b.Header.Height)
+					TxHash := tx.Hash(b.Header.Height)
 					item := fr.txpool.Get(TxHash)
 					if item != nil {
 						sm[TxHash] = item.Signer
@@ -428,7 +428,7 @@ func (fr *GeneratorNode) AddTx(tx *types.Transaction, sig common.Signature) erro
 		}
 	}
 
-	TxHash := tx.Hash(fr.ChainID, fr.lastGenHeight)
+	TxHash := tx.HashSig()
 	ctx := fr.cn.NewContext()
 	if ctx.IsUsedTimeSlot(slot, string(TxHash[:])) {
 		return errors.WithStack(types.ErrUsedTimeSlot)
@@ -463,7 +463,7 @@ func (fr *GeneratorNode) PushTx(tx *types.Transaction, sig common.Signature) err
 	}
 	tx.From = pubkey.Address()
 
-	TxHash := tx.Hash(fr.ChainID, fr.lastGenHeight)
+	TxHash := tx.HashSig()
 	if !fr.txpool.IsExist(TxHash) {
 		fr.txWaitQ.Push(TxHash, &p2p.TxMsgItem{
 			TxHash: TxHash,
@@ -533,7 +533,7 @@ func (fr *GeneratorNode) addBlock(b *types.Block) error {
 
 func (fr *GeneratorNode) cleanPool(b *types.Block) {
 	for _, tx := range b.Body.Transactions {
-		TxHash := tx.Hash(fr.ChainID, fr.lastGenHeight)
+		TxHash := tx.HashSig()
 		fr.txpool.Remove(TxHash, tx)
 		fr.txQ.Remove(string(TxHash[:]))
 	}
