@@ -47,10 +47,11 @@ func (cont *FarmContract) OnCreate(cc *types.ContractContext, Args []byte) error
 
 	cc.SetContractData([]byte{tagOwnerReward}, bin.Uint16Bytes(data.OwnerReward))
 
-	cc.SetContractData([]byte{tagTokenMaxSupply}, data.TokenMaxSupply.Bytes())
 	cc.SetContractData([]byte{tagTokenPerBlock}, data.TokenPerBlock.Bytes())
 	cc.SetContractData([]byte{tagStartBlock}, bin.Uint32Bytes(data.StartBlock))
-	return nil
+
+	cont.pool.SetFarm(cc, cont.addr)
+	return cont.initPool(cc, data.WantToken)
 }
 
 func (cont *FarmContract) OnReward(cc *types.ContractContext, b *types.Block, CountMap map[common.Address]uint32) (map[common.Address]*amount.Amount, error) {
@@ -86,12 +87,6 @@ func (cont *FarmContract) FarmToken(cc *types.ContractContext) common.Address {
 	bs := cc.ContractData([]byte{tagFarmToken})
 	copy(FarmToken[:], bs)
 	return FarmToken
-}
-
-func (cont *FarmContract) TokenMaxSupply(cc *types.ContractContext) *amount.Amount {
-	bs := cc.ContractData([]byte{tagTokenMaxSupply})
-	am := amount.NewAmountFromBytes(bs)
-	return am
 }
 
 func (cont *FarmContract) TokenPerBlock(cc *types.ContractContext) *amount.Amount {
@@ -149,19 +144,10 @@ func (cont *FarmContract) UserInfo(cc *types.ContractContext, pid uint64, user c
 
 // Return reward multiplier over the given _from to _to block.
 func (cont *FarmContract) GetMultiplier(cc *types.ContractContext, _from uint32, _to uint32) (uint32, error) {
-	farmToken := cont.FarmToken(cc)
-	ins, err := cc.Exec(cc, farmToken, "TotalSupply", []interface{}{})
-	if err != nil {
-		return 0, err
-	}
-	if tokenSupply, ok := ins[0].(*amount.Amount); ok {
-		TokenMaxSupply := cont.TokenMaxSupply(cc)
-		if tokenSupply.Cmp(TokenMaxSupply.Int) >= 0 {
-			return 0, nil
-		}
+	if _to >= _from {
 		return _to - _from, nil
 	}
-	return 0, errors.New("invalid token supply")
+	return 0, errors.New("invalid height")
 }
 
 // View function to see pending Cherry on frontend.

@@ -2,6 +2,7 @@ package mappfarm
 
 import (
 	"errors"
+	"log"
 
 	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/core/types"
@@ -51,8 +52,10 @@ func (cont *FarmContract) UpdatePool(cc *types.ContractContext, _pid uint64) err
 	banker := cont.Banker(cc)
 
 	FarmToken := cont.FarmToken(cc)
-	if _, err := cc.Exec(cc, FarmToken, "TransferFrom", []interface{}{banker, owner, ownerReward}); err != nil {
-		return err
+	if ownerReward.IsPlus() {
+		if _, err := cc.Exec(cc, FarmToken, "TransferFrom", []interface{}{banker, owner, ownerReward}); err != nil {
+			return err
+		}
 	}
 	// CherryToken(CherryAddr).mint(address(this), CherryReward);
 	if _, err := cc.Exec(cc, FarmToken, "TransferFrom", []interface{}{banker, cont.addr, CherryReward}); err != nil {
@@ -95,10 +98,11 @@ func (cont *FarmContract) Deposit(cc *types.ContractContext, _pid uint64, _wantA
 		if err != nil {
 			return err
 		}
-		user.Shares = amt
+		user.Shares = user.Shares.Add(amt)
 	}
 	user.RewardDebt = user.Shares.Mul(pool.AccTokenPerShare)
 	cont.setUserInfo(cc, _pid, cc.From(), user)
+	log.Println(cc.From().String(), user.RewardDebt.String(), user.Shares.String())
 	// emit Deposit(msg.sender, _pid, _wantAmt);
 	return nil
 }

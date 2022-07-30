@@ -249,7 +249,7 @@ func (tc *TestContext) SendTx(mkey key.Key, to common.Address, method string, pa
 	return nil, nil
 }
 
-func (tc *TestContext) ReadTx(mkey key.Key, to common.Address, method string, params ...interface{}) (interface{}, error) {
+func (tc *TestContext) ReadTx(mkey key.Key, to common.Address, method string, params ...interface{}) ([]interface{}, error) {
 	tx := &types.Transaction{
 		ChainID:   ChainID,
 		Timestamp: tc.Ctx.LastTimestamp(),
@@ -289,19 +289,68 @@ func (tc *TestContext) ReadTx(mkey key.Key, to common.Address, method string, pa
 	return nil, nil
 }
 
-func (tc *TestContext) MakeTx(mkey key.Key, to common.Address, method string, params ...interface{}) (interface{}, error) {
+func (tc *TestContext) MakeTx(mkey key.Key, to common.Address, method string, params ...interface{}) ([]interface{}, error) {
 	infs, err := tc.SendTx(mkey, to, method, params...)
-	if len(infs) > 0 {
-		return infs[0], err
-	}
 	return infs, err
 }
 
-func (tc *TestContext) MustSendTx(mkey key.Key, to common.Address, method string, params ...interface{}) interface{} {
-	res, err := tc.MakeTx(mkey, to, method, params...)
+func (tc *TestContext) MustSendTx(mkey key.Key, to common.Address, method string, params ...interface{}) []interface{} {
+	res, err := tc.SendTx(mkey, to, method, params...)
 	if err != nil {
 		fmt.Printf("%+v\n", err)
 		panic(err)
 	}
 	return res
+}
+
+type TxCase struct {
+	Mkey   key.Key
+	To     common.Address
+	Method string
+	Params []interface{}
+}
+
+func (tc *TestContext) MustSendTxs(txcs []*TxCase) [][]interface{} {
+	txs := []*types.Transaction{}
+	ks := []key.Key{}
+	for _, txc := range txcs {
+		tx := &types.Transaction{
+			ChainID:   ChainID,
+			Timestamp: tc.Ctx.LastTimestamp(),
+			To:        txc.To,
+			Method:    txc.Method,
+		}
+
+		tx.Args = bin.TypeWriteAll(txc.Params...)
+
+		ins, err := bin.TypeReadAll(tx.Args, len(txc.Params))
+		if err != nil {
+			log.Println(ins, err)
+			panic(err)
+		}
+		txs = append(txs, tx)
+		ks = append(ks, txc.Mkey)
+	}
+
+	err := tc.Sleep(10, txs, ks)
+	if err != nil {
+		panic(err)
+	}
+	b, err := tc.Cn.Provider().Block(tc.Ctx.TargetHeight() - 1)
+	if err != nil {
+		panic(err)
+	}
+	inss := [][]interface{}{}
+	for i := 0; i < len(b.Body.Events); i++ {
+		en := b.Body.Events[i]
+		if en.Type == types.EventTagTxMsg {
+			ins, err := bin.TypeReadAll(en.Result, 1)
+			if err != nil {
+				panic(err)
+			}
+			inss = append(inss, ins)
+		}
+	}
+
+	return inss
 }

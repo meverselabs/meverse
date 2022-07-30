@@ -191,9 +191,9 @@ func scenario(point uint8, t *testing.T) (inf interface{}, err error) {
 	adminBal := tc.MustSendTx(util.AdminKey, tokenAddr, "BalanceOf", util.Admin)
 	user0Bal := tc.MustSendTx(util.AdminKey, tokenAddr, "BalanceOf", util.Users[0])
 	if point == AfterReclaimTokenAdminBalanceOf {
-		poolAmt := poolBal.(*amount.Amount)
-		adminAmt := adminBal.(*amount.Amount)
-		user0Amt := user0Bal.(*amount.Amount)
+		poolAmt := poolBal[0].(*amount.Amount)
+		adminAmt := adminBal[0].(*amount.Amount)
+		user0Amt := user0Bal[0].(*amount.Amount)
 		return []*amount.Amount{poolAmt, adminAmt, user0Amt}, nil
 	}
 	return

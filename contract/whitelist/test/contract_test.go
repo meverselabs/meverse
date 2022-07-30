@@ -63,7 +63,7 @@ func TestWhiteList(t *testing.T) {
 	// delegate common.Address, method string, params []interface{}, checkResult string, result []byte
 	inf = tc.MustSendTx(util.AdminKey, whiteListAddr, "AddGroup", nftAddr, "BalanceOf", []interface{}{"user"}, "*big.Int:has", bin.Uint64Bytes(FEE/30))
 	log.Println("TestExecuteContractTx", inf)
-	groupID := inf.(hash.Hash256)
+	groupID := inf[0].(hash.Hash256)
 
 	tokenAddr := tc.MakeToken("TestToken", "TEST", "10000")
 	log.Println("Test Token Addr", tokenAddr) // 0xadCAdf65B8A05e5Fbc0cfB0dEe8De2d2BAa16bDf
@@ -87,7 +87,7 @@ func TestWhiteList(t *testing.T) {
 	inf = tc.MustSendTx(util.AdminKey, factoryAddr, "CreatePairUni",
 		tokenAddr, tc.MainToken, tc.MainToken, "testlp", "TESTLP", util.Admin,
 		util.Admin, FEE, ADMINFEE, WINNERFEE, whiteListAddr, groupID, UniClassID)
-	lpaddr := inf.(common.Address)
+	lpaddr := inf[0].(common.Address)
 	log.Println("TestExecuteContractTx", lpaddr)
 
 	inf = tc.MustSendTx(util.AdminKey, tc.MainToken, "Approve", routerAddr, amount.NewAmount(1000000000, 0))
@@ -154,7 +154,7 @@ func TestEmptyWhiteList(t *testing.T) {
 	inf = tc.MustSendTx(util.AdminKey, factoryAddr, "CreatePairUni",
 		tokenAddr, tc.MainToken, tc.MainToken, "testlp", "TESTLP", util.Admin,
 		util.Admin, FEE, ADMINFEE, WINNERFEE, whiteListAddr, hash.Hash256{}, UniClassID)
-	lpaddr := inf.(common.Address)
+	lpaddr := inf[0].(common.Address)
 	log.Println("TestExecuteContractTx", lpaddr)
 
 	inf = tc.MustSendTx(util.AdminKey, tc.MainToken, "Approve", routerAddr, amount.NewAmount(1000000000, 0))

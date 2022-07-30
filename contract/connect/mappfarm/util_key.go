@@ -5,13 +5,12 @@ import (
 )
 
 var (
-	tagOwner          = byte(0x01)
-	tagBanker         = byte(0x02)
-	tagFarmToken      = byte(0x03)
-	tagOwnerReward    = byte(0x04)
-	tagTokenMaxSupply = byte(0x05)
-	tagTokenPerBlock  = byte(0x06)
-	tagStartBlock     = byte(0x07)
+	tagOwner         = byte(0x01)
+	tagBanker        = byte(0x02)
+	tagFarmToken     = byte(0x03)
+	tagOwnerReward   = byte(0x04)
+	tagTokenPerBlock = byte(0x06)
+	tagStartBlock    = byte(0x07)
 
 	// tagTotalAllocPoint = byte(0x08)
 

@@ -12,6 +12,7 @@ var (
 	tagPlatform             = byte(0x05)
 	tagPlatformFee          = byte(0x06)
 	tagTokenInRevert        = byte(0x07)
+	tagFeeOwner             = byte(0x08)
 )
 
 func makeGatewayKey(key byte, body []byte) []byte {

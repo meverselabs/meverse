@@ -19,6 +19,9 @@ type front struct {
 func (f *front) AddPlatform(cc *types.ContractContext, Platform string, Amount *amount.Amount) error {
 	return f.cont.AddPlatform(cc, Platform, Amount)
 }
+func (f *front) SetFeeOwner(cc *types.ContractContext, feeOwner common.Address) error {
+	return f.cont.SetFeeOwner(cc, feeOwner)
+}
 func (f *front) Transfer(cc *types.ContractContext, to common.Address, Amount *amount.Amount) error {
 	return f.cont.Transfer(cc, to, Amount)
 }

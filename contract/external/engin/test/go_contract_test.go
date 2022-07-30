@@ -61,7 +61,7 @@ func TestGoContractTx(t *testing.T) {
 		t.Errorf("error not expect")
 		return
 	}
-	jsAddr, ok := inf.(common.Address)
+	jsAddr, ok := inf[0].(common.Address)
 	if !ok {
 		t.Errorf("deplory contract not retruned address %v", inf)
 		return

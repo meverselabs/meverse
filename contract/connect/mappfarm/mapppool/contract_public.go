@@ -24,28 +24,7 @@ func (cont PoolContract) Deposit(cc *types.ContractContext, _userAddress common.
 	// if !cont.isFarm(cc) {
 	// 	return nil, errors.New("ownable: Deposit are only possible using owner contract")
 	// }
-	depositFeeFactor := cont.DepositFeeFactor(cc)
 	want := cont.Want(cc)
-	if depositFeeFactor > 0 && depositFeeFactor < factorMax {
-		wantAmt := _wantAmt.MulC(int64(depositFeeFactor)).DivC(int64(factorMax))
-		depositFee := _wantAmt.Sub(wantAmt)
-
-		// uint256 rewardDepositFee = depositFee.mul(distributionDepositRatio).div(10000);
-		rewardFeeFactor := cont.RewardFeeFactor(cc)
-		rewardDepositFee := depositFee.MulC(int64(rewardFeeFactor)).DivC(int64(factorMax))
-		// depositFee = depositFee.sub(rewardDepositFee);
-		depositFee = depositFee.Sub(rewardDepositFee)
-
-		// IERC20(wantAddress).safeTransferFrom(address(msg.sender),depositFeeFundAddress,depositFee);
-		if _, err := cc.Exec(cc, want, "TransferFrom", []interface{}{cc.From(), cont.FeeFundAddress(cc), depositFee}); err != nil {
-			return nil, err
-		}
-		// IERC20(wantAddress).safeTransferFrom(address(msg.sender),rewardsAddress,rewardDepositFee);
-		if _, err := cc.Exec(cc, want, "TransferFrom", []interface{}{cc.From(), cont.RewardsAddress(cc), rewardDepositFee}); err != nil {
-			return nil, err
-		}
-		_wantAmt = wantAmt
-	}
 
 	// IERC20(wantAddress).safeTransferFrom(address(msg.sender),address(this),_wantAmt);
 	if _, err := cc.Exec(cc, want, "TransferFrom", []interface{}{cc.From(), cont.Farm(cc), _wantAmt}); err != nil {
@@ -66,11 +45,6 @@ func (cont *PoolContract) Withdraw(cc *types.ContractContext, _userAddress commo
 	}
 
 	wantLockedTotal := cont.WantLockedTotal(cc)
-	withdrawFeeFactor := cont.WithdrawFeeFactor(cc)
-	if withdrawFeeFactor < factorMax {
-		_wantAmt = _wantAmt.MulC(int64(withdrawFeeFactor)).DivC(int64(factorMax))
-	}
-
 	want := cont.Want(cc)
 
 	// wantAmt := IERC20(wantAddress).balanceOf(address(this))

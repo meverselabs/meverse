@@ -9,13 +9,13 @@ import (
 )
 
 type FarmContractConstruction struct {
-	Owner          common.Address
-	Banker         common.Address
-	FarmToken      common.Address
-	OwnerReward    uint16
-	TokenMaxSupply *amount.Amount
-	TokenPerBlock  *amount.Amount
-	StartBlock     uint32
+	Owner         common.Address
+	Banker        common.Address
+	FarmToken     common.Address
+	WantToken     common.Address
+	OwnerReward   uint16
+	TokenPerBlock *amount.Amount
+	StartBlock    uint32
 }
 
 func (s *FarmContractConstruction) WriteTo(w io.Writer) (int64, error) {
@@ -29,10 +29,10 @@ func (s *FarmContractConstruction) WriteTo(w io.Writer) (int64, error) {
 	if sum, err := sw.Address(w, s.FarmToken); err != nil {
 		return sum, err
 	}
-	if sum, err := sw.Uint16(w, s.OwnerReward); err != nil {
+	if sum, err := sw.Address(w, s.WantToken); err != nil {
 		return sum, err
 	}
-	if sum, err := sw.Amount(w, s.TokenMaxSupply); err != nil {
+	if sum, err := sw.Uint16(w, s.OwnerReward); err != nil {
 		return sum, err
 	}
 	if sum, err := sw.Amount(w, s.TokenPerBlock); err != nil {
@@ -55,10 +55,10 @@ func (s *FarmContractConstruction) ReadFrom(r io.Reader) (int64, error) {
 	if sum, err := sr.Address(r, &s.FarmToken); err != nil {
 		return sum, err
 	}
-	if sum, err := sr.Uint16(r, &s.OwnerReward); err != nil {
+	if sum, err := sr.Address(r, &s.WantToken); err != nil {
 		return sum, err
 	}
-	if sum, err := sr.Amount(r, &s.TokenMaxSupply); err != nil {
+	if sum, err := sr.Uint16(r, &s.OwnerReward); err != nil {
 		return sum, err
 	}
 	if sum, err := sr.Amount(r, &s.TokenPerBlock); err != nil {

@@ -85,7 +85,7 @@ func _init() (tc *util.TestContext, egAddr, dataAddr, marketAddr, tokenAddr, nft
 		log.Println(inf)
 		panic(err)
 	}
-	if iss, ok := inf.([]interface{}); ok {
+	if iss, ok := inf[0].([]interface{}); ok {
 		log.Println(iss[0])
 		// if strs, ok := iss[0].([]interface{}); ok {
 		// 	ts := make([]string, len(strs))
@@ -147,28 +147,28 @@ func TestRegisterMarketItemBuyNowWithToken(t *testing.T) {
 	}
 
 	inf, _ = tc.ReadTx(util.UserKeys[2], tokenAddr, "balanceOf", util.Users[2])
-	iss := inf.([]interface{})
+	iss := inf[0].([]interface{})
 	am := iss[0].(*amount.Amount)
 	if am.String() != "0" {
 		t.Errorf("expect zero")
 		return
 	}
 	inf, _ = tc.ReadTx(util.UserKeys[0], tokenAddr, "balanceOf", util.Users[1])
-	iss = inf.([]interface{})
+	iss = inf[0].([]interface{})
 	am = iss[0].(*amount.Amount)
 	if am.String() != "47000" {
 		t.Errorf("expect 47000")
 		return
 	}
 	inf, _ = tc.ReadTx(util.UserKeys[0], tokenAddr, "balanceOf", dataAddr)
-	iss = inf.([]interface{})
+	iss = inf[0].([]interface{})
 	am = iss[0].(*amount.Amount)
 	if am.String() != "500" {
 		t.Errorf("expect 500")
 		return
 	}
 	inf, _ = tc.ReadTx(util.UserKeys[0], tokenAddr, "balanceOf", util.Users[0])
-	iss = inf.([]interface{})
+	iss = inf[0].([]interface{})
 	am = iss[0].(*amount.Amount)
 	if am.String() != "2500" {
 		t.Errorf("expect 2500")
@@ -253,28 +253,28 @@ func TestRegisterMarketItemNftTransferBuyNowWithTokenRegisterMarketItemBuyNowWit
 	}
 
 	inf, _ = tc.ReadTx(util.UserKeys[2], tokenAddr, "balanceOf", util.Users[2])
-	iss := inf.([]interface{})
+	iss := inf[0].([]interface{})
 	am := iss[0].(*amount.Amount)
 	if am.String() != "0" {
 		t.Errorf("expect zero")
 		return
 	}
 	inf, _ = tc.ReadTx(util.UserKeys[0], tokenAddr, "balanceOf", util.Admin)
-	iss = inf.([]interface{})
+	iss = inf[0].([]interface{})
 	am = iss[0].(*amount.Amount)
 	if am.String() != "47000" {
 		t.Errorf("expect 47000 %v", am.String())
 		return
 	}
 	inf, _ = tc.ReadTx(util.UserKeys[0], tokenAddr, "balanceOf", dataAddr)
-	iss = inf.([]interface{})
+	iss = inf[0].([]interface{})
 	am = iss[0].(*amount.Amount)
 	if am.String() != "500" {
 		t.Errorf("expect 500 %v", am.String())
 		return
 	}
 	inf, _ = tc.ReadTx(util.UserKeys[0], tokenAddr, "balanceOf", util.Users[0])
-	iss = inf.([]interface{})
+	iss = inf[0].([]interface{})
 	am = iss[0].(*amount.Amount)
 	if am.String() != "2500" {
 		t.Errorf("expect 2500 %v", am.String())

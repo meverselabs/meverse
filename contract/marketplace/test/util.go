@@ -50,7 +50,7 @@ func deployNFT(tc *util.TestContext, egAddr common.Address, _name string, _symbo
 			panic(err)
 		}
 		var ok bool
-		if nftAddr, ok = inf.(common.Address); !ok {
+		if nftAddr, ok = inf[0].(common.Address); !ok {
 			panic(err)
 		}
 	}
@@ -80,7 +80,7 @@ func setupMarketCont(marketFeeStr, royaltyFeeStr, dataPath, operationPath string
 			panic(err)
 		}
 		var ok bool
-		if dataAddr, ok = inf.(common.Address); !ok {
+		if dataAddr, ok = inf[0].(common.Address); !ok {
 			panic("dataAddr is not set")
 		}
 
@@ -105,7 +105,7 @@ func setupMarketCont(marketFeeStr, royaltyFeeStr, dataPath, operationPath string
 			panic("error not expect")
 		}
 		var ok bool
-		marketAddr, ok = inf.(common.Address)
+		marketAddr, ok = inf[0].(common.Address)
 		if !ok {
 			panic(fmt.Sprintf("deplory contract not retruned address %v", inf))
 		}
@@ -130,7 +130,7 @@ func mintNFT(tc *util.TestContext, nftAddr common.Address, addrs ...common.Addre
 	if err != nil {
 		panic(err)
 	}
-	is, ok := inf.([]interface{})
+	is, ok := inf[0].([]interface{})
 	if !ok {
 		panic("no result")
 	}

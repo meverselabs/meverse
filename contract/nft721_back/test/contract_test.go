@@ -38,7 +38,7 @@ func TestName(t *testing.T) {
 	if err != nil {
 		t.Error("Name", err, inf)
 	}
-	name, ok := inf.(string)
+	name, ok := inf[0].(string)
 	if !ok {
 		t.Error("Name", "name not returns string")
 	}
@@ -50,7 +50,7 @@ func TestName(t *testing.T) {
 	if err != nil {
 		t.Error("Symbol", err, inf)
 	}
-	symbol, ok := inf.(string)
+	symbol, ok := inf[0].(string)
 	if !ok {
 		t.Error("Symbol", "symbol not returns string")
 	}
@@ -82,7 +82,7 @@ func _testMint3NFT(t *testing.T, i int) (nftAddr common.Address, tc *util.TestCo
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
-	is, ok := inf.([]interface{})
+	is, ok := inf[0].([]interface{})
 	if !ok {
 		t.Error(TAG, "no result")
 	}
@@ -101,7 +101,7 @@ func _testMint3NFT(t *testing.T, i int) (nftAddr common.Address, tc *util.TestCo
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
-	is, ok = inf.([]interface{})
+	is, ok = inf[0].([]interface{})
 	if !ok {
 		t.Error(TAG, "no result")
 	}
@@ -121,7 +121,7 @@ func _testMint3NFT(t *testing.T, i int) (nftAddr common.Address, tc *util.TestCo
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
-	bi, ok := inf.(*big.Int)
+	bi, ok := inf[0].(*big.Int)
 	if !ok {
 		t.Error(TAG, "no bigint")
 	} else if bi.Cmp(big.NewInt(int64(len(checkMap)))) != 0 {
@@ -132,7 +132,7 @@ func _testMint3NFT(t *testing.T, i int) (nftAddr common.Address, tc *util.TestCo
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
-	adminBal, ok := inf.(*big.Int)
+	adminBal, ok := inf[0].(*big.Int)
 	if !ok {
 		t.Error(TAG, "no bigint")
 	}
@@ -159,7 +159,7 @@ func TestBurn(t *testing.T) {
 		t.Error(TAG, err, inf)
 	}
 
-	nftID, ok := inf.(hash.Hash256)
+	nftID, ok := inf[0].(hash.Hash256)
 	if !ok {
 		t.Error(TAG, "no nft")
 	}
@@ -174,7 +174,7 @@ func TestBurn(t *testing.T) {
 		t.Error(TAG, err, inf)
 	}
 
-	nftID2, ok := inf.(hash.Hash256)
+	nftID2, ok := inf[0].(hash.Hash256)
 	if !ok {
 		t.Error(TAG, "no nft")
 	}
@@ -187,7 +187,7 @@ func TestBurn(t *testing.T) {
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
-	bi, ok := inf.(*big.Int)
+	bi, ok := inf[0].(*big.Int)
 	if !ok {
 		t.Error(TAG, "no bigint")
 	} else if bi.Cmp(big.NewInt(2)) != 0 {
@@ -198,7 +198,7 @@ func TestBurn(t *testing.T) {
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
-	adminBal, ok := inf.(*big.Int)
+	adminBal, ok := inf[0].(*big.Int)
 	if !ok {
 		t.Error(TAG, "no bigint")
 	}
@@ -213,7 +213,7 @@ func TestBurn(t *testing.T) {
 			t.Error(TAG, err, inf)
 		}
 
-		nftID, ok = inf.(hash.Hash256)
+		nftID, ok = inf[0].(hash.Hash256)
 		if !ok {
 			t.Error(TAG, "no nft")
 		}
@@ -228,7 +228,7 @@ func TestBurn(t *testing.T) {
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
-	bi, ok = inf.(*big.Int)
+	bi, ok = inf[0].(*big.Int)
 	if !ok {
 		t.Error(TAG, "no bigint")
 	} else if bi.Cmp(big.NewInt(0)) != 0 {
@@ -239,7 +239,7 @@ func TestBurn(t *testing.T) {
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
-	adminBal, ok = inf.(*big.Int)
+	adminBal, ok = inf[0].(*big.Int)
 	if !ok {
 		t.Error(TAG, "no bigint")
 	}
@@ -270,7 +270,7 @@ func TestApprove(t *testing.T) {
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
-	is, ok := inf.([]interface{})
+	is, ok := inf[0].([]interface{})
 	if !ok {
 		t.Error(TAG, "no result")
 	}
@@ -333,7 +333,7 @@ func TestSetApprovalForAll(t *testing.T) {
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
-	is, ok := inf.([]interface{})
+	is, ok := inf[0].([]interface{})
 	if !ok {
 		t.Error(TAG, "no result")
 	}
@@ -463,7 +463,7 @@ func TestSafeTransferFrom(t *testing.T) {
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
-	is, ok := inf.([]interface{})
+	is, ok := inf[0].([]interface{})
 	if !ok {
 		t.Error(TAG, "no result")
 	}
@@ -531,7 +531,7 @@ func TestMintBatch(t *testing.T) {
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
-	is, ok := inf.([]interface{})
+	is, ok := inf[0].([]interface{})
 	if !ok {
 		t.Error(TAG, "no result")
 	}
@@ -549,7 +549,7 @@ func TestMintBatch(t *testing.T) {
 		if err != nil {
 			t.Error(TAG, err, inf)
 		}
-		addr := inf.(common.Address)
+		addr := inf[0].(common.Address)
 		if addr != util.Users[i] {
 			t.Error(TAG, addr, "!=", util.Users[i])
 		}

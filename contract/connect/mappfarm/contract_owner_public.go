@@ -30,15 +30,6 @@ func (cont *FarmContract) setOwnerReward(cc *types.ContractContext, OwnerReward 
 	return nil
 }
 
-func (cont *FarmContract) setTokenMaxSupply(cc *types.ContractContext, TokenMaxSupply *amount.Amount) error {
-	isOwner := cont.isOwner(cc, cc.From())
-	if cc.From() != cont.master && !isOwner {
-		return errors.New("ownable: caller is not the owner")
-	}
-	cc.SetContractData([]byte{tagTokenMaxSupply}, TokenMaxSupply.Bytes())
-	return nil
-}
-
 func (cont *FarmContract) setTokenPerBlock(cc *types.ContractContext, TokenPerBlock *amount.Amount) error {
 	isOwner := cont.isOwner(cc, cc.From())
 	if cc.From() != cont.master && !isOwner {
@@ -57,18 +48,7 @@ func (cont *FarmContract) setStartBlock(cc *types.ContractContext, StartBlock ui
 	return nil
 }
 
-func (cont *FarmContract) InitPool(cc *types.ContractContext, _withUpdate bool, args []byte) error {
-	isOwner := cont.isOwner(cc, cc.From())
-	if cc.From() != cont.master && !isOwner {
-		return errors.New("ownable: caller is not the owner")
-	}
-
-	if _withUpdate {
-		err := cont.MassUpdatePools(cc)
-		if err != nil {
-			return err
-		}
-	}
+func (cont *FarmContract) initPool(cc *types.ContractContext, want common.Address) error {
 	lastRewardBlock := cont.StartBlock(cc)
 	if cc.TargetHeight() > lastRewardBlock {
 		lastRewardBlock = cc.TargetHeight()
@@ -82,7 +62,7 @@ func (cont *FarmContract) InitPool(cc *types.ContractContext, _withUpdate bool, 
 		// Strat:            _strat,
 	})
 	// cont.addPoolLength(cc)
-	return cont.pool.InitPool(cc, args)
+	return cont.pool.SetWant(cc, want)
 }
 
 func (cont *FarmContract) InCaseTokensGetStuck(cc *types.ContractContext, _token common.Address, _amount *amount.Amount) error {

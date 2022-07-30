@@ -1,16 +1,17 @@
 const tagOwner               = "01"
-const tagNAME                = "02"
-const tagSYMBOL              = "03"
+const tagMinter              = "02"
+const tagNAME                = "03"
+const tagSYMBOL              = "04"
 
-const tagBaseURI             = "04"
-const tagTokenURI            = "05"
-const tagNFTCount            = "06"
-const tagNFTMakeIndex        = "07"
-const tagNFTIndex            = "08"
-const tagIndexNFT            = "09"
-const tagNFTOwner            = "10"
-const tagTokenApprove        = "11"
-const tagTokenApproveForAll  = "12"
+const tagBaseURI             = "05"
+const tagTokenURI            = "06"
+const tagNFTCount            = "07"
+const tagNFTMakeIndex        = "08"
+const tagNFTIndex            = "09"
+const tagIndexNFT            = "10"
+const tagNFTOwner            = "11"
+const tagTokenApprove        = "12"
+const tagTokenApproveForAll  = "13"
 
 //////////////////////////////////////////////////
 // Public Functions
@@ -19,6 +20,7 @@ const tagTokenApproveForAll  = "12"
 function Init(owner, _name, _symbol) {
     require(address(owner) !== address(0), "owner not provided")
 	Mev.SetContractData(tagOwner, owner)
+	Mev.SetContractData(tagMinter+BigInt(owner).toString(16), "1")
 	Mev.SetContractData(tagNAME, _name)
 	Mev.SetContractData(tagSYMBOL, _symbol)
 }
@@ -160,8 +162,9 @@ function tokenByRange(start, end) {
 		inx = BigInt(inx).toString(16)
 		if (inx.length % 2 == 1) {
 			list.push("0x0"+inx)
+		} else {
+			list.push("0x"+inx)
 		}
-		list.push("0x"+inx)
 	}
 
 	return list
@@ -213,8 +216,9 @@ function tokenOfOwnerByRange(_owner, start, end) {
 		inx = BigInt(inx).toString(16)
 		if (inx.length % 2 == 1) {
 			list.push("0x0"+inx)
+		} else {
+			list.push("0x"+inx)
 		}
-		list.push("0x"+inx)
 	}
 	return list
 }
@@ -226,9 +230,21 @@ function isOwner() {
 	let addr = Mev.ContractData(tagOwner)
 	return address(Mev.From()) == address(addr)
 }
+function isMinter() {
+	let isMinter = Mev.ContractData(tagMinter+BigInt(Mev.From()).toString(16))
+	return isMinter == "1"
+}
+function setMinter(addr) {
+    require(isOwner(), "doesn't have mint permission")
+	Mev.SetContractData(tagMinter+BigInt(addr).toString(16), "1")
+}
+function revertMinter(addr) {
+    require(isOwner(), "doesn't have mint permission")
+	Mev.SetContractData(tagMinter+BigInt(addr).toString(16), "")
+}
 
 function mint(count) {
-    require(isOwner(), "doesn't have mint permission")
+    require(isMinter(), "doesn't have mint permission")
     count = BigInt(count)
     require(count > 0, "mint count must over then 0")
 
@@ -244,8 +260,26 @@ function mint(count) {
 	return JSON.stringify(hs)
 }
 
+function addr() {
+	return Mev.This()
+}
+
+function getNftId(nc) {
+	let seedAddr = Mev.This()
+	let key = BigInt(nc)
+    var hex = key.toString(16);
+    if (hex.length % 2) {
+      hex = '0' + hex;
+    }
+	let o = seedAddr+hex
+	let o2 = Mev.Hash256(o)
+	let o3 = Mev.Hash256(o2)
+	let nftID = Mev.DoubleHash256(o)
+	return seedAddr+":"+hex+":"+o+":"+nc+":"+key+":"+nftID+":"+o2+":"+o3+":"+BigInt(nftID)
+}
+
 function mintWithID(nftID) {
-    require(isOwner(), "doesn't have mint permission")
+    require(isMinter(), "doesn't have mint permission")
 
 	let nc = BigInt(Mev.ContractData(tagNFTCount))
 	nftID = _mintNFTWithIndex(Mev.This(), nc, nftID)
@@ -255,7 +289,7 @@ function mintWithID(nftID) {
 
 function mintBatch(addrsStg) {
     let addrs = JSON.parse(addrsStg)
-    require(isOwner(), "doesn't have mint permission")
+    require(isMinter(), "doesn't have mint permission")
     count = BigInt(addrs.length)
     require(count > 0, "mint count must over then 0")
     
@@ -326,7 +360,7 @@ function _setNFTAccountIndex(addr, nftID, nc) {
 }
 
 function burn(nftID) {
-    require(isOwner(), "doesn't have burn permission")
+    require(isMinter(), "doesn't have burn permission")
     
     let burnkey = _makeNFTIndexKey(nftID)
     let indexbs = Mev.ContractData(burnkey)
@@ -369,6 +403,7 @@ function _removeNFTAccount(nftID) {
 		let lastNFTID = BigInt(tokenOfOwnerByIndex(addr, lastIndex))
 		_setNFTAccountIndex(addr, lastNFTID, burnIndex)
 	}
+	Mev.SetContractData(_makeNFTOwnerKey(nftID), address(0))
 	Mev.SetAccountData(addr, _makeIndexNFTKey(lastIndex), "")
 	Mev.SetAccountData(addr, tagNFTCount, lastIndex)
 }

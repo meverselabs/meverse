@@ -39,7 +39,7 @@ func TestName(t *testing.T) {
 	inf, err := tc.ReadTx(util.AdminKey, nftAddr, "name")
 	if err != nil {
 		t.Errorf("error not expected %+v", err)
-	} else if iss, ok := inf.([]interface{}); !ok {
+	} else if iss, ok := inf[0].([]interface{}); !ok {
 		t.Error("Name", "invalid readTx Type")
 		return
 	} else if len(iss) == 0 {
@@ -56,7 +56,7 @@ func TestName(t *testing.T) {
 	inf, err = tc.ReadTx(util.AdminKey, nftAddr, "symbol")
 	if err != nil {
 		t.Errorf("error not expected %+v", err)
-	} else if iss, ok := inf.([]interface{}); !ok {
+	} else if iss, ok := inf[0].([]interface{}); !ok {
 		t.Error("Name", "invalid readTx Type")
 		return
 	} else if len(iss) == 0 {
@@ -107,7 +107,7 @@ func deployNFT(tc *util.TestContext, t *testing.T, _name string, _symbol string)
 			return common.Address{}, nil
 		}
 		var ok bool
-		if nftAddr, ok = inf.(common.Address); !ok {
+		if nftAddr, ok = inf[0].(common.Address); !ok {
 			t.Errorf("nftAddr is not set")
 			return common.Address{}, nil
 		}
@@ -140,7 +140,7 @@ func _testMint3NFT(t *testing.T, i int) (nftAddr common.Address, tc *util.TestCo
 		t.Error(TAG, err, inf)
 		return
 	}
-	is, ok := inf.([]interface{})
+	is, ok := inf[0].([]interface{})
 	if !ok {
 		t.Error(TAG, "no result")
 		return
@@ -164,7 +164,7 @@ func _testMint3NFT(t *testing.T, i int) (nftAddr common.Address, tc *util.TestCo
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
-	is, ok = inf.([]interface{})
+	is, ok = inf[0].([]interface{})
 	if !ok {
 		t.Error(TAG, "no result")
 		return
@@ -189,7 +189,7 @@ func _testMint3NFT(t *testing.T, i int) (nftAddr common.Address, tc *util.TestCo
 		return
 	}
 
-	str = inf.(string)
+	str = inf[0].(string)
 	bi, ok := big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 	if !ok {
 		t.Error(TAG, "no bigint")
@@ -205,7 +205,7 @@ func _testMint3NFT(t *testing.T, i int) (nftAddr common.Address, tc *util.TestCo
 		return
 	}
 
-	str = inf.(string)
+	str = inf[0].(string)
 	adminBal, ok := big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 	if !ok {
 		t.Error(TAG, "no bigint")
@@ -235,7 +235,7 @@ func TestBurn(t *testing.T) {
 		return
 	}
 
-	str := inf.(string)
+	str := inf[0].(string)
 	nftid, ok := big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 	if !ok {
 		t.Error(TAG, "not nft id")
@@ -254,7 +254,7 @@ func TestBurn(t *testing.T) {
 		return
 	}
 
-	str = inf.(string)
+	str = inf[0].(string)
 	nftid2, ok := big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 	if !ok {
 		t.Error(TAG, "not nft id")
@@ -272,7 +272,7 @@ func TestBurn(t *testing.T) {
 		return
 	}
 
-	str = inf.(string)
+	str = inf[0].(string)
 	bi, ok := big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 	if !ok {
 		t.Error(TAG, "no bigint")
@@ -287,7 +287,7 @@ func TestBurn(t *testing.T) {
 		t.Error(TAG, err, inf)
 		return
 	}
-	str = inf.(string)
+	str = inf[0].(string)
 	adminBal, ok := big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 	if !ok {
 		t.Error(TAG, "no bigint")
@@ -305,7 +305,7 @@ func TestBurn(t *testing.T) {
 			return
 		}
 
-		str = inf.(string)
+		str = inf[0].(string)
 		nftid, ok := big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 		if !ok {
 			t.Error(TAG, "no nft")
@@ -324,7 +324,7 @@ func TestBurn(t *testing.T) {
 		t.Error(TAG, err, inf)
 		return
 	}
-	str = inf.(string)
+	str = inf[0].(string)
 	bi, ok = big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 	if !ok {
 		t.Error(TAG, "no bigint")
@@ -339,7 +339,7 @@ func TestBurn(t *testing.T) {
 		t.Error(TAG, err, inf)
 		return
 	}
-	str = inf.(string)
+	str = inf[0].(string)
 	adminBal, ok = big.NewInt(0).SetString(strings.Replace(str, "0x", "", -1), 16)
 	if !ok {
 		t.Error(TAG, "no bigint")
@@ -381,7 +381,7 @@ func TestApprove(t *testing.T) {
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
-	is, ok := inf.([]interface{})
+	is, ok := inf[0].([]interface{})
 	if !ok {
 		t.Error(TAG, "no result")
 		return
@@ -461,7 +461,7 @@ func TestSetApprovalForAll(t *testing.T) {
 		t.Error(TAG, err, inf)
 		return
 	}
-	is, ok := inf.([]interface{})
+	is, ok := inf[0].([]interface{})
 	if !ok {
 		t.Error(TAG, "no result")
 		return
@@ -614,7 +614,7 @@ func TestSafeTransferFrom(t *testing.T) {
 		t.Error(TAG, err, inf)
 		return
 	}
-	is, ok := inf.([]interface{})
+	is, ok := inf[0].([]interface{})
 	if !ok {
 		t.Error(TAG, "no result")
 		return
@@ -693,7 +693,7 @@ func TestMintBatch(t *testing.T) {
 		t.Error(TAG, err, inf)
 		return
 	}
-	is, ok := inf.([]interface{})
+	is, ok := inf[0].([]interface{})
 	if !ok {
 		t.Error(TAG, "no result")
 		return
@@ -717,7 +717,7 @@ func TestMintBatch(t *testing.T) {
 		if err != nil {
 			t.Error(TAG, err, inf)
 		}
-		addrStr := inf.(string)
+		addrStr := inf[0].(string)
 		addr := common.HexToAddress(addrStr)
 		if addr != util.Users[i] {
 			t.Error(TAG, addr, "!=", util.Users[i])
@@ -746,7 +746,7 @@ func TestBurnAndMint(t *testing.T) {
 		t.Error(TAG, err, inf)
 		return
 	}
-	is, ok := inf.([]interface{})
+	is, ok := inf[0].([]interface{})
 	if !ok {
 		t.Error(TAG, "no result")
 		return
@@ -773,7 +773,7 @@ func TestBurnAndMint(t *testing.T) {
 		t.Error(TAG, err, inf)
 		return
 	}
-	is, ok = inf.([]interface{})
+	is, ok = inf[0].([]interface{})
 	if !ok {
 		t.Error(TAG, "no result")
 		return
@@ -819,7 +819,7 @@ func TestBurnAll(t *testing.T) {
 		t.Error(TAG, err, inf)
 		return
 	}
-	is, ok := inf.([]interface{})
+	is, ok := inf[0].([]interface{})
 	if !ok {
 		t.Error(TAG, "no result")
 		return

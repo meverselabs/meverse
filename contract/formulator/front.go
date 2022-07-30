@@ -90,6 +90,14 @@ func (f *front) SetURI(cc *types.ContractContext, uri string) error {
 	return f.cont.SetURI(cc, uri)
 }
 
+func (f *front) SetRewardPolicy(cc *types.ContractContext, bs []byte) error {
+	return f.cont.SetRewardPolicy(cc, bs)
+}
+
+func (f *front) SetRewardPerBlock(cc *types.ContractContext, RewardPerBlock *amount.Amount) error {
+	return f.cont.SetRewardPerBlock(cc, RewardPerBlock)
+}
+
 //////////////////////////////////////////////////
 // Public Reader Functions
 //////////////////////////////////////////////////

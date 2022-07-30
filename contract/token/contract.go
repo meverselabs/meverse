@@ -57,6 +57,9 @@ func (cont *TokenContract) addBalance(cc *types.ContractContext, addr common.Add
 	if !am.IsPlus() {
 		return errors.Errorf("invalid transfer amount %v", am.String())
 	}
+	if cont.isPause(cc) {
+		return errors.New("paused")
+	}
 	bal := cont.BalanceOf(cc, addr)
 
 	bal = bal.Add(am)
@@ -73,6 +76,9 @@ func (cont *TokenContract) addBalance(cc *types.ContractContext, addr common.Add
 func (cont *TokenContract) subBalance(cc *types.ContractContext, addr common.Address, am *amount.Amount) error {
 	if !am.IsPlus() {
 		return errors.Errorf("invalid transfer amount %v", am.String())
+	}
+	if cont.isPause(cc) {
+		return errors.New("paused")
 	}
 	bal := cont.BalanceOf(cc, addr)
 	if bal.Less(am) {
@@ -385,6 +391,30 @@ func (cont *TokenContract) SetSymbol(cc *types.ContractContext, symbol string) e
 		return errors.New("not token master")
 	}
 	cc.SetContractData([]byte{tagTokenSymbol}, []byte(symbol))
+	return nil
+}
+
+func (cont *TokenContract) isPause(cc *types.ContractContext) bool {
+	bs := cc.ContractData([]byte{tagPause})
+	if len(bs) == 1 && bs[0] == 1 {
+		return true
+	}
+	return false
+}
+
+func (cont *TokenContract) Pause(cc *types.ContractContext) error {
+	if cc.From() != cont.Master() {
+		return errors.New("not token master")
+	}
+	cc.SetContractData([]byte{tagPause}, []byte{1})
+	return nil
+}
+
+func (cont *TokenContract) Unpause(cc *types.ContractContext) error {
+	if cc.From() != cont.Master() {
+		return errors.New("not token master")
+	}
+	cc.SetContractData([]byte{tagPause}, nil)
 	return nil
 }
 

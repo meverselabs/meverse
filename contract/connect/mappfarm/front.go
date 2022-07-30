@@ -48,18 +48,11 @@ func (f *front) SetOwner(cc *types.ContractContext, To common.Address) error {
 func (f *front) SetOwnerReward(cc *types.ContractContext, OwnerReward uint16) error {
 	return f.cont.setOwnerReward(cc, OwnerReward)
 }
-func (f *front) SetTokenMaxSupply(cc *types.ContractContext, TokenMaxSupply *amount.Amount) error {
-	return f.cont.setTokenMaxSupply(cc, TokenMaxSupply)
-}
 func (f *front) SetTokenPerBlock(cc *types.ContractContext, TokenPerBlock *amount.Amount) error {
 	return f.cont.setTokenPerBlock(cc, TokenPerBlock)
 }
 func (f *front) SetStartBlock(cc *types.ContractContext, StartBlock uint32) error {
 	return f.cont.setStartBlock(cc, StartBlock)
-}
-
-func (f *front) InitPool(cc *types.ContractContext, _withUpdate bool, args []byte) error {
-	return f.cont.InitPool(cc, _withUpdate, args)
 }
 
 // func (f *front) Add(cc *types.ContractContext, _allocPoint uint32, _want common.Address, _withUpdate bool, _strat common.Address) error {
@@ -85,10 +78,6 @@ func (f *front) OwnerReward(cc *types.ContractContext) uint16 {
 
 func (f *front) FarmToken(cc *types.ContractContext) common.Address {
 	return f.cont.FarmToken(cc)
-}
-
-func (f *front) TokenMaxSupply(cc *types.ContractContext) *amount.Amount {
-	return f.cont.TokenMaxSupply(cc)
 }
 
 func (f *front) TokenPerBlock(cc *types.ContractContext) *amount.Amount {
@@ -128,4 +117,15 @@ func (f *front) PendingReward(cc *types.ContractContext, _pid uint64, _user comm
 // View function to see staked Want tokens on frontend.
 func (f *front) StakedWantTokens(cc *types.ContractContext, _pid uint64, _user common.Address) (*amount.Amount, error) {
 	return f.cont.StakedWantTokens(cc, _pid, _user)
+}
+
+func (f *front) Want(cc *types.ContractContext) common.Address {
+	return f.cont.pool.Want(cc)
+}
+
+func (f *front) WantLockedTotal(cc *types.ContractContext) *amount.Amount {
+	return f.cont.pool.WantLockedTotal(cc)
+}
+func (f *front) SharesTotal(cc *types.ContractContext) *amount.Amount {
+	return f.cont.pool.SharesTotal(cc)
 }

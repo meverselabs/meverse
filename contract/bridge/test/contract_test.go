@@ -256,6 +256,6 @@ func getBal(tc *util.TestContext, testToken, user common.Address, t *testing.T, 
 	if err != nil {
 		t.Errorf(TAG+"TestSendToGatewayTx", err, inf)
 	}
-	bal := inf.(*amount.Amount)
+	bal := inf[0].(*amount.Amount)
 	return bal
 }

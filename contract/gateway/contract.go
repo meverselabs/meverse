@@ -196,7 +196,11 @@ func (cont *GatewayContract) TokenOut(cc *types.ContractContext, Platform string
 	feebs := cc.ContractData(makePlatformFeeKey(pf))
 	fee := amount.NewAmountFromBytes(feebs)
 
-	if _, err := cc.Exec(cc, taddr, "TransferFrom", []interface{}{cc.From(), cont.Master(), fee}); err != nil {
+	feeOwner := cont.FeeOwner(cc)
+	if feeOwner == common.ZeroAddr {
+		feeOwner = cont.Master()
+	}
+	if _, err := cc.Exec(cc, taddr, "TransferFrom", []interface{}{cc.From(), feeOwner, fee}); err != nil {
 		return err
 	}
 	if _, err := cc.Exec(cc, taddr, "TransferFrom", []interface{}{cc.From(), cont.Address(), Amount}); err != nil {
@@ -241,12 +245,24 @@ func (cont *GatewayContract) SetSender(cc *types.ContractContext, To common.Addr
 	return nil
 }
 
+func (cont *GatewayContract) SetFeeOwner(cc *types.ContractContext, feeOwner common.Address) error {
+	if cc.From() != cont.Master() {
+		return errors.New("not token master")
+	}
+	cc.SetContractData([]byte{tagFeeOwner}, feeOwner.Bytes())
+	return nil
+}
+
 //////////////////////////////////////////////////
 // Public Reader Functions
 //////////////////////////////////////////////////
 
 func (cont *GatewayContract) TokenAddress(cc *types.ContractContext) common.Address {
 	return common.BytesToAddress(cc.ContractData([]byte{tagTokenContractAddress}))
+}
+
+func (cont *GatewayContract) FeeOwner(cc *types.ContractContext) common.Address {
+	return common.BytesToAddress(cc.ContractData([]byte{tagFeeOwner}))
 }
 
 func (cont *GatewayContract) IsSender(cc types.ContractLoader, addr common.Address) bool {

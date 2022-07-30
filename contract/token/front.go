@@ -22,8 +22,9 @@ func (f *front) SubCollectedFee(cc *types.ContractContext, am *amount.Amount) er
 	return f.cont.SubCollectedFee(cc, am)
 }
 
-func (f *front) Transfer(cc *types.ContractContext, To common.Address, Amount *amount.Amount) error {
-	return f.cont.Transfer(cc, To, Amount)
+func (f *front) Transfer(cc *types.ContractContext, To common.Address, Amount *amount.Amount) (bool, error) {
+	err := f.cont.Transfer(cc, To, Amount)
+	return err == nil, err
 }
 
 func (f *front) Burn(cc *types.ContractContext, am *amount.Amount) error {
@@ -42,12 +43,14 @@ func (f *front) SetMinter(cc *types.ContractContext, To common.Address, Is bool)
 	return f.cont.SetMinter(cc, To, Is)
 }
 
-func (f *front) Approve(cc *types.ContractContext, To common.Address, Amount *amount.Amount) error {
-	return f.cont.Approve(cc, To, Amount)
+func (f *front) Approve(cc *types.ContractContext, To common.Address, Amount *amount.Amount) (bool, error) {
+	err := f.cont.Approve(cc, To, Amount)
+	return err == nil, err
 }
 
-func (f *front) TransferFrom(cc *types.ContractContext, From common.Address, To common.Address, Amount *amount.Amount) error {
-	return f.cont.TransferFrom(cc, From, To, Amount)
+func (f *front) TransferFrom(cc *types.ContractContext, From common.Address, To common.Address, Amount *amount.Amount) (bool, error) {
+	err := f.cont.TransferFrom(cc, From, To, Amount)
+	return err == nil, err
 }
 func (f *front) SetGateway(cc *types.ContractContext, Gateway common.Address, Is bool) error {
 	return f.cont.SetGateway(cc, Gateway, Is)
@@ -66,6 +69,15 @@ func (f *front) SetName(cc *types.ContractContext, name string) {
 }
 func (f *front) SetSymbol(cc *types.ContractContext, symbol string) {
 	f.cont.SetSymbol(cc, symbol)
+}
+func (f *front) IsPause(cc *types.ContractContext) bool {
+	return f.cont.isPause(cc)
+}
+func (f *front) Pause(cc *types.ContractContext) error {
+	return f.cont.Pause(cc)
+}
+func (f *front) Unpause(cc *types.ContractContext) error {
+	return f.cont.Unpause(cc)
 }
 
 //////////////////////////////////////////////////

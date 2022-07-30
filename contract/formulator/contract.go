@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"math/big"
 	"strings"
 
@@ -212,8 +213,10 @@ func (cont *FormulatorContract) OnReward(cc *types.ContractContext, b *types.Blo
 				return nil, err
 			}
 		}
+		log.Println("TotalReward", TotalReward.String(), "TotalFee", TotalFee.String())
 		TotalReward = TotalReward.Add(TotalFee)
 		TotalForCmp = amount.NewAmountFromBytes(TotalReward.Int.Bytes())
+		log.Println("TotalReward", TotalReward.String(), "TotalFee", TotalFee.String(), "TotalForCmp", TotalForCmp.String())
 
 		Ratio := TotalReward.Div(RewardPowerSum)
 		for RewardAddress, RewardPower := range RewardPowerMap {
@@ -329,6 +332,45 @@ func (cont *FormulatorContract) addRewardMap(rewardMap map[common.Address]*amoun
 		rewardMap[RewardAddress] = am
 	}
 	am.Int.Add(am.Int, RewardAmount.Int)
+}
+
+func (cont *FormulatorContract) SetRewardPolicy(cc *types.ContractContext, bs []byte) error {
+	if cont.master != cc.From() {
+		return errors.New("is not master")
+	}
+
+	rewardPolicy := &RewardPolicy{}
+	if _, err := rewardPolicy.ReadFrom(bytes.NewReader(bs)); err != nil {
+		return err
+	}
+
+	if bs, _, err := bin.WriterToBytes(rewardPolicy); err != nil {
+		return err
+	} else {
+		cc.SetContractData([]byte{tagRewardPolicy}, bs)
+	}
+	return nil
+}
+
+func (cont *FormulatorContract) SetRewardPerBlock(cc *types.ContractContext, RewardPerBlock *amount.Amount) error {
+	if cont.master != cc.From() {
+		return errors.New("is not master")
+	}
+
+	rewardPolicy := &RewardPolicy{}
+	if _, err := rewardPolicy.ReadFrom(bytes.NewReader(cc.ContractData([]byte{tagRewardPolicy}))); err != nil {
+		return err
+	}
+
+	rewardPolicy.RewardPerBlock = RewardPerBlock
+
+	if bs, _, err := bin.WriterToBytes(rewardPolicy); err != nil {
+		return err
+	} else {
+		cc.SetContractData([]byte{tagRewardPolicy}, bs)
+	}
+
+	return nil
 }
 
 //////////////////////////////////////////////////
