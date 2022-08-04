@@ -196,11 +196,11 @@ func Genesis() *types.ContextData {
 		fmt.Println("formulatorAddress", formulatorAddress.String())
 		// formulatorAddress 0x75A098f86bAe71039217a879f064d034c59C3766
 	}
-	types.SetLegacyCheckHeight(25298976)
 	return genesis.Top()
 }
 
 func RegisterContractClass() map[string]uint64 {
+	types.SetLegacyCheckHeight(25298976)
 	ClassMap := map[string]uint64{}
 	registerContractClass(&token.TokenContract{}, "Token", ClassMap)
 	registerContractClass(&formulator.FormulatorContract{}, "Formulator", ClassMap)
