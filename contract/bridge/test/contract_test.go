@@ -52,6 +52,9 @@ func setupTest() *util.TestContext {
 	tc.MustSendTx(util.UserKeys[0], bridgeAddr, "SetTokenFeeInfo", "BSC", uint16(0))
 	tc.MustSendTx(util.UserKeys[0], bridgeAddr, "SetTokenFeeInfo", "POLYGON", uint16(0))
 
+	tc.MustSendTx(util.UserKeys[0], bridgeAddr, "TransferTokenFeeOwnership", common.HexToAddress("0x0fee"))
+	tc.MustSendTx(util.UserKeys[0], bridgeAddr, "SetTransferTokenFeeInfo", "ETHEREUM", uint16(10))
+
 	testUsers = []common.Address{
 		util.Users[2],
 		util.Users[3],
@@ -96,6 +99,45 @@ func TestSendToGatewayTx(t *testing.T) {
 
 	log.Println(tokenCont.BalanceOf(tcc, util.Users[3]).String())
 	_, err = tc.MakeTx(util.UserKeys[3], bridgeAddr, "SendToGateway", tc.MainToken, amount.NewAmount(10, 0), []common.Address{}, "POLYGON", []byte("MEVERSE/POLYGON/MEV"))
+	if err != nil {
+		t.Errorf("TestSendToGatewayTx error = %+v", err)
+	}
+	log.Println(tokenCont.BalanceOf(tcc, util.Users[3]).String())
+
+	bv, err := tc.Ctx.Contract(bridgeAddr)
+	if err != nil {
+		t.Errorf("contract load error")
+	}
+
+	cont := bv.(*bridge.BridgeContract)
+	bcc := tc.Ctx.ContractContext(cont, util.Admin)
+	fcont := cont.Front().(bridge.BridgeFront)
+	log.Println(fcont.GetSequenceFrom(bcc, banker, "POLYGON"))
+}
+
+func TestSendToGatewayEthTx(t *testing.T) {
+	tc := setupTest()
+	// token, amt, path []common.Address, toChain string, summary []byte
+	_, err := tc.MakeTx(util.UserKeys[3], bridgeAddr, "SendToGateway", tc.MainToken, amount.NewAmount(10, 0), []common.Address{}, "ETHEREUM", []byte("MEVERSE/ETHEREUM/MEV"))
+	if err == nil {
+		t.Errorf("TestSendToGatewayTx error not approved but tx success")
+	}
+
+	_, err = tc.MakeTx(util.UserKeys[3], tc.MainToken, "Approve", bridgeAddr, amount.NewAmount(10000000000, 0))
+	if err != nil {
+		t.Errorf("TestSendToGatewayTx error = %+v", err)
+	}
+
+	mv, err := tc.Ctx.Contract(tc.MainToken)
+	if err != nil {
+		t.Errorf("contract load error")
+	}
+	tokenCont := mv.(*token.TokenContract)
+	tcc := tc.Ctx.ContractContext(tokenCont, util.Admin)
+	log.Println(tokenCont.TotalSupply(tcc))
+
+	log.Println(tokenCont.BalanceOf(tcc, util.Users[3]).String())
+	_, err = tc.MakeTx(util.UserKeys[3], bridgeAddr, "SendToGateway", tc.MainToken, amount.NewAmount(100, 0), []common.Address{}, "ETHEREUM", []byte("MEVERSE/ETHEREUM/MEV"))
 	if err != nil {
 		t.Errorf("TestSendToGatewayTx error = %+v", err)
 	}
@@ -168,7 +210,7 @@ func TestSend1Mev(t *testing.T) {
 		[]*amount.Amount{
 			amount.NewAmount(0, 0),
 			amount.NewAmount(0, 0),
-			amount.NewAmount(0, 0),
+			amount.NewAmount(1, 0),
 			amount.NewAmount(100, 0),
 		},
 		[]*amount.Amount{

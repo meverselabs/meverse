@@ -125,22 +125,28 @@ func (cont *BridgeContract) sendToGateway(cc *types.ContractContext, token commo
 	if !amt.IsPlus() {
 		return errors.New("sendToGateway: plus amount")
 	}
-	mt := cc.MainToken()
+	mt := *cc.MainToken()
 	transferFee := cont.transferFeeInfoToChain(cc, toChain)
-	if bal, err := getBalanceOf(cc, *mt, cc.From()); err != nil {
-		return err
-	} else if bal.Cmp(transferFee.Int) < 0 {
-		return errors.New("sendToGateway: fee is not valid")
+	transferTokenFeeFactor := cont.transferTokenFeeInfoToChain(cc, toChain)
+	transferTokenFee := amt.MulC(int64(transferTokenFeeFactor)).DivC(int64(feeFactorMax))
+	if transferTokenFee.IsMinus() {
+		return errors.New("sendToGateway: invalid token fee")
 	}
+
+	// if bal, err := getBalanceOf(cc, *mt, cc.From()); err != nil {
+	// 	return err
+	// } else if bal.Cmp(transferFee.Int) < 0 {
+	// 	return errors.New("sendToGateway: fee is not valid")
+	// }
 	// require(
 	// 	IERC20(token).allowance(_msgSender(), address(this)) >= amt,
 	// 	"sendToGateway: insufficient allowance"
 	// );
-	if allow, err := getAllowance(cc, token, cc.From(), cont.addr); err != nil {
-		return err
-	} else if allow.Cmp(amt.Int) < 0 {
-		return errors.New("sendToGateway: insufficient allowance")
-	}
+	// if allow, err := getAllowance(cc, token, cc.From(), cont.addr); err != nil {
+	// 	return err
+	// } else if allow.Cmp(amt.Int) < 0 {
+	// 	return errors.New("sendToGateway: insufficient allowance")
+	// }
 	// SafeERC20.safeTransferFrom(
 	// 	IERC20(token),
 	// 	_msgSender(),
@@ -154,8 +160,14 @@ func (cont *BridgeContract) sendToGateway(cc *types.ContractContext, token commo
 	// if (transferFee > 0) {
 	// 	payable(feeOwner()).transfer(transferFee);
 	// }
-	if transferFee.Cmp(big.NewInt(0)) > 0 {
-		if err := safeTransferFrom(cc, *mt, cc.From(), cont.feeOwner(cc), transferFee); err != nil {
+	if transferFee.IsPlus() {
+		if err := safeTransferFrom(cc, mt, cc.From(), cont.feeOwner(cc), transferFee); err != nil {
+			return err
+		}
+	}
+	tokenFeeOwner := cont.tokenFeeOwner(cc)
+	if transferTokenFee.IsPlus() && tokenFeeOwner != common.ZeroAddr {
+		if err := safeTransferFrom(cc, token, cc.From(), tokenFeeOwner, transferTokenFee); err != nil {
 			return err
 		}
 	}
@@ -189,9 +201,24 @@ func (cont *BridgeContract) feeOwner(cc *types.ContractContext) common.Address {
 	return addr
 }
 
+func (cont *BridgeContract) tokenFeeOwner(cc *types.ContractContext) common.Address {
+	bs := cc.ContractData([]byte{tagTokenFeeOwnerAddress})
+	var addr common.Address
+	copy(addr[:], bs)
+	return addr
+}
+
 func (cont *BridgeContract) transferFeeInfoToChain(cc *types.ContractContext, chain string) *amount.Amount {
 	bs := cc.ContractData(makeTransferFeeInfoToChain(chain))
 	return amount.NewAmountFromBytes(bs)
+}
+
+func (cont *BridgeContract) transferTokenFeeInfoToChain(cc *types.ContractContext, chain string) uint16 {
+	bs := cc.ContractData(makeTransferTokenFeeInfoToChain(chain))
+	if len(bs) == 0 || len(bs) != 2 {
+		return 0
+	}
+	return bin.Uint16(bs)
 }
 
 func (cont *BridgeContract) tokenFeeInfoFromChain(cc *types.ContractContext, chain string) uint16 {
@@ -257,12 +284,16 @@ func (cont *BridgeContract) sendFromGateway(cc *types.ContractContext, token com
 		// 	SafeERC20.safeTransfer(IERC20(token), to, tokenFee);
 		// }
 		// uint256 caldAmount = SafeMath.sub(amountChangedDecimal, tokenFee);
-		tokenFee := amount.NewAmount(0, 0)
-		if fromChain == "MEVERSE" && cont.meverseToken(cc) != token {
-			tokenFeeFactor := cont.tokenFeeInfoFromChain(cc, fromChain)
-			tokenFee = amt.MulC(int64(tokenFeeFactor)).DivC(int64(feeFactorMax))
+		// tokenFee := amount.NewAmount(0, 0)
+		// if fromChain == "MEVERSE" && cont.meverseToken(cc) != token {
+		tokenFeeFactor := cont.tokenFeeInfoFromChain(cc, fromChain)
+		tokenFee := amt.MulC(int64(tokenFeeFactor)).DivC(int64(feeFactorMax))
+		if tokenFee.IsPlus() {
 			safeTransfer(cc, token, cont.feeOwner(cc), tokenFee)
+		} else if tokenFee.IsMinus() {
+			return errors.New("sendFromGateway: invalid token fee")
 		}
+		// }
 		caldAmount := amt.Sub(tokenFee)
 
 		// SafeERC20.safeTransfer(IERC20(token), to, caldAmount);
@@ -297,6 +328,14 @@ func (cont *BridgeContract) setTransferFeeInfo(cc *types.ContractContext, chain 
 	}
 	// transferFeeInfoToChain[chain] = transferFee;
 	cc.SetContractData(makeTransferFeeInfoToChain(chain), transferFee.Bytes())
+	return nil
+}
+
+func (cont *BridgeContract) setTransferTokenFeeInfo(cc *types.ContractContext, chain string, tokenFee uint16) error {
+	if !cont.checkOwner(cc) {
+		return errors.New("not owner")
+	}
+	cc.SetContractData(makeTransferTokenFeeInfoToChain(chain), bin.Uint16Bytes(tokenFee))
 	return nil
 }
 
@@ -350,6 +389,21 @@ func (cont *BridgeContract) transferFeeOwnership(cc *types.ContractContext, newF
 		return errors.New("FeeOwnable: new FeeOwner is the zero address")
 	}
 	cc.SetContractData([]byte{tagFeeOwnerAddress}, newFeeOwner[:])
+	return nil
+}
+
+func (cont *BridgeContract) transferTokenFeeOwnership(cc *types.ContractContext, newFeeOwner common.Address) error {
+	if !cont.checkOwner(cc) {
+		return errors.New("not owner")
+	}
+	// require(
+	// 	newFeeOwner != address(0),
+	// 	"FeeOwnable: new FeeOwner is the zero address"
+	// );
+	if newFeeOwner == common.ZeroAddr {
+		return errors.New("FeeOwnable: new FeeOwner is the zero address")
+	}
+	cc.SetContractData([]byte{tagTokenFeeOwnerAddress}, newFeeOwner[:])
 	return nil
 }
 
