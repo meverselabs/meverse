@@ -20,8 +20,7 @@ import (
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/meverselabs/meverse/node"
 	"github.com/meverselabs/meverse/service/apiserver"
-	"github.com/meverselabs/meverse/service/apiserver/viewchain"
-	"github.com/meverselabs/meverse/service/txsearch"
+	"github.com/meverselabs/meverse/service/apiserver/zipcontext"
 )
 
 // Config is a configuration for the cmd
@@ -163,9 +162,9 @@ func main() {
 
 	cn := chain.NewChain(ObserverKeys, st, "")
 	rpcapi := apiserver.NewAPIServer()
-	ts := txsearch.NewTxSearch(cfg.StoreRoot+"/_txsearch", rpcapi, st, cn, cfg.InitHeight)
-	cn.MustAddService(ts)
+	zipContext := zipcontext.NewZipContextService(rpcapi, st, "./zipcontext/", 172800)
 	cn.MustAddService(rpcapi)
+	cn.MustAddService(zipContext)
 	if cfg.InitHeight == 0 {
 		if err := cn.Init(app.Genesis()); err != nil {
 			panic(err)
@@ -204,8 +203,6 @@ func main() {
 	cm.Add("formulator", fr)
 
 	go rpcapi.Run(":" + strconv.Itoa(cfg.RPCPort))
-	viewchain.NewViewchain(rpcapi, ts, cn, st, fr)
-
 	go fr.Run(":" + strconv.Itoa(cfg.Port))
 
 	cm.Wait()
