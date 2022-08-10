@@ -1,7 +1,0 @@
--read
-
-
--write
-
-reveal(strs []string) string {
-
