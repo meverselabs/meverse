@@ -4,6 +4,7 @@ const MANAGER                   = "02"
 const MARKET_FEE                = "03"
 const ROYALTY_FEE               = "04"
 const MARKETDATA                = "05"
+const BURN_FEE                  = "06"
 
 const MAX_PERCENT = 10000n; // 2 decimal precision for percentage (100.00%)
 const MAX_PRICE = 1157920892373161954235709850086879078532699846656405640394575840079131296n; // = ((2^256)-1)/10000, since to avoid multiplication overflow we should satisfy X*10000<=(2^256-1)
@@ -146,7 +147,16 @@ function _setRoyaltyFee(val) {
     return Mev.SetContractData(ROYALTY_FEE, val)
 }
 
+function _burnFee() {
+    return BigInt(Mev.ContractData(BURN_FEE))
+}
+function _setBurnFee(val) {
+    val = BigInt(val)
+    return Mev.SetContractData(BURN_FEE, val)
+}
+
 function transferFrom(nftAddress, owner, to, tokenId) {
+    require(address(owner) == address(Mev.From()), "not owner")
     Mev.Exec(nftAddress, "transferFrom", [owner, to, tokenId]);
 }
 
@@ -155,6 +165,10 @@ function getItemSuggestionInfos(nftAddress, tokenId, currency) {
     nftAddress = address(nftAddress)
     tokenId = BigInt(tokenId)
     return Mev.Exec(_marketData(), "getItemSuggestionInfos", [nftAddress, tokenId, currency])
+}
+
+function getMarketItem(token, tokenId) {
+    return Mev.Exec(_marketData(), "getMarketItem", [token, tokenId])
 }
 
 function getMarketDataContractAddress() {
@@ -248,14 +262,18 @@ function acceptItemToBuyWithSeller(nftAddress, tokenId, suggestedBiddingPrice, c
     let adminAddress = Mev.Exec(_marketData(), "getFoundationAdminAddress", [nftAddress]);
     adminAddress = address(adminAddress)
     require(adminAddress != address(0), "NftMarket.acceptItemToBuy: foundation admin is not setted");
+    let burnAddress = Mev.Exec(_marketData(), "getBurnAddress", [nftAddress]);
+    burnAddress = address(burnAddress)
+    require(burnAddress != address(0), "NftMarket.acceptItemToBuy: burn is not setted");
     
     let totalAmountForMarket = 0n;
     let remainAmount = suggestedBiddingPrice;
     let marketFee = _calcMarketFee(remainAmount);
     let foundationRoyalty = _calcRoyaltyFee(remainAmount);
+    let burnCap = _calcBurnFee(remainAmount);
     {
-        remainAmount = remainAmount - marketFee - foundationRoyalty;
-        totalAmountForMarket = totalAmountForMarket + marketFee + foundationRoyalty;
+        remainAmount = remainAmount - marketFee - foundationRoyalty - burnCap;
+        totalAmountForMarket = totalAmountForMarket + marketFee + foundationRoyalty + burnCap;
         // _marketData.addMarketFee(marketFee, currency);
         Mev.Exec(_marketData(), "addMarketFee", [marketFee, currency]);
         // _marketData.addFoundationRoyalty(adminAddress, foundationRoyalty, currency);
@@ -280,6 +298,7 @@ function acceptItemToBuyWithSeller(nftAddress, tokenId, suggestedBiddingPrice, c
         // erc20Contract.transferFrom(suggestItem.buyer, _msgSender(), remainAmount);
         Mev.Exec(erc20Contract, "transferFrom", [suggestItem.buyer, _marketData(), marketFee]);
         Mev.Exec(erc20Contract, "transferFrom", [suggestItem.buyer, adminAddress, foundationRoyalty]);
+        Mev.Exec(erc20Contract, "transferFrom", [suggestItem.buyer, burnAddress, burnCap]);
         Mev.Exec(erc20Contract, "transferFrom", [suggestItem.buyer, _msgSender(), remainAmount]);
         // _marketData.acceptItemSuggestion(_msgSender(), nftAddress, tokenId, suggestedBiddingPrice, currency);
         Mev.Exec(_marketData(), "acceptItemSuggestion", [_msgSender(), nftAddress, tokenId, suggestedBiddingPrice, currency]);
@@ -377,6 +396,16 @@ function setRoyaltyFee(newFee) {
     // emit RoyaltyFeeUpdate(oldFee, newFee);
 }
 
+function setBurnFee(newFee) {
+    onlyManager()
+    newFee = BigInt(newFee)
+    require(newFee <= MAX_PERCENT , "Invaild fee");
+    // uint256 oldFee = _ROYALTY_FEE_;
+    _setBurnFee(newFee)
+    // _ROYALTY_FEE_ = newFee;
+    // emit RoyaltyFeeUpdate(oldFee, newFee);
+}
+
 function setMandatoryMarketDataContract(marketData) {
     onlyOwner()
     marketData = address(marketData)
@@ -439,6 +468,12 @@ function _settle(marketItem, buyerAddress, amount, currency) {
     nftOwner = address(nftOwner)
     
     require(adminAddress != address(0), "NftMarket._settle: foundation admin is not setted");
+
+    let burnAddress = Mev.Exec(_marketData(), "getBurnAddress", [nft]);
+    burnAddress = address(burnAddress)
+    Mev.Log(burnAddress)
+    require(burnAddress != address(0), "NftMarket.acceptItemToBuy: burn is not setted");
+
     // require(nft.isApprovedForAll(marketItem.seller, address(this)), "NftMarket._settle: NOT_APPROVED_OR_INVALID_TOKEN_ID");
     let isapp = Mev.Exec(nft, "isApprovedForAll", [marketItem.seller, Mev.This()])
     require(isapp == "true", "NftMarket._settle: NOT_APPROVED_OR_INVALID_TOKEN_ID");
@@ -450,12 +485,14 @@ function _settle(marketItem, buyerAddress, amount, currency) {
     let remainAmount = amount;
     let marketFee = 0n;
     let foundationRoyalty = 0n;
+    let burnCap = 0n;
     {
         let totalAmountForMarket = 0n;
         marketFee = _calcMarketFee(remainAmount);
         foundationRoyalty = _calcRoyaltyFee(remainAmount);
-        remainAmount = remainAmount - marketFee - foundationRoyalty;
-        totalAmountForMarket = totalAmountForMarket + marketFee + foundationRoyalty;
+        burnCap = _calcBurnFee(remainAmount);
+        remainAmount = remainAmount - marketFee - foundationRoyalty - burnCap;
+        totalAmountForMarket = totalAmountForMarket + marketFee + foundationRoyalty + burnCap;
         // _marketData.addMarketFee(marketFee, currency);
         Mev.Exec(_marketData(), "addMarketFee", [marketFee, currency])
         
@@ -486,12 +523,18 @@ function _settle(marketItem, buyerAddress, amount, currency) {
         // erc20Contract.transferFrom(buyerAddress, nftOwner, remainAmount);
         Mev.Exec(erc20Contract, "transferFrom", [buyerAddress, _marketData(), marketFee])
         Mev.Exec(erc20Contract, "transferFrom", [buyerAddress, adminAddress, foundationRoyalty])
+        Mev.Exec(erc20Contract, "transferFrom", [buyerAddress, burnAddress, burnCap])
         Mev.Exec(erc20Contract, "transferFrom", [buyerAddress, nftOwner, remainAmount])
         
         // _marketData.transactCompleteItemInMarket(marketItem);
         Mev.Exec(_marketData(), "transactCompleteItemInMarket", [marketItem])
         // emit MarketItemCompleted(SaleType.BUY_NOW, address(marketItem.nft.tokenContract), marketItem.nft.tokenId, marketItem.seller, _msgSender(), address(erc20Contract), amount);
     }
+}
+
+function _calcBurnFee(amount) {
+    amount = BigInt(amount)
+    return (amount * _burnFee()) / MAX_PERCENT;
 }
 
 function _calcRoyaltyFee(amount) {

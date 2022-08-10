@@ -16,7 +16,7 @@ var dataPath = "../market_data.js"
 var operationPath = "../market_operation.js"
 
 func _init() (tc *util.TestContext, egAddr, dataAddr, marketAddr, tokenAddr, nft1Addr, nft2Addr common.Address, nft1IDs, nft2IDs []*big.Int) {
-	tc, egAddr, dataAddr, marketAddr = setupMarketCont("100", "500", dataPath, operationPath)
+	tc, egAddr, dataAddr, marketAddr = setupMarketCont("200", "200", "100", dataPath, operationPath)
 	tokenAddr = deployToken(tc, "STOKEN", "STC")
 	nft1Addr = deployNFT(tc, egAddr, "FristNFT", "FNFT")
 	nft2Addr = deployNFT(tc, egAddr, "SecondNFT", "SNFT")
@@ -33,6 +33,16 @@ func _init() (tc *util.TestContext, egAddr, dataAddr, marketAddr, tokenAddr, nft
 		panic(err)
 	}
 	inf, err = tc.MakeTx(util.AdminKey, dataAddr, "setFoundationAdminAddress", nft2Addr, util.Users[1])
+	if err != nil {
+		log.Println(inf)
+		panic(err)
+	}
+	inf, err = tc.MakeTx(util.AdminKey, dataAddr, "setBurnAddress", nft1Addr, common.HexToAddress("0xdead"))
+	if err != nil {
+		log.Println(inf)
+		panic(err)
+	}
+	inf, err = tc.MakeTx(util.AdminKey, dataAddr, "setBurnAddress", nft2Addr, common.HexToAddress("0xdead"))
 	if err != nil {
 		log.Println(inf)
 		panic(err)
@@ -64,6 +74,11 @@ func _init() (tc *util.TestContext, egAddr, dataAddr, marketAddr, tokenAddr, nft
 		log.Println(inf)
 		panic(err)
 	}
+	inf, err = tc.MakeTx(util.UserKeys[2], nft1Addr, "setApprovalForAll", marketAddr, true)
+	if err != nil {
+		log.Println(inf)
+		panic(err)
+	}
 	inf, err = tc.MakeTx(util.AdminKey, nft2Addr, "setApprovalForAll", marketAddr, true)
 	if err != nil {
 		log.Println(inf)
@@ -75,6 +90,11 @@ func _init() (tc *util.TestContext, egAddr, dataAddr, marketAddr, tokenAddr, nft
 		panic(err)
 	}
 	inf, err = tc.MakeTx(util.UserKeys[1], nft2Addr, "setApprovalForAll", marketAddr, true)
+	if err != nil {
+		log.Println(inf)
+		panic(err)
+	}
+	inf, err = tc.MakeTx(util.UserKeys[2], nft2Addr, "setApprovalForAll", marketAddr, true)
 	if err != nil {
 		log.Println(inf)
 		panic(err)
@@ -147,31 +167,33 @@ func TestRegisterMarketItemBuyNowWithToken(t *testing.T) {
 	}
 
 	inf, _ = tc.ReadTx(util.UserKeys[2], tokenAddr, "balanceOf", util.Users[2])
-	iss := inf[0].([]interface{})
-	am := iss[0].(*amount.Amount)
+	am := inf[0].(*amount.Amount)
 	if am.String() != "0" {
-		t.Errorf("expect zero")
+		t.Errorf("expect zero " + am.String())
 		return
 	}
 	inf, _ = tc.ReadTx(util.UserKeys[0], tokenAddr, "balanceOf", util.Users[1])
-	iss = inf[0].([]interface{})
-	am = iss[0].(*amount.Amount)
-	if am.String() != "47000" {
-		t.Errorf("expect 47000")
+	am = inf[0].(*amount.Amount)
+	if am.String() != "47500" {
+		t.Errorf("expect 47500 " + am.String())
 		return
 	}
 	inf, _ = tc.ReadTx(util.UserKeys[0], tokenAddr, "balanceOf", dataAddr)
-	iss = inf[0].([]interface{})
-	am = iss[0].(*amount.Amount)
-	if am.String() != "500" {
-		t.Errorf("expect 500")
+	am = inf[0].(*amount.Amount)
+	if am.String() != "1000" {
+		t.Errorf("expect 1000 " + am.String())
 		return
 	}
 	inf, _ = tc.ReadTx(util.UserKeys[0], tokenAddr, "balanceOf", util.Users[0])
-	iss = inf[0].([]interface{})
-	am = iss[0].(*amount.Amount)
-	if am.String() != "2500" {
-		t.Errorf("expect 2500")
+	am = inf[0].(*amount.Amount)
+	if am.String() != "1000" {
+		t.Errorf("expect 1000 " + am.String())
+		return
+	}
+	inf, _ = tc.ReadTx(util.UserKeys[0], tokenAddr, "balanceOf", common.HexToAddress("0xdead"))
+	am = inf[0].(*amount.Amount)
+	if am.String() != "500" {
+		t.Errorf("expect 500 " + am.String())
 		return
 	}
 }
@@ -253,31 +275,33 @@ func TestRegisterMarketItemNftTransferBuyNowWithTokenRegisterMarketItemBuyNowWit
 	}
 
 	inf, _ = tc.ReadTx(util.UserKeys[2], tokenAddr, "balanceOf", util.Users[2])
-	iss := inf[0].([]interface{})
-	am := iss[0].(*amount.Amount)
+	am := inf[0].(*amount.Amount)
 	if am.String() != "0" {
 		t.Errorf("expect zero")
 		return
 	}
 	inf, _ = tc.ReadTx(util.UserKeys[0], tokenAddr, "balanceOf", util.Admin)
-	iss = inf[0].([]interface{})
-	am = iss[0].(*amount.Amount)
-	if am.String() != "47000" {
-		t.Errorf("expect 47000 %v", am.String())
+	am = inf[0].(*amount.Amount)
+	if am.String() != "47500" {
+		t.Errorf("expect 47500 %v", am.String())
 		return
 	}
 	inf, _ = tc.ReadTx(util.UserKeys[0], tokenAddr, "balanceOf", dataAddr)
-	iss = inf[0].([]interface{})
-	am = iss[0].(*amount.Amount)
-	if am.String() != "500" {
-		t.Errorf("expect 500 %v", am.String())
+	am = inf[0].(*amount.Amount)
+	if am.String() != "1000" {
+		t.Errorf("expect 1000 %v", am.String())
 		return
 	}
 	inf, _ = tc.ReadTx(util.UserKeys[0], tokenAddr, "balanceOf", util.Users[0])
-	iss = inf[0].([]interface{})
-	am = iss[0].(*amount.Amount)
-	if am.String() != "2500" {
-		t.Errorf("expect 2500 %v", am.String())
+	am = inf[0].(*amount.Amount)
+	if am.String() != "1000" {
+		t.Errorf("expect 1000 %v", am.String())
+		return
+	}
+	inf, _ = tc.ReadTx(util.UserKeys[0], tokenAddr, "balanceOf", common.HexToAddress("0xdead"))
+	am = inf[0].(*amount.Amount)
+	if am.String() != "500" {
+		t.Errorf("expect 500 " + am.String())
 		return
 	}
 }
@@ -368,6 +392,7 @@ func TestSuggestItemToBuyCancelItemToBuyWithSuggester(t *testing.T) {
 	inf, err = tc.ReadTx(util.UserKeys[1], marketAddr, "getItemSuggestionInfos", nft2Addr, nft2IDs[1], "USDT")
 	if strings.Count(fmt.Sprintln(inf), "SuggestItem") != 0 {
 		t.Errorf("error not expect len 1 %v, err %v", strings.Count(fmt.Sprintln(inf), "SuggestItem"), err)
+		return
 	}
 
 }
@@ -564,42 +589,78 @@ func TestMultiSuggestItemToBuyLowAcceptItemToBuyWithSeller(t *testing.T) {
 
 	buyp := amount.MustParseAmount("2500")
 	buyp2 := amount.MustParseAmount("3000")
-	_, err := tc.MakeTx(util.UserKeys[0], tokenAddr, "approve", marketAddr, buyp)
+	_, err := tc.MakeTx(util.UserKeys[3], tokenAddr, "approve", marketAddr, buyp)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
-	_, err = tc.MakeTx(util.AdminKey, tokenAddr, "Mint", util.Users[0], buyp)
+	_, err = tc.MakeTx(util.AdminKey, tokenAddr, "Mint", util.Users[3], buyp)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
-	_, err = tc.MakeTx(util.UserKeys[2], tokenAddr, "approve", marketAddr, buyp2)
+	_, err = tc.MakeTx(util.AdminKey, tc.MainToken, "Mint", util.Users[4], buyp)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
-	_, err = tc.MakeTx(util.AdminKey, tokenAddr, "Mint", util.Users[2], buyp2)
+	_, err = tc.MakeTx(util.UserKeys[4], tokenAddr, "approve", marketAddr, buyp2)
+	if err != nil {
+		t.Errorf("error not expect %+v", err)
+		return
+	}
+	_, err = tc.MakeTx(util.AdminKey, tokenAddr, "Mint", util.Users[4], buyp2)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
 
-	inf, err := tc.MakeTx(util.UserKeys[0], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[0], buyp, "USDT")
+	inf, err := tc.MakeTx(util.UserKeys[3], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], buyp, "USDT")
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[2], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[0], buyp2, "USDT")
+	inf, err = tc.MakeTx(util.UserKeys[4], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], buyp2, "USDT")
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[1], marketAddr, "acceptItemToBuyWithSeller", nft2Addr, nft2IDs[0], buyp2, "USDT")
+	inf, err = tc.MakeTx(util.UserKeys[2], marketAddr, "acceptItemToBuyWithSeller", nft2Addr, nft2IDs[1], buyp2, "USDT")
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
+		return
+	}
+
+	inf, _ = tc.ReadTx(util.UserKeys[4], tokenAddr, "balanceOf", util.Users[4])
+	am := inf[0].(*amount.Amount)
+	if am.String() != "0" {
+		t.Errorf("expect zero")
+		return
+	}
+	inf, _ = tc.ReadTx(util.UserKeys[2], tokenAddr, "balanceOf", util.Users[2])
+	am = inf[0].(*amount.Amount)
+	if am.String() != "2850" {
+		t.Errorf("expect 2850 %v", am.String())
+		return
+	}
+	inf, _ = tc.ReadTx(util.UserKeys[2], tokenAddr, "balanceOf", dataAddr)
+	am = inf[0].(*amount.Amount)
+	if am.String() != "60" {
+		t.Errorf("expect 60 %v", am.String())
+		return
+	}
+	inf, _ = tc.ReadTx(util.UserKeys[2], tokenAddr, "balanceOf", util.Users[1])
+	am = inf[0].(*amount.Amount)
+	if am.String() != "60" {
+		t.Errorf("expect 60 %v", am.String())
+		return
+	}
+	inf, _ = tc.ReadTx(util.UserKeys[0], tokenAddr, "balanceOf", common.HexToAddress("0xdead"))
+	am = inf[0].(*amount.Amount)
+	if am.String() != "30" {
+		t.Errorf("expect 30 " + am.String())
 		return
 	}
 }

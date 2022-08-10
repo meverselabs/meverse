@@ -66,7 +66,7 @@ func deployToken(tc *util.TestContext, _name string, _symbol string) common.Addr
 	return tc.DeployContract(ContType, ContArgs)
 }
 
-func setupMarketCont(marketFeeStr, royaltyFeeStr, dataPath, operationPath string) (tc *util.TestContext, egAddr, dataAddr, marketAddr common.Address) {
+func setupMarketCont(marketFeeStr, royaltyFeeStr, burnFee, dataPath, operationPath string) (tc *util.TestContext, egAddr, dataAddr, marketAddr common.Address) {
 	tc, egAddr = initEngin()
 
 	{
@@ -121,6 +121,11 @@ func setupMarketCont(marketFeeStr, royaltyFeeStr, dataPath, operationPath string
 			panic(fmt.Sprintf("error not expect %+v", err))
 		}
 		log.Println(inf)
+		inf, err = tc.MakeTx(util.AdminKey, marketAddr, "setBurnFee", burnFee)
+		if err != nil {
+			log.Println(inf)
+			panic(err)
+		}
 	}
 	return
 }

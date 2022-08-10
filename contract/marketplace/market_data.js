@@ -9,6 +9,7 @@ const FOUNDATIONADMINWALLETADDRESSKEY  = "08"
 const ISLISTINGINMARKETKEY             = "09"
 const FOUNDATIONBALANCESKEY            = "10"
 const ERC20CONTRACTSKEY                = "11"
+const BURNWALLETADDRESSKEY             = "12"
 
 // const zeroAddress = "0x0000000000000000000000000000000000000000"
 
@@ -181,6 +182,17 @@ function _foundationAdminWalletAddress(addr) {
 function _setFoundationAdminWalletAddress(addr, waddr) {
     Mev.SetContractData(_foundationAdminWalletAddressKey(addr), address(waddr))
 }
+
+// mapping(address => address) private _burnWalletAddress;
+function _burnWalletAddressKey(addr) {
+    return BURNWALLETADDRESSKEY+address(addr)
+}
+function _burnWalletAddress(addr) {
+    return Mev.ContractData(_burnWalletAddressKey(addr))
+}
+function _setBurnWalletAddress(addr, waddr) {
+    Mev.SetContractData(_burnWalletAddressKey(addr), address(waddr))
+}
 // mapping(address => mapping(uint256 => bool)) private _isListingInMarket; // track if item if in active market
 function _isListingInMarketKey(addr, tokenID) {
     return ISLISTINGINMARKETKEY+address(addr)+tokenID
@@ -227,6 +239,10 @@ function getERC20Contract(currency) {
 
 function getFoundationAdminAddress(token) {
     return _foundationAdminWalletAddress(token);
+}
+
+function getBurnAddress(token) {
+    return _burnWalletAddress(token);
 }
 
 function getFoundationRoyalty(wallet, currency) {
@@ -333,7 +349,24 @@ function acceptItemSuggestion(seller, nftAddress, tokenId, suggestBiddingPrice, 
         }
     }
     require(selectedItem.price == suggestBiddingPrice, "Invaild suggestBiddingPrice price");
+
+    let marketItem = _marketCollectionItems(nftAddress, tokenId);
+    if (marketItem && marketItem.nft && 
+        address(marketItem.nft.tokenContract) == address(nftAddress) &&
+        BigInt(marketItem.nft.tokenId) == BigInt(tokenId)
+        ) {
+            _checkMarketItem(marketItem);
+            marketItem.state = State.CANCELED
+            _setMarketCollectionItems(nftAddress, tokenId, marketItem);
+            _setIsListingInMarket(nftAddress, tokenId);
+    }
+
     _setSuggestedPriceList(nftAddress, tokenId, currency, []);
+    for (let _currency in CurrencyType) {
+        if (currency != _currency) {
+            _setSuggestedPriceList(nftAddress, tokenId, _currency, []);
+        }
+    }
     // emit TransactCompletedItemInMarket(nftAddress, tokenId, selectedItem.buyer, selectedItem.price, State.COMPLETED);
 }
 
@@ -384,7 +417,9 @@ function transactCompleteItemInMarket(item) {
     _setMarketCollectionItems(item.nft.tokenContract, item.nft.tokenId, item)
 
     _setIsListingInMarket(item.nft.tokenContract, item.nft.tokenId);
-
+    for (let currency in CurrencyType) {
+        _setSuggestedPriceList(item.nft.tokenContract, item.nft.tokenId, currency, []);
+    }
     // emit TransactCompletedItemInMarket(address(item.nft.tokenContract), item.nft.tokenId, item.buyer, item.buyNowPrice, State.COMPLETED);
 }
 
@@ -441,6 +476,16 @@ function setFoundationAdminAddress(nftAddress, adminAddress) {
     require( adminAddress != address(0), "Invaild admin address");
     _setFoundationAdminWalletAddress(nftAddress, adminAddress);
     // emit ChangedFoundationAdminAddress(nftAddress, adminAddress);
+}
+
+function setBurnAddress(nftAddress, burnAddress) {
+    onlyOwner()
+    nftAddress = address(nftAddress)
+    burnAddress = address(burnAddress)
+    require( nftAddress != address(0), "Invaild NFT address");
+    require( burnAddress != address(0), "Invaild admin address");
+    _setBurnWalletAddress(nftAddress, burnAddress);
+    // emit ChangedBurnAddress(nftAddress, burnAddress);
 }
 
 function setMandatoryInitContract(market) {
