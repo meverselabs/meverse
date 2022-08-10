@@ -44,7 +44,7 @@ func TestExecuteContractTx(t *testing.T) {
 
 	// - user에게 mint
 	// .\sendtx.exe 0x698da8d6b3382cabcfcde3fc514bd21c1f5d866d Approve addr 0xc30f8c78d4ac1a1f2401c51eacfb987c2c3d216b amt 1000000000
-	_ = tc.MustSendTx(util.AdminKey, tokenAddr, "Mint", util.Users[0], amount.MustParseAmount("25"))
+	_ = tc.MustSendTx(util.AdminKey, tokenAddr, "Mint", util.Users[0], amount.MustParseAmount("2000"))
 	_ = tc.MustSendTx(util.UserKeys[0], tokenAddr, "Approve", farmAddr, amount.MustParseAmount("100000000"))
 
 	_ = tc.MustSendTx(util.AdminKey, tokenAddr, "Approve", farmAddr, amount.MustParseAmount("100000000"))
