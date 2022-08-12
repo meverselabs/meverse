@@ -2,7 +2,6 @@ package util
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"math/big"
 	"math/cmplx"
@@ -156,7 +155,6 @@ func CubicRoot(a, b, c, d float64) (float64, error) {
 	// D := d1 - d2 - d3 + d4 - d5 // 판별식
 	bd := big.NewFloat(0)
 	D, _ := bd.Sub(d1, d2).Sub(bd, d3).Add(bd, d4).Sub(bd, d5).Float64() // 판별식
-	log.Println("D", D)
 
 	s1 := big.NewFloat(2 * b * b * b)
 	s2 := big.NewFloat(9 * a * b * c)
@@ -176,25 +174,18 @@ func CubicRoot(a, b, c, d float64) (float64, error) {
 		x2 := complex(0.5, -0.5*math.Sqrt(3.))
 		x3 := complex(0.5, 0.5*math.Sqrt(3.))
 		x4 := complex(3*a, 0)
-		log.Println("x1,x2,x3,x4,", x1, x2, x3, x4)
 		x_3 := x1
-		log.Println("x_3,", x_3)
 		x5 := complexMul(p, x2)
 		x_3 = complexAdd(x_3, x5)
-		log.Println("x_3,", x_3)
 		x6 := complexMul(x3, n)
 		x_3 = complexAdd(x_3, x6)
-		log.Println("x_3,", x_3)
 		x_3 = complexDiv(x_3, x4)
-		log.Println("s,	t,	p,	n,	x_3,", s, t, p, n, x_3)
 
 		if math.Abs(imag(x_3)) > 1e-20 {
 			return 0., errors.New("NOT_REAL")
 		}
 		rx_3 := real(x_3)
-		log.Println("rx_3", rx_3)
 		return rx_3, nil
-
 	}
 
 	// 실수해 1개인 경우
@@ -209,7 +200,6 @@ func CubicRoot(a, b, c, d float64) (float64, error) {
 	bt = bt.Sub(t1, t4)
 	ft, _ := bt.Float64()
 	t := math.Sqrt(ft)
-	log.Println("s,	t", s, t)
 	var p, n float64
 	if s+t > 0 {
 		p = math.Pow((s+t)/2., 1./3)
@@ -221,14 +211,12 @@ func CubicRoot(a, b, c, d float64) (float64, error) {
 	} else {
 		n = -math.Pow(-(s-t)/2., 1./3)
 	}
-	log.Println("p, n ", p, n)
 
 	x := (-b - p - n) / (3 * a)
 
 	if x < 0 {
 		return 0., errors.New("NOT_POSITIVE")
 	}
-	log.Println("x ", x)
 	return x, nil
 }
 

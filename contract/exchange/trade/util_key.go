@@ -2,7 +2,6 @@ package trade
 
 import (
 	"errors"
-	"log"
 	"math/big"
 	"strings"
 
@@ -197,9 +196,6 @@ func UniGetAmountOut(fee uint64, amountIn, reserveIn, reserveOut *big.Int) (*big
 	numerator := Mul(amountInWithFee, reserveOut)
 	denominator := Add(Mul(reserveIn, big.NewInt(FEE_DENOMINATOR)), amountInWithFee)
 	amountOut := Div(numerator, denominator)
-	log.Println("UniGetAmountOut FEE_DENOMINATOR, fee", FEE_DENOMINATOR, fee)
-	log.Println("UniGetAmountOut amountIn, reserveIn, reserveOut", amountIn, reserveIn, reserveOut)
-	log.Println("UniGetAmountOut amountInWithFee, numerator, denominator, amountOut", amountInWithFee, numerator, denominator, amountOut)
 
 	return amountOut, nil
 }
@@ -232,14 +228,11 @@ func UniGetOptimalOneCoin(fee uint64, onecoinAmountIn, reserveIn, reserveOut *bi
 	if fee == FEE_DENOMINATOR {
 		return nil, nil, errors.New("Exchange: FEE_100%")
 	}
-	log.Println("start UniGetOptimalOneCoin")
-	log.Println("onecoinAmountIn, reserveIn", onecoinAmountIn.String(), reserveIn.String())
 	floatIn, err := optimalCubicRoot(fee, onecoinAmountIn, reserveIn)
 	if err != nil {
 		return nil, nil, err
 	}
 	amountIn, err := ToBigInt(floatIn)
-	log.Println("amountIn, floatIn", amountIn, floatIn)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -251,8 +244,6 @@ func UniGetOptimalOneCoin(fee uint64, onecoinAmountIn, reserveIn, reserveOut *bi
 		return nil, nil, err
 	}
 
-	log.Println("floatIn, amountIn, amountOut", floatIn, amountIn.String(), amountOut.String())
-	log.Println("end UniGetOptimalOneCoin")
 	return amountIn, amountOut, nil
 }
 
