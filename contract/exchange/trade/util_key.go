@@ -261,3 +261,38 @@ func UniGetAmountIn(fee uint64, amountOut, reserveIn, reserveOut *big.Int) (*big
 	amountIn := Add(Div(numerator, denominator), big.NewInt(1))
 	return amountIn, nil
 }
+
+func TestOptimalCubicRoot(fee uint64, amountIn *big.Int, reserve *big.Int) (float64, error) {
+	f := float64(fee) / float64(FEE_DENOMINATOR)
+	A := ToFloat64(amountIn)
+	x_0 := ToFloat64(reserve)
+	a := 1. - f
+	b := 3. * (1 - f) * x_0
+	c := ((2.-f)*x_0 - (1.-f)*A) * x_0
+	d := -A * x_0 * x_0
+	r1, err := CubicRoot(a, b, c, d)
+	if err != nil {
+		return 0., err
+	}
+	if r1 < 0. {
+		return 0., errors.New("CUBICROOT: TOO_LARGE_COFFICIENT")
+	}
+	return r1, nil
+}
+func TestOptimalCubicRoot2(fee uint64, amountIn *big.Int, reserve *big.Int) (float64, error) {
+	f := float64(fee) / float64(FEE_DENOMINATOR)
+	A := ToFloat64(amountIn)
+	x_0 := ToFloat64(reserve)
+	a := 1. - f
+	b := 3. * (1 - f) * x_0
+	c := ((2.-f)*x_0 - (1.-f)*A) * x_0
+	d := -A * x_0 * x_0
+	r1, err := CubicRoot2(a, b, c, d)
+	if err != nil {
+		return 0., err
+	}
+	if r1 < 0. {
+		return 0., errors.New("CUBICROOT: TOO_LARGE_COFFICIENT")
+	}
+	return r1, nil
+}

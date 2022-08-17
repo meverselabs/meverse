@@ -185,3 +185,129 @@ func CubicRoot(a, b, c, d float64) (float64, error) {
 	}
 	return x, nil
 }
+
+// 3차방정식 일반해 :
+func CubicRoot2(a, b, c, d float64) (float64, error) {
+	if Approx(a, 0., 1e-10) {
+		return 0., errors.New("NOT_CUBIC_FUNCTION")
+	}
+
+	d1 := big.NewFloat(b * b * c * c)
+	d2 := big.NewFloat(4 * b * b * b * d)
+	d3 := big.NewFloat(4 * c * c * c * a)
+	d4 := big.NewFloat(18 * a * b * c * d)
+	d5 := big.NewFloat(27 * a * a * d * d)
+	// D := d1 - d2 - d3 + d4 - d5 // 판별식
+	bd := big.NewFloat(0)
+	D, _ := bd.Sub(d1, d2).Sub(bd, d3).Add(bd, d4).Sub(bd, d5).Float64() // 판별식
+
+	s1 := big.NewFloat(2 * b * b * b)
+	s2 := big.NewFloat(9 * a * b * c)
+	s3 := big.NewFloat(27 * a * a * d)
+	bs := big.NewFloat(0)
+	// s := 2*b*b*b - 9*a*b*c + 27*a*a*d
+	s, _ := bs.Sub(s1, s2).Add(bs, s3).Float64()
+
+	if D >= 0 { // 값의 결과상 x_3만 필요, x_1, x_2 < 0
+		t := cmplx.Sqrt(complex(s*s-4*math.Pow((b*b-3*a*c), 3.0), 0))
+		p := cmplx.Pow((complex(s, 0)+t)/2., complex(1./3., 0)) // plus
+		n := cmplx.Pow((complex(s, 0)-t)/2., complex(1./3., 0)) // negative
+		//x_1 := (-complex(b, 0) - p - n) / complex(3*a, 0)
+		//x_2 := (-complex(b, 0) + complex(0.5, 0.5*math.Sqrt(3.))*p + complex(0.5, -0.5*math.Sqrt(3.))*n) / complex(3*a, 0)
+
+		x1 := -complex(b, 0)
+		x2 := complex(0.5, -0.5*math.Sqrt(3.))
+		x3 := complex(0.5, 0.5*math.Sqrt(3.))
+		// x4 := complex(3*a, 0)
+		x_3 := x1
+		x5 := complexMul(p, x2)
+		x_3 = complexAdd(x_3, x5)
+		x6 := complexMul(x3, n)
+		x_3 = complexAdd(x_3, x6)
+		x_3 = x_3 / complex(3*a, 0)
+		// rx_3, ix_3 := complexDiv(x_3, x4)
+
+		if math.Abs(imag(x_3)) > 1e-20 {
+			// if math.Abs(ix_3) > 1e-20 {
+			return 0., errors.New("NOT_REAL")
+		}
+		rx_3 := real(x_3)
+		return rx_3, nil
+
+	}
+
+	// 실수해 1개인 경우
+	// s := 2*b*b*b - 9*a*b*c + 27*a*a*d
+	t1 := big.NewFloat(s * s)
+	t2 := big.NewFloat(b * b)
+	t3 := big.NewFloat(3 * a * c)
+	t4 := t2.Sub(t2, t3)
+	bt := big.NewFloat(0)
+	ft4, _ := t4.Float64()
+	t4 = big.NewFloat(4 * math.Pow(ft4, 3.0))
+	bt = bt.Sub(t1, t4)
+	ft, _ := bt.Float64()
+	t := math.Sqrt(ft)
+	var p, n float64
+	if s+t > 0 {
+		p = math.Pow((s+t)/2., 1./3)
+	} else {
+		p = -math.Pow(-(s+t)/2., 1./3)
+	}
+	if s-t > 0 {
+		n = math.Pow((s-t)/2., 1./3)
+	} else {
+		n = -math.Pow(-(s-t)/2., 1./3)
+	}
+
+	x := (-b - p - n) / (3 * a)
+
+	if x < 0 {
+		return 0., errors.New("NOT_POSITIVE")
+	}
+	return x, nil
+}
+
+func complexMul(a, b complex128) complex128 {
+	pr := big.NewFloat(real(a))
+	pi := big.NewFloat(imag(a))
+	xr := big.NewFloat(real(b))
+	xi := big.NewFloat(imag(b))
+	x_1 := big.NewFloat(0).Mul(pr, xr)
+	x_2 := big.NewFloat(0).Mul(pr, xi)
+	x_3 := big.NewFloat(0).Mul(pi, xr)
+	x_4 := big.NewFloat(0).Mul(pi, xi)
+	bx := big.NewFloat(0)
+	bxr, _ := bx.Sub(x_1, x_4).Float64()
+	bxi, _ := bx.Add(x_2, x_3).Float64()
+	return complex(bxr, bxi)
+}
+
+func complexAdd(a, b complex128) complex128 {
+	pr := big.NewFloat(real(a))
+	pi := big.NewFloat(imag(a))
+	x2r := big.NewFloat(real(b))
+	x2i := big.NewFloat(imag(b))
+	bx5 := big.NewFloat(0)
+	bx5r, _ := bx5.Add(pr, x2r).Float64()
+	bx5i, _ := bx5.Add(pi, x2i).Float64()
+	return complex(bx5r, bx5i)
+}
+
+func complexDiv(a, b complex128) (float64, float64) {
+	base := complex(real(b), -imag(b))
+	a1 := complexMul(a, base)
+	b1 := complexMul(b, base)
+	ar := big.NewFloat(real(a1))
+	ai := big.NewFloat(imag(a1))
+	br := big.NewFloat(real(b1))
+
+	arf, _ := ar.Float64()
+	brf, _ := br.Float64()
+	aif, _ := ai.Float64()
+	return arf / brf, aif / brf
+	// a1r, _ := new(big.Float).Quo(ar, br).Float64()
+	// a1i, _ := new(big.Float).Quo(ai, br).Float64()
+	// log.Println(a1r)
+	// return complex(a1r, a1i)
+}
