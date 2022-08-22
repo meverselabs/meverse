@@ -114,3 +114,9 @@ func (f *RounterFront) UniSwapTokensForExactTokens(
 	amounts, err := f.cont.uniSwapTokensForExactTokens(cc, amountOut.Int, amountInMax.Int, path, cc.From(), cc.From())
 	return ToAmounts(amounts), err
 }
+func (f *RounterFront) CubicRootType(cc *types.ContractContext) uint8 {
+	return f.cont.CubicRootType(cc)
+}
+func (f *RounterFront) SetCubicRootType(cc *types.ContractContext, cubicRootType uint8) {
+	f.cont.SetCubicRootType(cc, cubicRootType)
+}

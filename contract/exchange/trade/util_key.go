@@ -2,6 +2,7 @@ package trade
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"strings"
 
@@ -202,7 +203,7 @@ func UniGetAmountOut(fee uint64, amountIn, reserveIn, reserveOut *big.Int) (*big
 
 // UniGetOptimalOneCoin에서 Call
 // (1-f)x^3 + 3(1-f)x_0*x^2 + ((2-f)x_0 - (1-f)A)*x_0*x - A*x_0^2
-func optimalCubicRoot(fee uint64, amountIn *big.Int, reserve *big.Int) (float64, error) {
+func optimalCubicRoot(cubicRootType uint8, fee uint64, amountIn *big.Int, reserve *big.Int) (float64, error) {
 	f := float64(fee) / float64(FEE_DENOMINATOR)
 	A := ToFloat64(amountIn)
 	x_0 := ToFloat64(reserve)
@@ -210,7 +211,15 @@ func optimalCubicRoot(fee uint64, amountIn *big.Int, reserve *big.Int) (float64,
 	b := 3. * (1 - f) * x_0
 	c := ((2.-f)*x_0 - (1.-f)*A) * x_0
 	d := -A * x_0 * x_0
-	r1, err := CubicRoot(a, b, c, d)
+	var r1 float64
+	var err error
+	if cubicRootType == 0 {
+		r1, err = CubicRoot(a, b, c, d)
+	} else if cubicRootType == 1 {
+		r1, err = Newtonian(a, b, c, d, x_0)
+	} else {
+		return .0, errors.New("undefined cubicRootType")
+	}
 	if err != nil {
 		return 0., err
 	}
@@ -221,20 +230,23 @@ func optimalCubicRoot(fee uint64, amountIn *big.Int, reserve *big.Int) (float64,
 }
 
 // router.UniAddLiquidityOneCoin의 경우 swap 한후, router.UniAddLiquidity에 배분해서 넣어야 함.
-func UniGetOptimalOneCoin(fee uint64, onecoinAmountIn, reserveIn, reserveOut *big.Int) (*big.Int, *big.Int, error) {
+func UniGetOptimalOneCoin(cubicRootType uint8, fee uint64, onecoinAmountIn, reserveIn, reserveOut *big.Int) (*big.Int, *big.Int, error) {
 	if !(reserveIn.Cmp(Zero) > 0) || !(reserveOut.Cmp(Zero) > 0) {
 		return nil, nil, errors.New("Exchange: INSUFFICIENT_LIQUIDITY")
 	}
 	if fee == FEE_DENOMINATOR {
 		return nil, nil, errors.New("Exchange: FEE_100%")
 	}
-	floatIn, err := optimalCubicRoot(fee, onecoinAmountIn, reserveIn)
-	if err != nil {
-		return nil, nil, err
-	}
-	amountIn, err := ToBigInt(floatIn)
-	if err != nil {
-		return nil, nil, err
+	var amountIn *big.Int
+	if amountIn = checkComplexCalc(cubicRootType, fee, onecoinAmountIn, reserveIn); amountIn == nil {
+		floatIn, err := optimalCubicRoot(cubicRootType, fee, onecoinAmountIn, reserveIn)
+		if err != nil {
+			return nil, nil, err
+		}
+		amountIn, err = ToBigInt(floatIn)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 	if amountIn.Cmp(reserveIn) >= 0 {
 		return nil, nil, errors.New("Exchange: TOO_MUCH_INPUT")
@@ -275,7 +287,7 @@ func TestOptimalCubicRoot(fee uint64, amountIn *big.Int, reserve *big.Int) (floa
 		return 0., err
 	}
 	if r1 < 0. {
-		return 0., errors.New("CUBICROOT: TOO_LARGE_COFFICIENT")
+		return r1, errors.New("CUBICROOT: TOO_LARGE_COFFICIENT")
 	}
 	return r1, nil
 }
@@ -287,12 +299,25 @@ func TestOptimalCubicRoot2(fee uint64, amountIn *big.Int, reserve *big.Int) (flo
 	b := 3. * (1 - f) * x_0
 	c := ((2.-f)*x_0 - (1.-f)*A) * x_0
 	d := -A * x_0 * x_0
-	r1, err := CubicRoot2(a, b, c, d)
+	r1, err := Newtonian(a, b, c, d, x_0)
 	if err != nil {
 		return 0., err
 	}
 	if r1 < 0. {
-		return 0., errors.New("CUBICROOT: TOO_LARGE_COFFICIENT")
+		return r1, errors.New("CUBICROOT: TOO_LARGE_COFFICIENT")
 	}
 	return r1, nil
+}
+
+func checkComplexCalc(cubicRootType uint8, fee uint64, onecoinAmountIn, reserveIn *big.Int) *big.Int {
+	if cubicRootType != 0 {
+		return nil
+	}
+	key := fmt.Sprintf("%v:%v:%v", fee, onecoinAmountIn.String(), reserveIn.String())
+	return mustParseBigInt(cmMap[key])
+}
+
+func mustParseBigInt(str string) *big.Int {
+	bi, _ := big.NewInt(0).SetString(str, 10)
+	return bi
 }

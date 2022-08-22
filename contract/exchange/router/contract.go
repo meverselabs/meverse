@@ -127,6 +127,18 @@ func (cont *RouterContract) uniAddLiquidity(
 	return amountA, amountB, liquidity, pair, nil
 }
 
+func (cont *RouterContract) SetCubicRootType(cc *types.ContractContext, cubicRootType uint8) {
+	cc.SetContractData([]byte{tagCubicRoot}, []byte{cubicRootType})
+}
+
+func (cont *RouterContract) CubicRootType(cc *types.ContractContext) (cubicRootType uint8) {
+	bs := cc.ContractData([]byte{tagCubicRoot})
+	if len(bs) != 0 {
+		cubicRootType = uint8(bs[0])
+	}
+	return
+}
+
 // 결국 amountDesired 만큼 add 된다.
 func (cont *RouterContract) uniGetLPTokenAmountOneCoin(
 	cc *types.ContractContext,
@@ -155,9 +167,11 @@ func (cont *RouterContract) uniGetLPTokenAmountOneCoin(
 	var amountA, amountB *big.Int
 	var amountIn, amountOut *big.Int
 	var addAmountA, addAmountB *big.Int
+
+	cubicRootType := cont.CubicRootType(cc)
 	// swap 양 계산
 	if tokenIn == tokenA {
-		amountA, amountB, err = trade.UniGetOptimalOneCoin(fee, amountDesired, reserveA, reserveB)
+		amountA, amountB, err = trade.UniGetOptimalOneCoin(cubicRootType, fee, amountDesired, reserveA, reserveB)
 		if err != nil {
 			return ZeroAddress, nil, nil, nil, 0, err
 		}
@@ -168,7 +182,7 @@ func (cont *RouterContract) uniGetLPTokenAmountOneCoin(
 		reserveA = Add(reserveA, amountIn)
 		reserveB = Sub(reserveB, amountB)
 	} else if tokenIn == tokenB {
-		amountB, amountA, err = trade.UniGetOptimalOneCoin(fee, amountDesired, reserveB, reserveA)
+		amountB, amountA, err = trade.UniGetOptimalOneCoin(cubicRootType, fee, amountDesired, reserveB, reserveA)
 		if err != nil {
 			return ZeroAddress, nil, nil, nil, 0, err
 		}

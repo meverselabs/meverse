@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"log"
 	"math/big"
 	"strings"
 
@@ -213,10 +212,8 @@ func (cont *FormulatorContract) OnReward(cc *types.ContractContext, b *types.Blo
 				return nil, err
 			}
 		}
-		log.Println("TotalReward", TotalReward.String(), "TotalFee", TotalFee.String())
 		TotalReward = TotalReward.Add(TotalFee)
 		TotalForCmp = amount.NewAmountFromBytes(TotalReward.Int.Bytes())
-		log.Println("TotalReward", TotalReward.String(), "TotalFee", TotalFee.String(), "TotalForCmp", TotalForCmp.String())
 
 		Ratio := TotalReward.Div(RewardPowerSum)
 		for RewardAddress, RewardPower := range RewardPowerMap {

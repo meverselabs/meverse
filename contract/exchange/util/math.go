@@ -146,51 +146,6 @@ func CubicRoot(a, b, c, d float64) (float64, error) {
 	if Approx(a, 0., 1e-10) {
 		return 0., errors.New("NOT_CUBIC_FUNCTION")
 	}
-	D := b*b*c*c - 4*b*b*b*d - 4*c*c*c*a + 18*a*b*c*d - 27*a*a*d*d // 판별식
-	if D >= 0 {                                                    // 값의 결과상 x_3만 필요, x_1, x_2 < 0
-		s := 2*b*b*b - 9*a*b*c + 27*a*a*d
-		t := cmplx.Sqrt(complex(s*s-4*math.Pow((b*b-3*a*c), 3.0), 0))
-		p := cmplx.Pow((complex(s, 0)+t)/2., complex(1./3., 0)) // plus
-		n := cmplx.Pow((complex(s, 0)-t)/2., complex(1./3., 0)) // negative
-		//x_1 := (-complex(b, 0) - p - n) / complex(3*a, 0)
-		//x_2 := (-complex(b, 0) + complex(0.5, 0.5*math.Sqrt(3.))*p + complex(0.5, -0.5*math.Sqrt(3.))*n) / complex(3*a, 0)
-		x_3 := (-complex(b, 0) + complex(0.5, -0.5*math.Sqrt(3.))*p + complex(0.5, 0.5*math.Sqrt(3.))*n) / complex(3*a, 0)
-
-		if math.Abs(imag(x_3)) > 1e-20 {
-			return 0., errors.New("NOT_REAL")
-		}
-		return real(x_3), nil
-
-	}
-
-	// 실수해 1개인 경우
-	s := 2*b*b*b - 9*a*b*c + 27*a*a*d
-	t := math.Sqrt(s*s - 4*math.Pow((b*b-3*a*c), 3.0))
-	var p, n float64
-	if s+t > 0 {
-		p = math.Pow((s+t)/2., 1./3)
-	} else {
-		p = -math.Pow(-(s+t)/2., 1./3)
-	}
-	if s-t > 0 {
-		n = math.Pow((s-t)/2., 1./3)
-	} else {
-		n = -math.Pow(-(s-t)/2., 1./3)
-	}
-
-	x := (-b - p - n) / (3 * a)
-
-	if x < 0 {
-		return 0., errors.New("NOT_POSITIVE")
-	}
-	return x, nil
-}
-
-// 3차방정식 일반해 :
-func CubicRoot2(a, b, c, d float64) (float64, error) {
-	if Approx(a, 0., 1e-10) {
-		return 0., errors.New("NOT_CUBIC_FUNCTION")
-	}
 
 	d1 := big.NewFloat(b * b * c * c)
 	d2 := big.NewFloat(4 * b * b * b * d)
@@ -220,20 +175,19 @@ func CubicRoot2(a, b, c, d float64) (float64, error) {
 		x3 := complex(0.5, 0.5*math.Sqrt(3.))
 		// x4 := complex(3*a, 0)
 		x_3 := x1
-		x5 := complexMul(p, x2)
-		x_3 = complexAdd(x_3, x5)
-		x6 := complexMul(x3, n)
-		x_3 = complexAdd(x_3, x6)
-		x_3 = x_3 / complex(3*a, 0)
-		// rx_3, ix_3 := complexDiv(x_3, x4)
+		{
+			x5 := complexMul(p, x2)
+			x_3 = complexAdd(x_3, x5)
+			x6 := complexMul(x3, n)
+			x_3 = complexAdd(x_3, x6)
+			x_3 = x_3 / complex(3*a, 0)
+		}
 
 		if math.Abs(imag(x_3)) > 1e-20 {
-			// if math.Abs(ix_3) > 1e-20 {
 			return 0., errors.New("NOT_REAL")
 		}
 		rx_3 := real(x_3)
 		return rx_3, nil
-
 	}
 
 	// 실수해 1개인 경우
@@ -269,18 +223,26 @@ func CubicRoot2(a, b, c, d float64) (float64, error) {
 }
 
 func complexMul(a, b complex128) complex128 {
+	bxr, bxi := _complexMul(a, b)
+	fbxr, _ := bxr.Float64()
+	fbxi, _ := bxi.Float64()
+	return complex(fbxr, fbxi)
+}
+
+func _complexMul(a, b complex128) (*big.Float, *big.Float) {
 	pr := big.NewFloat(real(a))
 	pi := big.NewFloat(imag(a))
 	xr := big.NewFloat(real(b))
 	xi := big.NewFloat(imag(b))
+
 	x_1 := big.NewFloat(0).Mul(pr, xr)
 	x_2 := big.NewFloat(0).Mul(pr, xi)
 	x_3 := big.NewFloat(0).Mul(pi, xr)
 	x_4 := big.NewFloat(0).Mul(pi, xi)
-	bx := big.NewFloat(0)
-	bxr, _ := bx.Sub(x_1, x_4).Float64()
-	bxi, _ := bx.Add(x_2, x_3).Float64()
-	return complex(bxr, bxi)
+
+	bxr := big.NewFloat(0).Sub(x_1, x_4)
+	bxi := big.NewFloat(0).Add(x_2, x_3)
+	return bxr, bxi
 }
 
 func complexAdd(a, b complex128) complex128 {
@@ -294,20 +256,25 @@ func complexAdd(a, b complex128) complex128 {
 	return complex(bx5r, bx5i)
 }
 
-func complexDiv(a, b complex128) (float64, float64) {
-	base := complex(real(b), -imag(b))
-	a1 := complexMul(a, base)
-	b1 := complexMul(b, base)
-	ar := big.NewFloat(real(a1))
-	ai := big.NewFloat(imag(a1))
-	br := big.NewFloat(real(b1))
+// 3차방정식 해 - Newtonian Method
+//x0  initial
+func Newtonian(a, b, c, d, x0 float64) (float64, error) {
+	if Approx(a, 0., 1e-10) {
+		return 0., errors.New("NOT_CUBIC_FUNCTION")
+	}
 
-	arf, _ := ar.Float64()
-	brf, _ := br.Float64()
-	aif, _ := ai.Float64()
-	return arf / brf, aif / brf
-	// a1r, _ := new(big.Float).Quo(ar, br).Float64()
-	// a1i, _ := new(big.Float).Quo(ai, br).Float64()
-	// log.Println(a1r)
-	// return complex(a1r, a1i)
+	j := 0
+	x_p := x0
+	var x float64
+	for {
+		x = (2*a*x_p*x_p*x_p + b*x_p*x_p - d) / (3*a*x_p*x_p + 2*b*x_p + c)
+		if math.Abs(x-x_p) < 1 {
+			return x, nil
+		}
+		j++
+		x_p = x
+		if j > 256 {
+			return x, nil
+		}
+	}
 }
