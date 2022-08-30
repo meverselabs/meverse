@@ -1,0 +1,158 @@
+[
+    {
+        "inputs": [
+            {
+                "internalType": "string[]",
+                "name": "strs",
+                "type": "string[]"
+            }
+        ],
+        "name": "reveal",
+        "outputs": [
+            {
+                "internalType": "string[]",
+                "name": "",
+                "type": "string[]"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "string",
+                "name": "master",
+                "type": "string"
+            },
+            {
+                "internalType": "uint256",
+                "name": "mlv",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string",
+                "name": "slave",
+                "type": "string"
+            },
+            {
+                "internalType": "uint256",
+                "name": "slv",
+                "type": "uint256"
+            }
+        ],
+        "name": "merge",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "string",
+                "name": "master",
+                "type": "string"
+            },
+            {
+                "internalType": "string",
+                "name": "slave",
+                "type": "string"
+            }
+        ],
+        "name": "invalidMerge",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "string[]",
+                "name": "nftIds",
+                "type": "string[]"
+            }
+        ],
+        "name": "dismantle",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "constant": true,
+        "inputs": [],
+        "name": "slaveList",
+        "outputs": [
+            {
+                "internalType": "string[]",
+                "name": "",
+                "type": "string[]"
+            }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "constant": true,
+        "inputs": [
+            {
+                "internalType": "string",
+                "name": "master",
+                "type": "string"
+            }
+        ],
+        "name": "slaveToMasterList",
+        "outputs": [
+            {
+                "internalType": "string[]",
+                "name": "",
+                "type": "string[]"
+            }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "constant": true,
+        "inputs": [
+            {
+                "internalType": "string",
+                "name": "slave",
+                "type": "string"
+            }
+        ],
+        "name": "slaveInfo",
+        "outputs": [
+            {
+                "internalType": "string",
+                "name": "",
+                "type": "string"
+            }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "constant": true,
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+            }
+        ],
+        "name": "dismantleList",
+        "outputs": [
+            {
+                "internalType": "string[]",
+                "name": "",
+                "type": "string[]"
+            }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+    }
+]

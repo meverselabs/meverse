@@ -12,10 +12,17 @@ import (
 var fileName = "Reveal"
 
 var read = `
+slaveList() []string {
+slaveToMasterList(master string) []string {
+slaveInfo(slave string) string {
+dismantleList(owner common.Address) []string {
 `
 
 var write = `
-reveal(strs []string) string {
+reveal(strs []string) []string {
+merge(master string, mlv *big.Int, slave string, slv *big.Int) {
+invalidMerge(master string, slave string) {
+dismantle(nftIds []string) {
 `
 
 var reg = []string{
