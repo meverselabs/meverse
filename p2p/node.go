@@ -626,6 +626,9 @@ func (nd *Node) TestFullTx() bool {
 }
 
 func (nd *Node) addTx(TxHash hash.Hash256, tx *types.Transaction, sig common.Signature) error {
+	if tx.IsEtherType && len(sig) < 66 {
+		return errors.New("invalid recid chain check")
+	}
 	if nd.txpool.IsExist(TxHash) {
 		return errors.WithStack(txpool.ErrExistTransaction)
 	}

@@ -475,6 +475,9 @@ func (fr *GeneratorNode) PushTx(tx *types.Transaction, sig common.Signature) err
 }
 
 func (fr *GeneratorNode) addTx(TxHash hash.Hash256, tx *types.Transaction, sig common.Signature) error {
+	if tx.IsEtherType && len(sig) < 66 {
+		return errors.New("invalid recid chain check")
+	}
 	if fr.txpool.IsExist(TxHash) {
 		return errors.WithStack(txpool.ErrExistTransaction)
 	}
