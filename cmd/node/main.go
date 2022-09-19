@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/hex"
+	"flag"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -43,7 +44,16 @@ func main() {
 	ChainID := big.NewInt(0x1D5E)
 	Version := uint16(0x0001)
 	var cfg Config
-	if err := config.LoadFile("./config.toml", &cfg); err != nil {
+
+	_cfgPath := flag.String("cfg", "./config.toml", "config file path")
+	flag.Parse()
+
+	cfgPath := "./config.toml"
+	if _cfgPath != nil {
+		cfgPath = *_cfgPath
+	}
+
+	if err := config.LoadFile(cfgPath, &cfg); err != nil {
 		panic(err)
 	}
 	if len(cfg.StoreRoot) == 0 {
