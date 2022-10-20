@@ -41,7 +41,9 @@ func (cont *TokenContract) OnCreate(cc *types.ContractContext, Args []byte) erro
 
 	if data.Version == 0 {
 		for k, v := range data.InitialSupplyMap {
-			cont.addBalance(cc, k, v)
+			if err := cont.addBalance(cc, k, v); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -134,7 +136,7 @@ func (cont *TokenContract) SubCollectedFee(cc *types.ContractContext, am *amount
 
 	sum := cont.CollectedFee(cc)
 	if sum.Less(am) {
-		return errors.Errorf("invalid SubCollectedFee amount %v but remine %v", am.String(), sum.String())
+		return errors.Errorf("invalid SubCollectedFee amount %v but remain %v", am.String(), sum.String())
 	}
 	sum = sum.Sub(am)
 	if sum.IsZero() {
@@ -184,10 +186,7 @@ func (cont *TokenContract) Mint(cc *types.ContractContext, To common.Address, Am
 	if cc.From() != cont.Master() && !isMinter {
 		return errors.New(cc.From().String() + ": not token minter")
 	}
-	if Amount.IsPlus() {
-		return cont.addBalance(cc, To, Amount)
-	}
-	return nil
+	return cont.addBalance(cc, To, Amount)
 }
 
 func (cont *TokenContract) MintBatch(cc *types.ContractContext, Tos []common.Address, Amounts []*amount.Amount) error {
