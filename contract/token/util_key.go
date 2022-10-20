@@ -14,6 +14,7 @@ var (
 	tagRouterAddress    = byte(0x13)
 	tagRouterPaths      = byte(0x14)
 	tagPause            = byte(0x15)
+	tagVersion          = byte(0x16)
 )
 
 func MakeAllowanceTokenKey(sender common.Address) []byte {

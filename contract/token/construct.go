@@ -13,6 +13,7 @@ type TokenContractConstruction struct {
 	Symbol string
 	// FeeTokenAddress  common.Address
 	InitialSupplyMap map[common.Address]*amount.Amount
+	Version          uint8
 }
 
 func (s *TokenContractConstruction) WriteTo(w io.Writer) (int64, error) {
@@ -33,6 +34,9 @@ func (s *TokenContractConstruction) WriteTo(w io.Writer) (int64, error) {
 		if sum, err := sw.Amount(w, v); err != nil {
 			return sum, err
 		}
+	}
+	if sum, err := sw.Uint8(w, s.Version); err != nil {
+		return sum, err
 	}
 	return sw.Sum(), nil
 }
@@ -60,6 +64,11 @@ func (s *TokenContractConstruction) ReadFrom(r io.Reader) (int64, error) {
 			}
 			s.InitialSupplyMap[addr] = am
 		}
+	}
+	if v, sum, err := sr.GetUint8(r); err != nil && err != io.EOF {
+		return sum, err
+	} else {
+		s.Version = v
 	}
 	return sr.Sum(), nil
 }

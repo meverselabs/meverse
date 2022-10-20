@@ -38,8 +38,11 @@ func (cont *TokenContract) OnCreate(cc *types.ContractContext, Args []byte) erro
 	}
 	cc.SetContractData([]byte{tagTokenName}, []byte(data.Name))
 	cc.SetContractData([]byte{tagTokenSymbol}, []byte(data.Symbol))
-	for k, v := range data.InitialSupplyMap {
-		cont.addBalance(cc, k, v)
+
+	if data.Version == 0 {
+		for k, v := range data.InitialSupplyMap {
+			cont.addBalance(cc, k, v)
+		}
 	}
 
 	return nil
@@ -259,7 +262,12 @@ func (cont *TokenContract) TransferFrom(cc *types.ContractContext, From common.A
 		return errors.Errorf("the token allowance is insufficient token: %v cc.From: %v form: %v to: %v Amount: %v allowedValue: %v", cont.addr.String(), cc.From().String(), From.String(), To.String(), Amount, allowedValue)
 	}
 	nAllow := allowedValue.Sub(Amount)
-	cc.SetAccountData(From, MakeAllowanceTokenKey(To), nAllow.Bytes())
+	ver := cont.Version(cc)
+	if ver == 0 {
+		cc.SetAccountData(From, MakeAllowanceTokenKey(To), nAllow.Bytes())
+	} else {
+		cc.SetAccountData(From, MakeAllowanceTokenKey(cc.From()), nAllow.Bytes())
+	}
 
 	if err := cont.subBalance(cc, From, Amount); err != nil {
 		return err
@@ -384,6 +392,22 @@ func (cont *TokenContract) SetName(cc *types.ContractContext, name string) error
 	}
 	cc.SetContractData([]byte{tagTokenName}, []byte(name))
 	return nil
+}
+
+func (cont *TokenContract) SetVersion(cc *types.ContractContext, version uint8) error {
+	if cc.From() != cont.Master() {
+		return errors.New("not token master")
+	}
+	cc.SetContractData([]byte{tagVersion}, []byte{version})
+	return nil
+}
+
+func (cont *TokenContract) Version(cc *types.ContractContext) uint8 {
+	bs := cc.ContractData([]byte{tagVersion})
+	if len(bs) == 0 {
+		return 0
+	}
+	return uint8(bs[0])
 }
 
 func (cont *TokenContract) SetSymbol(cc *types.ContractContext, symbol string) error {
