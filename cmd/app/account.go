@@ -377,6 +377,6 @@ func initialSupply(supplyAddress common.Address) map[common.Address]*amount.Amou
 		common.HexToAddress("0xfaf601dC4C4e7A413aD3A5fFF56Bf3071912467C"): amount.MustParseAmount("176152.513886125956079632"),
 		common.HexToAddress("0xfc4aaF3791634E4DACc289e23eDdFadE0B2F32bB"): amount.MustParseAmount("999.9"),
 		common.HexToAddress("0xfe58AE2f8CC09BaD1490F5b0aD613E1f279C657c"): amount.MustParseAmount("5810.00281456423504"),
-		common.HexToAddress("0xff9F5b26878bcBE38D03799736303a549f09A7F8"): amount.MustParseAmount("0"),
+		// common.HexToAddress("0xff9F5b26878bcBE38D03799736303a549f09A7F8"): amount.MustParseAmount("0"),
 	}
 }
