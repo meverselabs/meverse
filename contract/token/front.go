@@ -79,6 +79,9 @@ func (f *front) Pause(cc *types.ContractContext) error {
 func (f *front) Unpause(cc *types.ContractContext) error {
 	return f.cont.Unpause(cc)
 }
+func (f *front) SetVersion(cc *types.ContractContext, version uint8) error {
+	return f.cont.SetVersion(cc, version)
+}
 
 //////////////////////////////////////////////////
 // Public Reader Functions
@@ -114,4 +117,7 @@ func (f *front) CollectedFee(cc types.ContractLoader) *amount.Amount {
 
 func (f *front) Allowance(cc types.ContractLoader, _owner common.Address, _spender common.Address) *amount.Amount {
 	return f.cont.Allowance(cc, _owner, _spender)
+}
+func (f *front) Version(cc *types.ContractContext) uint8 {
+	return f.cont.Version(cc)
 }
