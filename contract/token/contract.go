@@ -59,7 +59,7 @@ func (cont *TokenContract) OnReward(cc *types.ContractContext, b *types.Block, C
 //////////////////////////////////////////////////
 
 func (cont *TokenContract) addBalance(cc *types.ContractContext, addr common.Address, am *amount.Amount) error {
-	if !am.IsPlus() {
+	if !am.IsPlus() && !am.IsZero() {
 		return errors.Errorf("invalid transfer amount %v", am.String())
 	}
 	if cont.isPause(cc) {
@@ -79,7 +79,7 @@ func (cont *TokenContract) addBalance(cc *types.ContractContext, addr common.Add
 }
 
 func (cont *TokenContract) subBalance(cc *types.ContractContext, addr common.Address, am *amount.Amount) error {
-	if !am.IsPlus() {
+	if !am.IsPlus() && !am.IsZero() {
 		return errors.Errorf("invalid transfer amount %v", am.String())
 	}
 	if cont.isPause(cc) {
