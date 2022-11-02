@@ -65,6 +65,9 @@ func (cont *TokenContract) addBalance(cc *types.ContractContext, addr common.Add
 	if cont.isPause(cc) {
 		return errors.New("paused")
 	}
+	if am.IsZero() && cc.TargetHeight() < 44118055 {
+		return nil
+	}
 	bal := cont.BalanceOf(cc, addr)
 
 	bal = bal.Add(am)
@@ -84,6 +87,9 @@ func (cont *TokenContract) subBalance(cc *types.ContractContext, addr common.Add
 	}
 	if cont.isPause(cc) {
 		return errors.New("paused")
+	}
+	if am.IsZero() && cc.TargetHeight() < 44118055 {
+		return nil
 	}
 	bal := cont.BalanceOf(cc, addr)
 	if bal.Less(am) {

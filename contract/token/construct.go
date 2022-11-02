@@ -1,6 +1,7 @@
 package token
 
 import (
+	"errors"
 	"io"
 
 	"github.com/meverselabs/meverse/common"
@@ -65,7 +66,7 @@ func (s *TokenContractConstruction) ReadFrom(r io.Reader) (int64, error) {
 			s.InitialSupplyMap[addr] = am
 		}
 	}
-	if v, sum, err := sr.GetUint8(r); err != nil && err != io.EOF {
+	if v, sum, err := sr.GetUint8(r); err != nil && errors.Unwrap(err) != io.EOF {
 		return sum, err
 	} else {
 		s.Version = v
