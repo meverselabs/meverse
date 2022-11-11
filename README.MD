@@ -1,18 +1,15 @@
 This readme file is deprecated. It will be updated soon.
 
-## FLETA
+## MEVerse
 
-This is repository of FLETA project.<br/>
-This repository contains an explanation and contents about the FLETA Daemon, Observer Daemon, Block Explorer, and DApp examples.<br/>
-This v2 of FLETA blockchain provides more easy and convenient way to develop DApp.<br/>
-
-## Related repositories
-* You can find the Explorer at https://github.com/fletaio/explorer.
+This is repository of MEVerse project.<br/>
+This repository contains an explanation and contents about the MEVerse Daemon, Observer Daemon, Block Explorer, and DApp examples.<br/>
+This v2 of MEVerse blockchain provides more easy and convenient way to develop DApp.<br/>
 
 ## Building the source
 
 ### Prerequisites
-Golang 1.18.2 or later<br/>
+Golang 1.18.2<br/>
 C compiler(gcc 4.9.0 or later, mingw etc.)<br/>
 
 ### Step
@@ -65,7 +62,7 @@ In current stage, only the minimal configuration for the execution is being prov
 As the development is progressed, there can be additions/deletions/changes at any time.<br/>
 Please see the details in related repositories.
 
-## Running on FLETA Beta Test network
+## Running on MEVerse Beta Test network
 
 Just running node will join to the test network.<br/>
 If you want to join as a formulator, you should make formulator account.<br/>
