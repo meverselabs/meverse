@@ -79,12 +79,12 @@ func setupTest() *util.TestContext {
 func TestSendToGatewayTx(t *testing.T) {
 	tc := setupTest()
 	// token, amt, path []common.Address, toChain string, summary []byte
-	_, err := tc.MakeTx(util.UserKeys[3], bridgeAddr, "SendToGateway", tc.MainToken, amount.NewAmount(10, 0), []common.Address{}, "POLYGON", []byte("MEVERSE/POLYGON/MEV"))
+	_, err := tc.SendTx(util.UserKeys[3], bridgeAddr, "SendToGateway", tc.MainToken, amount.NewAmount(10, 0), []common.Address{}, "POLYGON", []byte("MEVERSE/POLYGON/MEV"))
 	if err == nil {
 		t.Errorf("TestSendToGatewayTx error not approved but tx success")
 	}
 
-	_, err = tc.MakeTx(util.UserKeys[3], tc.MainToken, "Approve", bridgeAddr, amount.NewAmount(10000000000, 0))
+	_, err = tc.SendTx(util.UserKeys[3], tc.MainToken, "Approve", bridgeAddr, amount.NewAmount(10000000000, 0))
 	if err != nil {
 		t.Errorf("TestSendToGatewayTx error = %+v", err)
 	}
@@ -98,7 +98,7 @@ func TestSendToGatewayTx(t *testing.T) {
 	log.Println(tokenCont.TotalSupply(tcc))
 
 	log.Println(tokenCont.BalanceOf(tcc, util.Users[3]).String())
-	_, err = tc.MakeTx(util.UserKeys[3], bridgeAddr, "SendToGateway", tc.MainToken, amount.NewAmount(10, 0), []common.Address{}, "POLYGON", []byte("MEVERSE/POLYGON/MEV"))
+	_, err = tc.SendTx(util.UserKeys[3], bridgeAddr, "SendToGateway", tc.MainToken, amount.NewAmount(10, 0), []common.Address{}, "POLYGON", []byte("MEVERSE/POLYGON/MEV"))
 	if err != nil {
 		t.Errorf("TestSendToGatewayTx error = %+v", err)
 	}
@@ -118,12 +118,12 @@ func TestSendToGatewayTx(t *testing.T) {
 func TestSendToGatewayEthTx(t *testing.T) {
 	tc := setupTest()
 	// token, amt, path []common.Address, toChain string, summary []byte
-	_, err := tc.MakeTx(util.UserKeys[3], bridgeAddr, "SendToGateway", tc.MainToken, amount.NewAmount(10, 0), []common.Address{}, "ETHEREUM", []byte("MEVERSE/ETHEREUM/MEV"))
+	_, err := tc.SendTx(util.UserKeys[3], bridgeAddr, "SendToGateway", tc.MainToken, amount.NewAmount(10, 0), []common.Address{}, "ETHEREUM", []byte("MEVERSE/ETHEREUM/MEV"))
 	if err == nil {
 		t.Errorf("TestSendToGatewayTx error not approved but tx success")
 	}
 
-	_, err = tc.MakeTx(util.UserKeys[3], tc.MainToken, "Approve", bridgeAddr, amount.NewAmount(10000000000, 0))
+	_, err = tc.SendTx(util.UserKeys[3], tc.MainToken, "Approve", bridgeAddr, amount.NewAmount(10000000000, 0))
 	if err != nil {
 		t.Errorf("TestSendToGatewayTx error = %+v", err)
 	}
@@ -137,7 +137,7 @@ func TestSendToGatewayEthTx(t *testing.T) {
 	log.Println(tokenCont.TotalSupply(tcc))
 
 	log.Println(tokenCont.BalanceOf(tcc, util.Users[3]).String())
-	_, err = tc.MakeTx(util.UserKeys[3], bridgeAddr, "SendToGateway", tc.MainToken, amount.NewAmount(100, 0), []common.Address{}, "ETHEREUM", []byte("MEVERSE/ETHEREUM/MEV"))
+	_, err = tc.SendTx(util.UserKeys[3], bridgeAddr, "SendToGateway", tc.MainToken, amount.NewAmount(100, 0), []common.Address{}, "ETHEREUM", []byte("MEVERSE/ETHEREUM/MEV"))
 	if err != nil {
 		t.Errorf("TestSendToGatewayTx error = %+v", err)
 	}
@@ -160,7 +160,7 @@ func TestSend1Mev(t *testing.T) {
 	TAG := "TestSend1Mev "
 
 	balBefore := getBal(tc, tc.MainToken, util.Users[9], t, TAG)
-	_, err := tc.MakeTx(util.AdminKey, bridgeAddr, "SendFromGateway", testToken, util.Users[9], amount.NewAmount(10, 0), []common.Address{}, "POLYGON", []byte("MEVERSE/POLYGON/MEV"))
+	_, err := tc.SendTx(util.AdminKey, bridgeAddr, "SendFromGateway", testToken, util.Users[9], amount.NewAmount(10, 0), []common.Address{}, "POLYGON", []byte("MEVERSE/POLYGON/MEV"))
 	if err != nil {
 		t.Errorf(TAG+"not expact error %v", err)
 	}
@@ -177,7 +177,7 @@ func TestSend1Mev(t *testing.T) {
 	// SetSendMaintoken(cc *types.ContractContext, store common.Address, fromChains []string, overthens, amts []*amount.Amount)
 
 	sendMevBalance := amount.NewAmount(1, 0)
-	_, err = tc.MakeTx(util.AdminKey, bridgeAddr, "SetSendMaintoken", store,
+	_, err = tc.SendTx(util.AdminKey, bridgeAddr, "SetSendMaintoken", store,
 		[]string{
 			"ETHEREUM",
 			"BSC",
@@ -200,7 +200,7 @@ func TestSend1Mev(t *testing.T) {
 	if err != nil {
 		t.Errorf(TAG+"not expact error %v", err)
 	}
-	_, err = tc.MakeTx(util.UserKeys[1], bridgeAddr, "SetSendMaintoken", store,
+	_, err = tc.SendTx(util.UserKeys[1], bridgeAddr, "SetSendMaintoken", store,
 		[]string{
 			"ETHEREUM",
 			"BSC",
@@ -224,20 +224,20 @@ func TestSend1Mev(t *testing.T) {
 		t.Errorf(TAG+"expact error %v", err)
 	}
 
-	_, err = tc.MakeTx(util.AdminKey, tc.MainToken, "Transfer", store, amount.MustParseAmount("1.1"))
+	_, err = tc.SendTx(util.AdminKey, tc.MainToken, "Transfer", store, amount.MustParseAmount("1.1"))
 	if err != nil {
 		t.Errorf(TAG+"not expact error %v", err)
 	}
 
-	bal, _ := tc.MakeTx(util.AdminKey, tc.MainToken, "BalanceOf", store)
+	bal, _ := tc.SendTx(util.AdminKey, tc.MainToken, "BalanceOf", store)
 	log.Println(bal)
-	_, err = tc.MakeTx(storeKey, tc.MainToken, "Approve", bridgeAddr, amount.NewAmount(10000000000, 0))
+	_, err = tc.SendTx(storeKey, tc.MainToken, "Approve", bridgeAddr, amount.NewAmount(10000000000, 0))
 	if err != nil {
 		t.Errorf(TAG+"not expact error %v", err)
 	}
 
 	balBefore = getBal(tc, tc.MainToken, util.Users[9], t, TAG)
-	_, err = tc.MakeTx(util.AdminKey, bridgeAddr, "SendFromGateway", testToken, util.Users[9], amount.NewAmount(10, 0), []common.Address{}, "POLYGON", []byte("MEVERSE/POLYGON/MEV"))
+	_, err = tc.SendTx(util.AdminKey, bridgeAddr, "SendFromGateway", testToken, util.Users[9], amount.NewAmount(10, 0), []common.Address{}, "POLYGON", []byte("MEVERSE/POLYGON/MEV"))
 	if err != nil {
 		t.Errorf(TAG+"not expact error %v", err)
 	}
@@ -247,7 +247,7 @@ func TestSend1Mev(t *testing.T) {
 	}
 
 	balBefore = getBal(tc, tc.MainToken, util.Users[9], t, TAG)
-	_, err = tc.MakeTx(util.AdminKey, bridgeAddr, "SendFromGateway", testToken, util.Users[9], amount.NewAmount(100, 0), []common.Address{}, "POLYGON", []byte("MEVERSE/POLYGON/MEV"))
+	_, err = tc.SendTx(util.AdminKey, bridgeAddr, "SendFromGateway", testToken, util.Users[9], amount.NewAmount(100, 0), []common.Address{}, "POLYGON", []byte("MEVERSE/POLYGON/MEV"))
 	if err != nil {
 		t.Errorf(TAG+"not expact error %v", err)
 		return
@@ -262,7 +262,7 @@ func TestSend1Mev(t *testing.T) {
 	}
 
 	balBefore = getBal(tc, tc.MainToken, util.Users[9], t, TAG)
-	_, err = tc.MakeTx(util.AdminKey, bridgeAddr, "SendFromGateway", testToken, util.Users[9], amount.NewAmount(10, 0), []common.Address{}, "ETHEREUM", []byte("MEVERSE/POLYGON/MEV"))
+	_, err = tc.SendTx(util.AdminKey, bridgeAddr, "SendFromGateway", testToken, util.Users[9], amount.NewAmount(10, 0), []common.Address{}, "ETHEREUM", []byte("MEVERSE/POLYGON/MEV"))
 	if err != nil {
 		t.Errorf(TAG+"not expact error %v", err)
 		return
@@ -277,7 +277,7 @@ func TestSend1Mev(t *testing.T) {
 	}
 
 	balBefore = getBal(tc, tc.MainToken, util.Users[8], t, TAG)
-	_, err = tc.MakeTx(util.AdminKey, bridgeAddr, "SendFromGateway", testToken, util.Users[8], amount.NewAmount(10, 0), []common.Address{}, "ETHEREUM", []byte("MEVERSE/POLYGON/MEV"))
+	_, err = tc.SendTx(util.AdminKey, bridgeAddr, "SendFromGateway", testToken, util.Users[8], amount.NewAmount(10, 0), []common.Address{}, "ETHEREUM", []byte("MEVERSE/POLYGON/MEV"))
 	if err != nil {
 		t.Errorf(TAG+"not expact error %v", err)
 		return
@@ -294,7 +294,7 @@ func TestSend1Mev(t *testing.T) {
 }
 
 func getBal(tc *util.TestContext, testToken, user common.Address, t *testing.T, TAG string) *amount.Amount {
-	inf, err := tc.MakeTx(util.AdminKey, testToken, "BalanceOf", user)
+	inf, err := tc.SendTx(util.AdminKey, testToken, "BalanceOf", user)
 	if err != nil {
 		t.Errorf(TAG+"TestSendToGatewayTx", err, inf)
 	}

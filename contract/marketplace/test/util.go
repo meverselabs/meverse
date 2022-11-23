@@ -22,7 +22,7 @@ func initEngin() (tc *util.TestContext, egAddr common.Address) {
 	ContType := &engin.EnginContract{}
 	egAddr = tc.DeployContract(ContType, ContArgs)
 
-	_, err := tc.MakeTx(util.AdminKey, egAddr, "AddEngin", "JSContractEngin", "javascript vm on meverse verseion 0.1.0", url)
+	_, err := tc.SendTx(util.AdminKey, egAddr, "AddEngin", "JSContractEngin", "javascript vm on meverse verseion 0.1.0", url)
 	if err != nil {
 		panic(err)
 	}
@@ -41,7 +41,7 @@ func deployNFT(tc *util.TestContext, egAddr common.Address, _name string, _symbo
 			panic(err)
 		}
 
-		inf, err := tc.MakeTx(util.AdminKey, egAddr, "DeploryContract", "JSContractEngin", "1", bs, []interface{}{
+		inf, err := tc.SendTx(util.AdminKey, egAddr, "DeploryContract", "JSContractEngin", "1", bs, []interface{}{
 			util.Admin.String(),
 			_name,
 			_symbol,
@@ -75,7 +75,7 @@ func setupMarketCont(marketFeeStr, royaltyFeeStr, burnFee, dataPath, operationPa
 			panic(err)
 		}
 
-		inf, err := tc.MakeTx(util.AdminKey, egAddr, "DeploryContract", "JSContractEngin", "1", bs, []interface{}{util.Admin.String()}, true)
+		inf, err := tc.SendTx(util.AdminKey, egAddr, "DeploryContract", "JSContractEngin", "1", bs, []interface{}{util.Admin.String()}, true)
 		if err != nil {
 			panic(err)
 		}
@@ -96,7 +96,7 @@ func setupMarketCont(marketFeeStr, royaltyFeeStr, burnFee, dataPath, operationPa
 			panic(err)
 		}
 
-		inf, err := tc.MakeTx(util.AdminKey, egAddr, "DeploryContract", "JSContractEngin", "1", bs, []interface{}{
+		inf, err := tc.SendTx(util.AdminKey, egAddr, "DeploryContract", "JSContractEngin", "1", bs, []interface{}{
 			util.Admin.String(),
 			marketFeeStr, royaltyFeeStr,
 		}, true)
@@ -111,17 +111,17 @@ func setupMarketCont(marketFeeStr, royaltyFeeStr, burnFee, dataPath, operationPa
 		}
 		log.Println(marketAddr)
 
-		inf, err = tc.MakeTx(util.AdminKey, marketAddr, "setMandatoryMarketDataContract", dataAddr)
+		inf, err = tc.SendTx(util.AdminKey, marketAddr, "setMandatoryMarketDataContract", dataAddr)
 		if err != nil {
 			panic(fmt.Sprintf("error not expect %+v", err))
 		}
 		log.Println(inf)
-		inf, err = tc.MakeTx(util.AdminKey, dataAddr, "setMandatoryInitContract", marketAddr)
+		inf, err = tc.SendTx(util.AdminKey, dataAddr, "setMandatoryInitContract", marketAddr)
 		if err != nil {
 			panic(fmt.Sprintf("error not expect %+v", err))
 		}
 		log.Println(inf)
-		inf, err = tc.MakeTx(util.AdminKey, marketAddr, "setBurnFee", burnFee)
+		inf, err = tc.SendTx(util.AdminKey, marketAddr, "setBurnFee", burnFee)
 		if err != nil {
 			log.Println(inf)
 			panic(err)
@@ -131,7 +131,7 @@ func setupMarketCont(marketFeeStr, royaltyFeeStr, burnFee, dataPath, operationPa
 }
 
 func mintNFT(tc *util.TestContext, nftAddr common.Address, addrs ...common.Address) []*big.Int {
-	inf, err := tc.MakeTx(util.AdminKey, nftAddr, "mintBatch", addrs)
+	inf, err := tc.SendTx(util.AdminKey, nftAddr, "mintBatch", addrs)
 	if err != nil {
 		panic(err)
 	}
@@ -144,7 +144,7 @@ func mintNFT(tc *util.TestContext, nftAddr common.Address, addrs ...common.Addre
 	}
 	tokenIDs := make([]*big.Int, len(addrs))
 	for i, h := range is {
-		_, err := tc.MakeTx(util.AdminKey, tc.MainToken, "Transfer", addrs[i], amount.MustParseAmount("100"))
+		_, err := tc.SendTx(util.AdminKey, tc.MainToken, "Transfer", addrs[i], amount.MustParseAmount("100"))
 		if err != nil {
 			panic(err)
 		}

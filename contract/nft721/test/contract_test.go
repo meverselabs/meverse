@@ -34,7 +34,7 @@ func TestName(t *testing.T) {
 	})
 	log.Println(TAG, nftAddr)
 
-	inf, err := tc.MakeTx(util.AdminKey, nftAddr, "Name")
+	inf, err := tc.SendTx(util.AdminKey, nftAddr, "Name")
 	if err != nil {
 		t.Error("Name", err, inf)
 	}
@@ -46,7 +46,7 @@ func TestName(t *testing.T) {
 		t.Error("Name", "name not matchd init name")
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, nftAddr, "Symbol")
+	inf, err = tc.SendTx(util.AdminKey, nftAddr, "Symbol")
 	if err != nil {
 		t.Error("Symbol", err, inf)
 	}
@@ -73,12 +73,12 @@ func _testMint3NFT(t *testing.T, i int) (nftAddr common.Address, tc *util.TestCo
 		Owner:  util.Admin,
 	})
 
-	inf, err := tc.MakeTx(util.UserKeys[0], nftAddr, "Mint", big.NewInt(1))
+	inf, err := tc.SendTx(util.UserKeys[0], nftAddr, "Mint", big.NewInt(1))
 	if err == nil {
 		t.Error(TAG, "minted not owner", err, inf)
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, nftAddr, "Mint", big.NewInt(1))
+	inf, err = tc.SendTx(util.AdminKey, nftAddr, "Mint", big.NewInt(1))
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
@@ -97,7 +97,7 @@ func _testMint3NFT(t *testing.T, i int) (nftAddr common.Address, tc *util.TestCo
 	checkMap := map[hash.Hash256]bool{}
 	checkMap[hs] = true
 
-	inf, err = tc.MakeTx(util.AdminKey, nftAddr, "Mint", big.NewInt(2))
+	inf, err = tc.SendTx(util.AdminKey, nftAddr, "Mint", big.NewInt(2))
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
@@ -117,7 +117,7 @@ func _testMint3NFT(t *testing.T, i int) (nftAddr common.Address, tc *util.TestCo
 		checkMap[hs] = true
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, nftAddr, "TotalSupply")
+	inf, err = tc.SendTx(util.AdminKey, nftAddr, "TotalSupply")
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
@@ -128,7 +128,7 @@ func _testMint3NFT(t *testing.T, i int) (nftAddr common.Address, tc *util.TestCo
 		t.Errorf(TAG, "not expect TotalSupply want 3 get %v", bi.Int64())
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
+	inf, err = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
@@ -154,7 +154,7 @@ func TestBurn(t *testing.T) {
 
 	nftAddr, tc := _testMint3NFT(t, 2)
 
-	inf, err := tc.MakeTx(util.AdminKey, nftAddr, "TokenByIndex", big.NewInt(0))
+	inf, err := tc.SendTx(util.AdminKey, nftAddr, "TokenByIndex", big.NewInt(0))
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
@@ -164,12 +164,12 @@ func TestBurn(t *testing.T) {
 		t.Error(TAG, "no nft")
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, nftAddr, "Burn", nftID)
+	inf, err = tc.SendTx(util.AdminKey, nftAddr, "Burn", nftID)
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, nftAddr, "TokenByIndex", big.NewInt(0))
+	inf, err = tc.SendTx(util.AdminKey, nftAddr, "TokenByIndex", big.NewInt(0))
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
@@ -183,7 +183,7 @@ func TestBurn(t *testing.T) {
 		t.Error(TAG, "expect different nftid but same")
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, nftAddr, "TotalSupply")
+	inf, err = tc.SendTx(util.AdminKey, nftAddr, "TotalSupply")
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
@@ -194,7 +194,7 @@ func TestBurn(t *testing.T) {
 		t.Errorf(TAG, "not expect TotalSupply want 2 get %v", bi.Int64())
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
+	inf, err = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
@@ -208,7 +208,7 @@ func TestBurn(t *testing.T) {
 	}
 
 	for i := bi.Int64(); i > 0; i-- {
-		inf, err = tc.MakeTx(util.AdminKey, nftAddr, "TokenByIndex", big.NewInt(i-1))
+		inf, err = tc.SendTx(util.AdminKey, nftAddr, "TokenByIndex", big.NewInt(i-1))
 		if err != nil {
 			t.Error(TAG, err, inf)
 		}
@@ -218,13 +218,13 @@ func TestBurn(t *testing.T) {
 			t.Error(TAG, "no nft")
 		}
 
-		inf, err = tc.MakeTx(util.AdminKey, nftAddr, "Burn", nftID)
+		inf, err = tc.SendTx(util.AdminKey, nftAddr, "Burn", nftID)
 		if err != nil {
 			t.Error(TAG, err, inf)
 		}
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, nftAddr, "TotalSupply")
+	inf, err = tc.SendTx(util.AdminKey, nftAddr, "TotalSupply")
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
@@ -235,7 +235,7 @@ func TestBurn(t *testing.T) {
 		t.Errorf(TAG, "not expect TotalSupply want 0 get %v", bi.Int64())
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
+	inf, err = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
@@ -263,10 +263,10 @@ func TestApprove(t *testing.T) {
 		Owner:  util.Admin,
 	})
 
-	tc.MakeTx(util.AdminKey, tc.MainToken, "Transfer", util.Users[0], amount.NewAmount(10, 0))
-	tc.MakeTx(util.AdminKey, tc.MainToken, "Transfer", util.Users[1], amount.NewAmount(10, 0))
+	tc.SendTx(util.AdminKey, tc.MainToken, "Transfer", util.Users[0], amount.NewAmount(10, 0))
+	tc.SendTx(util.AdminKey, tc.MainToken, "Transfer", util.Users[1], amount.NewAmount(10, 0))
 
-	inf, err := tc.MakeTx(util.AdminKey, nftAddr, "Mint", big.NewInt(1))
+	inf, err := tc.SendTx(util.AdminKey, nftAddr, "Mint", big.NewInt(1))
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
@@ -283,30 +283,30 @@ func TestApprove(t *testing.T) {
 		t.Error(TAG, "not nft id")
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[0], nftAddr, "Approve", util.Users[0], tokenID)
+	inf, err = tc.SendTx(util.UserKeys[0], nftAddr, "Approve", util.Users[0], tokenID)
 	if err == nil {
 		t.Error(TAG, err, inf)
 	} else {
 		log.Println(TAG, err)
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, nftAddr, "Approve", util.Users[0], tokenID)
+	inf, err = tc.SendTx(util.AdminKey, nftAddr, "Approve", util.Users[0], tokenID)
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[1], nftAddr, "TransferFrom", util.Admin, util.Users[1], tokenID)
+	inf, err = tc.SendTx(util.UserKeys[1], nftAddr, "TransferFrom", util.Admin, util.Users[1], tokenID)
 	if err == nil {
 		t.Error(TAG, err, inf)
 	} else {
 		log.Println(TAG, err)
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[0], nftAddr, "TransferFrom", util.Admin, util.Users[1], tokenID)
+	inf, err = tc.SendTx(util.UserKeys[0], nftAddr, "TransferFrom", util.Admin, util.Users[1], tokenID)
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
-	inf, err = tc.MakeTx(util.UserKeys[1], nftAddr, "TransferFrom", util.Users[1], util.Users[0], tokenID)
+	inf, err = tc.SendTx(util.UserKeys[1], nftAddr, "TransferFrom", util.Users[1], util.Users[0], tokenID)
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
@@ -326,10 +326,10 @@ func TestSetApprovalForAll(t *testing.T) {
 		Owner:  util.Admin,
 	})
 
-	tc.MakeTx(util.AdminKey, tc.MainToken, "Transfer", util.Users[0], amount.NewAmount(10, 0))
-	tc.MakeTx(util.AdminKey, tc.MainToken, "Transfer", util.Users[1], amount.NewAmount(10, 0))
+	tc.SendTx(util.AdminKey, tc.MainToken, "Transfer", util.Users[0], amount.NewAmount(10, 0))
+	tc.SendTx(util.AdminKey, tc.MainToken, "Transfer", util.Users[1], amount.NewAmount(10, 0))
 
-	inf, err := tc.MakeTx(util.AdminKey, nftAddr, "Mint", big.NewInt(10))
+	inf, err := tc.SendTx(util.AdminKey, nftAddr, "Mint", big.NewInt(10))
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
@@ -346,95 +346,95 @@ func TestSetApprovalForAll(t *testing.T) {
 		tokenIDs[i] = h.(hash.Hash256)
 	}
 
-	inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "TotalSupply")
-	Admininf, _ := tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
-	Users0inf, _ := tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[0])
-	Users1inf, _ := tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[1])
+	inf, _ = tc.SendTx(util.AdminKey, nftAddr, "TotalSupply")
+	Admininf, _ := tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
+	Users0inf, _ := tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[0])
+	Users1inf, _ := tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[1])
 	log.Println(TAG, inf, Admininf, Users0inf, Users1inf)
 
-	inf, err = tc.MakeTx(util.AdminKey, nftAddr, "SetApprovalForAll", util.Users[0], true)
+	inf, err = tc.SendTx(util.AdminKey, nftAddr, "SetApprovalForAll", util.Users[0], true)
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[1], nftAddr, "TransferFrom", util.Admin, util.Users[1], tokenIDs[0])
+	inf, err = tc.SendTx(util.UserKeys[1], nftAddr, "TransferFrom", util.Admin, util.Users[1], tokenIDs[0])
 	if err == nil {
 		t.Error(TAG, err, inf)
 	} else {
 		log.Println(TAG, err)
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[0], nftAddr, "TransferFrom", util.Admin, util.Users[1], tokenIDs[0])
+	inf, err = tc.SendTx(util.UserKeys[0], nftAddr, "TransferFrom", util.Admin, util.Users[1], tokenIDs[0])
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
 
-	inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "TotalSupply")
-	Admininf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
-	Users0inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[0])
-	Users1inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[1])
+	inf, _ = tc.SendTx(util.AdminKey, nftAddr, "TotalSupply")
+	Admininf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
+	Users0inf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[0])
+	Users1inf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[1])
 	log.Println(TAG, inf, Admininf, Users0inf, Users1inf)
 
-	inf, err = tc.MakeTx(util.UserKeys[0], nftAddr, "TransferFrom", util.Admin, util.Users[1], tokenIDs[0])
+	inf, err = tc.SendTx(util.UserKeys[0], nftAddr, "TransferFrom", util.Admin, util.Users[1], tokenIDs[0])
 	if err == nil {
 		t.Error(TAG, err, inf)
 	} else {
 		log.Println(TAG, err)
 	}
 
-	inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "TotalSupply")
-	Admininf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
-	Users0inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[0])
-	Users1inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[1])
+	inf, _ = tc.SendTx(util.AdminKey, nftAddr, "TotalSupply")
+	Admininf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
+	Users0inf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[0])
+	Users1inf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[1])
 	log.Println(TAG, inf, Admininf, Users0inf, Users1inf)
 
-	inf, err = tc.MakeTx(util.UserKeys[0], nftAddr, "TransferFrom", util.Admin, util.Users[1], tokenIDs[1])
+	inf, err = tc.SendTx(util.UserKeys[0], nftAddr, "TransferFrom", util.Admin, util.Users[1], tokenIDs[1])
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
-	inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "TotalSupply")
-	Admininf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
-	Users0inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[0])
-	Users1inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[1])
+	inf, _ = tc.SendTx(util.AdminKey, nftAddr, "TotalSupply")
+	Admininf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
+	Users0inf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[0])
+	Users1inf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[1])
 	log.Println(TAG, inf, Admininf, Users0inf, Users1inf)
 
-	inf, err = tc.MakeTx(util.UserKeys[0], nftAddr, "TransferFrom", util.Admin, util.Users[1], tokenIDs[2])
+	inf, err = tc.SendTx(util.UserKeys[0], nftAddr, "TransferFrom", util.Admin, util.Users[1], tokenIDs[2])
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
-	inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "TotalSupply")
-	Admininf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
-	Users0inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[0])
-	Users1inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[1])
+	inf, _ = tc.SendTx(util.AdminKey, nftAddr, "TotalSupply")
+	Admininf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
+	Users0inf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[0])
+	Users1inf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[1])
 	log.Println(TAG, inf, Admininf, Users0inf, Users1inf)
 
-	inf, err = tc.MakeTx(util.UserKeys[0], nftAddr, "TransferFrom", util.Admin, util.Users[1], tokenIDs[3])
-	if err != nil {
-		t.Error(TAG, err, inf)
-	}
-
-	inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "TotalSupply")
-	Admininf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
-	Users0inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[0])
-	Users1inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[1])
-	log.Println(TAG, inf, Admininf, Users0inf, Users1inf)
-
-	inf, err = tc.MakeTx(util.AdminKey, nftAddr, "SetApprovalForAll", util.Users[0], false)
+	inf, err = tc.SendTx(util.UserKeys[0], nftAddr, "TransferFrom", util.Admin, util.Users[1], tokenIDs[3])
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[0], nftAddr, "TransferFrom", util.Admin, util.Users[1], tokenIDs[4])
+	inf, _ = tc.SendTx(util.AdminKey, nftAddr, "TotalSupply")
+	Admininf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
+	Users0inf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[0])
+	Users1inf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[1])
+	log.Println(TAG, inf, Admininf, Users0inf, Users1inf)
+
+	inf, err = tc.SendTx(util.AdminKey, nftAddr, "SetApprovalForAll", util.Users[0], false)
+	if err != nil {
+		t.Error(TAG, err, inf)
+	}
+
+	inf, err = tc.SendTx(util.UserKeys[0], nftAddr, "TransferFrom", util.Admin, util.Users[1], tokenIDs[4])
 	if err == nil {
 		t.Error(TAG, err, inf)
 	} else {
 		log.Println(TAG, err)
 	}
 
-	inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "TotalSupply")
-	Admininf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
-	Users0inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[0])
-	Users1inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[1])
+	inf, _ = tc.SendTx(util.AdminKey, nftAddr, "TotalSupply")
+	Admininf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
+	Users0inf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[0])
+	Users1inf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[1])
 	log.Println(TAG, inf, Admininf, Users0inf, Users1inf)
 }
 
@@ -456,10 +456,10 @@ func TestSafeTransferFrom(t *testing.T) {
 
 	receiverAddr := tc.DeployContract(&nft721receiver.NFT721ReceiverContract{}, &nft721receiver.NFT721ReceiverContractConstruction{})
 
-	tc.MakeTx(util.AdminKey, tc.MainToken, "Transfer", util.Users[0], amount.NewAmount(10, 0))
-	tc.MakeTx(util.AdminKey, tc.MainToken, "Transfer", util.Users[1], amount.NewAmount(10, 0))
+	tc.SendTx(util.AdminKey, tc.MainToken, "Transfer", util.Users[0], amount.NewAmount(10, 0))
+	tc.SendTx(util.AdminKey, tc.MainToken, "Transfer", util.Users[1], amount.NewAmount(10, 0))
 
-	inf, err := tc.MakeTx(util.AdminKey, nftAddr, "Mint", big.NewInt(10))
+	inf, err := tc.SendTx(util.AdminKey, nftAddr, "Mint", big.NewInt(10))
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
@@ -476,36 +476,36 @@ func TestSafeTransferFrom(t *testing.T) {
 		tokenIDs[i] = h.(hash.Hash256)
 	}
 
-	inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "TotalSupply")
-	Admininf, _ := tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
-	Users0inf, _ := tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[0])
-	Users1inf, _ := tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[1])
+	inf, _ = tc.SendTx(util.AdminKey, nftAddr, "TotalSupply")
+	Admininf, _ := tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
+	Users0inf, _ := tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[0])
+	Users1inf, _ := tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[1])
 	log.Println(TAG, inf, Admininf, Users0inf, Users1inf)
 
-	inf, err = tc.MakeTx(util.AdminKey, nftAddr, "SetApprovalForAll", util.Users[0], true)
+	inf, err = tc.SendTx(util.AdminKey, nftAddr, "SetApprovalForAll", util.Users[0], true)
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[1], nftAddr, "SafeTransferFrom", util.Admin, receiverAddr, tokenIDs[0], []byte{0})
+	inf, err = tc.SendTx(util.UserKeys[1], nftAddr, "SafeTransferFrom", util.Admin, receiverAddr, tokenIDs[0], []byte{0})
 	if err == nil {
 		t.Error(TAG, err, inf)
 	} else {
 		log.Println(TAG, err)
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[0], nftAddr, "SafeTransferFrom", util.Admin, receiverAddr, tokenIDs[0], []byte{0})
+	inf, err = tc.SendTx(util.UserKeys[0], nftAddr, "SafeTransferFrom", util.Admin, receiverAddr, tokenIDs[0], []byte{0})
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
 
-	inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "TotalSupply")
-	Admininf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
-	Users0inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[0])
-	Users1inf, _ = tc.MakeTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[1])
+	inf, _ = tc.SendTx(util.AdminKey, nftAddr, "TotalSupply")
+	Admininf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Admin)
+	Users0inf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[0])
+	Users1inf, _ = tc.SendTx(util.AdminKey, nftAddr, "BalanceOf", util.Users[1])
 	log.Println(TAG, inf, Admininf, Users0inf, Users1inf)
 
-	inf, err = tc.MakeTx(util.UserKeys[0], nftAddr, "SafeTransferFrom", util.Admin, receiverAddr, tokenIDs[0], []byte{0})
+	inf, err = tc.SendTx(util.UserKeys[0], nftAddr, "SafeTransferFrom", util.Admin, receiverAddr, tokenIDs[0], []byte{0})
 	if err == nil {
 		t.Error(TAG, err, inf)
 	} else {
@@ -527,7 +527,7 @@ func TestMintBatch(t *testing.T) {
 		Owner:  util.Admin,
 	})
 
-	inf, err := tc.MakeTx(util.AdminKey, nftAddr, "MintBatch", []common.Address{util.Users[0], util.Users[1], util.Users[2]})
+	inf, err := tc.SendTx(util.AdminKey, nftAddr, "MintBatch", []common.Address{util.Users[0], util.Users[1], util.Users[2]})
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
@@ -545,7 +545,7 @@ func TestMintBatch(t *testing.T) {
 	}
 
 	for i, tokenID := range tokenIDs {
-		inf, err := tc.MakeTx(util.AdminKey, nftAddr, "OwnerOf", tokenID)
+		inf, err := tc.SendTx(util.AdminKey, nftAddr, "OwnerOf", tokenID)
 		if err != nil {
 			t.Error(TAG, err, inf)
 		}
@@ -570,7 +570,7 @@ func TestBurnAll(t *testing.T) {
 		Owner:  util.Admin,
 	})
 
-	inf, err := tc.MakeTx(util.AdminKey, nftAddr, "Mint", big.NewInt(10))
+	inf, err := tc.SendTx(util.AdminKey, nftAddr, "Mint", big.NewInt(10))
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}
@@ -592,7 +592,7 @@ func TestBurnAll(t *testing.T) {
 		if !ok {
 			t.Error(TAG, "not nft id")
 		}
-		inf, err := tc.MakeTx(util.AdminKey, nftAddr, "Burn", hs)
+		inf, err := tc.SendTx(util.AdminKey, nftAddr, "Burn", hs)
 		if err != nil {
 			t.Error(TAG, err, inf)
 		}
@@ -602,7 +602,7 @@ func TestBurnAll(t *testing.T) {
 		}
 		log.Println("***-******", i)
 	}
-	inf, err = tc.MakeTx(util.AdminKey, nftAddr, "Mint", big.NewInt(10))
+	inf, err = tc.SendTx(util.AdminKey, nftAddr, "Mint", big.NewInt(10))
 	if err != nil {
 		t.Error(TAG, err, inf)
 	}

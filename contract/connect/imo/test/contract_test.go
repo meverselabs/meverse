@@ -58,7 +58,7 @@ func TestExecuteContractTx(t *testing.T) {
 
 	var err error
 	// - imo에 deposit
-	_, err = tc.MakeTx(util.AdminKey, imoAddr, "Deposit", amount.MustParseAmount("1000"))
+	_, err = tc.SendTx(util.AdminKey, imoAddr, "Deposit", amount.MustParseAmount("1000"))
 	if err == nil {
 		t.Errorf("ExecuteContractTx wantErr %v but not occur the error", true)
 	}
@@ -70,7 +70,7 @@ func TestExecuteContractTx(t *testing.T) {
 	log.Println("current height:", tc.Cn.Provider().Height())
 
 	// - imo에 harvest
-	_, err = tc.MakeTx(util.AdminKey, imoAddr, "Harvest")
+	_, err = tc.SendTx(util.AdminKey, imoAddr, "Harvest")
 	if err == nil {
 		t.Errorf("ExecuteContractTx wantErr %v but not occur the error", true)
 	}

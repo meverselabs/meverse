@@ -83,6 +83,6 @@ func TestSwapMaintokenTx(t *testing.T) {
 	inf = tc.MustSendTx(util.AdminKey, tokenAddr, "SetRouter", routerAddr, []common.Address{tokenAddr, tc.MainToken})
 	log.Println("SetRouter", inf)
 
-	inf, err := tc.MakeTx(util.UserKeys[0], tokenAddr, "SwapToMainToken", amount.NewAmount(10, 0))
+	inf, err := tc.SendTx(util.UserKeys[0], tokenAddr, "SwapToMainToken", amount.NewAmount(10, 0))
 	log.Println("SwapToMainToken", inf, ":", err)
 }

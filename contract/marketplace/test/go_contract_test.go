@@ -27,74 +27,74 @@ func _init() (tc *util.TestContext, egAddr, dataAddr, marketAddr, tokenAddr, nft
 
 	// await nftMarketData.setFoundationAdminAddress(pocketBattles.address, pocketAdmin, {from: owner });
 	// await nftMarketData.setFoundationAdminAddress(kingOfPlanets.address, kopAdmin, {from: owner });
-	inf, err := tc.MakeTx(util.AdminKey, dataAddr, "setFoundationAdminAddress", nft1Addr, util.Users[0])
+	inf, err := tc.SendTx(util.AdminKey, dataAddr, "setFoundationAdminAddress", nft1Addr, util.Users[0])
 	if err != nil {
 		log.Println(inf)
 		panic(err)
 	}
-	inf, err = tc.MakeTx(util.AdminKey, dataAddr, "setFoundationAdminAddress", nft2Addr, util.Users[1])
+	inf, err = tc.SendTx(util.AdminKey, dataAddr, "setFoundationAdminAddress", nft2Addr, util.Users[1])
 	if err != nil {
 		log.Println(inf)
 		panic(err)
 	}
-	inf, err = tc.MakeTx(util.AdminKey, dataAddr, "setBurnAddress", nft1Addr, common.HexToAddress("0xdead"))
+	inf, err = tc.SendTx(util.AdminKey, dataAddr, "setBurnAddress", nft1Addr, common.HexToAddress("0xdead"))
 	if err != nil {
 		log.Println(inf)
 		panic(err)
 	}
-	inf, err = tc.MakeTx(util.AdminKey, dataAddr, "setBurnAddress", nft2Addr, common.HexToAddress("0xdead"))
-	if err != nil {
-		log.Println(inf)
-		panic(err)
-	}
-
-	inf, err = tc.MakeTx(util.AdminKey, dataAddr, "setERC20Contract", "MEV", tc.MainToken)
-	if err != nil {
-		log.Println(inf)
-		panic(err)
-	}
-	inf, err = tc.MakeTx(util.AdminKey, dataAddr, "setERC20Contract", "USDT", tokenAddr)
+	inf, err = tc.SendTx(util.AdminKey, dataAddr, "setBurnAddress", nft2Addr, common.HexToAddress("0xdead"))
 	if err != nil {
 		log.Println(inf)
 		panic(err)
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, nft1Addr, "setApprovalForAll", marketAddr, true)
+	inf, err = tc.SendTx(util.AdminKey, dataAddr, "setERC20Contract", "MEV", tc.MainToken)
 	if err != nil {
 		log.Println(inf)
 		panic(err)
 	}
-	inf, err = tc.MakeTx(util.UserKeys[0], nft1Addr, "setApprovalForAll", marketAddr, true)
+	inf, err = tc.SendTx(util.AdminKey, dataAddr, "setERC20Contract", "USDT", tokenAddr)
 	if err != nil {
 		log.Println(inf)
 		panic(err)
 	}
-	inf, err = tc.MakeTx(util.UserKeys[1], nft1Addr, "setApprovalForAll", marketAddr, true)
+
+	inf, err = tc.SendTx(util.AdminKey, nft1Addr, "setApprovalForAll", marketAddr, true)
 	if err != nil {
 		log.Println(inf)
 		panic(err)
 	}
-	inf, err = tc.MakeTx(util.UserKeys[2], nft1Addr, "setApprovalForAll", marketAddr, true)
+	inf, err = tc.SendTx(util.UserKeys[0], nft1Addr, "setApprovalForAll", marketAddr, true)
 	if err != nil {
 		log.Println(inf)
 		panic(err)
 	}
-	inf, err = tc.MakeTx(util.AdminKey, nft2Addr, "setApprovalForAll", marketAddr, true)
+	inf, err = tc.SendTx(util.UserKeys[1], nft1Addr, "setApprovalForAll", marketAddr, true)
 	if err != nil {
 		log.Println(inf)
 		panic(err)
 	}
-	inf, err = tc.MakeTx(util.UserKeys[0], nft2Addr, "setApprovalForAll", marketAddr, true)
+	inf, err = tc.SendTx(util.UserKeys[2], nft1Addr, "setApprovalForAll", marketAddr, true)
 	if err != nil {
 		log.Println(inf)
 		panic(err)
 	}
-	inf, err = tc.MakeTx(util.UserKeys[1], nft2Addr, "setApprovalForAll", marketAddr, true)
+	inf, err = tc.SendTx(util.AdminKey, nft2Addr, "setApprovalForAll", marketAddr, true)
 	if err != nil {
 		log.Println(inf)
 		panic(err)
 	}
-	inf, err = tc.MakeTx(util.UserKeys[2], nft2Addr, "setApprovalForAll", marketAddr, true)
+	inf, err = tc.SendTx(util.UserKeys[0], nft2Addr, "setApprovalForAll", marketAddr, true)
+	if err != nil {
+		log.Println(inf)
+		panic(err)
+	}
+	inf, err = tc.SendTx(util.UserKeys[1], nft2Addr, "setApprovalForAll", marketAddr, true)
+	if err != nil {
+		log.Println(inf)
+		panic(err)
+	}
+	inf, err = tc.SendTx(util.UserKeys[2], nft2Addr, "setApprovalForAll", marketAddr, true)
 	if err != nil {
 		log.Println(inf)
 		panic(err)
@@ -126,41 +126,41 @@ func TestRegisterMarketItemBuyNowWithToken(t *testing.T) {
 
 	buyp := amount.MustParseAmount("50000")
 
-	inf, err := tc.MakeTx(util.UserKeys[1], marketAddr, "registerMarketItem", nft1Addr, nft1IDs[1], buyp, "USDT", "0", amount.MustParseAmount("10000"))
+	inf, err := tc.SendTx(util.UserKeys[1], marketAddr, "registerMarketItem", nft1Addr, nft1IDs[1], buyp, "USDT", "0", amount.MustParseAmount("10000"))
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
 	log.Println("registerMarketItem", inf)
 
-	inf, err = tc.MakeTx(util.UserKeys[2], marketAddr, "buyNowWithToken", nft1Addr, nft1IDs[1], buyp, "USDT")
+	inf, err = tc.SendTx(util.UserKeys[2], marketAddr, "buyNowWithToken", nft1Addr, nft1IDs[1], buyp, "USDT")
 	if err == nil || err.Error() != "NftMarket._settle: is not sufficient balance" {
 		t.Errorf("error expect but err is nil or not start with 'NftMarket._settle' %+v", err)
 		return
 	}
 	log.Println(inf)
 
-	_, err = tc.MakeTx(util.AdminKey, tokenAddr, "Mint", util.Users[2], amount.MustParseAmount("50000"))
+	_, err = tc.SendTx(util.AdminKey, tokenAddr, "Mint", util.Users[2], amount.MustParseAmount("50000"))
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[2], marketAddr, "buyNowWithToken", nft1Addr, nft1IDs[1], buyp, "USDT")
+	inf, err = tc.SendTx(util.UserKeys[2], marketAddr, "buyNowWithToken", nft1Addr, nft1IDs[1], buyp, "USDT")
 	if err == nil || err.Error() != "NftMarket._settle: is not allowanced" {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
 	log.Println(inf)
 
-	inf, err = tc.MakeTx(util.UserKeys[2], tokenAddr, "approve", marketAddr, buyp)
+	inf, err = tc.SendTx(util.UserKeys[2], tokenAddr, "approve", marketAddr, buyp)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
 	log.Println(inf)
 
-	inf, err = tc.MakeTx(util.UserKeys[2], marketAddr, "buyNowWithToken", nft1Addr, nft1IDs[1], buyp, "USDT")
+	inf, err = tc.SendTx(util.UserKeys[2], marketAddr, "buyNowWithToken", nft1Addr, nft1IDs[1], buyp, "USDT")
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
@@ -206,69 +206,69 @@ func TestRegisterMarketItemNftTransferBuyNowWithTokenRegisterMarketItemBuyNowWit
 
 	buyp := amount.MustParseAmount("50000")
 
-	inf, err := tc.MakeTx(util.UserKeys[1], marketAddr, "registerMarketItem", nft1Addr, nft1IDs[1], buyp, "USDT", "0", "100000")
+	inf, err := tc.SendTx(util.UserKeys[1], marketAddr, "registerMarketItem", nft1Addr, nft1IDs[1], buyp, "USDT", "0", "100000")
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
 	log.Println("registerMarketItem", inf)
 
-	inf, err = tc.MakeTx(util.UserKeys[2], marketAddr, "buyNowWithToken", nft1Addr, nft1IDs[1], buyp, "USDT")
+	inf, err = tc.SendTx(util.UserKeys[2], marketAddr, "buyNowWithToken", nft1Addr, nft1IDs[1], buyp, "USDT")
 	if err == nil || err.Error() != "NftMarket._settle: is not sufficient balance" {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
 	log.Println(inf)
 
-	_, err = tc.MakeTx(util.AdminKey, tokenAddr, "Mint", util.Users[2], amount.MustParseAmount("50000"))
+	_, err = tc.SendTx(util.AdminKey, tokenAddr, "Mint", util.Users[2], amount.MustParseAmount("50000"))
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[2], marketAddr, "buyNowWithToken", nft1Addr, nft1IDs[1], buyp, "USDT")
+	inf, err = tc.SendTx(util.UserKeys[2], marketAddr, "buyNowWithToken", nft1Addr, nft1IDs[1], buyp, "USDT")
 	if err == nil || err.Error() != "NftMarket._settle: is not allowanced" {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
 	log.Println(inf)
 
-	inf, err = tc.MakeTx(util.UserKeys[2], tokenAddr, "approve", marketAddr, buyp)
+	inf, err = tc.SendTx(util.UserKeys[2], tokenAddr, "approve", marketAddr, buyp)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
 	log.Println(inf)
 
-	inf, err = tc.MakeTx(util.UserKeys[1], nft1Addr, "approve", util.Admin, nft1IDs[1])
+	inf, err = tc.SendTx(util.UserKeys[1], nft1Addr, "approve", util.Admin, nft1IDs[1])
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
 	}
-	inf, err = tc.MakeTx(util.AdminKey, nft1Addr, "transferFrom", util.Users[1], util.Admin, nft1IDs[1])
+	inf, err = tc.SendTx(util.AdminKey, nft1Addr, "transferFrom", util.Users[1], util.Admin, nft1IDs[1])
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[2], marketAddr, "buyNowWithToken", nft1Addr, nft1IDs[1], buyp, "USDT")
+	inf, err = tc.SendTx(util.UserKeys[2], marketAddr, "buyNowWithToken", nft1Addr, nft1IDs[1], buyp, "USDT")
 	if err == nil || err.Error() != "NftMarket._settle: seller is Not owner" {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, nft1Addr, "setApprovalForAll", marketAddr, true)
+	inf, err = tc.SendTx(util.AdminKey, nft1Addr, "setApprovalForAll", marketAddr, true)
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
 	}
-	inf, err = tc.MakeTx(util.AdminKey, marketAddr, "registerMarketItem", nft1Addr, nft1IDs[1], buyp, "USDT", "0", "100000")
+	inf, err = tc.SendTx(util.AdminKey, marketAddr, "registerMarketItem", nft1Addr, nft1IDs[1], buyp, "USDT", "0", "100000")
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[2], marketAddr, "buyNowWithToken", nft1Addr, nft1IDs[1], buyp, "USDT")
+	inf, err = tc.SendTx(util.UserKeys[2], marketAddr, "buyNowWithToken", nft1Addr, nft1IDs[1], buyp, "USDT")
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
@@ -314,31 +314,31 @@ func TestSuggestItemToBuyCancelItemToBuyWithSuggester(t *testing.T) {
 
 	buyp := amount.MustParseAmount("2500")
 
-	inf, err := tc.MakeTx(util.UserKeys[1], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], buyp, "USDT")
+	inf, err := tc.SendTx(util.UserKeys[1], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], buyp, "USDT")
 	if err == nil || err.Error() != "NftMarket.suggestItemToBuy: is not allowanced" {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
 	}
 
-	_, err = tc.MakeTx(util.UserKeys[1], tokenAddr, "approve", marketAddr, buyp)
+	_, err = tc.SendTx(util.UserKeys[1], tokenAddr, "approve", marketAddr, buyp)
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[1], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], buyp, "USDT")
+	inf, err = tc.SendTx(util.UserKeys[1], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], buyp, "USDT")
 	if err == nil || err.Error() != "NftMarket.suggestItemToBuy: is not sufficient balance" {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
 	}
 
-	_, err = tc.MakeTx(util.AdminKey, tokenAddr, "Mint", util.Users[1], amount.MustParseAmount("3500"))
+	_, err = tc.SendTx(util.AdminKey, tokenAddr, "Mint", util.Users[1], amount.MustParseAmount("3500"))
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[1], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], buyp, "USDT")
+	inf, err = tc.SendTx(util.UserKeys[1], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], buyp, "USDT")
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
@@ -347,21 +347,22 @@ func TestSuggestItemToBuyCancelItemToBuyWithSuggester(t *testing.T) {
 	inf, err = tc.ReadTx(util.UserKeys[1], marketAddr, "getItemSuggestionInfos", nft2Addr, nft2IDs[1], "USDT")
 	if strings.Count(fmt.Sprintln(inf), "SuggestItem") != 1 {
 		t.Errorf("error not expect len 1 %v, err %v", strings.Count(fmt.Sprintln(inf), "SuggestItem"), err)
+		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[1], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], buyp, "USDT")
+	inf, err = tc.SendTx(util.UserKeys[1], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], buyp, "USDT")
 	if err == nil || err.Error() != "NftMarket.suggestItemToBuy: not valid suggestBiddingPrice" {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
 	}
 
-	_, err = tc.MakeTx(util.UserKeys[1], tokenAddr, "approve", marketAddr, amount.MustParseAmount("3500"))
+	_, err = tc.SendTx(util.UserKeys[1], tokenAddr, "approve", marketAddr, amount.MustParseAmount("3500"))
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[1], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], amount.MustParseAmount("3500"), "USDT")
+	inf, err = tc.SendTx(util.UserKeys[1], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], amount.MustParseAmount("3500"), "USDT")
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
@@ -370,9 +371,10 @@ func TestSuggestItemToBuyCancelItemToBuyWithSuggester(t *testing.T) {
 	inf, err = tc.ReadTx(util.UserKeys[1], marketAddr, "getItemSuggestionInfos", nft2Addr, nft2IDs[1], "USDT")
 	if strings.Count(fmt.Sprintln(inf), "SuggestItem") != 2 {
 		t.Errorf("error not expect len 1 %v, err %v", strings.Count(fmt.Sprintln(inf), "SuggestItem"), err)
+		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[1], marketAddr, "cancelItemToBuyWithSuggester", nft2Addr, nft2IDs[1], "USDT", amount.MustParseAmount("2500"))
+	inf, err = tc.SendTx(util.UserKeys[1], marketAddr, "cancelItemToBuyWithSuggester", nft2Addr, nft2IDs[1], "USDT", amount.MustParseAmount("2500"))
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
@@ -381,9 +383,10 @@ func TestSuggestItemToBuyCancelItemToBuyWithSuggester(t *testing.T) {
 	inf, err = tc.ReadTx(util.UserKeys[1], marketAddr, "getItemSuggestionInfos", nft2Addr, nft2IDs[1], "USDT")
 	if strings.Count(fmt.Sprintln(inf), "SuggestItem") != 1 {
 		t.Errorf("error not expect len 1 %v, err %v", strings.Count(fmt.Sprintln(inf), "SuggestItem"), err)
+		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[1], marketAddr, "cancelItemToBuyWithSuggester", nft2Addr, nft2IDs[1], "USDT", amount.MustParseAmount("3500"))
+	inf, err = tc.SendTx(util.UserKeys[1], marketAddr, "cancelItemToBuyWithSuggester", nft2Addr, nft2IDs[1], "USDT", amount.MustParseAmount("3500"))
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
@@ -405,25 +408,25 @@ func TestSuggestItemToBuyCancelItem(t *testing.T) {
 
 	buyp := amount.MustParseAmount("2500")
 
-	_, err := tc.MakeTx(util.AdminKey, tokenAddr, "Mint", util.Users[1], buyp)
+	_, err := tc.SendTx(util.AdminKey, tokenAddr, "Mint", util.Users[1], buyp)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
 
-	_, err = tc.MakeTx(util.UserKeys[1], tokenAddr, "approve", marketAddr, buyp)
+	_, err = tc.SendTx(util.UserKeys[1], tokenAddr, "approve", marketAddr, buyp)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
 
-	inf, err := tc.MakeTx(util.UserKeys[1], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], buyp, "USDT")
+	inf, err := tc.SendTx(util.UserKeys[1], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], buyp, "USDT")
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[1], marketAddr, "cancelItemToBuyWithSuggester", nft2Addr, nft2IDs[1], "USDT", buyp)
+	inf, err = tc.SendTx(util.UserKeys[1], marketAddr, "cancelItemToBuyWithSuggester", nft2Addr, nft2IDs[1], "USDT", buyp)
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
@@ -437,24 +440,24 @@ func TestSuggestItemToBuyAcceptItemToBuyWithSeller(t *testing.T) {
 	}
 
 	buyp := amount.MustParseAmount("2500")
-	_, err := tc.MakeTx(util.UserKeys[0], tokenAddr, "approve", marketAddr, buyp)
+	_, err := tc.SendTx(util.UserKeys[0], tokenAddr, "approve", marketAddr, buyp)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
-	_, err = tc.MakeTx(util.AdminKey, tokenAddr, "Mint", util.Users[0], buyp)
+	_, err = tc.SendTx(util.AdminKey, tokenAddr, "Mint", util.Users[0], buyp)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
 
-	inf, err := tc.MakeTx(util.UserKeys[0], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[0], buyp, "USDT")
+	inf, err := tc.SendTx(util.UserKeys[0], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[0], buyp, "USDT")
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[1], marketAddr, "acceptItemToBuyWithSeller", nft2Addr, nft2IDs[0], buyp, "USDT")
+	inf, err = tc.SendTx(util.UserKeys[1], marketAddr, "acceptItemToBuyWithSeller", nft2Addr, nft2IDs[0], buyp, "USDT")
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
@@ -467,17 +470,17 @@ func TestSuggestItemToBuyChangeNftOwnerAcceptItemToBuyWithSeller(t *testing.T) {
 		log.Println(tc, egAddr, dataAddr, marketAddr, tokenAddr, nft1Addr, nft2Addr, nft1IDs, nft2IDs)
 	}
 	buyp := amount.MustParseAmount("2500")
-	_, err := tc.MakeTx(util.UserKeys[0], tokenAddr, "approve", marketAddr, buyp)
+	_, err := tc.SendTx(util.UserKeys[0], tokenAddr, "approve", marketAddr, buyp)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
-	_, err = tc.MakeTx(util.AdminKey, tokenAddr, "Mint", util.Users[0], buyp)
+	_, err = tc.SendTx(util.AdminKey, tokenAddr, "Mint", util.Users[0], buyp)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
-	inf, err := tc.MakeTx(util.UserKeys[0], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[0], buyp, "USDT")
+	inf, err := tc.SendTx(util.UserKeys[0], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[0], buyp, "USDT")
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
@@ -486,31 +489,32 @@ func TestSuggestItemToBuyChangeNftOwnerAcceptItemToBuyWithSeller(t *testing.T) {
 	inf, err = tc.ReadTx(util.UserKeys[0], marketAddr, "getItemSuggestionInfos", nft2Addr, nft2IDs[0], "USDT")
 	if strings.Count(fmt.Sprintln(inf), "SuggestItem") != 1 {
 		t.Errorf("error not expect len 1 %v, err %v", strings.Count(fmt.Sprintln(inf), "SuggestItem"), err)
+		return
 	}
 
-	_, err = tc.MakeTx(util.UserKeys[1], nft2Addr, "approve", util.Admin, nft2IDs[0])
+	_, err = tc.SendTx(util.UserKeys[1], nft2Addr, "approve", util.Admin, nft2IDs[0])
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
-	_, err = tc.MakeTx(util.AdminKey, nft2Addr, "transferFrom", util.Users[1], util.Admin, nft2IDs[0])
+	_, err = tc.SendTx(util.AdminKey, nft2Addr, "transferFrom", util.Users[1], util.Admin, nft2IDs[0])
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[1], marketAddr, "acceptItemToBuyWithSeller", nft2Addr, nft2IDs[0], buyp, "USDT")
+	inf, err = tc.SendTx(util.UserKeys[1], marketAddr, "acceptItemToBuyWithSeller", nft2Addr, nft2IDs[0], buyp, "USDT")
 	if err == nil || err.Error() != "NftMarket.acceptItemToBuy: seller is not owner" {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
 	}
 
-	_, err = tc.MakeTx(util.AdminKey, nft2Addr, "approve", util.Users[1], nft2IDs[0])
+	_, err = tc.SendTx(util.AdminKey, nft2Addr, "approve", util.Users[1], nft2IDs[0])
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
-	_, err = tc.MakeTx(util.UserKeys[1], nft2Addr, "transferFrom", util.Admin, util.Users[1], nft2IDs[0])
+	_, err = tc.SendTx(util.UserKeys[1], nft2Addr, "transferFrom", util.Admin, util.Users[1], nft2IDs[0])
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
@@ -519,9 +523,10 @@ func TestSuggestItemToBuyChangeNftOwnerAcceptItemToBuyWithSeller(t *testing.T) {
 	inf, err = tc.ReadTx(util.UserKeys[0], marketAddr, "getItemSuggestionInfos", nft2Addr, nft2IDs[0], "USDT")
 	if strings.Count(fmt.Sprintln(inf), "SuggestItem") != 1 {
 		t.Errorf("error not expect len 1 %v, err %v", strings.Count(fmt.Sprintln(inf), "SuggestItem"), err)
+		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[1], marketAddr, "acceptItemToBuyWithSeller", nft2Addr, nft2IDs[0], buyp, "USDT")
+	inf, err = tc.SendTx(util.UserKeys[1], marketAddr, "acceptItemToBuyWithSeller", nft2Addr, nft2IDs[0], buyp, "USDT")
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
@@ -530,6 +535,7 @@ func TestSuggestItemToBuyChangeNftOwnerAcceptItemToBuyWithSeller(t *testing.T) {
 	inf, err = tc.ReadTx(util.UserKeys[0], marketAddr, "getItemSuggestionInfos", nft2Addr, nft2IDs[0], "USDT")
 	if strings.Count(fmt.Sprintln(inf), "SuggestItem") != 0 {
 		t.Errorf("error not expect len 1 %v, err %v", strings.Count(fmt.Sprintln(inf), "SuggestItem"), err)
+		return
 	}
 }
 
@@ -541,40 +547,40 @@ func TestMultiSuggestItemToBuyAcceptItemToBuyWithSeller(t *testing.T) {
 
 	buyp := amount.MustParseAmount("2500")
 	buyp2 := amount.MustParseAmount("3000")
-	_, err := tc.MakeTx(util.UserKeys[0], tokenAddr, "approve", marketAddr, buyp)
+	_, err := tc.SendTx(util.UserKeys[0], tokenAddr, "approve", marketAddr, buyp)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
-	_, err = tc.MakeTx(util.AdminKey, tokenAddr, "Mint", util.Users[0], buyp)
+	_, err = tc.SendTx(util.AdminKey, tokenAddr, "Mint", util.Users[0], buyp)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
-	_, err = tc.MakeTx(util.UserKeys[2], tokenAddr, "approve", marketAddr, buyp2)
+	_, err = tc.SendTx(util.UserKeys[2], tokenAddr, "approve", marketAddr, buyp2)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
-	_, err = tc.MakeTx(util.AdminKey, tokenAddr, "Mint", util.Users[2], buyp2)
+	_, err = tc.SendTx(util.AdminKey, tokenAddr, "Mint", util.Users[2], buyp2)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
 
-	inf, err := tc.MakeTx(util.UserKeys[0], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[0], buyp, "USDT")
+	inf, err := tc.SendTx(util.UserKeys[0], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[0], buyp, "USDT")
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[2], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[0], buyp2, "USDT")
+	inf, err = tc.SendTx(util.UserKeys[2], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[0], buyp2, "USDT")
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[1], marketAddr, "acceptItemToBuyWithSeller", nft2Addr, nft2IDs[0], buyp, "USDT")
+	inf, err = tc.SendTx(util.UserKeys[1], marketAddr, "acceptItemToBuyWithSeller", nft2Addr, nft2IDs[0], buyp, "USDT")
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
@@ -589,45 +595,45 @@ func TestMultiSuggestItemToBuyLowAcceptItemToBuyWithSeller(t *testing.T) {
 
 	buyp := amount.MustParseAmount("2500")
 	buyp2 := amount.MustParseAmount("3000")
-	_, err := tc.MakeTx(util.UserKeys[3], tokenAddr, "approve", marketAddr, buyp)
+	_, err := tc.SendTx(util.UserKeys[3], tokenAddr, "approve", marketAddr, buyp)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
-	_, err = tc.MakeTx(util.AdminKey, tokenAddr, "Mint", util.Users[3], buyp)
+	_, err = tc.SendTx(util.AdminKey, tokenAddr, "Mint", util.Users[3], buyp)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
-	_, err = tc.MakeTx(util.AdminKey, tc.MainToken, "Mint", util.Users[4], buyp)
+	_, err = tc.SendTx(util.AdminKey, tc.MainToken, "Mint", util.Users[4], buyp)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
-	_, err = tc.MakeTx(util.UserKeys[4], tokenAddr, "approve", marketAddr, buyp2)
+	_, err = tc.SendTx(util.UserKeys[4], tokenAddr, "approve", marketAddr, buyp2)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
-	_, err = tc.MakeTx(util.AdminKey, tokenAddr, "Mint", util.Users[4], buyp2)
+	_, err = tc.SendTx(util.AdminKey, tokenAddr, "Mint", util.Users[4], buyp2)
 	if err != nil {
 		t.Errorf("error not expect %+v", err)
 		return
 	}
 
-	inf, err := tc.MakeTx(util.UserKeys[3], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], buyp, "USDT")
+	inf, err := tc.SendTx(util.UserKeys[3], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], buyp, "USDT")
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[4], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], buyp2, "USDT")
+	inf, err = tc.SendTx(util.UserKeys[4], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], buyp2, "USDT")
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[2], marketAddr, "acceptItemToBuyWithSeller", nft2Addr, nft2IDs[1], buyp2, "USDT")
+	inf, err = tc.SendTx(util.UserKeys[2], marketAddr, "acceptItemToBuyWithSeller", nft2Addr, nft2IDs[1], buyp2, "USDT")
 	if err != nil {
 		t.Errorf("error not expect %v %+v", inf, err)
 		return
@@ -661,6 +667,102 @@ func TestMultiSuggestItemToBuyLowAcceptItemToBuyWithSeller(t *testing.T) {
 	am = inf[0].(*amount.Amount)
 	if am.String() != "30" {
 		t.Errorf("expect 30 " + am.String())
+		return
+	}
+}
+
+func TestMultiSuggestItemChangeOwner(t *testing.T) {
+	tc, egAddr, dataAddr, marketAddr, tokenAddr, nft1Addr, nft2Addr, nft1IDs, nft2IDs := _init()
+	if false {
+		log.Println(tc, egAddr, dataAddr, marketAddr, tokenAddr, nft1Addr, nft2Addr, nft1IDs, nft2IDs)
+	}
+
+	buyp := amount.MustParseAmount("2500")
+	buyp2 := amount.MustParseAmount("3000")
+	_, err := tc.SendTx(util.UserKeys[3], tokenAddr, "approve", marketAddr, buyp)
+	if err != nil {
+		t.Errorf("error not expect %+v", err)
+		return
+	}
+	_, err = tc.SendTx(util.AdminKey, tokenAddr, "Mint", util.Users[3], buyp)
+	if err != nil {
+		t.Errorf("error not expect %+v", err)
+		return
+	}
+	_, err = tc.SendTx(util.AdminKey, tc.MainToken, "Mint", util.Users[4], buyp)
+	if err != nil {
+		t.Errorf("error not expect %+v", err)
+		return
+	}
+	_, err = tc.SendTx(util.UserKeys[4], tokenAddr, "approve", marketAddr, buyp2)
+	if err != nil {
+		t.Errorf("error not expect %+v", err)
+		return
+	}
+	_, err = tc.SendTx(util.AdminKey, tokenAddr, "Mint", util.Users[4], buyp2)
+	if err != nil {
+		t.Errorf("error not expect %+v", err)
+		return
+	}
+
+	inf, err := tc.SendTx(util.UserKeys[3], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], buyp, "USDT")
+	if err != nil {
+		t.Errorf("error not expect %v %+v", inf, err)
+		return
+	}
+
+	inf, err = tc.SendTx(util.UserKeys[4], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], buyp2, "USDT")
+	if err != nil {
+		t.Errorf("error not expect %v %+v", inf, err)
+		return
+	}
+
+	inf, err = tc.SendTx(util.UserKeys[4], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], buyp, "USDT")
+	if err == nil {
+		t.Errorf("error expect %v %+v", inf, err)
+		return
+	}
+
+	inf, err = tc.ReadTx(util.UserKeys[2], marketAddr, "getItemSuggestionInfos", nft2Addr, nft2IDs[1], "USDT")
+	if err != nil {
+		t.Errorf("error not expect %v %+v", inf, err)
+		return
+	}
+	if iss, ok := inf[0].([]interface{}); !ok {
+		t.Errorf("not expected. suggestion list must be an array %v %+v", inf, err)
+		return
+	} else if len(iss) != 2 {
+		t.Errorf("suggestion list size must be 2 %v %+v", inf, err)
+		return
+	}
+
+	inf, err = tc.SendTx(util.UserKeys[2], nft2Addr, "transferFrom", util.Users[2], util.Users[3], nft2IDs[1])
+	if err != nil {
+		t.Errorf("error not expect %v %+v", inf, err)
+		return
+	}
+
+	inf, err = tc.ReadTx(util.UserKeys[2], marketAddr, "getItemSuggestionInfos", nft2Addr, nft2IDs[1], "USDT")
+	if iss, ok := inf[0].([]interface{}); !ok {
+		t.Errorf("not expected. suggestion list must be an array %v %+v", inf, err)
+		return
+	} else if len(iss) != 2 {
+		t.Errorf("suggestion list size must be 2 %v %+v", inf, err)
+		return
+	}
+
+	inf, err = tc.SendTx(util.UserKeys[4], marketAddr, "suggestItemToBuyWithSuggester", nft2Addr, nft2IDs[1], buyp, "USDT")
+	if err != nil {
+		t.Errorf("error not expect %v %+v", inf, err)
+		return
+	}
+
+	inf, err = tc.ReadTx(util.UserKeys[2], marketAddr, "getItemSuggestionInfos", nft2Addr, nft2IDs[1], "USDT")
+	if iss, ok := inf[0].([]interface{}); !ok {
+		t.Errorf("not expected. suggestion list must be an array %v %+v", inf, err)
+		return
+	} else if len(iss) != 1 {
+		t.Errorf("suggestion list size must be 1 %v %+v", inf, err)
 		return
 	}
 }
