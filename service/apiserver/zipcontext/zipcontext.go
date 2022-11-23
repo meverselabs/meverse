@@ -108,7 +108,7 @@ type initContextInfo struct {
 }
 
 func (ici *initContextInfo) zipContextInfo(filePath string, zipContextPath string) error {
-	err := os.MkdirAll(filepath.Dir(filePath), os.ModeDir)
+	err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm)
 	if err != nil {
 		return err
 	}
@@ -160,7 +160,7 @@ func (s *ZipContextService) ZipContext(savePath string) (filePath string, err er
 	}
 
 	zipContextPath := "./tempZipContext/context"
-	if err = os.MkdirAll(filepath.Dir(zipContextPath), os.ModeDir); err != nil {
+	if err = os.MkdirAll(filepath.Dir(zipContextPath), os.ModePerm); err != nil {
 		return
 	} else {
 		defer func() {

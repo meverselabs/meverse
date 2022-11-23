@@ -4,6 +4,7 @@ _data*
 _test*
 fdata/
 ndata/
+ndata*
 odata/
 *.exe
 ndkey.key
@@ -18,3 +19,4 @@ cmd/mainnetcachecontext
 contract/plugin/test/plugin/
 *.so
 cmd/testnet/testnet_ips.txt
+zipcontext/
