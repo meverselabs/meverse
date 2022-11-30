@@ -41,7 +41,7 @@ func (nd *Node) sendStatusTo(TargetPublicKey common.PublicKey) error {
 
 	cp := nd.cn.Provider()
 	nm := &StatusMessage{
-		Version:  cp.Version(),
+		Version:  cp.Version(cp.Height()),
 		Height:   cp.Height(),
 		LastHash: cp.LastHash(),
 	}
@@ -52,7 +52,7 @@ func (nd *Node) sendStatusTo(TargetPublicKey common.PublicKey) error {
 func (nd *Node) broadcastStatus() error {
 	cp := nd.cn.Provider()
 	nm := &StatusMessage{
-		Version:  cp.Version(),
+		Version:  cp.Version(cp.Height()),
 		Height:   cp.Height(),
 		LastHash: cp.LastHash(),
 	}

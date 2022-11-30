@@ -24,7 +24,7 @@ func (fr *GeneratorNode) OnObserverConnected(p peer.Peer) {
 
 	cp := fr.cn.Provider()
 	nm := &p2p.StatusMessage{
-		Version:  cp.Version(),
+		Version:  cp.Version(cp.Height()),
 		Height:   cp.Height(),
 		LastHash: cp.LastHash(),
 	}
@@ -387,7 +387,8 @@ func (fr *GeneratorNode) updateByGenItem() {
 						sm[TxHash] = item.Signer
 					}
 				}
-				if err := fr.ct.ExecuteBlockOnContext(item.BlockGen.Block, ctx, sm); err != nil {
+				var err error
+				if _, err = fr.ct.ExecuteBlockOnContext(item.BlockGen.Block, ctx, sm); err != nil {
 					log.Printf("updateByGenItem.prevItem.ExecuteBlockOnContext %+v\n", err)
 					return
 				}
@@ -414,7 +415,7 @@ func (fr *GeneratorNode) updateByGenItem() {
 			},
 		}
 		if item.Context != nil {
-			if err := fr.ct.ConnectBlockWithContext(b, item.Context); err != nil {
+			if err := fr.ct.ConnectBlockWithContext(b, item.Context, item.Receipts); err != nil {
 				log.Printf("updateByGenItem.ConnectBlockWithContext %+v\n", err)
 				delete(fr.lastGenItemMap, b.Header.Height)
 				go fr.tryRequestBlocks()
@@ -511,6 +512,8 @@ func (fr *GeneratorNode) genBlock(ID string, msg *BlockReqMessage) error {
 		fr.txpool.Lock() // Prevent delaying from TxPool.Push
 		Count := 0
 		currentSlot := types.ToTimeSlot(Timestamp)
+
+		var receipts = types.Receipts{}
 	TxLoop:
 		for {
 			select {
@@ -521,23 +524,25 @@ func (fr *GeneratorNode) genBlock(ID string, msg *BlockReqMessage) error {
 				if item == nil {
 					break TxLoop
 				}
-				if err := bc.UnsafeAddTx(item.TxHash, item.Transaction, item.Signature, item.Signer); err != nil {
+				if receipt, err := bc.UnsafeAddTx(item.TxHash, item.Transaction, item.Signature, item.Signer); err != nil {
 					if errors.Cause(err) != types.ErrUsedTimeSlot {
 						fmt.Printf("UnsafeAddTx %+v\n", err)
 						failTxs = append(failTxs, item.Transaction)
 						failerrs = append(failerrs, err)
 					}
 					continue
-				}
-				Count++
-				if Count > MaxTxPerBlock {
-					break TxLoop
+				} else {
+					Count++
+					receipts = append(receipts, receipt)
+					if Count > MaxTxPerBlock {
+						break TxLoop
+					}
 				}
 			}
 		}
 		fr.txpool.Unlock() // Prevent delaying from TxPool.Push
 
-		b, err := bc.Finalize(gaslv)
+		b, err := bc.Finalize(gaslv, receipts)
 		if err != nil {
 			return err
 		}
@@ -558,6 +563,7 @@ func (fr *GeneratorNode) genBlock(ID string, msg *BlockReqMessage) error {
 		fr.lastGenItemMap[sm.Block.Header.Height] = &genItem{
 			BlockGen: sm,
 			Context:  ctx,
+			Receipts: append(types.Receipts{}, receipts...),
 		}
 		fr.lastGenHeight = ctx.TargetHeight()
 		fr.lastGenTime = time.Now().UnixNano()

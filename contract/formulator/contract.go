@@ -3,6 +3,7 @@ package formulator
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"strings"
@@ -329,6 +330,19 @@ func (cont *FormulatorContract) addRewardMap(rewardMap map[common.Address]*amoun
 		rewardMap[RewardAddress] = am
 	}
 	am.Int.Add(am.Int, RewardAmount.Int)
+}
+
+func (cont *FormulatorContract) RewardPolicy(cc *types.ContractContext) (string, error) {
+	bs := cc.ContractData([]byte{tagRewardPolicy})
+	rewardPolicy := &RewardPolicy{}
+	if _, err := rewardPolicy.ReadFrom(bytes.NewReader(bs)); err != nil {
+		return "", err
+	}
+	poli, err := json.Marshal(rewardPolicy)
+	if err != nil {
+		return "", err
+	}
+	return string(poli), nil
 }
 
 func (cont *FormulatorContract) SetRewardPolicy(cc *types.ContractContext, bs []byte) error {

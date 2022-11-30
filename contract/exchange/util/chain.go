@@ -114,17 +114,20 @@ func AddBlock(cn *chain.Chain, ctx *types.Context, tx *types.Transaction, signer
 	}
 
 	bc := chain.NewBlockCreator(cn, ctx, Generator, TimeoutCount, ctx.LastTimestamp(), 0)
+	var receipts = types.Receipts{}
 	if tx != nil {
 		sig, err := signer.Sign(tx.HashSig())
 		if err != nil {
 			return hash.HexToHash(""), err
 		}
-		if err := bc.AddTx(tx, sig); err != nil {
+		if receipt, err := bc.AddTx(tx, sig); err != nil {
 			return hash.HexToHash(""), err
+		} else {
+			receipts = append(receipts, receipt)
 		}
 	}
 
-	b, err := bc.Finalize(0)
+	b, err := bc.Finalize(0, receipts)
 	if err != nil {
 		return hash.HexToHash(""), err
 	}

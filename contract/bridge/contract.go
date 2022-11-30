@@ -117,11 +117,6 @@ func safeTransferFrom(cc *types.ContractContext, token common.Address, From comm
 // Public Writer Functions
 //////////////////////////////////////////////////
 func (cont *BridgeContract) sendToGateway(cc *types.ContractContext, token common.Address, amt *amount.Amount, path []common.Address, toChain string, summary []byte) error {
-	// uint256 transferFee = msg.value;
-	// require(
-	// 	transferFee == transferFeeInfoToChain[toChain],
-	// 	"sendToGateway: fee is not valid"
-	// );
 	if !amt.IsPlus() {
 		return errors.New("sendToGateway: plus amount")
 	}
@@ -133,35 +128,16 @@ func (cont *BridgeContract) sendToGateway(cc *types.ContractContext, token commo
 		return errors.New("sendToGateway: invalid token fee")
 	}
 
-	// if bal, err := getBalanceOf(cc, *mt, cc.From()); err != nil {
-	// 	return err
-	// } else if bal.Cmp(transferFee.Int) < 0 {
-	// 	return errors.New("sendToGateway: fee is not valid")
-	// }
-	// require(
-	// 	IERC20(token).allowance(_msgSender(), address(this)) >= amt,
-	// 	"sendToGateway: insufficient allowance"
-	// );
-	// if allow, err := getAllowance(cc, token, cc.From(), cont.addr); err != nil {
-	// 	return err
-	// } else if allow.Cmp(amt.Int) < 0 {
-	// 	return errors.New("sendToGateway: insufficient allowance")
-	// }
-	// SafeERC20.safeTransferFrom(
-	// 	IERC20(token),
-	// 	_msgSender(),
-	// 	address(this),
-	// 	amt
-	// );
 	if err := safeTransferFrom(cc, token, cc.From(), cont.addr, amt); err != nil {
 		return err
 	}
 
-	// if (transferFee > 0) {
-	// 	payable(feeOwner()).transfer(transferFee);
-	// }
 	if transferFee.IsPlus() {
 		if err := safeTransferFrom(cc, mt, cc.From(), cont.feeOwner(cc), transferFee); err != nil {
+			return err
+		}
+	} else if transferFee.IsMinus() {
+		if err := safeTransferFrom(cc, mt, cont.feeOwner(cc), cc.From(), transferFee); err != nil {
 			return err
 		}
 	}
@@ -171,7 +147,6 @@ func (cont *BridgeContract) sendToGateway(cc *types.ContractContext, token commo
 			return err
 		}
 	}
-	// getSequenceFrom[_msgSender()][toChain]++;
 	cont.addSequenceFrom(cc, cc.From(), toChain)
 	return nil
 }

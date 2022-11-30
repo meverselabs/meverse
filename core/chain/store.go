@@ -24,7 +24,6 @@ type Store struct {
 	db             *keydb.DB
 	cdb            *piledb.DB
 	chainID        *big.Int
-	version        uint16
 	feeUnit        *amount.Amount
 	cache          storecache
 	closeLock      sync.RWMutex
@@ -42,6 +41,7 @@ type storecache struct {
 	height           uint32
 	heightHash       hash.Hash256
 	heightBlock      *types.Block
+	heightReceipts   types.Receipts
 	heightTimestamp  uint64
 	heightPoFSameGen uint32
 	admins           []common.Address
@@ -49,8 +49,24 @@ type storecache struct {
 	contracts        []types.Contract
 }
 
+type versionInfo struct {
+	height  uint32
+	version uint16
+}
+
+var versionSet map[uint32]uint16
+
+func init() {
+	versionSet = map[uint32]uint16{}
+}
+
+func SetVersion(h uint32, v uint16) {
+	versionSet[h] = v
+}
+
 // NewStore returns a Store
-func NewStore(keydbPath string, cdb *piledb.DB, ChainID *big.Int, Version uint16) (*Store, error) {
+func NewStore(keydbPath string, cdb *piledb.DB, ChainID *big.Int, version uint16) (*Store, error) {
+	SetVersion(0, version)
 	db, err := keydb.Open(keydbPath, func(key []byte, value []byte) (interface{}, error) {
 		switch key[0] {
 		case tagHeight:
@@ -97,10 +113,10 @@ func NewStore(keydbPath string, cdb *piledb.DB, ChainID *big.Int, Version uint16
 	}
 
 	st := &Store{
-		db:          db,
-		cdb:         cdb,
-		chainID:     ChainID,
-		version:     Version,
+		db:      db,
+		cdb:     cdb,
+		chainID: ChainID,
+		// version:     Version,
 		AddrSeqMap:  map[common.Address]uint64{},
 		timeSlotMap: map[uint32]map[string]bool{},
 		keydbPath:   keydbPath,
@@ -142,8 +158,18 @@ func (st *Store) ChainID() *big.Int {
 }
 
 // Version returns the version of the target chain
-func (st *Store) Version() uint16 {
-	return st.version
+func (st *Store) Version(h uint32) uint16 {
+	// vlen := len(versionSet)
+	// if vlen == 0 {
+	// 	return 1
+	// }
+	v := uint16(1)
+	for height, version := range versionSet {
+		if height < h && version > v {
+			v = version
+		}
+	}
+	return v
 }
 
 // TargetHeight returns the target height of the target chain
@@ -215,6 +241,20 @@ func (st *Store) Hash(height uint32) (hash.Hash256, error) {
 		}
 	}
 
+	// height = 0 or initHeight
+	if height == 0 || height == st.InitHeight() {
+		var h hash.Hash256
+		st.db.View(func(txn *keydb.Tx) error {
+			value, err := txn.Get(toHeightHashKey(height))
+			if err != nil {
+				return err
+			}
+			h = value.(hash.Hash256)
+			return nil
+		})
+		return h, nil
+	}
+
 	h, err := st.cdb.GetHash(height)
 	if err != nil {
 		if errors.Cause(err) == piledb.ErrInvalidHeight {
@@ -284,10 +324,46 @@ func (st *Store) Block(height uint32) (*types.Block, error) {
 		}
 	}
 	var b types.Block
+	// log.Println(hash.DoubleHash(value).String())
 	if _, err := bin.ReadFromBytes(&b, value); err != nil {
 		return nil, err
 	}
 	return &b, nil
+}
+
+// Block returns the block by height
+func (st *Store) Receipts(height uint32) (types.Receipts, error) {
+	st.closeLock.RLock()
+	defer st.closeLock.RUnlock()
+	if st.isClose {
+		return nil, errors.WithStack(ErrStoreClosed)
+	}
+
+	if height <= st.InitHeight() {
+		return nil, errors.WithStack(keydb.ErrNotFound)
+	}
+	if st.cache.cached {
+		if st.cache.height == height {
+			return st.cache.heightReceipts, nil
+		}
+	}
+
+	value, err := st.cdb.GetData(height, 2)
+	if err != nil {
+		if errors.Cause(err) == piledb.ErrInvalidHeight {
+			return nil, errors.WithStack(keydb.ErrNotFound)
+		} else {
+			return nil, err
+		}
+	}
+	if value == nil {
+		return nil, nil
+	}
+	var receipts = types.Receipts{}
+	if _, err := bin.ReadFromBytes(&receipts, value); err != nil {
+		return nil, err
+	}
+	return receipts, nil
 }
 
 // Height returns the current height of the target chain
@@ -669,6 +745,30 @@ func (st *Store) IsUsedTimeSlot(slot uint32, key string) bool {
 	return tm[key]
 }
 
+// Height returns the current height of the target chain
+func (st *Store) GenHash() hash.Hash256 {
+	st.closeLock.RLock()
+	defer st.closeLock.RUnlock()
+	if st.isClose {
+		return hash.Hash256{}
+	}
+
+	if st.cache.cached && st.cache.height == 0 {
+		return st.cache.heightHash
+	}
+
+	var h hash.Hash256
+	st.db.View(func(txn *keydb.Tx) error {
+		value, err := txn.Get(toHeightHashKey(0))
+		if err != nil {
+			return err
+		}
+		h = value.(hash.Hash256)
+		return nil
+	})
+	return h
+}
+
 // StoreGenesis stores the genesis data
 func (st *Store) StoreGenesis(genHash hash.Hash256, ctd *types.ContextData) error {
 	st.closeLock.RLock()
@@ -726,6 +826,7 @@ func (st *Store) StoreGenesis(genHash hash.Hash256, ctd *types.ContextData) erro
 	st.cache.height = 0
 	st.cache.heightHash = genHash
 	st.cache.heightBlock = nil
+	st.cache.heightReceipts = nil
 	st.cache.heightTimestamp = 0
 	st.cache.heightPoFSameGen = 0
 	st.cache.generators = []common.Address{}
@@ -813,6 +914,7 @@ func (st *Store) StoreInit(genHash hash.Hash256, initHash hash.Hash256, initHeig
 	st.cache.height = initHeight
 	st.cache.heightHash = initHash
 	st.cache.heightBlock = nil
+	st.cache.heightReceipts = nil
 	st.cache.heightTimestamp = initTimestamp
 	st.cache.generators = []common.Address{}
 	st.cache.contracts = []types.Contract{}
@@ -874,6 +976,13 @@ func (st *Store) Prepare() error {
 		b, err := st.Block(st.cache.height)
 		if err != nil {
 			return err
+		}
+		if b.Header.Version > 1 {
+			receipts, err := st.Receipts(st.cache.height)
+			if err != nil {
+				return err
+			}
+			st.cache.heightReceipts = append(types.Receipts{}, receipts...)
 		}
 		st.cache.heightBlock = b
 		st.cache.heightTimestamp = st.LastTimestamp()
@@ -942,7 +1051,7 @@ func (st *Store) ProcessReward(ctx *types.Context, b *types.Block) (map[common.A
 }
 
 // StoreBlock stores the block
-func (st *Store) StoreBlock(b *types.Block, ctx *types.Context) error {
+func (st *Store) StoreBlock(b *types.Block, ctx *types.Context, receipts types.Receipts) error {
 	st.closeLock.RLock()
 	defer st.closeLock.RUnlock()
 	if st.isClose {
@@ -960,6 +1069,13 @@ func (st *Store) StoreBlock(b *types.Block, ctx *types.Context) error {
 	Datas := [][]byte{bsHeader}
 	{
 		data, _, err := bin.WriterToBytes(&b.Body)
+		if err != nil {
+			return err
+		}
+		Datas = append(Datas, data)
+	}
+	{
+		data, _, err := bin.WriterToBytes(&receipts)
 		if err != nil {
 			return err
 		}
@@ -1085,6 +1201,7 @@ func (st *Store) StoreBlock(b *types.Block, ctx *types.Context) error {
 	st.cache.height = b.Header.Height
 	st.cache.heightHash = HeaderHash
 	st.cache.heightBlock = b
+	st.cache.heightReceipts = append(types.Receipts{}, receipts...)
 	st.cache.heightTimestamp = b.Header.Timestamp
 	st.cache.generators = []common.Address{}
 	st.cache.contracts = []types.Contract{}

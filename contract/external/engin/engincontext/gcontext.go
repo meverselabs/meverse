@@ -39,7 +39,7 @@ func (pc *EnginContextContract) ChainID() *big.Int {
 
 // Version returns the version of the chain
 func (pc *EnginContextContract) Version() uint16 {
-	return pc.cc.Version()
+	return pc.cc.Version(pc.cc.TargetHeight())
 }
 
 // Hash returns the hash value of it

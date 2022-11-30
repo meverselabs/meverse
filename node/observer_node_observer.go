@@ -375,20 +375,28 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicKey common.PublicKey, 
 		}
 
 		ctx := ob.ct.NewContext()
-		if err := ob.ct.ExecuteBlockOnContext(msg.Block, ctx, nil); err != nil {
+		var receipts = types.Receipts{}
+		if receipts, err = ob.ct.ExecuteBlockOnContext(msg.Block, ctx, nil); err != nil {
 			log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "if err := ob.ct.ExecuteBlockOnContext(msg.Block, ctx); err != nil {", err)
 			return err
 		}
 
 		if msg.Block.Header.ContextHash != ctx.Hash() {
-			log.Println(ob.obID, msg.Block.Header.Generator.String(), "if msg.Block.Header.ContextHash != ctx.Hash() {", msg.Block.Header.ContextHash.String(), ctx.Hash().String())
 			log.Println(ob.obID, ctx.Dump())
 			return errors.WithStack(chain.ErrInvalidContextHash)
+		}
+
+		if msg.Block.Header.Version > 1 {
+			if msg.Block.Header.ReceiptHash != bin.MustWriterToHash(&receipts) {
+				log.Println(ob.obID, msg.Block.Header.Generator.String(), "if msg.Block.Header.ReceiptHash != receiptHash {", msg.Block.Header.ReceiptHash.String(), bin.MustWriterToHash(&receipts).String())
+				return errors.WithStack(chain.ErrInvalidReceiptHash)
+			}
 		}
 
 		ob.round.RoundState = BlockVoteState
 		br.BlockGenMessage = msg
 		br.Context = ctx
+		br.Receipts = append(br.Receipts, receipts...)
 
 		ob.sendBlockVote(br.BlockGenMessage)
 
@@ -573,7 +581,7 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicKey common.PublicKey, 
 					BlockSignatures:       append([]common.Signature{br.BlockGenMessage.GeneratorSignature}, sigs...),
 				},
 			}
-			if err := ob.ct.ConnectBlockWithContext(b, br.Context); err != nil {
+			if err := ob.ct.ConnectBlockWithContext(b, br.Context, br.Receipts); err != nil {
 				return err
 			} else {
 				ob.broadcastStatus()

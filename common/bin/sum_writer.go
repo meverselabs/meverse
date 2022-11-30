@@ -140,6 +140,35 @@ func (sw *SumWriter) BigInt(w io.Writer, v *big.Int) (int64, error) {
 	}
 }
 
+func (sw *SumWriter) ChainIDVersion(w io.Writer, chainID *big.Int, version uint16) (int64, error) {
+	bs := []byte{}
+	if chainID != nil {
+		bs = chainID.Bytes()
+	}
+	if version <= 1 {
+		n, err := WriteBytes(w, bs)
+		if err == nil {
+			sw.sum += int64(n)
+		}
+		return sw.sum, err
+	} else {
+		bs = append([]byte{0}, bs...)
+		if n, err := WriteBytes(w, bs); err != nil {
+			return sw.sum, err
+		} else {
+			sw.sum += int64(n)
+		}
+
+		if n, err := WriteUint16(w, version); err != nil {
+			return sw.sum, err
+		} else {
+			sw.sum += int64(n)
+			return sw.sum, nil
+		}
+
+	}
+}
+
 func (sw *SumWriter) WriterTo(w io.Writer, v io.WriterTo) (int64, error) {
 	if n, err := v.WriteTo(w); err != nil {
 		return sw.sum, err

@@ -46,8 +46,8 @@ func (ctx *Context) ChainID() *big.Int {
 }
 
 // Version returns the version of the chain
-func (ctx *Context) Version() uint16 {
-	return ctx.loader.Version()
+func (ctx *Context) Version(h uint32) uint16 {
+	return ctx.loader.Version(h)
 }
 
 // TargetHeight returns the recorded target height when context generation
@@ -119,6 +119,11 @@ func (ctx *Context) AddrSeq(addr common.Address) uint64 {
 func (ctx *Context) AddAddrSeq(addr common.Address) {
 	ctx.isLatestHash = false
 	ctx.Top().AddAddrSeq(addr)
+}
+
+func (ctx *Context) SetNonce(addr common.Address, nonce uint64) {
+	ctx.isLatestHash = false
+	ctx.Top().SetNonce(addr, nonce)
 }
 
 // BasicFee returns the basic fee
@@ -304,4 +309,9 @@ func (ctx *Context) Hash() hash.Hash256 {
 // Dump prints the top context data of the context
 func (ctx *Context) Dump() string {
 	return ctx.Top().Dump()
+}
+
+// Dump prints the top context data of the context
+func (ctx *Context) WriteDump() string {
+	return ctx.Top().WriteDump()
 }

@@ -423,13 +423,19 @@ function transactCompleteItemInMarket(item) {
     // emit TransactCompletedItemInMarket(address(item.nft.tokenContract), item.nft.tokenId, item.buyer, item.buyNowPrice, State.COMPLETED);
 }
 
+function resetSuggestedPriceList(nftAddress, tokenId) {
+    onlyMarket()
+    for (let currency in CurrencyType) {
+        _setSuggestedPriceList(nftAddress, tokenId, currency, []);
+    }
+}
+
 function addFoundationRoyalty(foundationAddress, amount, currency) {
     onlyMarket()
     foundationAddress = address(foundationAddress)
     amount = BigInt(amount)
     require( foundationAddress != address(0), "Invaild address");
     require( 0 < amount, "Zero amount");
-    
 
     let amt = _foundationBalances(foundationAddress, currency)
 

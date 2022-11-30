@@ -3,6 +3,7 @@ package types
 import (
 	"bytes"
 	"encoding/hex"
+	"io"
 	"strconv"
 
 	"github.com/meverselabs/meverse/common"
@@ -358,8 +359,22 @@ func (ctd *ContextData) AddrSeq(addr common.Address) uint64 {
 
 // AddSeq update the sequence of the target address
 func (ctd *ContextData) AddAddrSeq(addr common.Address) {
-	ctd.AddrSeqMap[addr] = ctd.AddrSeq(addr) + 1
-	ctd.size += 28 // addr + uint64
+	if val, has := ctd.AddrSeqMap[addr]; !has {
+		ctd.size += 28 // addr + uint64
+		ctd.AddrSeqMap[addr] = val + 1
+	} else {
+		ctd.AddrSeqMap[addr] = val + 1
+	}
+}
+
+// SetNonce update the sequence(nonce) of the target address
+func (ctd *ContextData) SetNonce(addr common.Address, nonce uint64) {
+	if _, has := ctd.AddrSeqMap[addr]; !has {
+		ctd.size += 28 // addr + uint64
+		ctd.AddrSeqMap[addr] = nonce
+	} else {
+		ctd.AddrSeqMap[addr] = nonce
+	}
 }
 
 // BasicFee returns the basic fee
@@ -392,7 +407,7 @@ func (ctd *ContextData) Hash() hash.Hash256 {
 	buffer.WriteString("ChainID")
 	buffer.Write(ctd.cache.ctx.ChainID().Bytes())
 	buffer.WriteString("ChainVersion")
-	buffer.Write(bin.Uint16Bytes(ctd.cache.ctx.Version()))
+	buffer.Write(bin.Uint16Bytes(ctd.cache.ctx.Version(ctd.cache.ctx.TargetHeight())))
 	buffer.WriteString("Height")
 	buffer.Write(bin.Uint32Bytes(ctd.cache.ctx.TargetHeight()))
 	buffer.WriteString("PrevHash")
@@ -454,21 +469,32 @@ func (ctd *ContextData) Hash() hash.Hash256 {
 
 // Dump prints the context data
 func (ctd *ContextData) Dump() string {
-	var buffer bytes.Buffer
-	buffer.WriteString("ChainID\n")
-	buffer.WriteString(ctd.cache.ctx.ChainID().String())
-	buffer.WriteString("\n")
-	buffer.WriteString("ChainVersion\n")
-	buffer.WriteString(strconv.FormatUint(uint64(ctd.cache.ctx.Version()), 10))
-	buffer.WriteString("\n")
-	buffer.WriteString("Height\n")
+	buffer := &bytes.Buffer{}
+	ibuffer := ctd.dump(buffer, false)
+	buffer = ibuffer.(*bytes.Buffer)
+	return buffer.String()
+}
+
+// Dump prints the context data
+func (ctd *ContextData) WriteDump() string {
+	buffer := &bytes.Buffer{}
+	ibuffer := ctd.dump(buffer, true)
+	buffer = ibuffer.(*bytes.Buffer)
+	return buffer.String()
+}
+
+// Dump prints the context data
+func (ctd *ContextData) dump(buffer io.StringWriter, showValue bool) io.StringWriter {
+	buffer.WriteString("\nHeight\n")
 	buffer.WriteString(strconv.FormatUint(uint64(ctd.cache.ctx.TargetHeight()), 10))
-	buffer.WriteString("\n")
-	buffer.WriteString("PrevHash\n")
+	buffer.WriteString("\nChainID\n")
+	buffer.WriteString(ctd.cache.ctx.ChainID().String())
+	buffer.WriteString("\nChainVersion\n")
+	buffer.WriteString(strconv.FormatUint(uint64(ctd.cache.ctx.Version(ctd.cache.ctx.TargetHeight())), 10))
+	buffer.WriteString("\nPrevHash\n")
 	PrevHash := ctd.cache.ctx.PrevHash()
 	buffer.WriteString(PrevHash.String())
-	buffer.WriteString("\n")
-	buffer.WriteString("AdminMap\n")
+	buffer.WriteString("\nAdminMap\n")
 	EachAllAddressBool(ctd.AdminMap, func(key common.Address, value bool) error {
 		buffer.WriteString(key.String())
 		buffer.WriteString("\n")
@@ -496,7 +522,7 @@ func (ctd *ContextData) Dump() string {
 	})
 	buffer.WriteString("MainToken")
 	if ctd.mainToken != nil {
-		buffer.Write((*ctd.mainToken)[:])
+		buffer.WriteString(ctd.mainToken.String())
 	}
 	buffer.WriteString("DeletedGeneratorMap\n")
 	EachAllAddressBool(ctd.DeletedGeneratorMap, func(key common.Address, value bool) error {
@@ -508,7 +534,11 @@ func (ctd *ContextData) Dump() string {
 	EachAllStringBytes(ctd.DataMap, func(key string, value []byte) error {
 		buffer.WriteString(hex.EncodeToString([]byte(key)))
 		buffer.WriteString(":")
-		buffer.WriteString(hash.Hash(value).String())
+		if showValue {
+			buffer.WriteString(hex.EncodeToString(value))
+		} else {
+			buffer.WriteString(hash.Hash(value).String())
+		}
 		buffer.WriteString("\n")
 		return nil
 	})
@@ -531,5 +561,5 @@ func (ctd *ContextData) Dump() string {
 		buffer.WriteString("\n")
 		return nil
 	})
-	return buffer.String()
+	return buffer
 }

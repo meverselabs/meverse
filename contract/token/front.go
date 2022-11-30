@@ -47,6 +47,14 @@ func (f *front) Approve(cc *types.ContractContext, To common.Address, Amount *am
 	err := f.cont.Approve(cc, To, Amount)
 	return err == nil, err
 }
+func (f *front) SetDelegateFee(cc *types.ContractContext, spender, banker common.Address, fee, approveLowerLimit *amount.Amount) error {
+	return f.cont.SetDelegateFee(cc, spender, banker, fee, approveLowerLimit)
+}
+
+func (f *front) DelegateFeeApprove(cc *types.ContractContext, To common.Address, Amount *amount.Amount) (bool, error) {
+	err := f.cont.DelegateFeeApprove(cc, To, Amount)
+	return err == nil, err
+}
 
 func (f *front) TransferFrom(cc *types.ContractContext, From common.Address, To common.Address, Amount *amount.Amount) (bool, error) {
 	err := f.cont.TransferFrom(cc, From, To, Amount)

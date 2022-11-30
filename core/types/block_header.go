@@ -20,6 +20,7 @@ type Header struct {
 	Timestamp     uint64         // 8byte
 	Generator     common.Address // 20byte
 	Gas           uint16         // 2byte
+	ReceiptHash   hash.Hash256   // 32byte
 }
 
 func (s *Header) Clone() Header {
@@ -34,6 +35,7 @@ func (s *Header) Clone() Header {
 		Timestamp:     s.Timestamp,
 		Generator:     s.Generator,
 		Gas:           s.Gas,
+		ReceiptHash:   s.ReceiptHash,
 	}
 }
 
@@ -69,6 +71,11 @@ func (s *Header) WriteTo(w io.Writer) (int64, error) {
 	if sum, err := sw.Uint16(w, s.Gas); err != nil {
 		return sum, err
 	}
+	if s.Version > 1 {
+		if sum, err := sw.Hash256(w, s.ReceiptHash); err != nil {
+			return sum, err
+		}
+	}
 	return sw.Sum(), nil
 }
 
@@ -103,6 +110,11 @@ func (s *Header) ReadFrom(r io.Reader) (int64, error) {
 	}
 	if sum, err := sr.Uint16(r, &s.Gas); err != nil {
 		return sum, err
+	}
+	if s.Version > 1 {
+		if sum, err := sr.Hash256(r, &s.ReceiptHash); err != nil {
+			return sum, err
+		}
 	}
 	return sr.Sum(), nil
 }

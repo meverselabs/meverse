@@ -63,6 +63,7 @@ type BlockRound struct {
 	BlockVoteMap            map[common.PublicKey]*BlockVoteMessage
 	BlockGenMessage         *BlockGenMessage
 	Context                 *types.Context
+	Receipts                types.Receipts
 	BlockVoteMessageWaitMap map[common.PublicKey]*BlockVoteMessage
 	BlockGenMessageWait     *BlockGenMessage
 	LastBlockGenRequestTime uint64
@@ -73,6 +74,7 @@ func NewBlockRound() *BlockRound {
 	vr := &BlockRound{
 		BlockVoteMap:            map[common.PublicKey]*BlockVoteMessage{},
 		BlockVoteMessageWaitMap: map[common.PublicKey]*BlockVoteMessage{},
+		Receipts:                types.Receipts{},
 	}
 	return vr
 }

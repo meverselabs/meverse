@@ -276,3 +276,89 @@ func (st *Store) UpdateContext(b *types.Block, ctx *types.Context) error {
 	st.cache.cached = true
 	return nil
 }
+
+// StoreGenesis stores the genesis data
+func (st *Store) UpdateStoreGenesis(genHash hash.Hash256, ctd *types.ContextData) error {
+	st.closeLock.RLock()
+	defer st.closeLock.RUnlock()
+	if st.isClose {
+		return errors.WithStack(ErrStoreClosed)
+	}
+
+	st.Lock()
+	defer st.Unlock()
+
+	if st.Height() > 0 {
+		return errors.WithStack(ErrAlreadyGenesised)
+	}
+
+	rt := NewRankTable()
+	phase := rt.smallestPhase() + 2
+	for addr := range ctd.GeneratorMap {
+		if err := rt.addRank(NewRank(addr, phase, hash.DoubleHash(addr[:]))); err != nil {
+			return err
+		}
+	}
+
+	if err := st.db.Update(func(txn *keydb.Tx) error {
+		if err := txn.Set(toHeightHashKey(0), genHash, genHash[:]); err != nil {
+			return errors.WithStack(err)
+		}
+		Height := uint32(0)
+		if err := txn.Set([]byte{tagHeight}, Height, bin.Uint32Bytes(Height)); err != nil {
+			return errors.WithStack(err)
+		}
+		if err := applyContextData(txn, ctd); err != nil {
+			return err
+		}
+		{
+			bsRankTable, _, err := bin.WriterToBytes(rt)
+			if err != nil {
+				return err
+			}
+			if err := txn.Set([]byte{tagPoFRankTable}, rt, bsRankTable); err != nil {
+				return errors.WithStack(err)
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	st.rankTable = rt
+
+	st.cache.height = 0
+	st.cache.heightHash = genHash
+	st.cache.heightBlock = nil
+	st.cache.heightTimestamp = 0
+	st.cache.heightPoFSameGen = 0
+	st.cache.generators = []common.Address{}
+	st.cache.contracts = []types.Contract{}
+	if err := st.db.View(func(txn *keydb.Tx) error {
+		if err := txn.Iterate([]byte{tagGenerator}, func(key []byte, value interface{}) error {
+			if value.(bool) {
+				var addr common.Address
+				copy(addr[:], key[1:])
+				st.cache.generators = append(st.cache.generators, addr)
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+		if err := txn.Iterate([]byte{tagContract}, func(key []byte, value interface{}) error {
+			cd := value.(*types.ContractDefine)
+			cont, err := types.CreateContract(cd)
+			if err != nil {
+				return err
+			}
+			st.cache.contracts = append(st.cache.contracts, cont)
+			return nil
+		}); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	st.cache.cached = true
+	return nil
+}

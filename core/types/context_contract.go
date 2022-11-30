@@ -21,8 +21,8 @@ func (cc *ContractContext) ChainID() *big.Int {
 }
 
 // Version returns the version of the chain
-func (cc *ContractContext) Version() uint16 {
-	return cc.ctx.Version()
+func (cc *ContractContext) Version(h uint32) uint16 {
+	return cc.ctx.Version(h)
 }
 
 // Hash returns the hash value of it
@@ -110,3 +110,12 @@ func (cc *ContractContext) NextSeq() uint32 {
 func (cc *ContractContext) IsContract(addr common.Address) bool {
 	return cc.ctx.Top().IsContract(addr)
 }
+
+// cycling import is not allowed
+
+// func (cc *ContractContext) EvmCall(caller vm.ContractRef, to common.Address, input []byte) (ret []byte, leftOverGas uint64, err error) {
+// 	evm := core.DefaultEVM(cc)
+
+// 	inputGas := uint64(math.MaxUint64)
+// 	return evm.Call(caller, to, input, inputGas, big.NewInt(0))
+// }

@@ -21,7 +21,7 @@ func (fr *GeneratorNode) OnConnected(p peer.Peer) {
 
 	cp := fr.cn.Provider()
 	nm := &p2p.StatusMessage{
-		Version:  cp.Version(),
+		Version:  cp.Version(cp.Height()),
 		Height:   cp.Height(),
 		LastHash: cp.LastHash(),
 	}

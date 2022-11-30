@@ -99,7 +99,7 @@ func (ob *ObserverNode) sendRoundVote() error {
 	if !has || status.Height < height {
 		lastHash := cp.LastHash()
 		ob.sendMessage(1, nm.Generator, &p2p.StatusMessage{
-			Version:  cp.Version(),
+			Version:  cp.Version(height),
 			Height:   height,
 			LastHash: lastHash,
 		})
@@ -350,7 +350,7 @@ func (ob *ObserverNode) sendStatusTo(TargetPubKey common.PublicKey) error {
 	height := cp.Height()
 	lastHash := cp.LastHash()
 	nm := &p2p.StatusMessage{
-		Version:  cp.Version(),
+		Version:  cp.Version(height),
 		Height:   height,
 		LastHash: lastHash,
 	}
@@ -364,7 +364,7 @@ func (ob *ObserverNode) broadcastStatus() error {
 	height := cp.Height()
 	lastHash := cp.LastHash()
 	nm := &p2p.StatusMessage{
-		Version:  cp.Version(),
+		Version:  cp.Version(height),
 		Height:   height,
 		LastHash: lastHash,
 	}

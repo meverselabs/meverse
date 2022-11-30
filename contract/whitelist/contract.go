@@ -85,6 +85,10 @@ func setOwner(cc *types.ContractContext, groupId hash.Hash256, owner common.Addr
 }
 
 func updateGroupData(cc *types.ContractContext, groupId hash.Hash256, delegate common.Address, method string, params []interface{}, checkResult string, result []byte) error {
+	owner := common.BytesToAddress(cc.ContractData(makeGroupOwnerKey(groupId)))
+	if owner != cc.From() {
+		return errors.New("not a gorup owner")
+	}
 	gd := &GroupData{
 		delegate:    delegate,
 		method:      method,

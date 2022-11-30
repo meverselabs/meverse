@@ -35,6 +35,39 @@
     {
         "inputs": [
             {
+                "internalType": "address",
+                "name": "token",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "amt",
+                "type": "uint256"
+            },
+            {
+                "internalType": "address[]",
+                "name": "path",
+                "type": "address[]"
+            },
+            {
+                "internalType": "string",
+                "name": "toChain",
+                "type": "string"
+            },
+            {
+                "internalType": "bytes32",
+                "name": "summary",
+                "type": "bytes32"
+            }
+        ],
+        "name": "delegateFeeSendToGateway",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
                 "internalType": "string",
                 "name": "chain",
                 "type": "string"

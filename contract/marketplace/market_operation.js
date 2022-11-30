@@ -194,6 +194,17 @@ function suggestItemToBuyWithSuggester(nftAddress, tokenId, suggestBiddingPrice,
     let item = Mev.Exec(_marketData(), "getItemSuggestionInfo", [nftAddress, tokenId, currency])
     item = new SuggestItem(item)
 
+    // Inft nft = Inft(nftAddress);
+    // address nftOwner = nft.ownerOf(tokenId);
+    let nftOwner = Mev.Exec(nftAddress, "ownerOf", [tokenId])
+    nftOwner = address(nftOwner)
+    
+    if (item.seller != "" && item.seller != nftOwner) {
+        Mev.Exec(_marketData(), "resetSuggestedPriceList", [nftAddress, tokenId])
+        item = Mev.Exec(_marketData(), "getItemSuggestionInfo", [nftAddress, tokenId, currency])
+        item = new SuggestItem(item)
+    }
+
     require(suggestBiddingPrice > item.price,"NftMarket.suggestItemToBuy: not valid suggestBiddingPrice");
     // IERC20 erc20Contract = _marketData.getERC20Contract(currency);
     let erc20Contract = Mev.Exec(_marketData(), "getERC20Contract", [currency])
@@ -206,10 +217,6 @@ function suggestItemToBuyWithSuggester(nftAddress, tokenId, suggestBiddingPrice,
     balanceOf = BigInt(balanceOf)
     require(suggestBiddingPrice <= balanceOf, "NftMarket.suggestItemToBuy: is not sufficient balance");
     
-    // Inft nft = Inft(nftAddress);
-    // address nftOwner = nft.ownerOf(tokenId);
-    let nftOwner = Mev.Exec(nftAddress, "ownerOf", [tokenId])
-    nftOwner = address(nftOwner)
     // _marketData.suggestItemToBuy(_msgSender(), nftOwner, nftAddress, tokenId, suggestBiddingPrice, currency);
     Mev.Exec(_marketData(), "suggestItemToBuy", [_msgSender(), nftOwner, nftAddress, tokenId, suggestBiddingPrice, currency])
     // emit MarketItemSuggested(_msgSender(), nftAddress, tokenId, suggestBiddingPrice, currency);

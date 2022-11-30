@@ -41,8 +41,10 @@ func NewZipContextService(api *apiserver.APIServer, st *chain.Store, savePath st
 		savePath:    savePath,
 		zipInterval: zipInterval,
 	}
-	api.AddGETPath("zipcontext", s.zipContext)
-	api.AddGETPath("makeZipcontext", s.makeZipContext)
+	if api != nil {
+		api.AddGETPath("zipcontext", s.zipContext)
+		api.AddGETPath("makeZipcontext", s.makeZipContext)
+	}
 	return s
 }
 

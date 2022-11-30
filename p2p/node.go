@@ -327,7 +327,7 @@ func (nd *Node) Run(BindAddress string) {
 			}
 			nd.cleanPool(b)
 			// if nd.cn.Provider().Height()%100 == 0 {
-			log.Println("Node", nd.myPublicKey.Address().String(), nd.cn.Provider().Height(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Body.Transactions))
+			log.Println("Node", b.Header.Version, nd.myPublicKey.Address().String(), nd.cn.Provider().Height(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Body.Transactions))
 			// }
 
 			txs := nd.txpool.Clean(types.ToTimeSlot(b.Header.Timestamp))
@@ -377,7 +377,7 @@ func (nd *Node) OnConnected(p peer.Peer) {
 
 	cp := nd.cn.Provider()
 	nm := &StatusMessage{
-		Version:  cp.Version(),
+		Version:  cp.Version(cp.Height()),
 		Height:   cp.Height(),
 		LastHash: cp.LastHash(),
 	}
@@ -626,9 +626,9 @@ func (nd *Node) TestFullTx() bool {
 }
 
 func (nd *Node) addTx(TxHash hash.Hash256, tx *types.Transaction, sig common.Signature) error {
-	if tx.IsEtherType && len(sig) < 66 {
-		return errors.New("invalid recid chain check")
-	}
+	// if tx.IsEtherType && len(sig) < 66 {
+	// 	return errors.New("invalid recid chain check")
+	// }
 	if nd.txpool.IsExist(TxHash) {
 		return errors.WithStack(txpool.ErrExistTransaction)
 	}
@@ -647,16 +647,35 @@ func (nd *Node) addTx(TxHash hash.Hash256, tx *types.Transaction, sig common.Sig
 			if seq != tx.Seq {
 				if tx.Seq > seq {
 					return fmt.Errorf("future nonce. want %v, get %v signer %v ", seq, tx.Seq, tx.From)
+				} else {
+					return errors.Errorf("invalid signer sequence siger %v seq %v, got %v", tx.From, seq, tx.Seq)
 				}
-				return errors.Errorf("invalid signer sequence siger %v seq %v, got %v", tx.From, seq, tx.Seq)
 			}
 		}
 
+		// contract check
+		ctx := nd.cn.NewContext()
+		tx.VmType, tx.Method = types.GetTxType(ctx, tx)
+		// if tx.To != common.ZeroAddr {
+		// 	if !ctx.IsContract(tx.To) {
+		// 		tx.VmType = types.Evm
+		// 	}
+		// } else {
+		// 	if tx.Method == "Admin.Add" || tx.Method == "Admin.Remove" || tx.Method == "Generator.Add" || tx.Method == "Generator.Remove" || tx.Method == "Contract.Deploy" {
+		// 	} else {
+		// 		tx.VmType = types.Evm
+		// 	}
+		// }
+
 		txid := types.TransactionID(_ctx.TargetHeight(), 0)
-		if tx.To == common.ZeroAddr {
-			_, err = nd.cn.ExecuteTransaction(_ctx, tx, txid)
+		if tx.VmType != types.Evm {
+			if tx.To == common.ZeroAddr {
+				_, err = nd.cn.ExecuteTransaction(_ctx, tx, txid)
+			} else {
+				err = chain.TestContractWithOutSeq(_ctx, tx, tx.From)
+			}
 		} else {
-			err = chain.TestContractWithOutSeq(_ctx, tx, tx.From)
+			_, _, err = nd.cn.ApplyEvmTransaction(_ctx, tx, 0, tx.From)
 		}
 		// if err != nil && !strings.Contains(err.Error(), "invalid signer sequence siger seq") {
 		if err != nil {
@@ -677,7 +696,7 @@ func (nd *Node) addTx(TxHash hash.Hash256, tx *types.Transaction, sig common.Sig
 					log.Printf("%+v\n", err)
 					return err
 				}
-				return fmt.Errorf("future nonce. want %v, get %v signer %v ", seq, tx.Seq, tx.From)
+				return fmt.Errorf("future nonce. want: %v, get %v signer %v ", seq, tx.Seq, tx.From)
 			} else {
 				log.Printf("%+v\n", err)
 				return err

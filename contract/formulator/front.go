@@ -90,6 +90,10 @@ func (f *front) SetURI(cc *types.ContractContext, uri string) error {
 	return f.cont.SetURI(cc, uri)
 }
 
+func (f *front) RewardPolicy(cc *types.ContractContext) (string, error) {
+	return f.cont.RewardPolicy(cc)
+}
+
 func (f *front) SetRewardPolicy(cc *types.ContractContext, bs []byte) error {
 	return f.cont.SetRewardPolicy(cc, bs)
 }

@@ -19,6 +19,13 @@ func plog(str ...interface{}) {
 	fmt.Println(append(ss, str...)...)
 }
 
+type TxSearch struct {
+	db  *leveldb.DB
+	st  *chain.Store
+	cn  *chain.Chain
+	api *apiserver.APIServer
+}
+
 func NewTxSearch(Path string, api *apiserver.APIServer, st *chain.Store, cn *chain.Chain, initHeight uint32) *TxSearch {
 	db, err := leveldb.OpenFile(Path, nil)
 	if err != nil {

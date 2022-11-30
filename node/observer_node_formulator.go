@@ -17,7 +17,7 @@ func (ob *ObserverNode) OnGeneratorConnected(p peer.Peer) {
 
 	cp := ob.cn.Provider()
 	nm := &p2p.StatusMessage{
-		Version:  cp.Version(),
+		Version:  cp.Version(cp.Height()),
 		Height:   cp.Height(),
 		LastHash: cp.LastHash(),
 	}

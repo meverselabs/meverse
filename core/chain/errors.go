@@ -18,6 +18,7 @@ var (
 	ErrChainClosed                = errors.New("chain closed")
 	ErrInvalidContextHash         = errors.New("invalid context hash")
 	ErrInvalidLevelRootHash       = errors.New("invalid level root hash")
+	ErrInvalidReceiptHash         = errors.New("invalid receipt hash")
 	ErrStoreClosed                = errors.New("store closed")
 	ErrInvalidChainID             = errors.New("invalid chain id")
 	ErrAlreadyGenesised           = errors.New("already genesised")

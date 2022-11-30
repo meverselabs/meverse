@@ -12,7 +12,7 @@ import (
 // Loader defines functions that loads state data from the target chain
 type Loader interface {
 	ChainID() *big.Int
-	Version() uint16
+	Version(uint32) uint16
 	TargetHeight() uint32
 	PrevHash() hash.Hash256
 	LastTimestamp() uint64
@@ -51,7 +51,7 @@ func (st *emptyLoader) Name() string {
 }
 
 // Version returns 0
-func (st *emptyLoader) Version() uint16 {
+func (st *emptyLoader) Version(uint32) uint16 {
 	return 0
 }
 

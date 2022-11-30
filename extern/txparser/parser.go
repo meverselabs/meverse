@@ -27,6 +27,11 @@ var (
 	DECIMALS          string = ERCFuncSignature("decimals()")
 	TOTALSUPPLY       string = ERCFuncSignature("totalSupply()")
 	BALANCEOF         string = ERCFuncSignature("balanceOf(address)")
+
+	Address, _ = abi.NewType("address", "", nil)
+	Uint256, _ = abi.NewType("uint256", "", nil)
+	Bool, _    = abi.NewType("bool", "", nil)
+	String, _  = abi.NewType("string", "", nil)
 )
 
 /*
@@ -90,10 +95,87 @@ func init() {
 		if err != nil {
 			panic(err)
 		}
+
 		for _, m := range a.Methods {
 			AddAbi(m)
 		}
 	}
+
+	// function name() external view returns (string);
+	m := abi.NewMethod("name", "name", abi.Function, "view", false, false, nil, []abi.Argument{{Name: "", Type: String, Indexed: false}})
+	outMap := map[string]abi.Method{}
+	outMap["string"] = m
+	funcSigs[m.Sig] = outMap
+	funcSigs[hex.EncodeToString(m.ID)] = outMap
+
+	// function decimals() external view returns (uint256);
+	m = abi.NewMethod("decimals", "decimals", abi.Function, "view", false, false, nil, []abi.Argument{{Name: "", Type: Uint256, Indexed: false}})
+	outMap = map[string]abi.Method{}
+	outMap["uint256"] = m
+	funcSigs[m.Sig] = outMap
+	funcSigs[hex.EncodeToString(m.ID)] = outMap
+
+	// function symbol() external view returns (string);
+	m = abi.NewMethod("symbol", "symbol", abi.Function, "view", false, false, nil, []abi.Argument{{Name: "", Type: String, Indexed: false}})
+	outMap = map[string]abi.Method{}
+	outMap["string"] = m
+	funcSigs[m.Sig] = outMap
+	funcSigs[hex.EncodeToString(m.ID)] = outMap
+
+	// function setErc20Token(address erc20) external;
+	m = abi.NewMethod("setErc20Token", "setErc20Token", abi.Function, "nonpayable", false, false, []abi.Argument{{Name: "erc20", Type: Address, Indexed: false}}, nil)
+	outMap = map[string]abi.Method{}
+	outMap[""] = m
+	funcSigs[m.Sig] = outMap
+	funcSigs[hex.EncodeToString(m.ID)] = outMap
+
+	// function erc20Token() external view returns (address);
+	m = abi.NewMethod("erc20Token", "erc20Token", abi.Function, "view", false, false, nil, []abi.Argument{{Name: "", Type: Address, Indexed: false}})
+	outMap = map[string]abi.Method{}
+	outMap["address"] = m
+	funcSigs[m.Sig] = outMap
+	funcSigs[hex.EncodeToString(m.ID)] = outMap
+
+	// function isMinter(address minter) external view returns (bool);
+	m = abi.NewMethod("isMinter", "isMinter", abi.Function, "view", false, false, []abi.Argument{{Name: "", Type: Address, Indexed: false}}, []abi.Argument{{Name: "", Type: Bool, Indexed: false}})
+	outMap = map[string]abi.Method{}
+	outMap["bool"] = m
+	funcSigs[m.Sig] = outMap
+	funcSigs[hex.EncodeToString(m.ID)] = outMap
+
+	// function setMinter(address minter, bool flag) external;
+	m = abi.NewMethod("setMinter", "setMinter", abi.Function, "nonpayable", false, false, []abi.Argument{{Name: "", Type: Address, Indexed: false}}, nil)
+	outMap = map[string]abi.Method{}
+	outMap[""] = m
+	funcSigs[m.Sig] = outMap
+	funcSigs[hex.EncodeToString(m.ID)] = outMap
+
+	// function mint(address to, uint256 amount) external;
+	m = abi.NewMethod("mint", "mint", abi.Function, "nonpayable", false, false, []abi.Argument{{Name: "", Type: Address, Indexed: false}, {Name: "", Type: Uint256, Indexed: false}}, nil)
+	outMap = map[string]abi.Method{}
+	outMap[""] = m
+	funcSigs[m.Sig] = outMap
+	funcSigs[hex.EncodeToString(m.ID)] = outMap
+
+	// function burn(uint256 amount) external;
+	m = abi.NewMethod("burn", "burn", abi.Function, "nonpayable", false, false, []abi.Argument{{Name: "", Type: Uint256, Indexed: false}}, nil)
+	outMap = map[string]abi.Method{}
+	outMap[""] = m
+	funcSigs[m.Sig] = outMap
+	funcSigs[hex.EncodeToString(m.ID)] = outMap
+
+	//function uniAddLiquidity(address tokenA, address tokenB,uint256 amountADesired, uint256 amountBDesired, uint256 amountAMin, uint256 amountBMin )
+	m = abi.NewMethod("uniAddLiquidity", "uniAddLiquidity", abi.Function, "nonpayable", false, false, []abi.Argument{
+		{Name: "", Type: Address, Indexed: false},
+		{Name: "", Type: Address, Indexed: false},
+		{Name: "", Type: Uint256, Indexed: false},
+		{Name: "", Type: Uint256, Indexed: false},
+		{Name: "", Type: Uint256, Indexed: false},
+		{Name: "", Type: Uint256, Indexed: false}}, nil)
+	outMap = map[string]abi.Method{}
+	outMap[""] = m
+	funcSigs[m.Sig] = outMap
+	funcSigs[hex.EncodeToString(m.ID)] = outMap
 }
 
 func AddAbi(m abi.Method) {
@@ -106,22 +188,23 @@ func AddAbi(m abi.Method) {
 	outMap := funcSigs[m.Sig]
 	if outMap == nil {
 		outMap = map[string]abi.Method{}
-		funcSigs[m.Sig] = outMap
-		funcSigs[hex.EncodeToString(m.ID)] = outMap
 	}
 	outMap[output] = m
+
+	funcSigs[m.Sig] = outMap
+	funcSigs[hex.EncodeToString(m.ID)] = outMap
 
 	// name = name + ""
 	// log.Println(name, m.Name, m.RawName, m.Sig, hex.EncodeToString(m.ID))
 }
 
-func Abi(method string) (abi.Method, error) {
+func Abi(method string) abi.Method {
 	ms := funcSigs[method]
 	var m abi.Method
 	for _, m = range ms {
 		break
 	}
-	return m, nil
+	return m
 }
 
 func Abis(cont common.Address, method string) map[string]abi.Method {

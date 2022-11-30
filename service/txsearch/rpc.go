@@ -47,6 +47,9 @@ func (t *TxSearch) SetupApi() error {
 		}
 		m := map[string]interface{}{}
 		m["Header"] = b.Header
+		HeaderHash := bin.MustWriterToHash(&b.Header)
+		m["BlockHash"] = HeaderHash.String()
+
 		bodymap := map[string]interface{}{
 			"Transactions":          b.Body.Transactions,
 			"TransactionSignatures": b.Body.TransactionSignatures,
@@ -109,7 +112,11 @@ func (t *TxSearch) SetupApi() error {
 	})
 	s.Set("txs", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 		index, _ := arg.Int(0)
-		return t.TxList(index)
+		size, err := arg.Int(1)
+		if err != nil {
+			size = 20
+		}
+		return t.TxList(index, size)
 	})
 	s.Set("tx", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 		height, err := arg.Uint32(0)
@@ -151,8 +158,12 @@ func (t *TxSearch) SetupApi() error {
 		if err != nil {
 			return nil, err
 		}
+		size, err := arg.Int(2)
+		if err != nil {
+			size = 20
+		}
 		addr := common.HexToAddress(addrStr)
-		return t.AddressTxList(addr, index)
+		return t.AddressTxList(addr, index, size)
 	})
 	s.Set("tokenSize", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 		return t.TagSize(tagDefault, arg)
@@ -166,8 +177,12 @@ func (t *TxSearch) SetupApi() error {
 		if err != nil {
 			return nil, err
 		}
+		size, err := arg.Int(2)
+		if err != nil {
+			size = 20
+		}
 		addr := common.HexToAddress(addrStr)
-		return t.TokenTxList(addr, index)
+		return t.TokenTxList(addr, index, size)
 	})
 	s.Set("transferList", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 		tokenStr, err := arg.String(0)
@@ -182,9 +197,13 @@ func (t *TxSearch) SetupApi() error {
 		if err != nil {
 			return nil, err
 		}
+		size, err := arg.Int(3)
+		if err != nil {
+			size = 20
+		}
 		addr := common.HexToAddress(addrStr)
 		token := common.HexToAddress(tokenStr)
-		return t.TransferTxList(token, addr, index)
+		return t.TransferTxList(token, addr, index, size)
 	})
 	s.Set("reward", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 		tokenStr, err := arg.String(0)

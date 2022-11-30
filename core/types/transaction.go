@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/hex"
 	"fmt"
 	"io"
 	"math/big"
@@ -16,9 +17,16 @@ import (
 	"github.com/meverselabs/meverse/extern/txparser"
 )
 
+const (
+	Go uint8 = iota
+	Js
+	Evm
+)
+
 type Transaction struct {
 	//Input data
 	ChainID     *big.Int
+	Version     uint16
 	Timestamp   uint64
 	Seq         uint64
 	To          common.Address
@@ -30,6 +38,8 @@ type Transaction struct {
 
 	//After exec tx data
 	From common.Address
+
+	VmType uint8
 }
 
 var legacyCheckHeight uint32
@@ -71,7 +81,7 @@ func (s *Transaction) withOutFrom() *Transaction {
 
 func (s *Transaction) WriteTo(w io.Writer) (int64, error) {
 	sw := bin.NewSumWriter()
-	if sum, err := sw.BigInt(w, s.ChainID); err != nil {
+	if sum, err := sw.ChainIDVersion(w, s.ChainID, s.Version); err != nil {
 		return sum, err
 	}
 	if sum, err := sw.Uint64(w, s.Timestamp); err != nil {
@@ -101,12 +111,17 @@ func (s *Transaction) WriteTo(w io.Writer) (int64, error) {
 	if sum, err := sw.Bool(w, s.IsEtherType); err != nil {
 		return sum, err
 	}
+	if s.Version > 1 {
+		if sum, err := sw.Uint8(w, uint8(s.VmType)); err != nil {
+			return sum, err
+		}
+	}
 	return sw.Sum(), nil
 }
 
 func (s *Transaction) ReadFrom(r io.Reader) (int64, error) {
 	sr := bin.NewSumReader()
-	if sum, err := sr.BigInt(r, &s.ChainID); err != nil {
+	if sum, err := sr.ChainIDVersion(r, &s.ChainID, &s.Version); err != nil {
 		return sum, err
 	}
 	if sum, err := sr.Uint64(r, &s.Timestamp); err != nil {
@@ -135,6 +150,11 @@ func (s *Transaction) ReadFrom(r io.Reader) (int64, error) {
 	}
 	if sum, err := sr.Bool(r, &s.IsEtherType); err != nil {
 		return sum, err
+	}
+	if s.Version > 1 {
+		if sum, err := sr.Uint8(r, &s.VmType); err != nil {
+			return sum, err
+		}
 	}
 	return sr.Sum(), nil
 }
@@ -199,27 +219,65 @@ func (s *Transaction) Message() (h hash.Hash256) {
 	return
 }
 
-func TxArg(ctx *Context, tx *Transaction) (data []interface{}, isSendValue bool, err error) {
+func TxArg(ctx *Context, tx *Transaction) (to common.Address, method string, data []interface{}, err error) {
+	method = tx.Method
+	to = tx.To
 	if tx.IsEtherType {
 		var etx *etypes.Transaction
 		etx, _, err = txparser.EthTxFromRLP(tx.Args)
-		if err == nil {
-			eData := etx.Data()
-			if etx.Value().Cmp(amount.ZeroCoin.Int) > 0 && tx.To != *ctx.MainToken() {
-				if len(eData) > 0 {
-					err = errors.New("not support value transfer call")
-				} else {
-					isSendValue = true
-					data = []interface{}{&amount.Amount{Int: etx.Value()}}
-				}
-			} else if len(eData) > 0 {
-				data, err = txparser.Inputs(eData)
-			} else {
-				err = errors.New("invalid call")
-			}
+		if err != nil {
+			return
+		}
+		eData := etx.Data()
+		if len(eData) == 0 && etx.Value().Cmp(amount.ZeroCoin.Int) >= 0 {
+			to = *ctx.MainToken()
+			method = "Transfer"
+			data = []interface{}{tx.To, &amount.Amount{Int: etx.Value()}}
+		} else if len(eData) > 0 {
+			funcSig := hex.EncodeToString(etx.Data()[:4])
+			m := txparser.Abi(funcSig)
+			method = m.Name
+			data, err = txparser.Inputs(eData)
+		} else {
+			err = errors.New("invalid call")
 		}
 	} else {
 		data, err = bin.TypeReadAll(tx.Args, -1)
 	}
 	return
+}
+
+func GetTxType(ctx *Context, tx *Transaction) (uint8, string) {
+	if tx.To != common.ZeroAddr {
+		if ctx.IsContract(tx.To) {
+			return Go, tx.Method
+		} else {
+			if tx.IsEtherType {
+				etx := new(etypes.Transaction)
+				if err := etx.UnmarshalBinary(tx.Args); err != nil {
+					return Go, tx.Method
+				}
+				if len(etx.Data()) == 0 {
+					return Go, "Transfer"
+				}
+				funcSig := hex.EncodeToString(etx.Data()[:4])
+				m := txparser.Abi(funcSig)
+				if m.Name == "" {
+					return Evm, funcSig
+				}
+				return Evm, m.Name
+			}
+			return Go, tx.Method
+		}
+	} else if isGolangAdminContract(tx.Method) {
+		return Go, tx.Method
+	}
+	return Evm, tx.Method
+}
+
+func isGolangAdminContract(method string) bool {
+	if method == "Admin.Add" || method == "Admin.Remove" || method == "Generator.Add" || method == "Generator.Remove" || method == "Contract.Deploy" {
+		return true
+	}
+	return false
 }
