@@ -9,9 +9,10 @@ import (
 	etypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/meverselabs/meverse/ethereum/core/state"
+	"github.com/meverselabs/meverse/ethereum/core/defaultevm"
 	"github.com/meverselabs/meverse/ethereum/core/types"
 	"github.com/meverselabs/meverse/ethereum/core/vm"
+	"github.com/meverselabs/meverse/ethereum/istate"
 	"github.com/meverselabs/meverse/ethereum/params"
 )
 
@@ -19,7 +20,7 @@ import (
 // and uses the input parameters for its environment. It returns the receipt
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
-func ApplyTransaction(statedb *state.StateDB, tx *etypes.Transaction) (*etypes.Receipt, error) {
+func ApplyTransaction(statedb istate.IStateDB, tx *etypes.Transaction) (*etypes.Receipt, error) {
 
 	bc := ChainContext{}
 	author := common.Address{}
@@ -38,13 +39,13 @@ func ApplyTransaction(statedb *state.StateDB, tx *etypes.Transaction) (*etypes.R
 		ChainID: statedb.ChainID(),
 	}
 
-	vmenv := DefaultEVMWithConfig(statedb, config)
+	vmenv := defaultevm.DefaultEVMWithConfig(statedb, config)
 	return applyTransaction(msg, config, bc, &author, gp, statedb, blockNumber, blockHash, tx, usedGas, vmenv)
 
 }
 
 // ethereum.go와 일치
-func applyTransaction(msg etypes.Message, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *core.GasPool, statedb *state.StateDB, blockNumber *big.Int, blockHash common.Hash, tx *etypes.Transaction, usedGas *uint64, evm *vm.EVM) (*etypes.Receipt, error) {
+func applyTransaction(msg etypes.Message, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *core.GasPool, statedb istate.IStateDB, blockNumber *big.Int, blockHash common.Hash, tx *etypes.Transaction, usedGas *uint64, evm *vm.EVM) (*etypes.Receipt, error) {
 	// Create a new context to be used in the EVM environment.
 	txContext := NewEVMTxContext(msg)
 	evm.Reset(txContext, statedb)

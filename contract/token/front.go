@@ -42,6 +42,9 @@ func (f *front) MintBatch(cc *types.ContractContext, Tos []common.Address, Amoun
 func (f *front) SetMinter(cc *types.ContractContext, To common.Address, Is bool) error {
 	return f.cont.SetMinter(cc, To, Is)
 }
+func (f *front) SetTokenManager(cc *types.ContractContext, To common.Address, Is bool) error {
+	return f.cont.SetTokenManager(cc, To, Is)
+}
 
 func (f *front) Approve(cc *types.ContractContext, To common.Address, Amount *amount.Amount) (bool, error) {
 	err := f.cont.Approve(cc, To, Amount)

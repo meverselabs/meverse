@@ -11,6 +11,7 @@ import (
 	"github.com/meverselabs/meverse/common/key"
 	"github.com/meverselabs/meverse/core/chain"
 	"github.com/meverselabs/meverse/core/piledb"
+	"github.com/meverselabs/meverse/ethereum/params"
 	"github.com/meverselabs/meverse/node"
 	"github.com/meverselabs/meverse/service/apiserver"
 	"github.com/meverselabs/meverse/service/apiserver/metamaskrelay"
@@ -102,11 +103,17 @@ func Run() {
 
 		var rpcapi *apiserver.APIServer
 		var ts *txsearch.TxSearch
+		var bs *bloomservice.BloomBitService
 		if i == 0 {
 			rpcapi = apiserver.NewAPIServer()
+			bs, err = bloomservice.NewBloomBitService(cn, "../_test/_blmindexer", params.BloomBitsBlocks, params.BloomConfirms)
+			if err != nil {
+				panic(err)
+			}
 			ts = txsearch.NewTxSearch("../_test/_txsearch", rpcapi, st, cn, InitHeight)
 			cn.MustAddService(ts)
 			cn.MustAddService(rpcapi)
+			cn.MustAddService(bs)
 		}
 
 		if err := cn.Init(localapp.Genesis()); err != nil {
@@ -120,7 +127,7 @@ func Run() {
 			panic(err)
 		}
 		if i == 0 {
-			metamaskrelay.NewMetamaskRelay(rpcapi, ts, &bloomservice.BloomBitService{}, cn, fr)
+			metamaskrelay.NewMetamaskRelay(rpcapi, ts, bs, cn, fr)
 			go rpcapi.Run(":8541")
 		}
 		viewchain.NewViewchain(rpcapi, ts, cn, st, fr)

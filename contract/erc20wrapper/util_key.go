@@ -3,17 +3,12 @@ package erc20wrapper
 import (
 	"encoding/hex"
 	"fmt"
-	"math"
 	"math/big"
 
 	ecommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/common/amount"
-	"github.com/meverselabs/meverse/core/types"
-	"github.com/meverselabs/meverse/ethereum/core"
-	"github.com/meverselabs/meverse/ethereum/core/state"
-	"github.com/meverselabs/meverse/ethereum/core/vm"
 	"github.com/meverselabs/meverse/extern/txparser"
 )
 
@@ -32,18 +27,6 @@ func funcSig(method string) string {
 
 func toAmount(buf []byte) *amount.Amount {
 	return &amount.Amount{Int: new(big.Int).SetBytes(buf)}
-}
-
-func EvmCall(cc *types.ContractContext, caller vm.ContractRef, to common.Address, input []byte) (ret []byte, leftOverGas uint64, err error) {
-	statedb, err := state.New(cc.Ctx())
-	if err != nil {
-		return nil, 0, err
-	}
-
-	evm := core.DefaultEVM(statedb)
-
-	inputGas := uint64(math.MaxUint64)
-	return evm.Call(caller, to, input, inputGas, big.NewInt(0))
 }
 
 func unpackString(output []byte) (string, error) {

@@ -1,10 +1,13 @@
 package types
 
 import (
+	"math"
 	"math/big"
 
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/ethereum/core/defaultevm"
+	"github.com/meverselabs/meverse/ethereum/core/vm"
 )
 
 // ContractContext is an context for the contract
@@ -111,11 +114,11 @@ func (cc *ContractContext) IsContract(addr common.Address) bool {
 	return cc.ctx.Top().IsContract(addr)
 }
 
-// cycling import is not allowed
+// EvmCall call evm contract
+func (cc *ContractContext) EvmCall(caller vm.ContractRef, to common.Address, input []byte) (ret []byte, leftOverGas uint64, err error) {
+	statedb := NewStateDB(cc.ctx)
+	evm := defaultevm.DefaultEVM(statedb)
 
-// func (cc *ContractContext) EvmCall(caller vm.ContractRef, to common.Address, input []byte) (ret []byte, leftOverGas uint64, err error) {
-// 	evm := core.DefaultEVM(cc)
-
-// 	inputGas := uint64(math.MaxUint64)
-// 	return evm.Call(caller, to, input, inputGas, big.NewInt(0))
-// }
+	inputGas := uint64(math.MaxUint64)
+	return evm.Call(caller, to, input, inputGas, big.NewInt(0))
+}

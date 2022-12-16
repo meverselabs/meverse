@@ -295,7 +295,7 @@ func (tc *TestContext) ReadTx(mkey key.Key, to common.Address, method string, pa
 
 func (tc *TestContext) Call(toAddr common.Address, from, method string, params []interface{}) ([]interface{}, error) {
 	caller := viewchain.NewViewCaller(tc.Cn)
-	output, err := caller.Execute(toAddr, from, method, params)
+	output, _, err := caller.Execute(toAddr, from, method, params)
 	if err != nil {
 		return nil, err
 	}

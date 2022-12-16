@@ -12,6 +12,7 @@ import (
 	"github.com/meverselabs/meverse/contract/connect/imo"
 	"github.com/meverselabs/meverse/contract/connect/mappfarm"
 	"github.com/meverselabs/meverse/contract/connect/pool"
+	"github.com/meverselabs/meverse/contract/erc20wrapper"
 	"github.com/meverselabs/meverse/contract/exchange/factory"
 	"github.com/meverselabs/meverse/contract/exchange/router"
 	"github.com/meverselabs/meverse/contract/exchange/trade"
@@ -22,8 +23,14 @@ import (
 	"github.com/meverselabs/meverse/contract/nft721"
 	"github.com/meverselabs/meverse/contract/token"
 	"github.com/meverselabs/meverse/contract/whitelist"
+	"github.com/meverselabs/meverse/core/chain"
 	"github.com/meverselabs/meverse/core/types"
 )
+
+func init() {
+	types.SetLegacyCheckHeight(10)
+	chain.SetVersion(10, 2)
+}
 
 func Genesis() *types.ContextData {
 	adminAddress := common.HexToAddress("0x477C578843cBe53C3568736347f640c2cdA4616F")
@@ -232,9 +239,6 @@ func Genesis() *types.ContextData {
 
 		fmt.Println("formulatorAddress", formulatorAddress.String()) //0xBaa3C856fbA6FFAda189D6bD0a89d5ef7959c75E
 	}
-
-	types.SetLegacyCheckHeight(10)
-	// chain.SetVersion(15, 2)
 	return genesis.Top()
 }
 
@@ -256,6 +260,7 @@ func RegisterContractClass() map[string]uint64 {
 	registerContractClass(&nft721.NFT721Contract{}, "NFT721", ClassMap)
 	registerContractClass(&engin.EnginContract{}, "Engin", ClassMap)
 	registerContractClass(&deployer.DeployerContract{}, "EnginDeployer", ClassMap)
+	registerContractClass(&erc20wrapper.Erc20WrapperContract{}, "Erc20Wrapper", ClassMap)
 	registerContractClass(&mappfarm.FarmContract{}, "MappFarm", ClassMap)
 	return ClassMap
 }

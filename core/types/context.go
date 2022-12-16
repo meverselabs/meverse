@@ -204,6 +204,16 @@ func (ctx *Context) ContractContext(cont Contract, from common.Address) *Contrac
 	return cc
 }
 
+// ContractContextFromAddress returns a ContractContext
+func (ctx *Context) ContractContextFromAddress(cont, from common.Address) *ContractContext {
+	cc := &ContractContext{
+		cont: cont,
+		from: from,
+		ctx:  ctx,
+	}
+	return cc
+}
+
 // ContractLoader returns a ContractLoader
 func (ctx *Context) ContractLoader(cont common.Address) ContractLoader {
 	cc := &ContractContext{
@@ -240,7 +250,6 @@ func (ctx *Context) Snapshot() int {
 
 // GetSize returns context data size
 func (ctx *Context) GetPCSize() uint64 {
-	return 0
 	return ctx.Top().GetPCSize()
 }
 
@@ -293,6 +302,8 @@ func (ctx *Context) Commit(sn int) {
 		}
 		top.mainToken = ctd.mainToken
 		top.seq = ctd.seq
+		top.basicFee = ctd.basicFee
+		top.size = top.size + ctd.size
 	}
 	ctx.stack[len(ctx.stack)-1].isTop = true
 }

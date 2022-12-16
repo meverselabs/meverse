@@ -1,4 +1,4 @@
-package state
+package types
 
 import (
 	"encoding/hex"
@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/meverselabs/meverse/common/bin"
-	"github.com/meverselabs/meverse/core/types"
 	"github.com/meverselabs/meverse/ethereum/params"
 	"github.com/meverselabs/meverse/extern/txparser"
 )
@@ -24,7 +23,7 @@ var (
 )
 
 type StateDB struct {
-	ctx   *types.Context
+	ctx   *Context
 	dbErr error
 
 	thash   common.Hash
@@ -33,17 +32,13 @@ type StateDB struct {
 	logSize uint
 }
 
-func New(ctx *types.Context) (*StateDB, error) {
+func NewStateDB(ctx *Context) *StateDB {
 	sdb := &StateDB{
 		ctx:  ctx,
 		logs: make(map[common.Hash][]*etypes.Log),
 	}
-	return sdb, nil
+	return sdb
 }
-
-// func (s *StateDB) Ctx() *types.Context {
-// 	return s.ctx
-// }
 
 // ChainID returns the id of the chain
 func (s *StateDB) ChainID() *big.Int {
@@ -156,6 +151,10 @@ func (s *StateDB) GetNonce(addr common.Address) uint64 {
 // TxIndex returns the current transaction index set by Prepare.
 func (s *StateDB) TxIndex() int {
 	return s.txIndex
+}
+
+func (s *StateDB) IsEvmContract(addr common.Address) bool {
+	return len(s.GetCode(addr)) != 0
 }
 
 func (s *StateDB) GetCode(addr common.Address) []byte {
@@ -370,27 +369,27 @@ func (s *StateDB) IsExtContract(addr common.Address) bool {
 }
 
 // Exec executes the method of compiled contract in evm
-func (s *StateDB) Exec(user common.Address, contAddr common.Address, input []byte) ([]byte, error) {
+func (s *StateDB) Exec(user common.Address, contAddr common.Address, input []byte) ([]byte, uint64, error) {
 	//func Exec(ctx *mtypes.Context, user common.Address, contAddr common.Address, methodName string, args []interface{}) ([]interface{}, error) {
-	cc, err := s.getCC(contAddr, user)
+	intr, cc, err := s.getCC(contAddr, user)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	method := hex.EncodeToString(input[:4])
 	m := txparser.Abi(method)
 	if m.Name == "" {
-		return nil, errors.New("not exist abi")
+		return nil, 0, errors.New("not exist abi")
 	}
 
 	methodName := strings.ToUpper(string(m.Name[0])) + m.Name[1:]
 	args, err := m.Inputs.Unpack(input[4:])
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	is, err := cc.Exec(cc, contAddr, methodName, args)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	result := []interface{}{}
@@ -409,21 +408,22 @@ func (s *StateDB) Exec(user common.Address, contAddr common.Address, input []byt
 
 	bs, err := txparser.Outputs(m.Sig, result)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return bs, nil
+	gh := intr.GasHistory()
+	return bs, gh[0], nil
 }
 
 // getCC returns the ContractContext under contract and user context
-func (s *StateDB) getCC(contAddr common.Address, user common.Address) (*types.ContractContext, error) {
+func (s *StateDB) getCC(contAddr common.Address, user common.Address) (IInteractor, *ContractContext, error) {
 	cont, err := s.ctx.Contract(contAddr)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	cc := s.ctx.ContractContext(cont, user)
-	intr := types.NewInteractor(s.ctx, cont, cc, "000000000000", false)
+	intr := NewInteractor(s.ctx, cont, cc, "000000000000", true)
 	cc.Exec = intr.Exec
 
-	return cc, nil
+	return intr, cc, nil
 }

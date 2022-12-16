@@ -220,9 +220,10 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		ret, gas, err = RunPrecompiledContract(p, input, gas)
 	} else if isExtContract {
 		//log.Println("addr in evm.Call", addrCopy)
-		ret, err = evm.StateDB.Exec(caller.Address(), addrCopy, input)
-		gas = 0
-		//log.Println("ret in evm.Call", ret)
+		var usdGas uint64
+		ret, usdGas, err = evm.StateDB.Exec(caller.Address(), addrCopy, input)
+		gas -= usdGas
+		//log.Println("ret in evm.Call", ret) 9079256848778922038
 	} else {
 		// Initialise a new contract and set the code that is to be used by the EVM.
 		// The contract is a scoped environment for this execution context only.
@@ -383,8 +384,9 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 		ret, gas, err = RunPrecompiledContract(p, input, gas)
 	} else if evm.StateDB.IsExtContract(addrCopy) {
 		//log.Println("addr in evm.StaticCall", addrCopy)
-		ret, err = evm.StateDB.Exec(caller.Address(), addrCopy, input)
-		gas = 0
+		var usdGas uint64
+		ret, usdGas, err = evm.StateDB.Exec(caller.Address(), addrCopy, input)
+		gas -= usdGas
 		//log.Println("ret in evm.StaticCall", ret)
 	} else {
 		// At this point, we use a copy of address. If we don't, the go compiler will

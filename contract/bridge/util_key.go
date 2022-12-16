@@ -25,6 +25,8 @@ var (
 	tagTransferTokenFeeInfoToChain = byte(0x14)
 
 	tagTokenFeeOwnerAddress = byte(0x15)
+
+	tagDelegateTransferFeeInfoToChain = byte(0x16)
 )
 
 func makeBridgeKey(key byte, body []byte) []byte {
@@ -41,6 +43,9 @@ func makeSequenceTo(addr common.Address, fromChain string) []byte {
 }
 func makeTransferFeeInfoToChain(chain string) []byte {
 	return makeBridgeKey(tagTransferFeeInfoToChain, []byte(chain))
+}
+func makeDelegateTransferFeeInfoToChain(chain string) []byte {
+	return makeBridgeKey(tagDelegateTransferFeeInfoToChain, []byte(chain))
 }
 func makeTransferTokenFeeInfoToChain(chain string) []byte {
 	return makeBridgeKey(tagTransferTokenFeeInfoToChain, []byte(chain))

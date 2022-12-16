@@ -676,7 +676,7 @@ func (v *viewchain) Call(contract, from, method string, params []interface{}) (i
 		return nil, err
 	}
 	caller := NewViewCaller(v.cn)
-	output, err := caller.Execute(toAddr, from, method, params)
+	output, _, err := caller.Execute(toAddr, from, method, params)
 	if err != nil {
 		return nil, err
 	}

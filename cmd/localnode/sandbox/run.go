@@ -91,7 +91,7 @@ func Run() {
 	}
 
 	ndstrs := []string{
-		"b000000000000000000000000000000000000000000000000000000000000998",
+		"b000000000000000000000000000000000000000000000000000000000000999",
 	}
 	ndkeys := make([]key.Key, 0, len(ndstrs))
 	for i, v := range ndstrs {
@@ -102,7 +102,7 @@ func Run() {
 		} else {
 			ndkeys = append(ndkeys, Key)
 			pubkey := Key.PublicKey()
-			NdNetAddressMap[pubkey] = ":602" + strconv.Itoa(i)
+			NdNetAddressMap[pubkey] = ":601" + strconv.Itoa(i)
 		}
 	}
 

@@ -122,6 +122,7 @@ func (cont *BridgeContract) sendToGateway(cc *types.ContractContext, token commo
 	}
 	mt := *cc.MainToken()
 	transferFee := cont.transferFeeInfoToChain(cc, toChain)
+	isDelegateFee := cont.isDelegateTransferTokenFee(cc, toChain)
 	transferTokenFeeFactor := cont.transferTokenFeeInfoToChain(cc, toChain)
 	transferTokenFee := amt.MulC(int64(transferTokenFeeFactor)).DivC(int64(feeFactorMax))
 	if transferTokenFee.IsMinus() {
@@ -132,12 +133,12 @@ func (cont *BridgeContract) sendToGateway(cc *types.ContractContext, token commo
 		return err
 	}
 
-	if transferFee.IsPlus() {
-		if err := safeTransferFrom(cc, mt, cc.From(), cont.feeOwner(cc), transferFee); err != nil {
+	if isDelegateFee {
+		if err := safeTransferFrom(cc, mt, cont.feeOwner(cc), cc.From(), transferFee); err != nil {
 			return err
 		}
-	} else if transferFee.IsMinus() {
-		if err := safeTransferFrom(cc, mt, cont.feeOwner(cc), cc.From(), transferFee); err != nil {
+	} else {
+		if err := safeTransferFrom(cc, mt, cc.From(), cont.feeOwner(cc), transferFee); err != nil {
 			return err
 		}
 	}
@@ -292,7 +293,7 @@ func (cont *BridgeContract) sendFromGateway(cc *types.ContractContext, token com
 
 func (cont *BridgeContract) checkOwner(cc *types.ContractContext) bool {
 	if cc.TargetHeight() > 10780198 {
-		return cc.From() == cont.Master()
+		return cc.From() == cont.Master() || cc.From() == cont.bank(cc)
 	}
 	return true
 }
@@ -301,9 +302,26 @@ func (cont *BridgeContract) setTransferFeeInfo(cc *types.ContractContext, chain 
 	if !cont.checkOwner(cc) {
 		return errors.New("not owner")
 	}
-	// transferFeeInfoToChain[chain] = transferFee;
+	cc.SetContractData(makeDelegateTransferFeeInfoToChain(chain), nil)
 	cc.SetContractData(makeTransferFeeInfoToChain(chain), transferFee.Bytes())
 	return nil
+}
+
+func (cont *BridgeContract) setDelegateTransferFeeInfo(cc *types.ContractContext, chain string, transferFee *amount.Amount) error {
+	if !cont.checkOwner(cc) {
+		return errors.New("not owner")
+	}
+	cc.SetContractData(makeDelegateTransferFeeInfoToChain(chain), []byte{1})
+	cc.SetContractData(makeTransferFeeInfoToChain(chain), transferFee.Bytes())
+	return nil
+}
+
+func (cont *BridgeContract) isDelegateTransferTokenFee(cc *types.ContractContext, chain string) bool {
+	bs := cc.ContractData(makeDelegateTransferFeeInfoToChain(chain))
+	if len(bs) > 0 && bs[0] == 1 {
+		return true
+	}
+	return false
 }
 
 func (cont *BridgeContract) setTransferTokenFeeInfo(cc *types.ContractContext, chain string, tokenFee uint16) error {

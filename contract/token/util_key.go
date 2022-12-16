@@ -23,6 +23,7 @@ var (
 	tagPause            = byte(0x15)
 	tagVersion          = byte(0x16)
 	tagDelegateInfo     = byte(0x17)
+	tagTokenManager     = byte(0x18)
 )
 
 func MakeAllowanceTokenKey(sender common.Address) []byte {
@@ -63,7 +64,7 @@ func getDelegateInfo(cc *types.ContractContext) (*delegateInfo, error) {
 		return nil, errors.New("fee is not amount")
 	}
 	if di.approveLowerLimit, ok = is[3].(*amount.Amount); !ok {
-		return nil, errors.New("fee is not amount")
+		return nil, errors.New("Limit is not amount")
 	}
 	return di, nil
 }

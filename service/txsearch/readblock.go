@@ -185,7 +185,7 @@ func (t *TxSearch) _saveTx(indexMap map[addrIndexKey]uint64, index41Map map[addr
 	hbs := make([]byte, 4)
 	binary.BigEndian.PutUint32(hbs, height)
 
-	switch method {
+	switch strings.ToLower(method) {
 	case "transfer":
 		to := toAddress(arg, 0)
 		am := toAmount(arg, 1)

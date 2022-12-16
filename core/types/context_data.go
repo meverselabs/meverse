@@ -53,7 +53,7 @@ func NewContextData(cache *contextCache, Parent *ContextData) *ContextData {
 }
 
 func (ctd *ContextData) GetPCSize() uint64 {
-	return ctd.size
+	return ctd.size * 22
 }
 
 // IsAdmin returns the account is admin or not
@@ -62,10 +62,10 @@ func (ctd *ContextData) IsAdmin(addr common.Address) bool {
 		return false
 	}
 	if is, has := ctd.AdminMap[addr]; has {
+		ctd.size += 21 //uint32(common.Sizeof(reflect.TypeOf(addr))) + uint32(common.Sizeof(reflect.TypeOf(is)))
 		return is
 	} else if ctd.Parent != nil {
 		is := ctd.Parent.IsAdmin(addr)
-		ctd.size += 21 //uint32(common.Sizeof(reflect.TypeOf(addr))) + uint32(common.Sizeof(reflect.TypeOf(is)))
 		return is
 	} else {
 		is := ctd.cache.IsAdmin(addr)
@@ -99,12 +99,13 @@ func (ctd *ContextData) IsGenerator(addr common.Address) bool {
 	if _, has := ctd.DeletedGeneratorMap[addr]; has {
 		return false
 	}
-	ctd.size += 1 // uint32(common.Sizeof(reflect.TypeOf(bool)))
 	if is, has := ctd.GeneratorMap[addr]; has {
+		ctd.size += 1 // uint32(common.Sizeof(reflect.TypeOf(bool)))
 		return is
 	} else if ctd.Parent != nil {
 		return ctd.Parent.IsGenerator(addr)
 	} else {
+		ctd.size += 1 // uint32(common.Sizeof(reflect.TypeOf(bool)))
 		return ctd.cache.IsGenerator(addr)
 	}
 }
@@ -161,6 +162,7 @@ func (ctd *ContextData) SetMainToken(addr common.Address) {
 // IsContract returns is the contract
 func (ctd *ContextData) IsContract(addr common.Address) bool {
 	if _, has := ctd.ContractDefineMap[addr]; has {
+		ctd.size += 20 // uint32(common.Sizeof(reflect.TypeOf(addr)))
 		return true
 	} else if ctd.Parent != nil {
 		return ctd.Parent.IsContract(addr)
@@ -174,9 +176,9 @@ func (ctd *ContextData) IsContract(addr common.Address) bool {
 // Contract returns the contract
 func (ctd *ContextData) Contract(addr common.Address) (Contract, error) {
 	if cd, has := ctd.ContractDefineMap[addr]; has {
+		ctd.size += 20 // uint32(common.Sizeof(reflect.TypeOf(addr)))
 		return CreateContract(cd)
 	} else if ctd.Parent != nil {
-		ctd.size += 20 // uint32(common.Sizeof(reflect.TypeOf(addr)))
 		return ctd.Parent.Contract(addr)
 	} else {
 		ctd.size += 20 // uint32(common.Sizeof(reflect.TypeOf(addr)))
@@ -251,10 +253,10 @@ func (ctd *ContextData) Data(cont common.Address, addr common.Address, name []by
 		return nil
 	}
 	if value, has := ctd.DataMap[key]; has {
+		ctd.size += uint64(len(name)) + uint64(len(value))
 		return value
 	} else if ctd.Parent != nil {
 		value := ctd.Parent.Data(cont, addr, name)
-		ctd.size += uint64(len(name)) + uint64(len(value))
 		if len(value) > 0 {
 			if ctd.isTop {
 				nvalue := make([]byte, len(value))
@@ -375,6 +377,11 @@ func (ctd *ContextData) SetNonce(addr common.Address, nonce uint64) {
 	} else {
 		ctd.AddrSeqMap[addr] = nonce
 	}
+}
+
+// UnsafeBasicFee returns the basic fee
+func (ctd *ContextData) UnsafeBasicFee() *amount.Amount {
+	return ctd.basicFee
 }
 
 // BasicFee returns the basic fee

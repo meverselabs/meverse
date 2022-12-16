@@ -20,4 +20,6 @@ var (
 	ErrAlreadyGenerator             = errors.New("already generator")
 	ErrInvalidGenerator             = errors.New("invalid generator")
 	ErrDirtyContext                 = errors.New("dirty context")
+	ErrInvalidContractMethod        = errors.New("invalid contract method")
+	ErrInvalidArguments             = errors.New("invalid contract method arguments")
 )

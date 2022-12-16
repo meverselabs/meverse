@@ -24,7 +24,6 @@ type Store struct {
 	db             *keydb.DB
 	cdb            *piledb.DB
 	chainID        *big.Int
-	feeUnit        *amount.Amount
 	cache          storecache
 	closeLock      sync.RWMutex
 	isClose        bool
@@ -47,11 +46,6 @@ type storecache struct {
 	admins           []common.Address
 	generators       []common.Address
 	contracts        []types.Contract
-}
-
-type versionInfo struct {
-	height  uint32
-	version uint16
 }
 
 var versionSet map[uint32]uint16
@@ -104,6 +98,8 @@ func NewStore(keydbPath string, cdb *piledb.DB, ChainID *big.Int, version uint16
 			var addr common.Address
 			copy(addr[:], value)
 			return addr, nil
+		case tagBasicFee:
+			return value, nil
 		default:
 			panic("unknown data type")
 		}
@@ -587,27 +583,28 @@ func (st *Store) MainToken() *common.Address {
 
 // BasicFee returns basic fee
 func (st *Store) BasicFee() *amount.Amount {
-	if st.feeUnit == nil {
-		st.closeLock.RLock()
-		defer st.closeLock.RUnlock()
-		if err := st.db.View(func(txn *keydb.Tx) error {
-			value, err := txn.Get([]byte{tagBasicFee})
-			if err != nil {
-				return errors.WithStack(err)
-			}
-			bs := value.([]byte)
-			if len(bs) == 0 {
-				st.feeUnit = amount.NewAmount(0, 0) // 0
-			} else {
-				st.feeUnit = amount.NewAmountFromBytes(bs)
-			}
-			return nil
-		}); err != nil {
-			st.feeUnit = amount.NewAmount(0, 100000000000000000) // 0.1
-			return st.feeUnit
-		}
+	var feeUnit *amount.Amount
+	st.closeLock.RLock()
+	defer st.closeLock.RUnlock()
+	if err := st.db.View(func(txn *keydb.Tx) (err error) {
+		feeUnit = _basicFee(txn)
+		return
+	}); err != nil {
+		return feeUnit
 	}
-	return st.feeUnit
+	return feeUnit
+}
+
+// Contracts returns the contract form the store
+func _basicFee(txn *keydb.Tx) *amount.Amount {
+	value, err := txn.Get([]byte{tagBasicFee})
+	if err != nil {
+		// return amount.NewAmount(0, 3921568627450980) // 0.003921568627450980
+		return amount.NewAmount(0, 100000000000000000) // 0.1
+	}
+	bs := value.([]byte)
+	am := amount.NewAmountFromBytes(bs)
+	return am
 }
 
 // Contracts returns the contract form the store
@@ -1075,6 +1072,9 @@ func (st *Store) StoreBlock(b *types.Block, ctx *types.Context, receipts types.R
 		Datas = append(Datas, data)
 	}
 	{
+		// if len(receipts) > 0 {
+		// 	log.Println(receipts)
+		// }
 		data, _, err := bin.WriterToBytes(&receipts)
 		if err != nil {
 			return err
@@ -1306,6 +1306,10 @@ func applyContextData(txn *keydb.Tx, ctd *types.ContextData) error {
 		return nil
 	}); err != nil {
 		return err
+	}
+
+	if cam := ctd.UnsafeBasicFee(); cam != nil && _basicFee(txn).String() != cam.String() {
+		txn.Set([]byte{tagBasicFee}, cam.Bytes(), cam.Bytes())
 	}
 	return nil
 }

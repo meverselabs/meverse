@@ -11,13 +11,14 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/common/bin"
 	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/core/chain/admin"
 	"github.com/meverselabs/meverse/core/piledb"
 	"github.com/meverselabs/meverse/core/prefix"
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/meverselabs/meverse/ethereum/core"
-	"github.com/meverselabs/meverse/ethereum/core/state"
 
 	"github.com/pkg/errors"
 )
@@ -526,15 +527,15 @@ func (cn *Chain) ExecuteTransaction(ctx *types.Context, tx *types.Transaction, T
 	defer types.ExecLock.Unlock()
 
 	switch tx.Method {
-	case "Admin.Add":
+	case admin.AdminAdd:
 		return nil, ctx.SetAdmin(common.BytesToAddress(tx.Args), true)
-	case "Admin.Remove":
+	case admin.AdminRemove:
 		return nil, ctx.SetAdmin(common.BytesToAddress(tx.Args), false)
-	case "Generator.Add":
+	case admin.GeneratorAdd:
 		return nil, ctx.SetGenerator(common.BytesToAddress(tx.Args), true)
-	case "Generator.Remove":
+	case admin.GeneratorRemove:
 		return nil, ctx.SetGenerator(common.BytesToAddress(tx.Args), false)
-	case "Contract.Deploy":
+	case admin.ContractDeploy:
 		data := &DeployContractData{}
 		if _, err := data.ReadFrom(bytes.NewReader(tx.Args)); err != nil {
 			return nil, err
@@ -553,6 +554,24 @@ func (cn *Chain) ExecuteTransaction(ctx *types.Context, tx *types.Transaction, T
 				Result: bin.TypeWriteAll(addr),
 			}}, nil
 		}
+	case admin.TransactionSetBasicFee:
+		if iss, err := bin.TypeReadAll(tx.Args, 1); err != nil {
+			return nil, err
+		} else if fee, ok := iss[0].(*amount.Amount); ok {
+			ctx.SetBasicFee(fee)
+		} else {
+			return nil, errors.WithStack(ErrInvalidBasicFee)
+		}
+
+		_, i, err := types.ParseTransactionID(TXID)
+		if err != nil {
+			return nil, err
+		}
+		return []*types.Event{{
+			Index:  i,
+			Type:   types.EventTagTxMsg,
+			Result: tx.Args,
+		}}, nil
 	default:
 		return nil, errors.WithStack(ErrUnknownTransactionMethod)
 	}
@@ -568,7 +587,7 @@ func (cn *Chain) ApplyEvmTransaction(ctx *types.Context, tx *types.Transaction, 
 	if err := core.ValidateTx(etx, true); err != nil {
 		return nil, nil, err
 	}
-	statedb, err := state.New(ctx)
+	statedb := types.NewStateDB(ctx)
 	statedb.Prepare(etx.Hash(), int(ti))
 	receipt, err := core.ApplyTransaction(statedb, etx)
 	if err != nil {
@@ -576,18 +595,26 @@ func (cn *Chain) ApplyEvmTransaction(ctx *types.Context, tx *types.Transaction, 
 		return nil, nil, err
 	}
 
-	if err = ChargeFee(ctx, 0, signer); err != nil {
+	ens := []*types.Event{}
+	if fee, err := ChargeFee(ctx, receipt.GasUsed, signer); err != nil {
 		return nil, nil, err
+	} else {
+		en := &types.Event{
+			Index:  ti,
+			Type:   types.EventTagTxFee,
+			Result: bin.TypeWriteAll(fee),
+		}
+		ens = append(ens, en)
 	}
 
 	if receipt.ContractAddress != (common.Address{}) {
 		addr := receipt.ContractAddress
-		return []*types.Event{{
+		en := &types.Event{
 			Index:  ti,
 			Type:   types.EventTagTxMsg,
 			Result: bin.TypeWriteAll(addr),
-		}}, receipt, nil
-	} else {
-		return nil, receipt, nil
+		}
+		ens = append(ens, en)
 	}
+	return ens, receipt, nil
 }

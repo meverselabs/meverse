@@ -31,6 +31,9 @@ func (f *front) SendToGateway(cc *types.ContractContext, token common.Address, a
 func (f *front) SetTransferFeeInfo(cc *types.ContractContext, chain string, transferFee *amount.Amount) {
 	f.cont.setTransferFeeInfo(cc, chain, transferFee)
 }
+func (f *front) SetDelegateTransferFeeInfo(cc *types.ContractContext, chain string, transferFee *amount.Amount) {
+	f.cont.setDelegateTransferFeeInfo(cc, chain, transferFee)
+}
 func (f *front) TransferFeeInfo(cc *types.ContractContext, chain string) *amount.Amount {
 	return f.cont.transferFeeInfoToChain(cc, chain)
 }

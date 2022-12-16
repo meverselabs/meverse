@@ -23,8 +23,9 @@ var upgrader = websocket.Upgrader{
 }
 
 type ReqData struct {
-	req   *jRPCRequest
-	resCh *chan interface{}
+	reqArr    []*jRPCRequest
+	resCh     *chan interface{}
+	singleReq bool
 }
 
 // Run starts web service of the apiserver
@@ -55,14 +56,23 @@ func (s *APIServer) Run(BindAddress string) error {
 		dec := json.NewDecoder(bytes.NewReader(body))
 		dec.UseNumber()
 
-		var req jRPCRequest
-		if err := dec.Decode(&req); err != nil {
-			return errors.WithStack(err)
+		var reqArr []*jRPCRequest
+		singleReq := false
+		if err := dec.Decode(&reqArr); err != nil {
+			dec = json.NewDecoder(bytes.NewReader(body))
+			dec.UseNumber()
+			var req jRPCRequest
+			if err := dec.Decode(&req); err != nil {
+				return errors.WithStack(err)
+			}
+			singleReq = true
+			reqArr = []*jRPCRequest{&req}
 		}
 		resCh := make(chan interface{})
 		reqCh <- &ReqData{
-			req:   &req,
-			resCh: &resCh,
+			reqArr:    reqArr,
+			resCh:     &resCh,
+			singleReq: singleReq,
 		}
 		res := <-resCh
 		if res == nil {
@@ -90,14 +100,24 @@ func (s *APIServer) Run(BindAddress string) error {
 			dec := json.NewDecoder(bytes.NewReader(data))
 			dec.UseNumber()
 
-			var req jRPCRequest
-			if err := dec.Decode(&req); err != nil {
-				return errors.WithStack(err)
+			var reqArr []*jRPCRequest
+			singleReq := false
+			if err := dec.Decode(&reqArr); err != nil {
+				dec = json.NewDecoder(bytes.NewReader(data))
+				dec.UseNumber()
+				var req jRPCRequest
+				if err := dec.Decode(&req); err != nil {
+					return errors.WithStack(err)
+				}
+				singleReq = true
+				reqArr = []*jRPCRequest{&req}
 			}
+
 			resCh := make(chan interface{})
 			reqCh <- &ReqData{
-				req:   &req,
-				resCh: &resCh,
+				reqArr:    reqArr,
+				resCh:     &resCh,
+				singleReq: singleReq,
 			}
 			select {
 			case res := <-resCh:
@@ -121,8 +141,7 @@ func (s *APIServer) Run(BindAddress string) error {
 	for i := 0; i < 50; i++ {
 		go func() {
 			for r := range reqCh {
-				res := s.handleJRPC(r.req)
-				(*r.resCh) <- res
+				s.handleJRPCs(r)
 			}
 		}()
 	}
@@ -142,8 +161,24 @@ func (s *APIServer) JRPC(SubName string) (*JRPCSub, error) {
 	return js, nil //TEMP
 }
 
-func (s *APIServer) handleJRPC(req *jRPCRequest) interface{} {
+func (s *APIServer) handleJRPCs(r *ReqData) {
+	var res interface{}
+	if r.singleReq {
+		res = s._handleJRPC(r.reqArr[0])
+	} else {
+		ress := []interface{}{}
+		for _, req := range r.reqArr {
+			res := s._handleJRPC(req)
+			ress = append(ress, res)
+		}
+		res = ress
+	}
+	(*r.resCh) <- res
+}
+
+func (s *APIServer) _handleJRPC(req *jRPCRequest) interface{} {
 	method := req.Method
+	//log.Println("method", method)
 	if !strings.Contains(method, ".") {
 		method = "eth." + method
 	}
@@ -197,6 +232,7 @@ func (s *APIServer) handleJRPC(req *jRPCRequest) interface{} {
 	}
 
 	ret, err := fn(req.ID, NewArgument(args))
+	//log.Println(ret)
 	if req.ID == nil {
 		log.Println("failJRPCResponse err not fount id", err, req.Method, printParam(req.Params))
 		return &JRPCResponseWithError{

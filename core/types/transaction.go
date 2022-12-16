@@ -14,6 +14,7 @@ import (
 	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/common/bin"
 	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/core/chain/admin"
 	"github.com/meverselabs/meverse/extern/txparser"
 )
 
@@ -269,15 +270,8 @@ func GetTxType(ctx *Context, tx *Transaction) (uint8, string) {
 			}
 			return Go, tx.Method
 		}
-	} else if isGolangAdminContract(tx.Method) {
+	} else if admin.IsAdminMethod(tx.Method) {
 		return Go, tx.Method
 	}
 	return Evm, tx.Method
-}
-
-func isGolangAdminContract(method string) bool {
-	if method == "Admin.Add" || method == "Admin.Remove" || method == "Generator.Add" || method == "Generator.Remove" || method == "Contract.Deploy" {
-		return true
-	}
-	return false
 }

@@ -20,7 +20,6 @@ import (
 	"github.com/meverselabs/meverse/common/hash"
 	"github.com/meverselabs/meverse/core/chain"
 	"github.com/meverselabs/meverse/core/piledb"
-	"github.com/meverselabs/meverse/service/apiserver"
 	"github.com/meverselabs/meverse/service/apiserver/zipcontext"
 )
 
@@ -76,8 +75,7 @@ func testContext(exSt *chain.Store, cfg Config, cfgPath string) {
 	cm.Add("store", st)
 
 	cn := chain.NewChain(ObserverKeys, st, "")
-	rpcapi := apiserver.NewAPIServer()
-	zipContext := zipcontext.NewZipContextService(rpcapi, st, cfg.SaveZipPath, cfg.ZipInterval)
+	zipContext := zipcontext.NewZipContextService(nil, st, cfg.SaveZipPath, cfg.ZipInterval)
 	cn.MustAddService(zipContext)
 
 	if cfg.CheckInitHeight == 0 {

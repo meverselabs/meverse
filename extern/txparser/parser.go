@@ -144,7 +144,7 @@ func init() {
 	funcSigs[hex.EncodeToString(m.ID)] = outMap
 
 	// function setMinter(address minter, bool flag) external;
-	m = abi.NewMethod("setMinter", "setMinter", abi.Function, "nonpayable", false, false, []abi.Argument{{Name: "", Type: Address, Indexed: false}}, nil)
+	m = abi.NewMethod("setMinter", "setMinter", abi.Function, "nonpayable", false, false, []abi.Argument{{Name: "", Type: Address, Indexed: false}, {Name: "", Type: Bool, Indexed: false}}, nil)
 	outMap = map[string]abi.Method{}
 	outMap[""] = m
 	funcSigs[m.Sig] = outMap
@@ -159,6 +159,27 @@ func init() {
 
 	// function burn(uint256 amount) external;
 	m = abi.NewMethod("burn", "burn", abi.Function, "nonpayable", false, false, []abi.Argument{{Name: "", Type: Uint256, Indexed: false}}, nil)
+	outMap = map[string]abi.Method{}
+	outMap[""] = m
+	funcSigs[m.Sig] = outMap
+	funcSigs[hex.EncodeToString(m.ID)] = outMap
+
+	// function burnFrom(address account, uint256 amount) external;
+	m = abi.NewMethod("burnFrom", "burnFrom", abi.Function, "nonpayable", false, false, []abi.Argument{{Name: "", Type: Address, Indexed: false}, {Name: "", Type: Uint256, Indexed: false}}, nil)
+	outMap = map[string]abi.Method{}
+	outMap[""] = m
+	funcSigs[m.Sig] = outMap
+	funcSigs[hex.EncodeToString(m.ID)] = outMap
+
+	// function increaseAllowance(address to, uint256 addedValue) external;
+	m = abi.NewMethod("increaseAllowance", "increaseAllowance", abi.Function, "nonpayable", false, false, []abi.Argument{{Name: "", Type: Address, Indexed: false}, {Name: "", Type: Uint256, Indexed: false}}, []abi.Argument{{Name: "", Type: Bool, Indexed: false}})
+	outMap = map[string]abi.Method{}
+	outMap[""] = m
+	funcSigs[m.Sig] = outMap
+	funcSigs[hex.EncodeToString(m.ID)] = outMap
+
+	// function increaseAllowance(address to, uint256 addedValue) external;
+	m = abi.NewMethod("decreaseAllowance", "decreaseAllowance", abi.Function, "nonpayable", false, false, []abi.Argument{{Name: "", Type: Address, Indexed: false}, {Name: "", Type: Uint256, Indexed: false}}, []abi.Argument{{Name: "", Type: Bool, Indexed: false}})
 	outMap = map[string]abi.Method{}
 	outMap[""] = m
 	funcSigs[m.Sig] = outMap

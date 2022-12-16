@@ -36,4 +36,6 @@ var (
 	ErrExistAddress               = errors.New("exist address")
 	ErrExceedCandidateCount       = errors.New("exceed candidate count")
 	ErrFoundForkedBlock           = errors.New("found forked block")
+	ErrInvalidBasicFee            = errors.New("invalid basic fee")
+	ErrNotExistContract           = errors.New("not exist contract")
 )

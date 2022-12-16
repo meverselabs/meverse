@@ -11,6 +11,7 @@ const (
 	EventTagTxMsg       = EventType(0x00)
 	EventTagReward      = EventType(0x01)
 	EventTagCallHistory = EventType(0x02)
+	EventTagTxFee       = EventType(0x03)
 )
 
 type EventType uint8

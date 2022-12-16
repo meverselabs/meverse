@@ -9,9 +9,11 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/ethereum/core/vm"
 	"github.com/pkg/errors"
 )
 
@@ -23,18 +25,21 @@ type IInteractor interface {
 	Distroy()
 	Exec(Cc *ContractContext, Addr common.Address, MethodName string, Args []interface{}) ([]interface{}, error)
 	EventList() []*Event
+	GasHistory() []uint64
+	AddEvent(*Event)
 }
 
 type ExecFunc = func(Cc *ContractContext, Addr common.Address, MethodName string, Args []interface{}) ([]interface{}, error)
 
 type interactor struct {
-	ctx       *Context
-	cont      Contract
-	conMap    map[common.Address]Contract
-	exit      bool
-	index     uint16
-	eventList []*Event
-	saveEvent bool
+	ctx        *Context
+	cont       Contract
+	conMap     map[common.Address]Contract
+	exit       bool
+	index      uint16
+	eventList  []*Event
+	gasHistory []uint64
+	saveEvent  bool
 }
 
 var bigIntType = reflect.TypeOf(&big.Int{}).String()
@@ -52,8 +57,50 @@ func NewInteractor(ctx *Context, cont Contract, cc *ContractContext, TXID string
 	}
 }
 
+func NewInteractor2(ctx *Context, cc *ContractContext, TXID string, saveEvent bool) IInteractor {
+	_, i, _ := ParseTransactionID(TXID)
+	return &interactor{
+		ctx:       ctx,
+		conMap:    map[common.Address]Contract{},
+		index:     i,
+		eventList: []*Event{},
+		saveEvent: saveEvent,
+	}
+}
+
 func (i *interactor) Distroy() {
 	i.exit = true
+}
+
+var (
+	String, _  = abi.NewType("string", "", nil)
+	Uint8, _   = abi.NewType("uint8", "", nil)
+	Uint256, _ = abi.NewType("uint256", "", nil)
+	Address, _ = abi.NewType("address", "", nil)
+	Bool, _    = abi.NewType("bool", "", nil)
+)
+
+// var methodInputs = map[string]string{}
+
+var methods = map[string]abi.Method{
+	"name":         abi.NewMethod("name", "name", abi.Function, "", false, false, nil, []abi.Argument{{"", String, false}}),
+	"symbol":       abi.NewMethod("symbol", "symbol", abi.Function, "", false, false, nil, []abi.Argument{{"", String, false}}),
+	"decimals":     abi.NewMethod("decimals", "decimals", abi.Function, "", false, false, nil, []abi.Argument{{"", Uint8, false}}),
+	"totalSupply":  abi.NewMethod("totalSupply", "totalSupply", abi.Function, "", false, false, nil, []abi.Argument{{"", Uint256, false}}),
+	"balanceOf":    abi.NewMethod("balanceOf", "balanceOf", abi.Function, "", false, false, []abi.Argument{{"", Address, false}}, []abi.Argument{{"", Uint256, false}}),
+	"allowance":    abi.NewMethod("allowance", "allowance", abi.Function, "", false, false, []abi.Argument{{"", Address, false}, {"", Address, false}}, []abi.Argument{{"", Uint256, false}}),
+	"approve":      abi.NewMethod("approve", "approve", abi.Function, "", false, false, []abi.Argument{{"", Address, false}, {"", Uint256, false}}, []abi.Argument{{"", Bool, false}}),
+	"transfer":     abi.NewMethod("transfer", "transfer", abi.Function, "", false, false, []abi.Argument{{"", Address, false}, {"", Uint256, false}}, []abi.Argument{{"", Bool, false}}),
+	"transferFrom": abi.NewMethod("transferFrom", "transferFrom", abi.Function, "", false, false, []abi.Argument{{"", Address, false}, {"", Address, false}, {"", Uint256, false}}, []abi.Argument{{"", Bool, false}}),
+	"mint":         abi.NewMethod("mint", "mint", abi.Function, "", false, false, []abi.Argument{{"", Address, false}, {"", Uint256, false}}, nil),
+	"burn":         abi.NewMethod("burn", "burn", abi.Function, "", false, false, []abi.Argument{{"", Uint256, false}}, nil),
+	"burnFrom":     abi.NewMethod("burnFrom", "burnFrom", abi.Function, "", false, false, []abi.Argument{{"", Address, false}, {"", Uint256, false}}, nil),
+	"isMinter":     abi.NewMethod("isMinter", "isMinter", abi.Function, "", false, false, []abi.Argument{{"", Address, false}}, []abi.Argument{{"", Bool, false}}),
+	"setMinter":    abi.NewMethod("setMinter", "setMinter", abi.Function, "", false, false, []abi.Argument{{"", Address, false}, {"", Bool, false}}, nil),
+}
+
+var erc20Abi = abi.ABI{
+	Methods: methods,
 }
 
 func (i *interactor) Exec(Cc *ContractContext, ContAddr common.Address, MethodName string, Args []interface{}) ([]interface{}, error) {
@@ -64,79 +111,159 @@ func (i *interactor) Exec(Cc *ContractContext, ContAddr common.Address, MethodNa
 		return nil, errors.New("method not given")
 	}
 
-	ecc := i.currentContractContext(Cc, ContAddr)
+	if Cc.IsContract(ContAddr) {
 
-	var en *Event
-	cont, err := i.getContract(ContAddr)
-	if err != nil {
-		return nil, err
-	}
+		ecc := i.currentContractContext(Cc, ContAddr)
 
-	var is interface{} = cont
-	if _, ok := is.(InvokeableContract); ok &&
-		(MethodName != "InitContract" &&
-			MethodName != "IsUpdateable" &&
-			MethodName != "Update" &&
-			MethodName != "ContractInvoke" &&
-			MethodName != "SetOwner") {
-		Args = []interface{}{
-			MethodName,
-			Args,
+		var en *Event
+		cont, err := i.getContract(ContAddr)
+		if err != nil {
+			return nil, err
 		}
-		MethodName = "ContractInvoke"
-	} else {
-		MethodName = strings.ToUpper(string(MethodName[0])) + MethodName[1:]
-	}
 
-	if i.saveEvent {
-		en = i.addCallEvent(ecc, ContAddr, MethodName, Args)
-	}
-
-	rMethod, err := i.methodByName(cont, ContAddr, MethodName)
-	if err != nil {
-		return nil, err
-	}
-
-	in, err := ContractInputsConv(Args, rMethod)
-	if err != nil {
-		return nil, err
-	}
-	in = append([]reflect.Value{reflect.ValueOf(ecc)}, in...)
-
-	sn := ecc.ctx.Snapshot()
-
-	vs, err := func() (vs []reflect.Value, err error) {
-		defer func() {
-			v := recover()
-			if v != nil {
-				fmt.Println(v)
-				if MethodName == "ContractInvoke" && len(Args) > 0 {
-					MethodName = fmt.Sprintf("ci %v", Args[0])
-				}
-				err = fmt.Errorf("occur error call method(%v) of contract(%v) message: %v", MethodName, ContAddr.String(), v)
+		var is interface{} = cont
+		if _, ok := is.(InvokeableContract); ok &&
+			(MethodName != "InitContract" &&
+				MethodName != "IsUpdateable" &&
+				MethodName != "Update" &&
+				MethodName != "ContractInvoke" &&
+				MethodName != "SetOwner") {
+			Args = []interface{}{
+				MethodName,
+				Args,
 			}
-		}()
-		return rMethod.Call(in), nil
-	}()
-	if err != nil {
-		return nil, err
-	}
-
-	mtype := rMethod.Type()
-	params, resultsWithoutError, err := i.getResults(mtype, vs)
-	if err != nil {
-		ecc.ctx.Revert(sn)
-	}
-	ecc.ctx.Commit(sn)
-
-	if i.saveEvent {
-		_err := i.insertResultEvent(en, resultsWithoutError, err)
-		if _err != nil {
-			return nil, _err
+			MethodName = "ContractInvoke"
+		} else {
+			MethodName = strings.ToUpper(string(MethodName[0])) + MethodName[1:]
 		}
-	}
 
-	return params, err
+		var gasIndex int
+		if i.saveEvent {
+			en = i.addCallEvent(ecc, ContAddr, MethodName, Args)
+			gasIndex = i.addGasHistory()
+		}
+
+		rMethod, err := i.methodByName(cont, ContAddr, MethodName)
+		if err != nil {
+			return nil, err
+		}
+
+		in, err := ContractInputsConv(Args, rMethod)
+		if err != nil {
+			return nil, err
+		}
+		in = append([]reflect.Value{reflect.ValueOf(ecc)}, in...)
+
+		sn := ecc.ctx.Snapshot()
+		s := ecc.ctx.GetPCSize()
+
+		vs, err := func() (vs []reflect.Value, err error) {
+			defer func() {
+				v := recover()
+				if v != nil {
+					fmt.Println(v)
+					if MethodName == "ContractInvoke" && len(Args) > 0 {
+						MethodName = fmt.Sprintf("ci %v", Args[0])
+					}
+					err = fmt.Errorf("occur error call method(%v) of contract(%v) message: %v", MethodName, ContAddr.String(), v)
+				}
+			}()
+			return rMethod.Call(in), nil
+		}()
+		if err != nil {
+			return nil, err
+		}
+
+		useGas := ecc.ctx.GetPCSize() - s
+		mtype := rMethod.Type()
+		params, resultsWithoutError, err := i.getResults(mtype, vs)
+		if err != nil {
+			ecc.ctx.Revert(sn)
+		}
+		ecc.ctx.Commit(sn)
+
+		if i.saveEvent {
+			_err := i.insertResultEvent(en, resultsWithoutError, err)
+			if _err != nil {
+				return nil, _err
+			}
+			i.gasHistory[gasIndex] += useGas
+		}
+
+		return params, err
+	} else {
+		//ecc := i.currentContractContext(Cc, ContAddr)
+		statedb := NewStateDB(Cc.ctx)
+		if !statedb.IsEvmContract(ContAddr) {
+			return nil, ErrNotExistContract
+		}
+		cMethodName := strings.ToLower(MethodName[:1]) + MethodName[1:]
+		// sig, ok := funcSigMap[MethodName]
+		// if !ok {
+		// 	return nil, ErrInvalidContractMethod
+		// }
+		// //fmt.Println(sig)
+		// args, err := pack(Args)
+		// if err != nil {
+		// 	return nil, ErrInvalidArguments
+		// }
+
+		// data := append(sig, args...)
+		// //fmt.Println(data)
+
+		cArgs := make([]interface{}, len(Args))
+		copy(cArgs, Args)
+		switch cMethodName {
+		case "burn":
+			cArgs[0] = cArgs[0].(*amount.Amount).Int
+		case "approve", "transfer", "mint", "burnFrom":
+			cArgs[1] = cArgs[1].(*amount.Amount).Int
+		case "transferFrom":
+			cArgs[2] = cArgs[2].(*amount.Amount).Int
+		}
+
+		data, err := erc20Abi.Pack(cMethodName, cArgs...)
+		if err != nil {
+			return nil, err
+		}
+
+		result, _, err := Cc.EvmCall(vm.AccountRef(Cc.From()), ContAddr, data)
+		if err != nil {
+			return nil, err
+		}
+
+		ret := []interface{}{}
+		if result != nil {
+			ret, err = erc20Abi.Unpack(cMethodName, result)
+			if err != nil {
+				return nil, err
+			}
+
+			switch cMethodName {
+			case "decimals":
+				ret[0] = big.NewInt(int64(ret[0].(uint8)))
+			case "totalSupply":
+				ret[0] = &amount.Amount{Int: ret[0].(*big.Int)}
+			case "balanceOf":
+				ret[0] = &amount.Amount{Int: ret[0].(*big.Int)}
+			case "allowance":
+				ret[0] = &amount.Amount{Int: ret[0].(*big.Int)}
+			}
+		}
+
+		if i.saveEvent {
+			en := i.addCallEvent(Cc, ContAddr, MethodName, Args)
+			//gasIndex = i.addGasHistory()
+
+			_err := i.insertResultEvent(en, ret, err)
+			if _err != nil {
+				return nil, _err
+			}
+			//i.gasHistory[gasIndex] += useGas
+		}
+
+		return ret, nil
+	}
 }
 
 func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Value, error) {
@@ -403,6 +530,10 @@ func (i *interactor) EventList() []*Event {
 	return i.eventList
 }
 
+func (i *interactor) AddEvent(en *Event) {
+	i.eventList = append(i.eventList, en)
+}
+
 func (i *interactor) getResults(mType reflect.Type, vs []reflect.Value) (params []interface{}, result []interface{}, err error) {
 	params = []interface{}{}
 	result = []interface{}{}
@@ -418,6 +549,20 @@ func (i *interactor) getResults(mType reflect.Type, vs []reflect.Value) (params 
 		result = append(result, vi)
 	}
 	return
+}
+
+func (i *interactor) addGasHistory() (count int) {
+	count = len(i.gasHistory)
+	if count == 0 {
+		i.gasHistory = []uint64{21000}
+	} else {
+		i.gasHistory = append(i.gasHistory, 0)
+	}
+	return count
+}
+
+func (i *interactor) GasHistory() []uint64 {
+	return i.gasHistory[:]
 }
 
 func (i *interactor) addCallEvent(Cc *ContractContext, Addr common.Address, MethodName string, Args []interface{}) *Event {
