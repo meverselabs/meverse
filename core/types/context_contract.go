@@ -114,11 +114,12 @@ func (cc *ContractContext) IsContract(addr common.Address) bool {
 	return cc.ctx.Top().IsContract(addr)
 }
 
-// EvmCall call evm contract
-func (cc *ContractContext) EvmCall(caller vm.ContractRef, to common.Address, input []byte) (ret []byte, leftOverGas uint64, err error) {
+// EvmCall execute evm.Call function and returns result, usedGas, error
+func (cc *ContractContext) EvmCall(caller vm.ContractRef, to common.Address, input []byte) ([]byte, uint64, error) {
 	statedb := NewStateDB(cc.ctx)
 	evm := defaultevm.DefaultEVM(statedb)
 
 	inputGas := uint64(math.MaxUint64)
-	return evm.Call(caller, to, input, inputGas, big.NewInt(0))
+	ret, leftOverGas, err := evm.Call(caller, to, input, inputGas, big.NewInt(0))
+	return ret, inputGas - leftOverGas, err
 }

@@ -1,4 +1,4 @@
-package test2
+package test
 
 import (
 	"encoding/hex"
@@ -9,9 +9,6 @@ import (
 	"os"
 	"strings"
 	"time"
-
-	// etypes "github.com/ethereum/go-ethereum/core/types"
-	// mtypes "github.com/meverselabs/meverse/ethereum/core/types"
 
 	etypes "github.com/ethereum/go-ethereum/core/types"
 	mtypes "github.com/meverselabs/meverse/ethereum/core/types"
@@ -25,10 +22,11 @@ import (
 	"github.com/meverselabs/meverse/contract/exchange/factory"
 	"github.com/meverselabs/meverse/contract/exchange/router"
 	"github.com/meverselabs/meverse/contract/exchange/trade"
+
+	"github.com/meverselabs/meverse/contract/exchange/whitelist"
 	"github.com/meverselabs/meverse/contract/formulator"
 	"github.com/meverselabs/meverse/contract/gateway"
 	"github.com/meverselabs/meverse/contract/token"
-	"github.com/meverselabs/meverse/contract/whitelist"
 	"github.com/meverselabs/meverse/core/chain"
 	"github.com/meverselabs/meverse/core/chain/admin"
 	"github.com/meverselabs/meverse/core/piledb"
@@ -46,70 +44,56 @@ var (
 
 	ClassMap = map[string]uint64{}
 
-	_MininumLiquidity = amount.NewAmount(0, trade.MINIMUM_LIQUIDITY)
-	_SupplyTokens     = []*amount.Amount{amount.NewAmount(500000, 0), amount.NewAmount(1000000, 0)}
+	_BaseAmount = int64(1000000)
+
+	_Fee30     = uint64(30000000)   // 30bp
+	_Fee40     = uint64(40000000)   // 40bp
+	_Fee5000   = uint64(5000000000) // 50%
+	_AdminFee6 = uint64(1666666667) // 1/6 = uint64(1666666667)
+
+	_MaxIter = 10
+	_Step    = uint64(1000)
 )
-
-// ToAmount converts big.Int to amount.Amount
-func ToAmount(b *big.Int) *amount.Amount {
-	return &amount.Amount{Int: b}
-}
-
-// Sub : sub
-func Sub(a, b *big.Int) *big.Int {
-	return big.NewInt(0).Sub(a, b)
-}
-
-// Exp : exponential
-func Exp(a, b *big.Int) *big.Int {
-	return big.NewInt(0).Exp(a, b, nil)
-}
 
 // removeChainData removes data directory which includes data files
 func removeChainData(path string) error {
-	// if _, err := os.Stat("/mnt/ramdisk"); !os.IsNotExist(err) {
-	// 	dir = "/mnt/ramdisk/" + dir
-	// }
-
 	return os.RemoveAll(path)
 }
 
 // prepare return testBlockchain and results from Genesis
-func prepare(path string, deletePath bool, chainID *big.Int, version uint16, chainAdmin *common.Address, args []interface{}, genesisInitFunc func(*types.Context, []interface{}) ([]interface{}, error), cfg *initContextInfo) (*testBlockChain, []interface{}, error) {
+func prepare(path string, deletePath bool, chainID *big.Int, version uint16, chainAdmin *common.Address, args []interface{}, genesisInitFunc func(*types.Context, []interface{}) ([]interface{}, error), cfg *initContextInfo) (*testBlockChain, []interface{}) {
 
 	genesis := types.NewEmptyContext()
-	//classMap :=
 	RegisterContracts()
 
 	ret, err := genesisInitFunc(genesis, args)
 	if err != nil {
-		return nil, nil, err
+		panic(err)
 	}
 
 	tb, err := NewTestBlockChain(path, deletePath, chainID, version, genesis, chainAdmin, cfg)
 	if err != nil {
-		//removeChainData(path)
-		return nil, nil, err
+		removeChainData(path)
+		panic(err)
 	}
 
-	return tb, ret, nil
+	return tb, ret
 }
 
-// stringToKey converts private key string to Key struct
-func stringToKey(chainID *big.Int, pkStr string) (*key.MemoryKey, error) {
-	if strings.HasPrefix(pkStr, "0x") {
-		pkStr = pkStr[2:]
-	}
-	h, err := hex.DecodeString(pkStr)
-	if err != nil {
-		return nil, err
-	}
-	return key.NewMemoryKeyFromBytes(chainID, h)
-}
-
-// getSigners gets signers which are same with hardhat node users
-// in order to test in tandem
+// getSigners gets signers which are same with hardhat node users in order to test in tandem
 func getSingers(chainID *big.Int) ([]key.Key, error) {
+
+	// stringToKey converts private key string to Key struct
+	stringToKey := func(chainID *big.Int, pkStr string) (*key.MemoryKey, error) {
+		if strings.HasPrefix(pkStr, "0x") {
+			pkStr = pkStr[2:]
+		}
+		h, err := hex.DecodeString(pkStr)
+		if err != nil {
+			return nil, err
+		}
+		return key.NewMemoryKeyFromBytes(chainID, h)
+	}
 
 	keyStrs := []string{
 		"0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", //0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
@@ -130,22 +114,8 @@ func getSingers(chainID *big.Int) ([]key.Key, error) {
 	return userKeys, nil
 }
 
-// // GetCC gets ContractContext from Contex with given contract address and user address
-// func GetCC(ctx *types.Context, contAddr, user common.Address) (*types.ContractContext, error) {
-
-// 	cont, err := ctx.Contract(contAddr)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	cc := ctx.ContractContext(cont, user)
-// 	intr := types.NewInteractor(ctx, cont, cc, "000000000000", false)
-// 	cc.Exec = intr.Exec
-
-// 	return cc, nil
-// }
-
 // GetCC gets ContractContext from Contex with given contract address and user address
-func GetCC(ctx *types.Context, contAddr, user common.Address) (*types.ContractContext, error) {
+func getCC(ctx *types.Context, contAddr, user common.Address) (*types.ContractContext, error) {
 
 	if cont, err := ctx.Contract(contAddr); err == nil {
 		cc := ctx.ContractContext(cont, user)
@@ -166,178 +136,58 @@ func GetCC(ctx *types.Context, contAddr, user common.Address) (*types.ContractCo
 	}
 }
 
-// Exec calls ContractContext.Exec from Context
-func Exec(ctx *types.Context, user, contAddr common.Address, methodName string, args []interface{}) ([]interface{}, error) {
-	cc, err := GetCC(ctx, contAddr, user)
-	if err != nil {
-		return nil, err
-	}
-	is, err := cc.Exec(cc, contAddr, methodName, args)
-	return is, err
-}
-
-// TokenApprove executes token Approve transaction and connect to the chain
-func TokenApprove(tb *testBlockChain, senderKey key.Key, token, spender common.Address, amt *amount.Amount) error {
-	return addTxAndBlock(tb, senderKey, token, "Approve", spender, amt)
-}
-
-// TokenTransfer executes token Transfer transaction and connect to the chain
-func TokenTransfer(tb *testBlockChain, senderKey key.Key, token, to common.Address, amt *amount.Amount) error {
-	return addTxAndBlock(tb, senderKey, token, "Transfer", to, amt)
-}
-
-// TokenTransferFrom executes token TransferFrom transaction and connect to the chain
-func TokenTransferFrom(tb *testBlockChain, senderKey key.Key, token, from, to common.Address, amt *amount.Amount) error {
-	return addTxAndBlock(tb, senderKey, token, "TransferFrom", from, to, amt)
-}
-
-// TokenIncreaeAllowance executes token IncreaeAllowance transaction and connect to the chain
-func TokenIncreaseAllowance(tb *testBlockChain, senderKey key.Key, token, spender common.Address, addedValue *amount.Amount) error {
-	return addTxAndBlock(tb, senderKey, token, "IncreaseAllowance", spender, addedValue)
-}
-
-// TokenDecreaeAllowance executes token DecreaeAllowance transaction and connect to the chain
-func TokenDecreaseAllowance(tb *testBlockChain, senderKey key.Key, token, spender common.Address, subtractedValue *amount.Amount) error {
-	return addTxAndBlock(tb, senderKey, token, "DecreaseAllowance", spender, subtractedValue)
-}
-
-// TokenSetMinter executes token SetMinter transaction and connect to the chain
-func TokenSetMinter(tb *testBlockChain, senderKey key.Key, token, to common.Address, is bool) error {
-	return addTxAndBlock(tb, senderKey, token, "SetMinter", to, is)
-}
-
-// TokenMint executes token Mint transaction and connect to the chain
-func TokenMint(tb *testBlockChain, senderKey key.Key, token, to common.Address, amt *amount.Amount) error {
-	return addTxAndBlock(tb, senderKey, token, "Mint", to, amt)
-}
-
-// TokenBurn executes token Burn transaction and connect to the chain
-func TokenBurn(tb *testBlockChain, senderKey key.Key, token common.Address, amt *amount.Amount) error {
-	return addTxAndBlock(tb, senderKey, token, "Burn", amt)
-}
-
-// TokenBurnFrom executes token BurnFrom transaction and connect to the chain
-func TokenBurnFrom(tb *testBlockChain, senderKey key.Key, token, addr common.Address, amt *amount.Amount) error {
-	return addTxAndBlock(tb, senderKey, token, "BurnFrom", addr, amt)
-}
-
-// addTx executes matched-tx and connect to the chain
-func addTxAndBlock(tb *testBlockChain, senderKey key.Key, cont common.Address, method string, args ...any) error {
-	provider := tb.chain.Provider()
-
-	txws := &txWithSigner{&types.Transaction{
-		ChainID:     provider.ChainID(),
-		Timestamp:   tb.nextTimestamp(),
-		Seq:         provider.AddrSeq(senderKey.PublicKey().Address()),
-		To:          cont,
-		Method:      method,
-		GasPrice:    big.NewInt(10000000),
-		UseSeq:      true,
-		IsEtherType: false,
-		VmType:      types.Go,
-		Args:        bin.TypeWriteAll(args...),
-	}, senderKey}
-	// fmt.Println("tx", txws.tx.Args)
-
-	// for argNum, arg := range args {
-	// 	fmt.Println(argNum, arg)
-	// }
-
-	_, err := tb.addBlock([]*txWithSigner{txws})
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// TokenBurnFrom executes token BurnFrom transaction and connect to the chain
-func UniAddLiquidity(tb *testBlockChain, senderKey key.Key, router, tokenA, tokenB common.Address, amountADesired, amountBDesired, amountAMin, amountBMin *amount.Amount) error {
-	return addTxAndBlock(tb, senderKey, router, "UniAddLiquidity", tokenA, tokenB, amountADesired, amountBDesired, amountAMin, amountBMin)
-}
-
+// tokenTotalSupply return token's totalSupply method
 func tokenTotalSupply(ctx *types.Context, token common.Address) *amount.Amount {
-	cc, err := GetCC(ctx, token, AddressZero)
+	cc, err := getCC(ctx, token, AddressZero)
 	if err != nil {
 		panic(err)
 	}
 
-	result, err := ccTokenTotalSupply(cc, token)
-	if err != nil {
-		panic(err)
-	}
-	return ToAmount(result)
-}
-func tokenBalanceOf(ctx *types.Context, token, from common.Address) *amount.Amount {
-	cc, err := GetCC(ctx, token, AddressZero)
-	if err != nil {
-		panic(err)
-	}
-
-	result, err := ccTokenBalanceOf(cc, token, from)
-	if err != nil {
-		panic(err)
-	}
-	return ToAmount(result)
-}
-func tokenAllowance(ctx *types.Context, token, owner, spender common.Address) *amount.Amount {
-	cc, err := GetCC(ctx, token, AddressZero)
-	if err != nil {
-		panic(err)
-	}
-	result, err := ccTokenAllowance(cc, token, owner, spender)
-	if err != nil {
-		panic(err)
-	}
-	return ToAmount(result)
-}
-
-func tokenIsMinter(ctx *types.Context, token, minter common.Address) bool {
-	cc, err := GetCC(ctx, token, AddressZero)
-	if err != nil {
-		panic(err)
-	}
-	result, err := ccTokenIsMinter(cc, token, minter)
-	if err != nil {
-		panic(err)
-	}
-	return result
-}
-
-// token.TotalSupply()
-func ccTokenTotalSupply(cc *types.ContractContext, token common.Address) (*big.Int, error) {
 	is, err := cc.Exec(cc, token, "TotalSupply", []interface{}{})
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	return is[0].(*amount.Amount).Int, nil
+	return is[0].(*amount.Amount)
 }
 
-// token.BalanceOf(addr)
-func ccTokenBalanceOf(cc *types.ContractContext, token, from common.Address) (*big.Int, error) {
+// tokenBalanceOf return token's balanceOf method
+func tokenBalanceOf(ctx *types.Context, token, from common.Address) *amount.Amount {
+	cc, err := getCC(ctx, token, AddressZero)
+	if err != nil {
+		panic(err)
+	}
+
 	is, err := cc.Exec(cc, token, "BalanceOf", []interface{}{from})
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	return is[0].(*amount.Amount).Int, nil
+	return is[0].(*amount.Amount)
 }
 
-// token.Allowance(owner, spender)
-func ccTokenAllowance(cc *types.ContractContext, token, owner, spender common.Address) (*big.Int, error) {
+// tokenAllowance return token's allowance method
+func tokenAllowance(ctx *types.Context, token, owner, spender common.Address) *amount.Amount {
+	cc, err := getCC(ctx, token, AddressZero)
+	if err != nil {
+		panic(err)
+	}
 	is, err := cc.Exec(cc, token, "Allowance", []interface{}{owner, spender})
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	return is[0].(*amount.Amount).Int, nil
+	return is[0].(*amount.Amount)
 }
 
-// token.Allowance(owner, spender)
-func ccTokenIsMinter(cc *types.ContractContext, token, minter common.Address) (bool, error) {
+// tokenIsMinter return token's isMinter method
+func tokenIsMinter(ctx *types.Context, token, minter common.Address) bool {
+	cc, err := getCC(ctx, token, AddressZero)
+	if err != nil {
+		panic(err)
+	}
 	is, err := cc.Exec(cc, token, "IsMinter", []interface{}{minter})
 	if err != nil {
-		return false, err
+		panic(err)
 	}
-	return is[0].(bool), nil
+	return is[0].(bool)
 }
 
 // registerContractClass register class item
@@ -365,14 +215,14 @@ func RegisterContracts() {
 
 // testBlockChain is blockchain mock for testing
 type testBlockChain struct {
-	chainID         *big.Int // hardhat 1337
-	version         uint16
-	path            string // 화일저장 디렉토리
-	chain           *chain.Chain
-	obKeys          []key.Key
-	ctx             *types.Context
-	frKeyMap        map[common.Address]key.Key
-	stepMiliSeconds uint64 // chain default forward time for each block : units - miliseconds
+	chainID  *big.Int // hardhat 1337
+	version  uint16
+	path     string // 화일저장 디렉토리
+	chain    *chain.Chain
+	obKeys   []key.Key
+	ctx      *types.Context
+	frKeyMap map[common.Address]key.Key
+	step     uint64 // chain default forward time for each block : units - miliseconds
 }
 
 // initContextInfo struct is parameters for meverse chain with non-zero initheight
@@ -410,21 +260,30 @@ func NewTestBlockChain(path string, deletePath bool, chainID *big.Int, version u
 		return nil, err
 	}
 
+	// observer : 5개
+	obStrs := []string{
+		"b000000000000000000000000000000000000000000000000000000000000001",
+		"b000000000000000000000000000000000000000000000000000000000000002",
+		"b000000000000000000000000000000000000000000000000000000000000003",
+		"b000000000000000000000000000000000000000000000000000000000000004",
+		"b000000000000000000000000000000000000000000000000000000000000005",
+	}
 	obKeys := []key.Key{}
 	ObserverKeys := []common.PublicKey{}
-	for i := 0; i < 5; i++ {
-		pk, err := key.NewMemoryKeyFromBytes(chainID, []byte{1, 1, byte(i), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
-		if err != nil {
+	for _, v := range obStrs {
+		if bs, err := hex.DecodeString(v); err != nil {
 			return nil, err
+		} else if Key, err := key.NewMemoryKeyFromBytes(chainID, bs); err != nil {
+			return nil, err
+		} else {
+			obKeys = append(obKeys, Key)
+			ObserverKeys = append(ObserverKeys, Key.PublicKey())
 		}
-		obKeys = append(obKeys, pk)
-
-		ObserverKeys = append(ObserverKeys, pk.PublicKey())
 	}
 
 	// formulator : 1개
 	frStrs := []string{
-		"b000000000000000000000000000000000000000000000000000000000000010",
+		"a000000000000000000000000000000000000000000000000000000000000001",
 	}
 	frkeys := []key.Key{}
 	frKeyMap := map[common.Address]key.Key{}
@@ -455,8 +314,6 @@ func NewTestBlockChain(path string, deletePath bool, chainID *big.Int, version u
 			return nil, err
 		}
 	} else {
-		// RegisterContracts()
-		// log.Println(cfg)
 		if err := cn.InitWith(hash.HexToHash(cfg.InitGenesisHash), hash.HexToHash(cfg.InitHash), cfg.InitHeight, cfg.InitTimestamp); err != nil {
 			return nil, err
 		}
@@ -475,14 +332,14 @@ func NewTestBlockChain(path string, deletePath bool, chainID *big.Int, version u
 	}
 
 	tb := &testBlockChain{
-		path:            path,
-		chainID:         chainID,
-		version:         version,
-		obKeys:          obKeys,
-		frKeyMap:        frKeyMap,
-		chain:           cn,
-		ctx:             cn.NewContext(),
-		stepMiliSeconds: uint64(1000),
+		path:     path,
+		chainID:  chainID,
+		version:  version,
+		obKeys:   obKeys,
+		frKeyMap: frKeyMap,
+		chain:    cn,
+		ctx:      cn.NewContext(),
+		step:     _Step,
 	}
 
 	return tb, nil
@@ -493,22 +350,30 @@ func (tb *testBlockChain) newContext() *types.Context {
 	return tb.chain.NewContext()
 }
 
+// nextTimestamp forwards blockchain time (tx, block)
 func (tb *testBlockChain) nextTimestamp() uint64 {
 	timestamp := tb.chain.Provider().LastTimestamp()
 	if timestamp == 0 {
 		timestamp = uint64(time.Now().UnixNano())
 	}
-	return timestamp + tb.stepMiliSeconds*uint64(time.Millisecond)
+	return timestamp + tb.step*uint64(time.Millisecond)
 }
 
-// fmt.Println("rlp", "0x"+hex.EncodeToString(bs))
+// sleep forwards block time by amount sleeptime - miliseconds
+func (tb *testBlockChain) sleep(sleepTime uint64) {
+	tb.step = sleepTime
+	_, err := tb.addBlock(nil)
+	if err != nil {
+		panic(err)
+	}
+	tb.step = _Step
+}
 
 // addBlock adds a block containing txs
 func (tb *testBlockChain) addBlock(txs []*txWithSigner) (*types.Block, error) {
 	TimeoutCount := uint32(0)
 	Generator, err := tb.chain.TopGenerator(TimeoutCount)
 
-	//bc := chain.NewBlockCreator(tb.chain, tb.newContext(), Generator, TimeoutCount, uint64(time.Now().UnixNano()), 0)
 	bc := chain.NewBlockCreator(tb.chain, tb.newContext(), Generator, TimeoutCount, tb.nextTimestamp(), 0)
 	var receipts = types.Receipts{}
 	for _, tx := range txs {
@@ -529,7 +394,6 @@ func (tb *testBlockChain) addBlock(txs []*txWithSigner) (*types.Block, error) {
 	}
 
 	HeaderHash := bin.MustWriterToHash(&b.Header)
-	//LastHash := HeaderHash
 
 	pk := tb.frKeyMap[Generator]
 	if pk == nil {
@@ -570,6 +434,96 @@ func (tb *testBlockChain) addBlock(txs []*txWithSigner) (*types.Block, error) {
 	return b, nil
 }
 
+// view calls ContractContext.Exec from Context
+func (tb *testBlockChain) view(contAddr common.Address, methodName string, args ...any) ([]interface{}, error) {
+	cc, err := getCC(tb.ctx, contAddr, AddressZero)
+	if err != nil {
+		panic(err)
+	}
+
+	return cc.Exec(cc, contAddr, methodName, args)
+}
+
+// view calls ContractContext.Exec from Context
+func (tb *testBlockChain) viewFrom(from common.Address, contAddr common.Address, methodName string, args ...any) ([]interface{}, error) {
+	cc, err := getCC(tb.ctx, contAddr, from)
+	if err != nil {
+		panic(err)
+	}
+
+	return cc.Exec(cc, contAddr, methodName, args)
+}
+
+// amountView return first amount type result
+func (tb *testBlockChain) viewAmount(contAddr common.Address, methodName string, args ...any) *amount.Amount {
+
+	is, err := tb.view(contAddr, methodName, args...)
+	if err != nil {
+		panic(err)
+	}
+	return is[0].(*amount.Amount)
+}
+
+// amountView return first amount type result
+func (tb *testBlockChain) viewAddress(contAddr common.Address, methodName string, args ...any) common.Address {
+
+	is, err := tb.view(contAddr, methodName, args...)
+	if err != nil {
+		panic(err)
+	}
+	return is[0].(common.Address)
+}
+
+// txAddBlock executes matched-tx and connect block to the chain
+func (tb *testBlockChain) txCall(senderKey key.Key, cont common.Address, method string, args ...any) (*types.Block, error) {
+	provider := tb.chain.Provider()
+
+	txws := &txWithSigner{&types.Transaction{
+		ChainID:     provider.ChainID(),
+		Timestamp:   tb.nextTimestamp(),
+		Seq:         provider.AddrSeq(senderKey.PublicKey().Address()),
+		To:          cont,
+		Method:      method,
+		GasPrice:    big.NewInt(10000000),
+		UseSeq:      true,
+		IsEtherType: false,
+		VmType:      types.Go,
+		Args:        bin.TypeWriteAll(args...),
+	}, senderKey}
+
+	b, err := tb.addBlock([]*txWithSigner{txws})
+	if err != nil {
+		return nil, err
+	}
+
+	return b, nil
+}
+
+// txCall return results after txCall
+func (tb *testBlockChain) call(senderKey key.Key, cont common.Address, method string, args ...any) ([]interface{}, error) {
+	b, err := tb.txCall(senderKey, cont, method, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return getResults(b)
+}
+
+// getResults return block's results
+func getResults(b *types.Block) ([]interface{}, error) {
+	for i := 0; i < len(b.Body.Events); i++ {
+		en := b.Body.Events[i]
+		if en.Type == types.EventTagTxMsg {
+			ins, err := bin.TypeReadAll(en.Result, 1)
+			if err != nil {
+				return nil, err
+			}
+			return ins, nil
+		}
+	}
+	return nil, nil
+}
+
 // Close calls chain.Close()
 func (tb *testBlockChain) Close() {
 	tb.chain.Close()
@@ -577,28 +531,21 @@ func (tb *testBlockChain) Close() {
 
 // mevInitialize deploy mev Token, mint to sigers and register mainToken as mev
 func mevInitialize(ctx *types.Context, args []interface{}) ([]interface{}, error) {
-	//alice(admin), bob, charlie
+	//alice(admin)
 	alice, ok := args[0].(common.Address)
 	if !ok {
 		return nil, ErrArgument
 	}
-	bob, ok := args[1].(common.Address)
-	if !ok {
-		return nil, ErrArgument
-	}
-	charlie, ok := args[2].(common.Address)
-	if !ok {
-		return nil, ErrArgument
+
+	initialSupplyMap := map[common.Address]*amount.Amount{}
+	for _, arg := range args {
+		initialSupplyMap[arg.(common.Address)] = amount.NewAmount(uint64(_BaseAmount), 0)
 	}
 
 	arg := &token.TokenContractConstruction{
-		Name:   "MEVerse",
-		Symbol: "MEV",
-		InitialSupplyMap: map[common.Address]*amount.Amount{
-			alice:   amount.NewAmount(100000000, 0),
-			bob:     amount.NewAmount(100000000, 0),
-			charlie: amount.NewAmount(100000000, 0),
-		},
+		Name:             "MEVerse",
+		Symbol:           "MEV",
+		InitialSupplyMap: initialSupplyMap,
 	}
 	bs, _, _ := bin.WriterToBytes(arg)
 	v, err := ctx.DeployContract(alice, ClassMap["Token"], bs)
@@ -618,7 +565,6 @@ func erc20TokenWrapperCreationTx(tb *testBlockChain, owner, erc20Token common.Ad
 
 	erc20WrapperArgs := &erc20wrapper.ERC20WrapperContractConstruction{Erc20Token: erc20Token}
 	bs, _, _ := bin.WriterToBytes(erc20WrapperArgs)
-
 	arg := chain.DeployContractData{
 		Owner:   owner,
 		ClassID: ClassMap["Erc20Wrapper"],
@@ -626,7 +572,6 @@ func erc20TokenWrapperCreationTx(tb *testBlockChain, owner, erc20Token common.Ad
 	}
 
 	bs2, _, _ := bin.WriterToBytes(&arg)
-
 	tx := &types.Transaction{
 		ChainID:     tb.chainID,
 		Timestamp:   tb.nextTimestamp(),
@@ -638,7 +583,6 @@ func erc20TokenWrapperCreationTx(tb *testBlockChain, owner, erc20Token common.Ad
 		VmType:      types.Go,
 		Args:        bs2,
 	}
-
 	return tx, nil
 }
 
@@ -668,26 +612,16 @@ func tokenCreationTx(tb *testBlockChain, owner common.Address, name, symbol stri
 		VmType:      types.Go,
 		Args:        bs2,
 	}
-
 	return tx, nil
 }
 
 // dexInitialize deploy dex contracts and mint neccesary tokens to sigers
 func dexInitialize(genesis *types.Context, args []interface{}) ([]interface{}, error) {
-
 	//alice(admin), bob, charlie
 	alice, ok := args[0].(common.Address)
 	if !ok {
 		return nil, ErrArgument
 	}
-	// bob, ok := args[1].(common.Address)
-	// if !ok {
-	// 	return nil, ErrArgument
-	// }
-	// charlie, ok := args[2].(common.Address)
-	// if !ok {
-	// 	return nil, ErrArgument
-	// }
 
 	// factory
 	factoryConstrunction := &factory.FactoryContractConstruction{Owner: alice}
@@ -734,14 +668,14 @@ func dexInitialize(genesis *types.Context, args []interface{}) ([]interface{}, e
 
 // Erc20TokenContractCreation deploy Erc20Token contract with initialSupply(= 1 ether)
 // source code : evm-client/contracts/ERC20Token.sol
-func Erc20TokenContractCreationTx(tb *testBlockChain, txSignerKey key.Key, initialSupply *amount.Amount) (*types.Transaction, error) {
-	var abiJson map[string]interface{}
+func Erc20TokenContractCreationTx(tb *testBlockChain, senderKey key.Key, initialSupply *amount.Amount) (*types.Transaction, error) {
 
 	path, _ := os.Getwd() // /home/khzhao/prj/meverse/fleta2.0/exchange2/contract/exchange/ztest2
 	b, err := os.ReadFile(path + "/ERC20Token.json")
 	if err != nil {
 		return nil, ErrFileRead
 	}
+	var abiJson map[string]interface{}
 	if err := json.Unmarshal(b, &abiJson); err != nil {
 		return nil, err
 	}
@@ -756,8 +690,8 @@ func Erc20TokenContractCreationTx(tb *testBlockChain, txSignerKey key.Key, initi
 
 	signer := mtypes.MakeSigner(tb.chainID, provider.Height())
 
-	txSigner := txSignerKey.PublicKey().Address()
-	nonce := tb.chain.Provider().AddrSeq(txSigner)
+	txSigner := senderKey.PublicKey().Address()
+	nonce := provider.AddrSeq(txSigner)
 	etx := etypes.NewTx(&etypes.DynamicFeeTx{
 		ChainID:   tb.chainID,
 		Nonce:     nonce,
@@ -768,11 +702,7 @@ func Erc20TokenContractCreationTx(tb *testBlockChain, txSignerKey key.Key, initi
 		Value:     big.NewInt(0),
 	})
 
-	// fmt.Println("data length", len(data))
-	// fmt.Println("data", data)
-	// fmt.Println("private Key", txSignerKey.PrivateKey().D.Bytes())
-
-	signedTx, err := etypes.SignTx(etx, signer, txSignerKey.PrivateKey())
+	signedTx, err := etypes.SignTx(etx, signer, senderKey.PrivateKey())
 	if err != nil {
 		return nil, err
 	}
@@ -780,13 +710,10 @@ func Erc20TokenContractCreationTx(tb *testBlockChain, txSignerKey key.Key, initi
 	if err != nil {
 		return nil, err
 	}
-
-	// fmt.Println("rlp", "0x"+hex.EncodeToString(bs))
-
 	tx := &types.Transaction{
 		ChainID:     tb.chainID,
 		Timestamp:   tb.nextTimestamp(),
-		Seq:         tb.ctx.AddrSeq(txSignerKey.PublicKey().Address()),
+		Seq:         tb.ctx.AddrSeq(senderKey.PublicKey().Address()),
 		To:          AddressZero,
 		Method:      "",
 		GasPrice:    big.NewInt(748488682),
@@ -795,7 +722,6 @@ func Erc20TokenContractCreationTx(tb *testBlockChain, txSignerKey key.Key, initi
 		VmType:      types.Evm,
 		Args:        bs,
 	}
-
 	return tx, nil
 }
 
@@ -828,7 +754,11 @@ func factoryDeploy(tb *testBlockChain, deployerKey key.Key) (*common.Address, er
 	if err != nil {
 		return nil, err
 	}
-	factory := common.BytesToAddress(b.Body.Events[0].Result)
+	ret, err := getResults(b)
+	if err != nil {
+		return nil, err
+	}
+	factory := ret[0].(common.Address)
 
 	return &factory, nil
 }
@@ -858,8 +788,11 @@ func routerDeploy(tb *testBlockChain, deployerKey key.Key, factory *common.Addre
 	if err != nil {
 		return nil, err
 	}
-	router := common.BytesToAddress(b.Body.Events[0].Result)
-
+	ret, err := getResults(b)
+	if err != nil {
+		return nil, err
+	}
+	router := ret[0].(common.Address)
 	return &router, nil
 }
 
@@ -891,43 +824,55 @@ func whiteListDeploy(tb *testBlockChain, deployerKey key.Key) (*common.Address, 
 	if err != nil {
 		return nil, err
 	}
-	whiteList := common.BytesToAddress(b.Body.Events[0].Result)
-
+	ret, err := getResults(b)
+	if err != nil {
+		return nil, err
+	}
+	whiteList := ret[0].(common.Address)
 	return &whiteList, nil
+}
+
+// erc20WrapperCreate create erc20Token contract and erc20TokenWrapper contract
+func erc20TokenDeploy(tb *testBlockChain, deployerKey key.Key, initialSupply *amount.Amount) (*common.Address, error) {
+
+	tx, err := Erc20TokenContractCreationTx(tb, deployerKey, initialSupply)
+	if err != nil {
+		return nil, err
+	}
+	_, err = tb.addBlock([]*txWithSigner{{tx, deployerKey}})
+	if err != nil {
+		return nil, err
+	}
+	provider := tb.chain.Provider()
+	receipts, err := provider.Receipts(provider.Height())
+	if err != nil {
+		return nil, err
+	}
+	receipt := receipts[0]
+	erc20Token := receipt.ContractAddress
+	return &erc20Token, nil
 }
 
 // erc20WrapperCreate create erc20Token contract and erc20TokenWrapper contract
 func erc20WrapperDeploy(tb *testBlockChain, deployerKey key.Key, initialSupply *amount.Amount) (*common.Address, *common.Address, error) {
 
-	// tx1, block1 : deploy ERC20Token
-	tx1, err := Erc20TokenContractCreationTx(tb, deployerKey, initialSupply)
-	if err != nil {
-		return nil, nil, err
-	}
-	_, err = tb.addBlock([]*txWithSigner{{tx1, deployerKey}})
-	if err != nil {
-		return nil, nil, err
-	}
-	provider := tb.chain.Provider()
-	receipts, err := provider.Receipts(provider.Height())
-	if err != nil {
-		return nil, nil, err
-	}
-	receipt := receipts[0]
-	erc20Token := receipt.ContractAddress
+	erc20Token, err := erc20TokenDeploy(tb, deployerKey, initialSupply)
 
-	// tx2, block2 : deploy Erc20TokenWrapper
-	tx2, err := erc20TokenWrapperCreationTx(tb, deployerKey.PublicKey().Address(), erc20Token)
+	tx, err := erc20TokenWrapperCreationTx(tb, deployerKey.PublicKey().Address(), *erc20Token)
 	if err != nil {
 		return nil, nil, err
 	}
-	b, err := tb.addBlock([]*txWithSigner{{tx2, deployerKey}})
-	if err != nil {
-		return nil, nil, err
-	}
-	erc20Wrapper := common.BytesToAddress(b.Body.Events[0].Result)
 
-	return &erc20Wrapper, &erc20Token, nil
+	b, err := tb.addBlock([]*txWithSigner{{tx, deployerKey}})
+	if err != nil {
+		return nil, nil, err
+	}
+	ret, err := getResults(b)
+	if err != nil {
+		return nil, nil, err
+	}
+	erc20Wrapper := ret[0].(common.Address)
+	return &erc20Wrapper, erc20Token, nil
 }
 
 // tokenCreate create Token contract
@@ -941,8 +886,11 @@ func tokenDeploy(tb *testBlockChain, deployerKey key.Key, name, symbol string) (
 	if err != nil {
 		return nil, err
 	}
-	token := common.BytesToAddress(b.Body.Events[0].Result)
-
+	ret, err := getResults(b)
+	if err != nil {
+		return nil, err
+	}
+	token := ret[0].(common.Address)
 	return &token, nil
 }
 
@@ -970,12 +918,77 @@ func pairCreate(tb *testBlockChain, senderKey key.Key, p *pairContractConstructi
 		VmType:      types.Go,
 		Args:        bin.TypeWriteAll(p.TokenA, p.TokenB, p.PayToken, p.Name, p.Symbol, p.Owner, p.Winner, p.Fee, p.AdminFee, p.WinnerFee, p.WhiteList, p.GroupId, ClassMap["UniSwap"]),
 	}
-
 	b, err := tb.addBlock([]*txWithSigner{{tx, senderKey}})
 	if err != nil {
 		return nil, err
 	}
-	pair := common.BytesToAddress(b.Body.Events[0].Result)
+	ret, err := getResults(b)
+	if err != nil {
+		return nil, err
+	}
+	pair := ret[0].(common.Address)
 
 	return &pair, nil
+}
+
+// pairCreate create Uniswap pair contract
+func swapDeploy(tb *testBlockChain, deployerKey key.Key, p *trade.StableSwapConstruction) (*common.Address, error) {
+
+	bs, _, _ := bin.WriterToBytes(p)
+	arg := chain.DeployContractData{
+		Owner:   deployerKey.PublicKey().Address(),
+		ClassID: ClassMap["StableSwap"],
+		Args:    bs,
+	}
+
+	bs2, _, _ := bin.WriterToBytes(&arg)
+	tx := &types.Transaction{
+		ChainID:     tb.chainID,
+		Timestamp:   tb.nextTimestamp(),
+		To:          AddressZero,
+		Method:      admin.ContractDeploy,
+		GasPrice:    big.NewInt(748488682),
+		UseSeq:      false,
+		IsEtherType: false,
+		VmType:      types.Go,
+		Args:        bs2,
+	}
+
+	b, err := tb.addBlock([]*txWithSigner{{tx, deployerKey}})
+	if err != nil {
+		return nil, err
+	}
+	ret, err := getResults(b)
+	if err != nil {
+		return nil, err
+	}
+	swap := ret[0].(common.Address)
+
+	return &swap, nil
+}
+
+// setFees set Uniswap pair or Stableswap swap's fees
+func setFees(tb *testBlockChain, senderKey key.Key, ex common.Address, fee, admin_fee, winner_fee uint64) {
+	delay := uint64(86400)
+	//tb.step = delay * 1000
+	_, err := tb.call(senderKey, ex, "CommitNewFee", fee, admin_fee, winner_fee, delay)
+	if err != nil {
+		panic(err)
+	}
+	//tb.step = _Step
+	tb.sleep(delay*1000 - 1000)
+	_, err = tb.call(senderKey, ex, "ApplyNewFee")
+	if err != nil {
+		panic(err)
+	}
+}
+
+func insufficientBalanceErrorCheck(err error) {
+	errString := err.Error()
+	if k := strings.Index(errString, ":"); k >= 0 {
+		errString = errString[0:k]
+	}
+	if errString != "execution reverted" && errString != "the token holding quantity is insufficient balance" {
+		panic(err)
+	}
 }

@@ -22,4 +22,5 @@ var (
 	ErrDirtyContext                 = errors.New("dirty context")
 	ErrInvalidContractMethod        = errors.New("invalid contract method")
 	ErrInvalidArguments             = errors.New("invalid contract method arguments")
+	ErrConstructorNotAllowd         = errors.New("constructor not allowd")
 )

@@ -10,10 +10,12 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/common/hash"
 	"github.com/meverselabs/meverse/ethereum/core/vm"
+	"github.com/meverselabs/meverse/service/pack"
 	"github.com/pkg/errors"
 )
 
@@ -80,8 +82,6 @@ var (
 	Bool, _    = abi.NewType("bool", "", nil)
 )
 
-// var methodInputs = map[string]string{}
-
 var methods = map[string]abi.Method{
 	"name":         abi.NewMethod("name", "name", abi.Function, "", false, false, nil, []abi.Argument{{"", String, false}}),
 	"symbol":       abi.NewMethod("symbol", "symbol", abi.Function, "", false, false, nil, []abi.Argument{{"", String, false}}),
@@ -103,22 +103,69 @@ var erc20Abi = abi.ABI{
 	Methods: methods,
 }
 
-func (i *interactor) Exec(Cc *ContractContext, ContAddr common.Address, MethodName string, Args []interface{}) ([]interface{}, error) {
+func argTransform(lMethod string, args []interface{}) []interface{} {
+	tArgs := make([]interface{}, len(args))
+	copy(tArgs, args)
+
+	switch lMethod {
+	case "burn":
+		tArgs[0] = args[0].(*amount.Amount).Int
+	case "approve", "transfer", "mint", "burnFrom":
+		tArgs[1] = args[1].(*amount.Amount).Int
+	case "transferFrom":
+		tArgs[2] = args[2].(*amount.Amount).Int
+	}
+	return tArgs
+}
+
+func resultTransform(lMethod string, ret []interface{}) []interface{} {
+	tRet := make([]interface{}, len(ret))
+	copy(tRet, ret)
+
+	switch lMethod {
+	case "decimals":
+		tRet[0] = big.NewInt(int64(ret[0].(uint8)))
+	case "totalSupply":
+		tRet[0] = &amount.Amount{Int: ret[0].(*big.Int)}
+	case "balanceOf":
+		tRet[0] = &amount.Amount{Int: ret[0].(*big.Int)}
+	case "allowance":
+		tRet[0] = &amount.Amount{Int: ret[0].(*big.Int)}
+	}
+	return tRet
+}
+
+func (i *interactor) Exec(Cc *ContractContext, ContAddr common.Address, MethodName string, Args []interface{}) (result []interface{}, err error) {
 	if i.exit {
 		return nil, errors.New("expired")
 	}
 	if MethodName == "" {
 		return nil, errors.New("method not given")
 	}
+	ecc := i.currentContractContext(Cc, ContAddr)
+	var useGas uint64
+	var enResult []interface{}
+	if i.saveEvent {
+		en := i.addCallEvent(ecc, ContAddr, MethodName, Args)
+		gasIndex := i.addGasHistory()
+		defer func() {
+			if err != nil {
+				return
+			}
+			_err := i.insertResultEvent(en, enResult, err)
+			if _err != nil {
+				err = _err
+			} else {
+				i.gasHistory[gasIndex] += useGas
+			}
+		}()
+	}
 
 	if Cc.IsContract(ContAddr) {
-
-		ecc := i.currentContractContext(Cc, ContAddr)
-
-		var en *Event
-		cont, err := i.getContract(ContAddr)
-		if err != nil {
-			return nil, err
+		cont, _err := i.getContract(ContAddr)
+		if _err != nil {
+			err = _err
+			return
 		}
 
 		var is interface{} = cont
@@ -137,27 +184,23 @@ func (i *interactor) Exec(Cc *ContractContext, ContAddr common.Address, MethodNa
 			MethodName = strings.ToUpper(string(MethodName[0])) + MethodName[1:]
 		}
 
-		var gasIndex int
-		if i.saveEvent {
-			en = i.addCallEvent(ecc, ContAddr, MethodName, Args)
-			gasIndex = i.addGasHistory()
+		rMethod, _err := i.methodByName(cont, ContAddr, MethodName)
+		if _err != nil {
+			err = _err
+			return
 		}
 
-		rMethod, err := i.methodByName(cont, ContAddr, MethodName)
-		if err != nil {
-			return nil, err
-		}
-
-		in, err := ContractInputsConv(Args, rMethod)
-		if err != nil {
-			return nil, err
+		in, _err := ContractInputsConv(Args, rMethod)
+		if _err != nil {
+			err = _err
+			return
 		}
 		in = append([]reflect.Value{reflect.ValueOf(ecc)}, in...)
 
 		sn := ecc.ctx.Snapshot()
 		s := ecc.ctx.GetPCSize()
 
-		vs, err := func() (vs []reflect.Value, err error) {
+		vs, _err := func() (vs []reflect.Value, err error) {
 			defer func() {
 				v := recover()
 				if v != nil {
@@ -170,100 +213,91 @@ func (i *interactor) Exec(Cc *ContractContext, ContAddr common.Address, MethodNa
 			}()
 			return rMethod.Call(in), nil
 		}()
-		if err != nil {
-			return nil, err
+		if _err != nil {
+			err = _err
+			return
 		}
 
-		useGas := ecc.ctx.GetPCSize() - s
+		useGas = ecc.ctx.GetPCSize() - s
 		mtype := rMethod.Type()
-		params, resultsWithoutError, err := i.getResults(mtype, vs)
+		result, enResult, err = i.getResults(mtype, vs)
 		if err != nil {
 			ecc.ctx.Revert(sn)
 		}
 		ecc.ctx.Commit(sn)
-
-		if i.saveEvent {
-			_err := i.insertResultEvent(en, resultsWithoutError, err)
-			if _err != nil {
-				return nil, _err
-			}
-			i.gasHistory[gasIndex] += useGas
-		}
-
-		return params, err
 	} else {
-		//ecc := i.currentContractContext(Cc, ContAddr)
 		statedb := NewStateDB(Cc.ctx)
 		if !statedb.IsEvmContract(ContAddr) {
-			return nil, ErrNotExistContract
+			err = ErrNotExistContract
+			return
 		}
-		cMethodName := strings.ToLower(MethodName[:1]) + MethodName[1:]
-		// sig, ok := funcSigMap[MethodName]
-		// if !ok {
-		// 	return nil, ErrInvalidContractMethod
-		// }
-		// //fmt.Println(sig)
-		// args, err := pack(Args)
-		// if err != nil {
-		// 	return nil, ErrInvalidArguments
-		// }
-
-		// data := append(sig, args...)
-		// //fmt.Println(data)
-
-		cArgs := make([]interface{}, len(Args))
-		copy(cArgs, Args)
-		switch cMethodName {
-		case "burn":
-			cArgs[0] = cArgs[0].(*amount.Amount).Int
-		case "approve", "transfer", "mint", "burnFrom":
-			cArgs[1] = cArgs[1].(*amount.Amount).Int
-		case "transferFrom":
-			cArgs[2] = cArgs[2].(*amount.Amount).Int
+		// constructor not allowd
+		if MethodName == "" {
+			err = ErrConstructorNotAllowd
+			return
 		}
 
-		data, err := erc20Abi.Pack(cMethodName, cArgs...)
-		if err != nil {
-			return nil, err
-		}
+		lMethod := strings.ToLower(MethodName[:1]) + MethodName[1:]
 
-		result, _, err := Cc.EvmCall(vm.AccountRef(Cc.From()), ContAddr, data)
-		if err != nil {
-			return nil, err
-		}
+		_, exist := erc20Abi.Methods[lMethod]
 
-		ret := []interface{}{}
-		if result != nil {
-			ret, err = erc20Abi.Unpack(cMethodName, result)
-			if err != nil {
-				return nil, err
-			}
-
-			switch cMethodName {
-			case "decimals":
-				ret[0] = big.NewInt(int64(ret[0].(uint8)))
-			case "totalSupply":
-				ret[0] = &amount.Amount{Int: ret[0].(*big.Int)}
-			case "balanceOf":
-				ret[0] = &amount.Amount{Int: ret[0].(*big.Int)}
-			case "allowance":
-				ret[0] = &amount.Amount{Int: ret[0].(*big.Int)}
-			}
-		}
-
-		if i.saveEvent {
-			en := i.addCallEvent(Cc, ContAddr, MethodName, Args)
-			//gasIndex = i.addGasHistory()
-
-			_err := i.insertResultEvent(en, ret, err)
+		var data []byte
+		if exist {
+			_data, _err := erc20Abi.Pack(lMethod, argTransform(lMethod, Args)...)
 			if _err != nil {
-				return nil, _err
+				err = _err
+				return
 			}
-			//i.gasHistory[gasIndex] += useGas
+			data = _data
+		} else {
+			strArgs, _err := pack.ArgsToString2(Args)
+			if _err != nil {
+				err = _err
+				return
+			}
+
+			sig := fmt.Sprintf("%v(%v)", lMethod, strArgs)
+			data = append(data, crypto.Keccak256([]byte(sig))[:4]...)
+
+			argBytes, _err := pack.Pack(Args)
+			if _err != nil {
+				err = _err
+				return
+			}
+			data = append(data, argBytes...)
 		}
 
-		return ret, nil
+		// contract에서 호출할 경우
+		from := Cc.From()
+		if i.cont != nil {
+			from = Cc.cont
+		}
+
+		bsResult, sGas, _err := Cc.EvmCall(vm.AccountRef(from), ContAddr, data)
+		if _err != nil {
+			err = _err
+			return
+		}
+		useGas = sGas
+
+		result = []interface{}{}
+		// 존재하는 method가 아닌 경우 []byte 직접 리턴
+		if exist {
+			if bsResult != nil {
+				result, _err = erc20Abi.Unpack(lMethod, bsResult)
+				if _err != nil {
+					err = _err
+					return
+				}
+				result = resultTransform(lMethod, result)
+			}
+		} else {
+			result = append(result, bsResult)
+		}
+
+		enResult = result
 	}
+	return
 }
 
 func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Value, error) {
