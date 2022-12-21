@@ -3,190 +3,16 @@ package bloomservice
 import (
 	"bytes"
 	"errors"
-	"math/big"
 	"reflect"
-	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 	etypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/core/chain"
 	"github.com/meverselabs/meverse/core/types"
+	"github.com/meverselabs/meverse/service/pack"
 )
-
-var bigIntType = reflect.TypeOf(&big.Int{})
-var amountType = reflect.TypeOf(&amount.Amount{})
-var byteSliceType = reflect.TypeOf([]byte{})
-var addressType = reflect.TypeOf(common.Address{})
-
-// methodToString convert the given golang method to appropriate solidity-type function
-// contract function의 경우 index = 2 부터 실제 argument 이다.
-// ex. router.AddLiqudity : func(*router.RounterFront, *types.ContractContext, common.Address, common.Address, *amount.Amount, *amount.Amount, *amount.Amount, *amount.Amount) (*amount.Amount, *amount.Amount, *amount.Amount, common.Address, error)
-func argsToString(start int, method reflect.Method) (string, error) {
-	methodType := method.Type
-	args := ""
-	for j := start; j < methodType.NumIn(); j++ {
-		param := methodType.In(j)
-		arg, err := argToString(param)
-		if err != nil {
-			return "", err
-		}
-		if j > start {
-			args += ","
-		}
-		args += arg
-	}
-
-	return args, nil
-}
-
-// argToString convert the given type to appropriate solidity-type
-func argToString(typ reflect.Type) (string, error) {
-	switch kind := typ.Kind(); kind {
-	case reflect.Bool:
-		return "bool", nil
-	case reflect.Uint:
-		return "uint256", nil
-	case reflect.Uint8:
-		return "uint8", nil
-	case reflect.Uint16:
-		return "uint16", nil
-	case reflect.Uint32:
-		return "uint32", nil
-	case reflect.Uint64:
-		return "uint64", nil
-	case reflect.Int:
-		return "int256", nil
-	case reflect.Int8:
-		return "int8", nil
-	case reflect.Int16:
-		return "int16", nil
-	case reflect.Int32:
-		return "int32", nil
-	case reflect.Int64:
-		return "int64", nil
-	case reflect.Pointer:
-		switch typ {
-		case bigIntType, amountType:
-			return "uint256", nil
-		default:
-			return "", ErrInvalidType
-		}
-	case reflect.String:
-		return "string", nil
-	case reflect.Interface:
-		return "interface{}", nil
-
-	case reflect.Slice:
-		switch typ {
-		case byteSliceType:
-			return "bytes", nil
-		default:
-			r, err := argToString(typ.Elem())
-			if err != nil {
-				return "", err
-			}
-			return "[]" + r, nil
-		}
-	case reflect.Array:
-		switch typ {
-		case addressType:
-			return "address", nil
-		default:
-			r, err := argToString(typ.Elem())
-			if err != nil {
-				return "", err
-			}
-			return "[" + strconv.Itoa(typ.Len()) + "]" + r, nil
-		}
-	default:
-		return "", ErrInvalidType
-	}
-}
-
-// toUint256Bytes convert the given reflect-value to appropriate uint256 bytes representation and function-type.
-func toUint256Bytes(topics [][]byte, value reflect.Value) ([][]byte, error) {
-	switch kind := value.Kind(); kind {
-	case reflect.Bool:
-		if value.Bool() {
-			topics = append(topics, math.PaddedBigBytes(common.Big1, 32))
-		} else {
-			topics = append(topics, math.PaddedBigBytes(common.Big0, 32))
-		}
-		return topics, nil
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		topics = append(topics, math.U256Bytes(new(big.Int).SetUint64(value.Uint())))
-		return topics, nil
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		topics = append(topics, math.U256Bytes(big.NewInt(value.Int())))
-		return topics, nil
-	case reflect.Pointer:
-		switch typ := value.Type(); typ {
-		case bigIntType:
-			topics = append(topics, math.U256Bytes(value.Interface().(*big.Int)))
-			return topics, nil
-		case amountType:
-			topics = append(topics, math.U256Bytes(value.Interface().(*amount.Amount).Int))
-			return topics, nil
-		default:
-			return nil, ErrInvalidType
-		}
-	case reflect.Slice:
-		switch typ := value.Type(); typ {
-		case byteSliceType:
-			topics = append(topics, crypto.Keccak256(value.Bytes()))
-			return topics, nil
-		default: // ex. []interface{}
-			for i := 0; i < value.Len(); i++ {
-				var err error
-				topics, err = toUint256Bytes(topics, value.Index(i))
-				if err != nil {
-					return nil, err
-				}
-			}
-			return topics, nil
-		}
-	case reflect.Array:
-		switch typ := value.Type(); typ {
-		case addressType:
-			value = mustArrayToByteSlice(value)
-			topics = append(topics, common.LeftPadBytes(value.Bytes(), 32))
-			return topics, nil
-		default:
-			for i := 0; i < value.Len(); i++ {
-				var err error
-				topics, err = toUint256Bytes(topics, value.Index(i))
-				if err != nil {
-					return nil, err
-				}
-			}
-			return topics, nil
-		}
-	case reflect.String:
-		topics = append(topics, crypto.Keccak256([]byte(value.String())))
-		return topics, nil
-	case reflect.Interface:
-		var err error
-		topics, err = toUint256Bytes(topics, value.Elem())
-		if err != nil {
-			return nil, err
-		}
-		return topics, nil
-	default:
-		return nil, ErrInvalidType
-	}
-}
-
-// mustArrayToByteSlice creates a new byte slice with the exact same size as value
-// and copies the bytes in value to the new slice.
-func mustArrayToByteSlice(value reflect.Value) reflect.Value {
-	slice := reflect.MakeSlice(reflect.TypeOf([]byte{}), value.Len(), value.Len())
-	reflect.Copy(slice, value)
-	return slice
-}
 
 // AppendBloom appends the given Receipts (+Logs) to bloom
 func AppendBloom(bin *etypes.Bloom, receipts etypes.Receipts) {
@@ -251,7 +77,7 @@ func makeEventTopics(ctx *types.Context, mc *types.MethodCallEvent) ([][]byte, e
 
 	topics = append(topics, crypto.Keccak256([]byte(event)))          // event Hash
 	topics = append(topics, common.LeftPadBytes(mc.From.Bytes(), 32)) // Transfer, Approval Event의 경우 mc.From이 들어간다.
-	if topics, err = toUint256Bytes(topics, reflect.ValueOf(mc.Args)); err != nil {
+	if topics, err = pack.ToUint256Bytes(topics, reflect.ValueOf(mc.Args)); err != nil {
 		return nil, err
 	}
 	return topics, nil
@@ -281,7 +107,7 @@ func functionToEvent(ctx *types.Context, mc *types.MethodCallEvent) (string, err
 	if !ok {
 		return "", err
 	}
-	argsStr, err := argsToString(2, method)
+	argsStr, err := pack.ArgsToString(2, method)
 	if err != nil {
 		return "", err
 	}

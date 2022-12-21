@@ -21,6 +21,7 @@ import (
 	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/common/bin"
 	"github.com/meverselabs/meverse/core/types"
+	"github.com/meverselabs/meverse/service/pack"
 )
 
 type testStruct struct{}
@@ -169,7 +170,7 @@ func TestMethodToString(t *testing.T) {
 		method := typ.Method(i)
 
 		// first argument = *testStruct
-		have, err := argsToString(1, method)
+		have, err := pack.ArgsToString(1, method)
 		if err != nil {
 			t.Errorf("err : %s, method : %s", err.Error(), method.Name)
 		}
@@ -227,7 +228,7 @@ func TestUint256Bytes(t *testing.T) {
 	topics := [][]byte{}
 	var err error
 	for _, tt := range tests {
-		topics, err = toUint256Bytes(topics, tt.value)
+		topics, err = pack.ToUint256Bytes(topics, tt.value)
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -264,7 +265,7 @@ func TestUint256BytesArray(t *testing.T) {
 	topics := [][]byte{}
 	var err error
 	for _, tt := range tests {
-		topics, err = toUint256Bytes(topics, tt.value)
+		topics, err = pack.ToUint256Bytes(topics, tt.value)
 		if err != nil {
 			t.Fatalf("%v", err)
 		}

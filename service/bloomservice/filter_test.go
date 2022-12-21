@@ -20,6 +20,7 @@ import (
 	"github.com/meverselabs/meverse/common/hash"
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/meverselabs/meverse/ethereum/params"
+	"github.com/meverselabs/meverse/service/pack"
 	"github.com/meverselabs/meverse/service/txsearch/itxsearch"
 	"github.com/stretchr/testify/assert"
 )
@@ -85,7 +86,7 @@ func TestPackBoolAndNumber(t *testing.T) {
 		{reflect.ValueOf(amount.NewAmount(0, uint64(math.MaxInt64))), common.Hex2Bytes("0000000000000000000000000000000000000000000000007fffffffffffffff")},
 	}
 	for i, tt := range tests {
-		packed, err := packElement(tt.value)
+		packed, err := pack.PackElement(tt.value)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -108,7 +109,7 @@ func TestPack(t *testing.T) {
 		{reflect.ValueOf([]byte{10, 20}), common.Hex2Bytes("00000000000000000000000000000000000000000000000000000000000000020a14000000000000000000000000000000000000000000000000000000000000")},
 	}
 	for i, tt := range tests {
-		packed, err := packElement(tt.value)
+		packed, err := pack.PackElement(tt.value)
 		if err != nil {
 			t.Fatal(err)
 		}

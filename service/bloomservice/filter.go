@@ -5,19 +5,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"math/big"
 	"reflect"
 	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/common/bin"
 	"github.com/meverselabs/meverse/common/hash"
 	"github.com/meverselabs/meverse/core/chain"
@@ -25,6 +22,7 @@ import (
 	"github.com/meverselabs/meverse/ethereum/core/bloombits"
 	etypes "github.com/meverselabs/meverse/ethereum/core/types"
 	"github.com/meverselabs/meverse/ethereum/params"
+	"github.com/meverselabs/meverse/service/pack"
 	"github.com/meverselabs/meverse/service/txsearch/itxsearch"
 )
 
@@ -566,7 +564,7 @@ func EventsToLogs(chain *chain.Chain, header *mtypes.Header, tx *mtypes.Transact
 		}
 
 		log.Topics = hashTopics(topics)
-		log.Data, err = pack(mc.Args)
+		log.Data, err = pack.Pack(mc.Args)
 		if err != nil {
 			return nil, err
 		}
@@ -583,6 +581,7 @@ func EventsToLogs(chain *chain.Chain, header *mtypes.Header, tx *mtypes.Transact
 	return logs, nil
 }
 
+/*
 // Pack packs MethodCallEvent arguments. When unpacking, the function(event) definition is necessary
 func pack(args []interface{}) ([]byte, error) {
 
@@ -749,6 +748,8 @@ func packNum(value reflect.Value) []byte {
 		panic("abi: fatal error")
 	}
 }
+
+*/
 
 // indexedLogs returns the logs matching the filter criteria based on the bloom
 // bits indexed available locally or via the network.
