@@ -178,6 +178,17 @@ func (cont *TokenContract) Transfer(cc *types.ContractContext, To common.Address
 	}
 	return cont.addBalance(cc, To, Amount)
 }
+func (cont *TokenContract) DelegateFeeTransfer(cc *types.ContractContext, To common.Address, Amount *amount.Amount) error {
+	di, err := getDelegateInfo(cc)
+	if err != nil {
+		return err
+	}
+	if _, err := cc.Exec(cc, *cc.MainToken(), "TransferFrom", []interface{}{di.feeBanker, cc.From(), di.transferFee}); err != nil {
+		return err
+	}
+
+	return cont.Transfer(cc, To, Amount)
+}
 
 func (cont *TokenContract) Burn(cc *types.ContractContext, am *amount.Amount) error {
 	if am.IsMinus() {
@@ -268,11 +279,11 @@ func (cont *TokenContract) Approve(cc *types.ContractContext, spender common.Add
 	return nil
 }
 
-func (cont *TokenContract) SetDelegateFee(cc *types.ContractContext, spender, banker common.Address, fee, approveLowerLimit *amount.Amount) error {
+func (cont *TokenContract) SetDelegateFee(cc *types.ContractContext, spender, banker common.Address, approveFee, approveLowerLimit, transferFee *amount.Amount) error {
 	if cc.From() != cont.Master() && !cont.IsManager(cc, cc.From()) {
 		return errors.New("not token master")
 	}
-	_setDelegateInfo(cc, spender, banker, fee, approveLowerLimit)
+	_setDelegateInfo(cc, spender, banker, approveFee, approveLowerLimit, transferFee)
 	return nil
 }
 func (cont *TokenContract) DelegateFeeApprove(cc *types.ContractContext, spender common.Address, Amount *amount.Amount) error {
@@ -290,7 +301,7 @@ func (cont *TokenContract) DelegateFeeApprove(cc *types.ContractContext, spender
 	if di.spender != spender {
 		return errors.New("not matched delegate spender")
 	}
-	if _, err := cc.Exec(cc, *cc.MainToken(), "TransferFrom", []interface{}{di.feeBanker, cc.From(), di.fee}); err != nil {
+	if _, err := cc.Exec(cc, *cc.MainToken(), "TransferFrom", []interface{}{di.feeBanker, cc.From(), di.approveFee}); err != nil {
 		return err
 	}
 
