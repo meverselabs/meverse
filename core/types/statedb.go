@@ -11,8 +11,8 @@ import (
 	etypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 
+	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/common/bin"
-	"github.com/meverselabs/meverse/ethereum/params"
 	"github.com/meverselabs/meverse/extern/txparser"
 )
 
@@ -140,8 +140,11 @@ func (s *StateDB) Empty(addr common.Address) bool {
 
 // GetBalance retrieves the balance from the given address or 0 if object not found
 func (s *StateDB) GetBalance(addr common.Address) *big.Int {
+	bs := s.ctx.Data(*s.ctx.Top().MainToken(), addr, []byte{byte(0x10)}) // tagTokenAmount = byte(0x10)
+	bi := big.NewInt(0).SetBytes(bs)
 
-	return new(big.Int).Set(params.MaxUint256)
+	return bi
+	// return new(big.Int).Set(params.MaxUint256)
 }
 
 func (s *StateDB) GetNonce(addr common.Address) uint64 {
@@ -215,18 +218,41 @@ func (s *StateDB) HasSuicided(addr common.Address) bool {
  */
 
 // AddBalance adds amount to the account associated with addr.
-func (s *StateDB) AddBalance(addr common.Address, amount *big.Int) {
-	return
+func (s *StateDB) AddBalance(addr common.Address, amt *big.Int) {
+	if amt.Sign() < 0 {
+		panic("balance can not be minus")
+	}
+	mainToken := *s.ctx.Top().MainToken()
+	bs := s.ctx.Data(mainToken, addr, []byte{byte(0x10)}) // tagTokenAmount = byte(0x10)
+	am := amount.NewAmountFromBytes(bs)
+	added := am.Add(&amount.Amount{Int: amt})
+	s.ctx.SetData(*s.ctx.cache.MainToken(), addr, []byte{byte(0x10)}, added.Bytes())
 }
 
 // SubBalance subtracts amount from the account associated with addr.
-func (s *StateDB) SubBalance(addr common.Address, amount *big.Int) {
-	return
+func (s *StateDB) SubBalance(addr common.Address, amt *big.Int) {
+	if amt.Sign() < 0 {
+		panic("balance can not be minus")
+	}
+	mainToken := *s.ctx.Top().MainToken()
+	bs := s.ctx.Data(mainToken, addr, []byte{byte(0x10)}) // tagTokenAmount = byte(0x10)
+	am := amount.NewAmountFromBytes(bs)
+	subed := am.Sub(&amount.Amount{Int: amt})
+	if subed.IsMinus() {
+		panic("balance can not be minus")
+	}
+
+	s.ctx.SetData(*s.ctx.cache.MainToken(), addr, []byte{byte(0x10)}, subed.Bytes())
 }
 
 // SetBalance set amount of the account associated with addr.
-func (s *StateDB) SetBalance(addr common.Address, amount *big.Int) {
-	return
+func (s *StateDB) SetBalance(addr common.Address, amt *big.Int) {
+	if amt.Sign() < 0 {
+		panic("balance can not be minus")
+	}
+
+	rbs := amount.NewAmountFromBytes(amt.Bytes())
+	s.ctx.SetData(*s.ctx.cache.MainToken(), addr, []byte{byte(0x10)}, rbs.Bytes())
 }
 
 // SetBalance set nonce of the account associated with addr.
@@ -369,7 +395,7 @@ func (s *StateDB) IsExtContract(addr common.Address) bool {
 }
 
 // Exec executes the method of compiled contract in evm
-func (s *StateDB) Exec(user common.Address, contAddr common.Address, input []byte) ([]byte, uint64, error) {
+func (s *StateDB) Exec(user common.Address, contAddr common.Address, input []byte, gas uint64) ([]byte, uint64, error) {
 	//func Exec(ctx *mtypes.Context, user common.Address, contAddr common.Address, methodName string, args []interface{}) ([]interface{}, error) {
 	intr, cc, err := s.getCC(contAddr, user)
 	if err != nil {
@@ -412,7 +438,13 @@ func (s *StateDB) Exec(user common.Address, contAddr common.Address, input []byt
 	}
 
 	gh := intr.GasHistory()
-	return bs, gh[0], nil
+	usedGas := gh[0] - 21000
+
+	if usedGas > gas {
+		return nil, 0, errors.New("out of gas")
+	}
+
+	return bs, gas - usedGas, nil
 }
 
 // getCC returns the ContractContext under contract and user context

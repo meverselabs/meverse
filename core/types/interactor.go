@@ -15,6 +15,7 @@ import (
 	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/common/hash"
 	"github.com/meverselabs/meverse/ethereum/core/vm"
+	"github.com/meverselabs/meverse/extern/txparser"
 	"github.com/meverselabs/meverse/service/pack"
 	"github.com/pkg/errors"
 )
@@ -135,6 +136,20 @@ func resultTransform(lMethod string, ret []interface{}) []interface{} {
 	return tRet
 }
 
+func isFuncSig(s string) bool {
+	s = strings.ToLower(s)
+	s = strings.TrimPrefix(s, "0x")
+	if len(s) != 8 {
+		return false
+	}
+	for _, c := range s {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
 func (i *interactor) Exec(Cc *ContractContext, ContAddr common.Address, MethodName string, Args []interface{}) (result []interface{}, err error) {
 	if i.exit {
 		return nil, errors.New("expired")
@@ -142,9 +157,17 @@ func (i *interactor) Exec(Cc *ContractContext, ContAddr common.Address, MethodNa
 	if MethodName == "" {
 		return nil, errors.New("method not given")
 	}
-	ecc := i.currentContractContext(Cc, ContAddr)
+	isCont := Cc.IsContract(ContAddr)
 	var useGas uint64
 	var enResult []interface{}
+	ecc := i.currentContractContext(Cc, ContAddr)
+	var cont Contract
+	if isCont {
+		cont, MethodName, Args, err = i.getContMethod(Cc, ContAddr, MethodName, Args)
+		if err != nil {
+			return
+		}
+	}
 	if i.saveEvent {
 		en := i.addCallEvent(ecc, ContAddr, MethodName, Args)
 		gasIndex := i.addGasHistory()
@@ -160,143 +183,206 @@ func (i *interactor) Exec(Cc *ContractContext, ContAddr common.Address, MethodNa
 			}
 		}()
 	}
-
-	if Cc.IsContract(ContAddr) {
-		cont, _err := i.getContract(ContAddr)
-		if _err != nil {
-			err = _err
-			return
+	if isCont {
+		if i.saveEvent {
+			var k int
+			k += 1
 		}
-
-		var is interface{} = cont
-		if _, ok := is.(InvokeableContract); ok &&
-			(MethodName != "InitContract" &&
-				MethodName != "IsUpdateable" &&
-				MethodName != "Update" &&
-				MethodName != "ContractInvoke" &&
-				MethodName != "SetOwner") {
-			Args = []interface{}{
-				MethodName,
-				Args,
-			}
-			MethodName = "ContractInvoke"
-		} else {
-			MethodName = strings.ToUpper(string(MethodName[0])) + MethodName[1:]
-		}
-
-		rMethod, _err := i.methodByName(cont, ContAddr, MethodName)
-		if _err != nil {
-			err = _err
-			return
-		}
-
-		in, _err := ContractInputsConv(Args, rMethod)
-		if _err != nil {
-			err = _err
-			return
-		}
-		in = append([]reflect.Value{reflect.ValueOf(ecc)}, in...)
-
-		sn := ecc.ctx.Snapshot()
-		s := ecc.ctx.GetPCSize()
-
-		vs, _err := func() (vs []reflect.Value, err error) {
-			defer func() {
-				v := recover()
-				if v != nil {
-					fmt.Println(v)
-					if MethodName == "ContractInvoke" && len(Args) > 0 {
-						MethodName = fmt.Sprintf("ci %v", Args[0])
-					}
-					err = fmt.Errorf("occur error call method(%v) of contract(%v) message: %v", MethodName, ContAddr.String(), v)
-				}
-			}()
-			return rMethod.Call(in), nil
-		}()
-		if _err != nil {
-			err = _err
-			return
-		}
-
-		useGas = ecc.ctx.GetPCSize() - s
-		mtype := rMethod.Type()
-		result, enResult, err = i.getResults(mtype, vs)
-		if err != nil {
-			ecc.ctx.Revert(sn)
-		}
-		ecc.ctx.Commit(sn)
+		result, enResult, useGas, err = i._exec(ecc, cont, MethodName, Args)
 	} else {
-		statedb := NewStateDB(Cc.ctx)
-		if !statedb.IsEvmContract(ContAddr) {
-			err = ErrNotExistContract
-			return
-		}
-		// constructor not allowd
-		if MethodName == "" {
-			err = ErrConstructorNotAllowd
-			return
-		}
+		result, enResult, useGas, err = i._execEvm(Cc, ContAddr, MethodName, Args)
+	}
+	return
+}
 
-		lMethod := strings.ToLower(MethodName[:1]) + MethodName[1:]
+func (i *interactor) getContMethod(Cc *ContractContext, ContAddr common.Address, MethodName string, Args []interface{}) (Contract, string, []interface{}, error) {
+	cont, err := i.getContract(ContAddr)
+	if err != nil {
+		return nil, "", nil, err
+	}
 
-		_, exist := erc20Abi.Methods[lMethod]
+	var is interface{} = cont
+	if _, ok := is.(InvokeableContract); ok &&
+		(MethodName != "InitContract" &&
+			MethodName != "IsUpdateable" &&
+			MethodName != "Update" &&
+			MethodName != "ContractInvoke" &&
+			MethodName != "SetOwner") {
 
-		var data []byte
-		if exist {
-			_data, _err := erc20Abi.Pack(lMethod, argTransform(lMethod, Args)...)
-			if _err != nil {
-				err = _err
-				return
+		if isFuncSig(MethodName) {
+			m := txparser.Abi(MethodName)
+			if m.Name == "" {
+				n := i.ctx.Snapshot()
+				if rawabi, _, _, err := i._exec(Cc, cont, "ContractInvoke", []interface{}{"abis", []interface{}{}}); err != nil {
+					i.ctx.Revert(n)
+					return nil, "", nil, err
+				} else if len(rawabi) == 0 {
+					i.ctx.Revert(n)
+					return nil, "", nil, errors.New("invalid abis result")
+				} else if abis, ok := rawabi[0].([]interface{}); !ok {
+					i.ctx.Revert(n)
+					return nil, "", nil, errors.New("invalid abis method")
+				} else {
+					strs := []string{}
+					for _, funcStr := range abis {
+						if f, ok := funcStr.(string); ok {
+							strs = append(strs, f)
+						}
+					}
+					bs := []byte("[" + strings.Join(strs, ",") + "]")
+					reader := bytes.NewReader(bs)
+					if abi, err := abi.JSON(reader); err == nil {
+						for _, m := range abi.Methods {
+							txparser.AddAbi(m)
+						}
+					}
+				}
+				i.ctx.Revert(n)
+				m = txparser.Abi(MethodName)
 			}
-			data = _data
-		} else {
-			strArgs, _err := pack.ArgsToString2(Args)
-			if _err != nil {
-				err = _err
-				return
+			if m.Name != "" {
+				MethodName = m.Name
+				if len(Args) == 0 {
+					return nil, "", nil, errors.New("invalid data length")
+				}
+				if bs, ok := Args[0].([]byte); !ok {
+					return nil, "", nil, errors.New("invalid data type")
+				} else if args, err := txparser.Inputs(bs); err != nil {
+					return nil, "", nil, errors.New("invalid input data")
+				} else {
+					Args = args
+				}
 			}
-
-			sig := fmt.Sprintf("%v(%v)", lMethod, strArgs)
-			data = append(data, crypto.Keccak256([]byte(sig))[:4]...)
-
-			argBytes, _err := pack.Pack(Args)
-			if _err != nil {
-				err = _err
-				return
-			}
-			data = append(data, argBytes...)
 		}
-
-		// contract에서 호출할 경우
-		from := Cc.From()
-		if i.cont != nil {
-			from = Cc.cont
+		Args = []interface{}{
+			MethodName,
+			Args,
 		}
+		MethodName = "ContractInvoke"
+	} else {
+		MethodName = strings.ToUpper(string(MethodName[0])) + MethodName[1:]
+	}
+	return cont, MethodName, Args, nil
+}
 
-		bsResult, sGas, _err := Cc.EvmCall(vm.AccountRef(from), ContAddr, data)
+func (i *interactor) _execEvm(Cc *ContractContext, ContAddr common.Address, MethodName string, Args []interface{}) (result []interface{}, enResult []interface{}, useGas uint64, err error) {
+	// constructor not allowd
+	// contract에서 호출할 경우
+	// 존재하는 method가 아닌 경우 []byte 직접 리턴
+	statedb := NewStateDB(Cc.ctx)
+	if !statedb.IsEvmContract(ContAddr) {
+		err = ErrNotExistContract
+		return
+	}
+
+	if MethodName == "" {
+		err = ErrConstructorNotAllowd
+		return
+	}
+
+	lMethod := strings.ToLower(MethodName[:1]) + MethodName[1:]
+
+	_, exist := erc20Abi.Methods[lMethod]
+
+	var data []byte
+	if exist {
+		_data, _err := erc20Abi.Pack(lMethod, argTransform(lMethod, Args)...)
 		if _err != nil {
 			err = _err
 			return
 		}
-		useGas = sGas
-
-		result = []interface{}{}
-		// 존재하는 method가 아닌 경우 []byte 직접 리턴
-		if exist {
-			if bsResult != nil {
-				result, _err = erc20Abi.Unpack(lMethod, bsResult)
-				if _err != nil {
-					err = _err
-					return
-				}
-				result = resultTransform(lMethod, result)
-			}
-		} else {
-			result = append(result, bsResult)
+		data = _data
+	} else {
+		strArgs, _err := pack.ArgsToString2(Args)
+		if _err != nil {
+			err = _err
+			return
 		}
 
-		enResult = result
+		sig := fmt.Sprintf("%v(%v)", lMethod, strArgs)
+		data = append(data, crypto.Keccak256([]byte(sig))[:4]...)
+
+		argBytes, _err := pack.Pack(Args)
+		if _err != nil {
+			err = _err
+			return
+		}
+		data = append(data, argBytes...)
 	}
+
+	from := Cc.From()
+	if i.cont != nil {
+		from = Cc.cont
+	}
+
+	bsResult, sGas, _err := Cc.EvmCall(vm.AccountRef(from), ContAddr, data)
+	if _err != nil {
+		err = _err
+		return
+	}
+	useGas = sGas
+
+	result = []interface{}{}
+
+	if exist {
+		if bsResult != nil {
+			result, _err = erc20Abi.Unpack(lMethod, bsResult)
+			if _err != nil {
+				err = _err
+				return
+			}
+			result = resultTransform(lMethod, result)
+		}
+	} else {
+		result = append(result, bsResult)
+	}
+
+	enResult = result
+	return
+}
+
+func (i *interactor) _exec(ecc *ContractContext, cont Contract, MethodName string, Args []interface{}) (result []interface{}, enResult []interface{}, useGas uint64, err error) {
+	ContAddr := cont.Address()
+	rMethod, _err := i.methodByName(cont, ContAddr, MethodName)
+	if _err != nil {
+		err = _err
+		return
+	}
+
+	in, _err := ContractInputsConv(Args, rMethod)
+	if _err != nil {
+		err = _err
+		return
+	}
+	in = append([]reflect.Value{reflect.ValueOf(ecc)}, in...)
+
+	sn := ecc.ctx.Snapshot()
+	s := ecc.ctx.GetPCSize()
+
+	vs, _err := func() (vs []reflect.Value, err error) {
+		defer func() {
+			v := recover()
+			if v != nil {
+				if MethodName == "ContractInvoke" && len(Args) > 0 {
+					MethodName = fmt.Sprintf("ci %v", Args[0])
+				}
+				err = fmt.Errorf("occur error call method(%v) of contract(%v) message: %v", MethodName, ContAddr.String(), v)
+			}
+		}()
+		return rMethod.Call(in), nil
+	}()
+	if _err != nil {
+		err = _err
+		return
+	}
+
+	useGas = ecc.ctx.GetPCSize() - s
+	mtype := rMethod.Type()
+	result, enResult, err = i.getResults(mtype, vs)
+	if err != nil {
+		ecc.ctx.Revert(sn)
+	}
+	ecc.ctx.Commit(sn)
 	return
 }
 

@@ -253,7 +253,7 @@ func (ctd *ContextData) Data(cont common.Address, addr common.Address, name []by
 		return nil
 	}
 	if value, has := ctd.DataMap[key]; has {
-		ctd.size += uint64(len(name)) + uint64(len(value))
+		ctd.size += 72 //uint64(len(name)) + uint64(len(value))
 		return value
 	} else if ctd.Parent != nil {
 		value := ctd.Parent.Data(cont, addr, name)
@@ -270,7 +270,7 @@ func (ctd *ContextData) Data(cont common.Address, addr common.Address, name []by
 		}
 	} else {
 		value := ctd.cache.Data(cont, addr, name)
-		ctd.size += uint64(len(name)) + uint64(len(value))
+		ctd.size += 72 // uint64(len(name)) + uint64(len(value))
 		if len(value) > 0 {
 			if ctd.isTop {
 				nvalue := make([]byte, len(value))

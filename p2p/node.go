@@ -326,9 +326,9 @@ func (nd *Node) Run(BindAddress string) {
 				// break
 			}
 			nd.cleanPool(b)
-			if nd.cn.Provider().Height()%100 == 0 {
-				log.Println("Node", b.Header.Version, nd.myPublicKey.Address().String(), nd.cn.Provider().Height(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Body.Transactions))
-			}
+			//if nd.cn.Provider().Height()%100 == 0 {
+			log.Println("Node", b.Header.Version, nd.myPublicKey.Address().String(), nd.cn.Provider().Height(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Body.Transactions))
+			//}
 
 			txs := nd.txpool.Clean(types.ToTimeSlot(b.Header.Timestamp))
 			if len(txs) > 0 {
@@ -576,8 +576,10 @@ func (nd *Node) AddTx(tx *types.Transaction, sig common.Signature) error {
 		}
 	}
 
-	TxHash := tx.HashSig()
 	ctx := nd.cn.NewContext()
+	tx.VmType, tx.Method = types.GetTxType(ctx, tx)
+
+	TxHash := tx.HashSig()
 	if ctx.IsUsedTimeSlot(slot, string(TxHash[:])) {
 		return errors.WithStack(types.ErrUsedTimeSlot)
 	}
@@ -654,9 +656,6 @@ func (nd *Node) addTx(TxHash hash.Hash256, tx *types.Transaction, sig common.Sig
 		}
 
 		// contract check
-		ctx := nd.cn.NewContext()
-		tx.VmType, tx.Method = types.GetTxType(ctx, tx)
-
 		txid := types.TransactionID(_ctx.TargetHeight(), 0)
 		if tx.VmType != types.Evm {
 			if tx.To == common.ZeroAddr {

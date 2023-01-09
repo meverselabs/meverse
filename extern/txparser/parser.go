@@ -228,8 +228,17 @@ func Abi(method string) abi.Method {
 	return m
 }
 
-func Abis(cont common.Address, method string) map[string]abi.Method {
-	return funcSigs[method]
+func Abis(to common.Address, method string, caller Caller) (abiMs map[string]abi.Method, err error) {
+	abiMs = funcSigs[method]
+	if len(abiMs) == 0 {
+		abim, err := MakeAbi(to, method, caller)
+		if err != nil {
+			return nil, err
+		}
+		abiMs = map[string]abi.Method{}
+		abiMs[abim.Name] = abim
+	}
+	return
 }
 
 func Inputs(data []byte) ([]interface{}, error) {
@@ -287,84 +296,85 @@ func Outputs(method string, data []interface{}) ([]byte, error) {
 	}
 
 	var err error
-	var bs []byte
 	for _, m := range ms {
-		if len(m.Outputs) != len(data) {
-			err = errors.New("invalid output count")
-			continue
-		}
-		for i, ot := range m.Outputs {
-			if ot.Type.GetType() == reflect.TypeOf(data[i]) {
-				continue
-			}
-			switch ot.Type.T {
-			case abi.IntTy:
-				data[i], err = reflectIntType(false, ot.Type.Size, data[i])
-			case abi.UintTy:
-				data[i], err = reflectIntType(true, ot.Type.Size, data[i])
-			case abi.BoolTy:
-				sr, ok := data[i].(fmt.Stringer)
-				var s string
-				if ok {
-					s = sr.String()
-				} else {
-					s, _ = data[i].(string)
-				}
-				if s == "true" {
-					data[i] = true
-				} else if s == "false" {
-					data[i] = false
-				}
-			case abi.StringTy:
-				switch t := data[i].(type) {
-				case string:
-					data[i] = t
-				case []byte:
-					data[i] = string(t)
-				case fmt.Stringer:
-					data[i] = t.String()
-				}
-			case abi.SliceTy, abi.ArrayTy:
-				if s, ok := data[i].([]interface{}); ok {
-					sts := []string{}
-					for _, v := range s {
-						sts = append(sts, fmt.Sprintf("%v", v))
-					}
-					data[i] = sts
-				}
-			case abi.AddressTy:
-				if s, ok := data[i].(string); ok {
-					data[i] = common.HexToAddress(s)
-				}
-			case abi.BytesTy:
-				if s, ok := data[i].(string); ok {
-					data[i], err = hex.DecodeString(s)
-				}
-			case abi.HashTy:
-				if s, ok := data[i].(string); ok {
-					data[i] = hash.HexToHash(s)
-				}
-			// case abi.FixedPointTy:
-			// 	// fixedpoint type currently not used
-			// 	return reflect.ArrayOf(32, reflect.TypeOf(byte(0)))
-			// case abi.FunctionTy:
-			// 	return reflect.ArrayOf(24, reflect.TypeOf(byte(0)))
-			default:
-				panic("Invalid type")
-			}
-			if err != nil {
-				break
-			}
-		}
-		if err != nil {
-			continue
-		}
-		bs, err = m.Outputs.Pack(data...)
-		if err == nil {
-			break
+		if _bs, _err := getOutput(m, data); _err == nil {
+			return _bs, nil
+		} else {
+			err = _err
 		}
 	}
-	return bs, err
+	return nil, err
+}
+
+func getOutput(m abi.Method, data []interface{}) (bs []byte, err error) {
+	// case abi.FixedPointTy:
+	// 	// fixedpoint type currently not used
+	// 	return reflect.ArrayOf(32, reflect.TypeOf(byte(0)))
+	// case abi.FunctionTy:
+	// 	return reflect.ArrayOf(24, reflect.TypeOf(byte(0)))
+	if len(m.Outputs) != len(data) {
+		return nil, errors.New("invalid output count")
+	}
+	for i, ot := range m.Outputs {
+		if ot.Type.GetType() == reflect.TypeOf(data[i]) {
+			continue
+		}
+		switch ot.Type.T {
+		case abi.IntTy:
+			data[i], err = reflectIntType(false, ot.Type.Size, data[i])
+		case abi.UintTy:
+			data[i], err = reflectIntType(true, ot.Type.Size, data[i])
+		case abi.BoolTy:
+			sr, ok := data[i].(fmt.Stringer)
+			var s string
+			if ok {
+				s = sr.String()
+			} else {
+				s, _ = data[i].(string)
+			}
+			if s == "true" {
+				data[i] = true
+			} else if s == "false" {
+				data[i] = false
+			}
+		case abi.StringTy:
+			switch t := data[i].(type) {
+			case string:
+				data[i] = t
+			case []byte:
+				data[i] = string(t)
+			case fmt.Stringer:
+				data[i] = t.String()
+			}
+		case abi.SliceTy, abi.ArrayTy:
+			if s, ok := data[i].([]interface{}); ok {
+				sts := []string{}
+				for _, v := range s {
+					sts = append(sts, fmt.Sprintf("%v", v))
+				}
+				data[i] = sts
+			}
+		case abi.AddressTy:
+			if s, ok := data[i].(string); ok {
+				data[i] = common.HexToAddress(s)
+			}
+		case abi.BytesTy:
+			if s, ok := data[i].(string); ok {
+				data[i], err = hex.DecodeString(s)
+			}
+		case abi.HashTy:
+			if s, ok := data[i].(string); ok {
+				data[i] = hash.HexToHash(s)
+			}
+		default:
+			err = errors.New("Invalid type")
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	bs, err = m.Outputs.Pack(data...)
+	return
 }
 
 func reflectIntType(unsigned bool, size int, data interface{}) (i interface{}, err error) {
@@ -457,4 +467,39 @@ func appendLeftZeroPad(app []byte, size int, padd ...byte) []byte {
 		padd = bs
 	}
 	return append(app, padd...)
+}
+
+type Caller interface {
+	Execute(contAddr common.Address, from, method string, inputs []interface{}) ([]interface{}, uint64, error)
+}
+
+func MakeAbi(to common.Address, funcSig string, caller Caller) (abi.Method, error) {
+	toStr := to.String()
+	if !AbiCaches[toStr] {
+		AbiCaches[toStr] = true
+		if rawabi, _, err := caller.Execute(to, common.Address{}.String(), "abis", []interface{}{}); err == nil && len(rawabi) > 0 {
+			if abis, ok := rawabi[0].([]interface{}); ok {
+				strs := []string{}
+				for _, funcStr := range abis {
+					if f, ok := funcStr.(string); ok {
+						strs = append(strs, f)
+					}
+				}
+				bs := []byte("[" + strings.Join(strs, ",") + "]")
+				reader := bytes.NewReader(bs)
+				if abi, err := abi.JSON(reader); err == nil {
+					for _, m := range abi.Methods {
+						AddAbi(m)
+					}
+				}
+			}
+		}
+		mabi := Abi(funcSig)
+		if mabi.Name == "" {
+			return abi.Method{}, errors.New("not exist abi")
+		}
+		return mabi, nil
+	} else {
+		return abi.Method{}, errors.New("not exist abi")
+	}
 }

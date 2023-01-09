@@ -17,6 +17,8 @@
 package vm
 
 import (
+	"errors"
+	"fmt"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -824,6 +826,8 @@ func opStop(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 }
 
 func opSelfdestruct(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	fmt.Println("*-----------------opSelfdestruct--------------**")
+	return nil, errors.New("Not supported")
 	if interpreter.readOnly {
 		return nil, ErrWriteProtection
 	}

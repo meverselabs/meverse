@@ -25,7 +25,7 @@ import (
 
 // StateDB is an EVM database for full state querying.
 type StateDB interface {
-	Exec(user common.Address, contAddr common.Address, input []byte) ([]byte, uint64, error)
+	Exec(user common.Address, contAddr common.Address, input []byte, gas uint64) ([]byte, uint64, error)
 	IsExtContract(addr common.Address) bool
 
 	CreateAccount(common.Address)

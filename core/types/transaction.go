@@ -6,6 +6,7 @@ import (
 	"io"
 	"math/big"
 	"strconv"
+	"strings"
 
 	etypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
@@ -237,8 +238,13 @@ func TxArg(ctx *Context, tx *Transaction) (to common.Address, method string, dat
 		} else if len(eData) > 0 {
 			funcSig := hex.EncodeToString(etx.Data()[:4])
 			m := txparser.Abi(funcSig)
-			method = m.Name
-			data, err = txparser.Inputs(eData)
+			if m.Name == "" {
+				method = funcSig
+				data = []interface{}{eData}
+			} else {
+				method = m.Name
+				data, err = txparser.Inputs(eData)
+			}
 		} else {
 			err = errors.New("invalid call")
 		}
@@ -248,30 +254,50 @@ func TxArg(ctx *Context, tx *Transaction) (to common.Address, method string, dat
 	return
 }
 
-func GetTxType(ctx *Context, tx *Transaction) (uint8, string) {
+func GetTxType(ctx *Context, tx *Transaction) (tp uint8, method string) {
+	defer func() {
+		if tp == Go && len(tx.Method) > 0 && ctx.IsContract(tx.To) {
+			var cont interface{}
+			var err error
+			cont, err = ctx.Contract(tx.To)
+			if err == nil {
+				if _, ok := cont.(InvokeableContract); !ok {
+					tx.Method = strings.ToUpper(string(tx.Method[0])) + tx.Method[1:]
+					method = tx.Method
+				}
+			}
+		}
+	}()
 	if tx.To != common.ZeroAddr {
-		if ctx.IsContract(tx.To) {
-			return Go, tx.Method
-		} else {
-			if tx.IsEtherType {
-				etx := new(etypes.Transaction)
-				if err := etx.UnmarshalBinary(tx.Args); err != nil {
-					return Go, tx.Method
+		if tx.IsEtherType {
+			etx := new(etypes.Transaction)
+			if err := etx.UnmarshalBinary(tx.Args); err != nil {
+				tp, method = Go, tx.Method
+			} else {
+				if ctx.IsContract(tx.To) {
+					tp = Go
+				} else {
+					tp = Evm
 				}
 				if len(etx.Data()) == 0 {
-					return Go, "Transfer"
+					tx.Method, method = "Transfer", "Transfer"
+				} else {
+					funcSig := hex.EncodeToString(etx.Data()[:4])
+					m := txparser.Abi(funcSig)
+					if m.Name == "" {
+						tx.Method, method = funcSig, funcSig
+					} else {
+						tx.Method, method = m.Name, m.Name
+					}
 				}
-				funcSig := hex.EncodeToString(etx.Data()[:4])
-				m := txparser.Abi(funcSig)
-				if m.Name == "" {
-					return Evm, funcSig
-				}
-				return Evm, m.Name
 			}
-			return Go, tx.Method
+		} else {
+			tp, method = Go, tx.Method
 		}
 	} else if admin.IsAdminMethod(tx.Method) {
-		return Go, tx.Method
+		tp, method = Go, tx.Method
+	} else {
+		tp, method = Evm, tx.Method
 	}
-	return Evm, tx.Method
+	return
 }

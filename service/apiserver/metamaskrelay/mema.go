@@ -172,10 +172,9 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts itxsearch.ITxSearch, bs *bloo
 	s.Set("eth_estimateGas", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 		switch m.Version() {
 		case 0, 1:
-			//return "0x0186A0", nil
-			return "0x1DCD6500", nil
+			return "0x0186A0", nil
+			//return "0x1DCD6500", nil
 		default:
-			//log.Println("arg in eth_estimateGas", arg)
 			argMap, err := arg.Map(0)
 			if err != nil {
 				return "0x1DCD6500", nil // 50000000
@@ -193,21 +192,21 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts itxsearch.ITxSearch, bs *bloo
 				from = froml
 			}
 
-			if data == "" {
-				if value, ok := argMap["value"].(string); ok {
-					data = fmt.Sprintf("0xa9059cbb%064v%064v", strings.Replace(to, "0x", "", -1), strings.Replace(value, "0x", "", -1))
-					to = m.cn.NewContext().MainToken().String()
-				} else {
-					return 0, errors.New("invalid value")
-				}
-			}
-			//_, gas, err := m.ethCall(from, to, data)
+			// if data == "" {
+			// 	if value, ok := argMap["value"].(string); ok {
+			// 		data = fmt.Sprintf("0xa9059cbb%064v%064v", strings.Replace(to, "0x", "", -1), strings.Replace(value, "0x", "", -1))
+			// 		to = m.cn.NewContext().MainToken().String()
+			// 	} else {
+			// 		return 0, errors.New("invalid value")
+			// 	}
+			// }
+			_, gas, err := m.ethCall(from, to, data)
 
-			//return gas, err
+			return gas, err
 
-			gasDefault := "0x1DCD6500"
-			_, _, err = m.ethCall(from, to, data)
-			return gasDefault, err
+			// gasDefault := "0x1DCD6500"
+			// _, _, err = m.ethCall(from, to, data)
+			// return gasDefault, err
 		}
 
 		// return "0xcf08", nil 79500
@@ -536,6 +535,20 @@ func (m *metamaskRelay) transactionHash(rlp string) (interface{}, error) {
 	}
 
 	var method string
+	// var vmType uint8
+
+	if len(etx.Data()) > 4 {
+		method = "0x" + hex.EncodeToString(etx.Data()[:4])
+	}
+
+	// getMethod := func() (string, error) {
+	// 	m := txparser.Abi(hex.EncodeToString(etx.Data()[:4]))
+	// 	if m.Name == "" {
+	// 		return "", errors.New("not exist abi")
+	// 	}
+	// 	return m.Name, nil
+	// }
+
 	getSig := func() []byte {
 		v, r, s := etx.RawSignatureValues()
 
@@ -573,6 +586,9 @@ func (m *metamaskRelay) transactionHash(rlp string) (interface{}, error) {
 		// VmType:      vmType,
 	}
 
+	// fmt.Printf("tx = %+v\n", tx)
+	// fmt.Printf("rlp = %+v\n", rlp)
+
 	err = m.nd.AddTx(tx, getSig())
 	if err != nil {
 		if strings.Contains(err.Error(), "future nonce") {
@@ -597,7 +613,63 @@ func (m *metamaskRelay) transactionHash(rlp string) (interface{}, error) {
 	}
 
 	return tx.HashSig(), nil
+	// if vmType != types.Evm {
+	// 	return tx.HashSig(), nil
+	// }
+	// return etx.Hash(), nil
 }
+
+// func (m *metamaskRelay) TransmuteTx(rlp string) (*types.Transaction, common.Signature, error) {
+// 	rlp = strings.Replace(rlp, "0x", "", -1)
+// 	rlpBytes, err := hex.DecodeString(rlp)
+// 	if err != nil {
+// 		return nil, nil, errors.WithStack(err)
+// 	}
+// 	etx, sig, err := txparser.EthTxFromRLP(rlpBytes)
+// 	if err != nil {
+// 		return nil, nil, err
+// 	}
+
+// 	var method string
+// 	if len(etx.Data()) >= 4 {
+// 		var m abi.Method
+// 		for _, m = range txparser.FuncSigs[hex.EncodeToString(etx.Data()[:4])] {
+// 			break
+// 		}
+// 		if m.Name == "" {
+// 			return nil, nil, errors.New("not exist abi")
+// 		}
+// 		method = strings.ToUpper(string(m.Name[0])) + m.Name[1:]
+// 	}
+// 	/*
+// 		if method == "" {
+// 			var m abi.Method
+// 			for _, m = range txparser.FuncSigs["transfer(address,uint256)"] {
+// 				break
+// 			}
+// 			name := m.Name
+// 			method = strings.ToUpper(string(name[0])) + name[1:]
+// 		}
+// 	*/
+
+// 	gp := etx.GasPrice()
+// 	if gp == nil || len(gp.Bytes()) == 0 {
+// 		gp = etx.GasFeeCap()
+// 	}
+
+// 	tx := &types.Transaction{
+// 		ChainID:     m.cn.Provider().ChainID(),
+// 		Timestamp:   uint64(time.Now().UnixNano()),
+// 		To:          *etx.To(),
+// 		Method:      method,
+// 		Args:        rlpBytes,
+// 		Seq:         etx.Nonce(),
+// 		UseSeq:      true,
+// 		IsEtherType: true,
+// 		GasPrice:    gp,
+// 	}
+// 	return tx, sig, nil
+// }
 
 func getTransaction(m *metamaskRelay, height uint32, index uint16) (interface{}, error) {
 	b, err := m.cn.Provider().Block(height)
@@ -798,34 +870,13 @@ func (m *metamaskRelay) TransmuteTx(rlp string) (*types.Transaction, common.Sign
 
 	var method string
 	if len(etx.Data()) >= 4 {
-		mabi := txparser.Abi(hex.EncodeToString(etx.Data()[:4]))
+		funcSig := hex.EncodeToString(etx.Data()[:4])
+		mabi := txparser.Abi(funcSig)
 		if mabi.Name == "" {
-			if !txparser.AbiCaches[etx.To().String()] {
-				caller := viewchain.NewViewCaller(m.cn)
-				txparser.AbiCaches[etx.To().String()] = true
-				if rawabi, _, err := caller.Execute(*etx.To(), common.Address{}.String(), "abis", []interface{}{}); err == nil && len(rawabi) > 0 {
-					if abis, ok := rawabi[0].([]interface{}); ok {
-						strs := []string{}
-						for _, funcStr := range abis {
-							if f, ok := funcStr.(string); ok {
-								strs = append(strs, f)
-							}
-						}
-						bs := []byte("[" + strings.Join(strs, ",") + "]")
-						reader := bytes.NewReader(bs)
-						if abi, err := abi.JSON(reader); err == nil {
-							for _, m := range abi.Methods {
-								txparser.AddAbi(m)
-							}
-						}
-					}
-				}
-				mabi = txparser.Abi(hex.EncodeToString(etx.Data()[:4]))
-				if mabi.Name == "" {
-					return nil, nil, errors.New("not exist abi")
-				}
-			} else {
-				return nil, nil, errors.New("not exist abi")
+			caller := viewchain.NewViewCaller(m.cn)
+			mabi, err = txparser.MakeAbi(*etx.To(), funcSig, caller)
+			if err != nil {
+				return nil, nil, err
 			}
 		}
 		if isInvokeable {
@@ -861,6 +912,15 @@ func (m *metamaskRelay) TransmuteTx(rlp string) (*types.Transaction, common.Sign
 		GasPrice:    gp,
 	}
 
+	// if isInvokeable {
+	// 	data, _, err := types.TxArg(ctx, tx)
+	// 	if err != nil {
+	// 		return nil, nil, err
+	// 	}
+	// 	tx.IsEtherType = false
+	// 	tx.Args = append(bin.TypeWriteAll(data), tx.Args...)
+	// }
+
 	return tx, sig, nil
 }
 
@@ -893,11 +953,11 @@ func (m *metamaskRelay) _getTokenBalanceOf(to common.Address, addr common.Addres
 }
 
 func (m *metamaskRelay) ethCall(from, to, data string) (result string, gas uint64, err error) {
-	if len(data) < 10 {
-		//log.Println("ErrInvalidData len:", len(data))
-		err = errors.WithStack(ErrInvalidData)
-		return
-	}
+	// if len(data) < 10 {
+	// 	//log.Println("ErrInvalidData len:", len(data))
+	// 	err = errors.WithStack(ErrInvalidData)
+	// 	return
+	// }
 	toAddr, err := common.ParseAddress(to)
 	if err != nil {
 		return "", 0, err
@@ -909,33 +969,9 @@ func (m *metamaskRelay) ethCall(from, to, data string) (result string, gas uint6
 	ctx := m.cn.NewContext()
 	if ctx.IsContract(toAddr) {
 		caller := viewchain.NewViewCaller(m.cn)
-		abiMs := txparser.Abis(toAddr, data[:8])
-		// abiMs : map[string]abi.Method
-		if len(abiMs) == 0 {
-			if !txparser.AbiCaches[toAddr.String()] {
-				txparser.AbiCaches[toAddr.String()] = true
-				if rawabi, _, err := caller.Execute(toAddr, from, "abis", []interface{}{}); err == nil && len(rawabi) > 0 {
-					if abis, ok := rawabi[0].([]interface{}); ok {
-						strs := []string{}
-						for _, funcStr := range abis {
-							if f, ok := funcStr.(string); ok {
-								strs = append(strs, f)
-							}
-						}
-						bs := []byte("[" + strings.Join(strs, ",") + "]")
-						reader := bytes.NewReader(bs)
-						if abi, err := abi.JSON(reader); err == nil {
-							for _, m := range abi.Methods {
-								txparser.AddAbi(m)
-							}
-						}
-					}
-				}
-				abiMs = txparser.Abis(toAddr, data[:8])
-			}
-		}
-		if len(abiMs) == 0 {
-			return "", 0, errors.New("func not found")
+		abiMs, err := txparser.Abis(toAddr, data[:8], caller)
+		if err != nil {
+			return "", 0, err
 		}
 		for _, abiM := range abiMs {
 			if result, gas, err = execWithAbi(caller, from, toAddr, abiM, data); err == nil {
@@ -957,6 +993,9 @@ func (m *metamaskRelay) ethCall(from, to, data string) (result string, gas uint6
 		}
 		if len(result.Revert()) > 0 {
 			return "", 0, newRevertError(result)
+		}
+		if result.Err != nil {
+			return "0x" + hex.EncodeToString(result.ReturnData), result.UsedGas, result.Err
 		}
 		return "0x" + hex.EncodeToString(result.ReturnData), result.UsedGas, result.Err
 	}

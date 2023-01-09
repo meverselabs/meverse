@@ -192,6 +192,11 @@ func TestContractWithOutSeq(ctx *types.Context, tx *types.Transaction, signer co
 	if err != nil {
 		return err
 	}
+	// var to common.Address = tx.To
+	// if !ctx.IsContract(tx.To) || isSendValue {
+	// 	data = append([]interface{}{tx.To}, data...)
+	// 	to = *ctx.MainToken()
+	// }
 	cont, err := ctx.Contract(to)
 	if err != nil {
 		return err
@@ -216,6 +221,11 @@ func _execContractWithOutSeq(ctx *types.Context, tx *types.Transaction, signer c
 	if err != nil {
 		return nil, nil, err
 	}
+	// var to common.Address = tx.To
+	// if !ctx.IsContract(tx.To) || isSendValue {
+	// 	data = append([]interface{}{tx.To}, data...)
+	// 	to = *ctx.MainToken()
+	// }
 
 	var result []interface{}
 	var intr types.IInteractor

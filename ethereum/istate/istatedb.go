@@ -61,6 +61,6 @@ type IStateDB interface {
 	AddressInAccessList(addr common.Address) bool
 	SlotInAccessList(addr common.Address, slot common.Hash) (addressPresent bool, slotPresent bool)
 	IsExtContract(addr common.Address) bool
-	Exec(user common.Address, contAddr common.Address, input []byte) ([]byte, uint64, error)
+	Exec(user common.Address, contAddr common.Address, input []byte, gas uint64) ([]byte, uint64, error)
 	// getCC(contAddr common.Address, user common.Address) (*types.ContractContext, error)
 }
