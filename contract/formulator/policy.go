@@ -1,6 +1,7 @@
 package formulator
 
 import (
+	"errors"
 	"io"
 
 	"github.com/meverselabs/meverse/common"
@@ -80,6 +81,8 @@ type RewardPolicy struct {
 	CommissionRatio1000   uint32
 	MiningFeeAddress      common.Address
 	MiningFee1000         uint32
+	MiningFee2Ratio1000   uint32
+	MiningFee2Address     common.Address
 }
 
 func (s *RewardPolicy) WriteTo(w io.Writer) (int64, error) {
@@ -111,6 +114,14 @@ func (s *RewardPolicy) WriteTo(w io.Writer) (int64, error) {
 	if sum, err := sw.Uint32(w, s.MiningFee1000); err != nil {
 		return sum, err
 	}
+	if s.MiningFee2Ratio1000 > 0 {
+		if sum, err := sw.Uint32(w, s.MiningFee2Ratio1000); err != nil {
+			return sum, err
+		}
+		if sum, err := sw.Address(w, s.MiningFee2Address); err != nil {
+			return sum, err
+		}
+	}
 	return sw.Sum(), nil
 }
 
@@ -141,6 +152,15 @@ func (s *RewardPolicy) ReadFrom(r io.Reader) (int64, error) {
 		return sum, err
 	}
 	if sum, err := sr.Uint32(r, &s.MiningFee1000); err != nil {
+		return sum, err
+	}
+	if sum, err := sr.Uint32(r, &s.MiningFee2Ratio1000); err != nil {
+		if errors.Unwrap(err) == io.EOF {
+			return sum, nil
+		}
+		return sum, err
+	}
+	if sum, err := sr.Address(r, &s.MiningFee2Address); err != nil {
 		return sum, err
 	}
 	return sr.Sum(), nil

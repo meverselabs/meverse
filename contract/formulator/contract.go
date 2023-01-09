@@ -231,10 +231,24 @@ func (cont *FormulatorContract) OnReward(cc *types.ContractContext, b *types.Blo
 					}
 					fee := RewardAmount.MulC(int64(rewardPolicy.MiningFee1000)).DivC(1000)
 					if !fee.IsZero() {
-						if err := cont.sendReward(cc, taddr, rewardEvent, rewardPolicy.MiningFeeAddress, fee); err != nil {
-							// if _, err := cc.Exec(cc, taddr, "Mint", []interface{}{rewardPolicy.MiningFeeAddress, fee}); err != nil {
-							return nil, err
+						if rewardPolicy.MiningFee2Ratio1000 == 0 {
+							if err := cont.sendReward(cc, taddr, rewardEvent, rewardPolicy.MiningFeeAddress, fee); err != nil {
+								// if _, err := cc.Exec(cc, taddr, "Mint", []interface{}{rewardPolicy.MiningFeeAddress, fee}); err != nil {
+								return nil, err
+							}
+						} else {
+							fee2 := fee.MulC(int64(rewardPolicy.MiningFee2Ratio1000)).DivC(1000)
+							fee1 := fee.Sub(fee2)
+							if err := cont.sendReward(cc, taddr, rewardEvent, rewardPolicy.MiningFeeAddress, fee1); err != nil {
+								// if _, err := cc.Exec(cc, taddr, "Mint", []interface{}{rewardPolicy.MiningFeeAddress, fee}); err != nil {
+								return nil, err
+							}
+							if err := cont.sendReward(cc, taddr, rewardEvent, rewardPolicy.MiningFee2Address, fee2); err != nil {
+								// if _, err := cc.Exec(cc, taddr, "Mint", []interface{}{rewardPolicy.MiningFeeAddress, fee}); err != nil {
+								return nil, err
+							}
 						}
+
 					}
 					processedAmount := RewardAmount.Sub(fee)
 					if err := cont.sendReward(cc, taddr, rewardEvent, RewardAddress, processedAmount); err != nil {
