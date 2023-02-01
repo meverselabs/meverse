@@ -163,6 +163,9 @@ func (ms *GeneratorService) handleConnection(p peer.Peer) error {
 			return err
 		}
 		if err := ms.ob.onGeneratorRecv(p, bs); err != nil {
+			if errors.Unwrap(err) == p2p.ErrUnknownMessage {
+				panic(p2p.ErrUnknownMessage) //TEMP
+			}
 			return err
 		}
 	}

@@ -42,9 +42,25 @@ func (f *front) MintBatch(cc *types.ContractContext, Tos []common.Address, Amoun
 func (f *front) SetMinter(cc *types.ContractContext, To common.Address, Is bool) error {
 	return f.cont.SetMinter(cc, To, Is)
 }
+func (f *front) SetTokenManager(cc *types.ContractContext, To common.Address, Is bool) error {
+	return f.cont.SetTokenManager(cc, To, Is)
+}
 
 func (f *front) Approve(cc *types.ContractContext, To common.Address, Amount *amount.Amount) (bool, error) {
 	err := f.cont.Approve(cc, To, Amount)
+	return err == nil, err
+}
+func (f *front) SetDelegateFee(cc *types.ContractContext, spender, banker common.Address, approveFee, approveLowerLimit, transferFee *amount.Amount) error {
+	return f.cont.SetDelegateFee(cc, spender, banker, approveFee, approveLowerLimit, transferFee)
+}
+
+func (f *front) DelegateFeeApprove(cc *types.ContractContext, To common.Address, Amount *amount.Amount) (bool, error) {
+	err := f.cont.DelegateFeeApprove(cc, To, Amount)
+	return err == nil, err
+}
+
+func (f *front) DelegateFeeTransfer(cc *types.ContractContext, To common.Address, Amount *amount.Amount) (bool, error) {
+	err := f.cont.DelegateFeeTransfer(cc, To, Amount)
 	return err == nil, err
 }
 

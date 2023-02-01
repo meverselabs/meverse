@@ -91,6 +91,11 @@ func (ac *MemoryKey) PublicKey() common.PublicKey {
 	return ac.pubkey
 }
 
+// PrivateKey returns *ecdsa.PrivateKey  of the private key
+func (ac *MemoryKey) PrivateKey() *ecdsa.PrivateKey {
+	return ac.PrivKey
+}
+
 // Sign generates the signature of the target hash
 func (ac *MemoryKey) Sign(h hash.Hash256) (common.Signature, error) {
 	bs, err := crypto.Sign(h[:], ac.PrivKey)

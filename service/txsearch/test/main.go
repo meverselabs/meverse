@@ -16,7 +16,7 @@ import (
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/meverselabs/meverse/extern/txparser"
-	"github.com/meverselabs/meverse/service/txsearch"
+	"github.com/meverselabs/meverse/service/txsearch/itxsearch"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -93,7 +93,7 @@ func main() {
 	return
 	for i = 0; i < 4294967295; i += 10000 {
 		for j = 0; j < 64000; j += 1000 {
-			testStruct := txsearch.TxID{
+			testStruct := itxsearch.TxID{
 				Height: i,
 				Index:  j,
 			}

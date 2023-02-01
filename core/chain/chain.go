@@ -7,13 +7,19 @@ import (
 	"sync"
 	"time"
 
+	etypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/google/uuid"
+
 	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/common/bin"
 	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/core/chain/admin"
 	"github.com/meverselabs/meverse/core/piledb"
 	"github.com/meverselabs/meverse/core/prefix"
 	"github.com/meverselabs/meverse/core/types"
+	"github.com/meverselabs/meverse/ethereum/core"
+
 	"github.com/pkg/errors"
 )
 
@@ -197,6 +203,11 @@ func (cn *Chain) Provider() types.Provider {
 	return cn.store
 }
 
+// Store returns the store of the chain
+func (cn *Chain) Store() *Store {
+	return cn.store
+}
+
 // WaitConnectedBlock is wait untile target block stored
 func (cn *Chain) WaitConnectedBlock(targetBlock uint32) {
 	if cn.Provider().Height() >= targetBlock {
@@ -256,10 +267,11 @@ func (cn *Chain) ConnectBlock(b *types.Block, SigMap map[hash.Hash256]common.Add
 		return err
 	}
 	ctx := types.NewContext(cn.store)
-	if err := cn.executeBlockOnContext(b, ctx, SigMap); err != nil {
+	if receipts, err := cn.executeBlockOnContext(b, ctx, SigMap); err != nil {
 		return err
+	} else {
+		return cn.connectBlockWithContext(b, ctx, receipts)
 	}
-	return cn.connectBlockWithContext(b, ctx)
 }
 
 func (cn *Chain) ValidateSignature(bh *types.Header, sigs []common.Signature) error {
@@ -306,18 +318,26 @@ func (cn *Chain) ValidateSignature(bh *types.Header, sigs []common.Signature) er
 	return nil
 }
 
-func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context) error {
+func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context, receipts types.Receipts) error {
 	if b.Header.ContextHash != ctx.Hash() {
 		log.Println("CONNECT", ctx.Hash(), b.Header.ContextHash, ctx.Dump())
 		panic("")
 		// return errors.WithStack(ErrInvalidContextHash)
 	}
 
+	if cn.store.Version(b.Header.Height) > 1 {
+		if b.Header.ReceiptHash != bin.MustWriterToHash(&receipts) {
+			log.Println("CONNECT", bin.MustWriterToHash(&receipts), b.Header.ReceiptHash, receipts)
+			panic("")
+			return errors.WithStack(ErrInvalidReceiptHash)
+		}
+	}
+
 	if ctx.StackSize() > 1 {
 		return errors.WithStack(types.ErrDirtyContext)
 	}
 
-	if err := cn.store.StoreBlock(b, ctx); err != nil {
+	if err := cn.store.StoreBlock(b, ctx, receipts); err != nil {
 		return err
 	}
 	var ca []*common.SyncChan
@@ -336,57 +356,69 @@ func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context) err
 	return nil
 }
 
-func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context, sm map[hash.Hash256]common.Address) error {
+func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context, sm map[hash.Hash256]common.Address) (types.Receipts, error) {
 	TxSigners, TxHashes, err := cn.validateTransactionSignatures(b, sm)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Execute Transctions
 	currentSlot := types.ToTimeSlot(b.Header.Timestamp)
+	receipts := types.Receipts{}
 	for i, tx := range b.Body.Transactions {
 		slot := types.ToTimeSlot(tx.Timestamp)
 		if slot < currentSlot-1 {
-			return errors.WithStack(types.ErrInvalidTransactionTimeSlot)
+			return nil, errors.WithStack(types.ErrInvalidTransactionTimeSlot)
 		} else if slot > currentSlot {
-			return errors.WithStack(types.ErrInvalidTransactionTimeSlot)
+			return nil, errors.WithStack(types.ErrInvalidTransactionTimeSlot)
 		}
 
 		sn := ctx.Snapshot()
 		if err := ctx.UseTimeSlot(slot, string(TxHashes[i][:])); err != nil {
 			ctx.Revert(sn)
-			return err
+			return nil, err
 		}
 		TXID := types.TransactionID(b.Header.Height, uint16(len(b.Body.Transactions)))
-		if tx.To == common.ZeroAddr {
-			if !ctx.IsAdmin(TxSigners[i]) {
-				ctx.Revert(sn)
-				return errors.WithStack(ErrInvalidAdminAddress)
+		if tx.VmType != types.Evm {
+			if tx.To == common.ZeroAddr {
+				if !ctx.IsAdmin(TxSigners[i]) {
+					ctx.Revert(sn)
+					return nil, errors.WithStack(ErrInvalidAdminAddress)
+				}
+				if _, err := cn.ExecuteTransaction(ctx, tx, TXID); err != nil {
+					ctx.Revert(sn)
+					return nil, err
+				}
+			} else {
+				if err := ExecuteContractTx(ctx, tx, TxSigners[i], TXID); err != nil {
+					ctx.Revert(sn)
+					return nil, err
+				}
 			}
-			if _, err := cn.ExecuteTransaction(ctx, tx, TXID); err != nil {
-				ctx.Revert(sn)
-				return err
-			}
+			receipt := new(etypes.Receipt)
+			receipts = append(receipts, receipt)
 		} else {
-			if err := ExecuteContractTx(ctx, tx, TxSigners[i], TXID); err != nil {
+			if _, receipt, err := cn.ApplyEvmTransaction(ctx, tx, uint16(i), TxSigners[i]); err != nil {
 				ctx.Revert(sn)
-				return err
+				return nil, err
+			} else {
+				receipts = append(receipts, receipt)
 			}
 		}
 		ctx.Commit(sn)
 	}
 	if ctx.StackSize() > 1 {
-		return errors.WithStack(types.ErrDirtyContext)
+		return nil, errors.WithStack(types.ErrDirtyContext)
 	}
 	if b.Header.Height%prefix.RewardIntervalBlocks == 0 {
 		if _, err := ctx.ProcessReward(ctx, b); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	if ctx.StackSize() > 1 {
-		return errors.WithStack(types.ErrDirtyContext)
+		return nil, errors.WithStack(types.ErrDirtyContext)
 	}
-	return nil
+	return receipts, nil
 }
 
 func (cn *Chain) validateHeader(bh *types.Header) error {
@@ -394,7 +426,7 @@ func (cn *Chain) validateHeader(bh *types.Header) error {
 	if bh.ChainID.Cmp(cn.store.ChainID()) != 0 {
 		return errors.Wrapf(ErrInvalidChainID, "chainid %v, %v", bh.ChainID, cn.store.ChainID())
 	}
-	if bh.Version > cn.store.Version() {
+	if bh.Version > cn.store.Version(bh.Height) {
 		return errors.WithStack(ErrInvalidVersion)
 	}
 	if bh.PrevHash != lastHash {
@@ -495,15 +527,15 @@ func (cn *Chain) ExecuteTransaction(ctx *types.Context, tx *types.Transaction, T
 	defer types.ExecLock.Unlock()
 
 	switch tx.Method {
-	case "Admin.Add":
+	case admin.AdminAdd:
 		return nil, ctx.SetAdmin(common.BytesToAddress(tx.Args), true)
-	case "Admin.Remove":
+	case admin.AdminRemove:
 		return nil, ctx.SetAdmin(common.BytesToAddress(tx.Args), false)
-	case "Generator.Add":
+	case admin.GeneratorAdd:
 		return nil, ctx.SetGenerator(common.BytesToAddress(tx.Args), true)
-	case "Generator.Remove":
+	case admin.GeneratorRemove:
 		return nil, ctx.SetGenerator(common.BytesToAddress(tx.Args), false)
-	case "Contract.Deploy":
+	case admin.ContractDeploy:
 		data := &DeployContractData{}
 		if _, err := data.ReadFrom(bytes.NewReader(tx.Args)); err != nil {
 			return nil, err
@@ -522,7 +554,67 @@ func (cn *Chain) ExecuteTransaction(ctx *types.Context, tx *types.Transaction, T
 				Result: bin.TypeWriteAll(addr),
 			}}, nil
 		}
+	case admin.TransactionSetBasicFee:
+		if iss, err := bin.TypeReadAll(tx.Args, 1); err != nil {
+			return nil, err
+		} else if fee, ok := iss[0].(*amount.Amount); ok {
+			ctx.SetBasicFee(fee)
+		} else {
+			return nil, errors.WithStack(ErrInvalidBasicFee)
+		}
+
+		_, i, err := types.ParseTransactionID(TXID)
+		if err != nil {
+			return nil, err
+		}
+		return []*types.Event{{
+			Index:  i,
+			Type:   types.EventTagTxMsg,
+			Result: tx.Args,
+		}}, nil
 	default:
 		return nil, errors.WithStack(ErrUnknownTransactionMethod)
 	}
+}
+
+// ethereum type transaction 실행
+func (cn *Chain) ApplyEvmTransaction(ctx *types.Context, tx *types.Transaction, ti uint16, signer common.Address) ([]*types.Event, *etypes.Receipt, error) {
+	etx := new(etypes.Transaction)
+	if err := etx.UnmarshalBinary([]byte(tx.Args)); err != nil {
+		return nil, nil, err
+	}
+
+	if err := core.ValidateTx(etx, true); err != nil {
+		return nil, nil, err
+	}
+	statedb := types.NewStateDB(ctx)
+	statedb.Prepare(etx.Hash(), int(ti))
+	receipt, err := core.ApplyTransaction(statedb, etx)
+	if err != nil {
+		log.Println("core.ApplyTransaction", err)
+		return nil, nil, err
+	}
+
+	ens := []*types.Event{}
+	if fee, err := ChargeFee(ctx, receipt.GasUsed, signer); err != nil {
+		return nil, nil, err
+	} else {
+		en := &types.Event{
+			Index:  ti,
+			Type:   types.EventTagTxFee,
+			Result: bin.TypeWriteAll(fee),
+		}
+		ens = append(ens, en)
+	}
+
+	if receipt.ContractAddress != (common.Address{}) {
+		addr := receipt.ContractAddress
+		en := &types.Event{
+			Index:  ti,
+			Type:   types.EventTagTxMsg,
+			Result: bin.TypeWriteAll(addr),
+		}
+		ens = append(ens, en)
+	}
+	return ens, receipt, nil
 }

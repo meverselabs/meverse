@@ -54,37 +54,37 @@ func scenario(point uint8, t *testing.T) (inf interface{}, err error) {
 
 	poolAddr = tc.DeployContract(tokenContType, tokenContArgs)
 
-	inf, err = tc.MakeTx(util.AdminKey, tc.MainToken, "Transfer", util.Users[0], amount.NewAmount(10, 0))
+	inf, err = tc.SendTx(util.AdminKey, tc.MainToken, "Transfer", util.Users[0], amount.NewAmount(10, 0))
 	if err != nil {
 		t.Error("Transfer", err, inf)
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, poolAddr, "Deposit")
+	inf, err = tc.SendTx(util.AdminKey, poolAddr, "Deposit")
 	if point == ErrDepositNoApprove {
 		return
 	}
 
-	_, err = tc.MakeTx(util.AdminKey, tokenAddr, "Approve", poolAddr, amount.NewAmount(3000, 0))
+	_, err = tc.SendTx(util.AdminKey, tokenAddr, "Approve", poolAddr, amount.NewAmount(3000, 0))
 	if err != nil {
 		t.Error("Approve", err)
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, poolAddr, "Holder")
+	inf, err = tc.SendTx(util.AdminKey, poolAddr, "Holder")
 	if point == Holder0 {
 		return
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, poolAddr, "Deposit")
+	inf, err = tc.SendTx(util.AdminKey, poolAddr, "Deposit")
 	if point == Deposit {
 		return
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, poolAddr, "Deposit")
+	inf, err = tc.SendTx(util.AdminKey, poolAddr, "Deposit")
 	if point == ErrDepositDuplicate {
 		return
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, poolAddr, "Holder")
+	inf, err = tc.SendTx(util.AdminKey, poolAddr, "Holder")
 	if point == Holder1 {
 		return
 	}
@@ -93,55 +93,55 @@ func scenario(point uint8, t *testing.T) (inf interface{}, err error) {
 		if i < 2 {
 			continue
 		}
-		tc.MakeTx(util.AdminKey, tc.MainToken, "Transfer", u, amount.NewAmount(1, 0))
-		tc.MakeTx(util.AdminKey, tokenAddr, "Transfer", u, amount.NewAmount(300, 0))
-		tc.MakeTx(util.UserKeys[i], tokenAddr, "Approve", poolAddr, amount.NewAmount(300, 0))
-		tc.MakeTx(util.UserKeys[i], poolAddr, "Deposit")
+		tc.SendTx(util.AdminKey, tc.MainToken, "Transfer", u, amount.NewAmount(1, 0))
+		tc.SendTx(util.AdminKey, tokenAddr, "Transfer", u, amount.NewAmount(300, 0))
+		tc.SendTx(util.UserKeys[i], tokenAddr, "Approve", poolAddr, amount.NewAmount(300, 0))
+		tc.SendTx(util.UserKeys[i], poolAddr, "Deposit")
 	}
-	inf, err = tc.MakeTx(util.AdminKey, poolAddr, "Holder")
+	inf, err = tc.SendTx(util.AdminKey, poolAddr, "Holder")
 	if point == Holder9 {
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[0], poolAddr, "LockDeposit")
+	inf, err = tc.SendTx(util.UserKeys[0], poolAddr, "LockDeposit")
 	if point == LockDeposit {
 		return
 	}
 
-	tc.MakeTx(util.AdminKey, tc.MainToken, "Transfer", util.Users[1], amount.NewAmount(1, 0))
-	tc.MakeTx(util.AdminKey, tokenAddr, "Transfer", util.Users[1], amount.NewAmount(300, 0))
-	tc.MakeTx(util.UserKeys[1], tokenAddr, "Approve", poolAddr, amount.NewAmount(300, 0))
-	inf, err = tc.MakeTx(util.UserKeys[1], poolAddr, "Deposit")
+	tc.SendTx(util.AdminKey, tc.MainToken, "Transfer", util.Users[1], amount.NewAmount(1, 0))
+	tc.SendTx(util.AdminKey, tokenAddr, "Transfer", util.Users[1], amount.NewAmount(300, 0))
+	tc.SendTx(util.UserKeys[1], tokenAddr, "Approve", poolAddr, amount.NewAmount(300, 0))
+	inf, err = tc.SendTx(util.UserKeys[1], poolAddr, "Deposit")
 	if point == ErrDepositAfterLock {
 		return
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, poolAddr, "IsHolder", util.Admin)
+	inf, err = tc.SendTx(util.AdminKey, poolAddr, "IsHolder", util.Admin)
 	if point == AdminIsHolder {
 		return
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, tokenAddr, "BalanceOf", poolAddr)
+	inf, err = tc.SendTx(util.AdminKey, tokenAddr, "BalanceOf", poolAddr)
 	if point == PoolBalanceOf300 {
 		return
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, poolAddr, "Withdraw")
+	inf, err = tc.SendTx(util.AdminKey, poolAddr, "Withdraw")
 	if point == ErrWithdrawBeforeUnlock {
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[0], poolAddr, "UnlockWithdraw")
+	inf, err = tc.SendTx(util.UserKeys[0], poolAddr, "UnlockWithdraw")
 	if point == UnlockWithdraw {
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[0], poolAddr, "Withdraw")
+	inf, err = tc.SendTx(util.UserKeys[0], poolAddr, "Withdraw")
 	if point == ErrWithdrawNoDeposit {
 		return
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, poolAddr, "Withdraw")
+	inf, err = tc.SendTx(util.AdminKey, poolAddr, "Withdraw")
 	if point == WithdrawDuplicate {
 		return
 	}
@@ -155,7 +155,7 @@ func scenario(point uint8, t *testing.T) (inf interface{}, err error) {
 		if i < 2 {
 			continue
 		}
-		tc.MakeTx(k, poolAddr, "Withdraw")
+		tc.SendTx(k, poolAddr, "Withdraw")
 	}
 	inf = tc.MustSendTx(util.AdminKey, tokenAddr, "BalanceOf", poolAddr)
 	if point == PoolBalanceOf0 {
@@ -167,22 +167,22 @@ func scenario(point uint8, t *testing.T) (inf interface{}, err error) {
 		return
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, tokenAddr, "Transfer", poolAddr, amount.NewAmount(10, 0))
+	inf, err = tc.SendTx(util.AdminKey, tokenAddr, "Transfer", poolAddr, amount.NewAmount(10, 0))
 	if err != nil {
 		t.Error("Transfer", err, inf)
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, poolAddr, "ReclaimToken", tokenAddr, amount.MustParseAmount("20"))
+	inf, err = tc.SendTx(util.AdminKey, poolAddr, "ReclaimToken", tokenAddr, amount.MustParseAmount("20"))
 	if point == ErrReclaimTokenNotOwner {
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[0], poolAddr, "ReclaimToken", tokenAddr, amount.MustParseAmount("20"))
+	inf, err = tc.SendTx(util.UserKeys[0], poolAddr, "ReclaimToken", tokenAddr, amount.MustParseAmount("20"))
 	if point == ErrReclaimTokenExceedBalance {
 		return
 	}
 
-	inf, err = tc.MakeTx(util.UserKeys[0], poolAddr, "ReclaimToken", tokenAddr, amount.MustParseAmount("10"))
+	inf, err = tc.SendTx(util.UserKeys[0], poolAddr, "ReclaimToken", tokenAddr, amount.MustParseAmount("10"))
 	if err != nil {
 		t.Error("Transfer", err, inf)
 	}

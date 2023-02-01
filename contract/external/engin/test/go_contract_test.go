@@ -34,7 +34,7 @@ func TestGoContractTx(t *testing.T) {
 	egAddr := tc.DeployContract(ContType, ContArgs)
 	log.Println("engin Addr", egAddr)
 
-	inf, err := tc.MakeTx(util.AdminKey, egAddr, "AddEngin", "JSContractEngin", "javascript vm on meverse verseion 0.1.0", url)
+	inf, err := tc.SendTx(util.AdminKey, egAddr, "AddEngin", "JSContractEngin", "javascript vm on meverse verseion 0.1.0", url)
 	log.Println(inf, err)
 	if err != nil {
 		t.Errorf("error not expect")
@@ -53,7 +53,7 @@ func TestGoContractTx(t *testing.T) {
 		return
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, egAddr, "DeploryContract", "JSContractEngin", "1", bs, []interface{}{
+	inf, err = tc.SendTx(util.AdminKey, egAddr, "DeploryContract", "JSContractEngin", "1", bs, []interface{}{
 		util.Admin.String(),
 	}, true)
 	log.Println(inf, err)
@@ -68,7 +68,7 @@ func TestGoContractTx(t *testing.T) {
 	}
 
 	firstData := "data is Set"
-	inf, err = tc.MakeTx(util.AdminKey, jsAddr, "SetData", firstData)
+	inf, err = tc.SendTx(util.AdminKey, jsAddr, "SetData", firstData)
 	if err != nil {
 		t.Errorf("setdata error result: %v, err: %v", inf, err)
 		return
@@ -89,7 +89,7 @@ func TestGoContractTx(t *testing.T) {
 		return
 	}
 
-	inf, err = tc.MakeTx(util.AdminKey, jsAddr, "Update", "JSContractEngin", "1", bs)
+	inf, err = tc.SendTx(util.AdminKey, jsAddr, "Update", "JSContractEngin", "1", bs)
 	log.Println(inf, err)
 	if err != nil {
 		t.Errorf("error not expect")
@@ -107,7 +107,7 @@ func TestGoContractTx(t *testing.T) {
 	}
 
 	secondData := "data is override"
-	inf, err = tc.MakeTx(util.AdminKey, jsAddr, "SetData", secondData)
+	inf, err = tc.SendTx(util.AdminKey, jsAddr, "SetData", secondData)
 	if err != nil {
 		t.Errorf("setdata error result: %v, err: %v", inf, err)
 		return

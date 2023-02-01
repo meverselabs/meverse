@@ -2,13 +2,10 @@ package test
 
 import (
 	"log"
-	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/common/amount"
-	"github.com/meverselabs/meverse/common/bin"
 	"github.com/meverselabs/meverse/common/hash"
 	"github.com/meverselabs/meverse/contract/exchange/factory"
 	"github.com/meverselabs/meverse/contract/exchange/router"
@@ -20,17 +17,37 @@ import (
 func init() {
 }
 
-func getContClassID(rt reflect.Type) uint64 {
-	for rt.Kind() == reflect.Ptr {
-		rt = rt.Elem()
-	}
-	name := rt.Name()
-	if pkgPath := rt.PkgPath(); len(pkgPath) > 0 {
-		pkgPath = strings.Replace(pkgPath, "meverselabs/meverse", "fletaio/fleta_v2", -1)
-		name = pkgPath + "." + name
-	}
-	h := hash.Hash([]byte(name))
-	return bin.Uint64(h[len(h)-8:])
+func TestSendTx(t *testing.T) {
+	tc := util.NewTestContext()
+
+	is, err := tc.ReadTx(util.AdminKey, tc.MainToken, "BalanceOf", util.Admin)
+	am1 := is[0].(*amount.Amount)
+	log.Println(am1.String(), err)
+
+	tokenAddr := tc.MakeToken("TestToken", "TEST", "10000")
+	log.Println("Test Token Addr", tokenAddr) // 0xadCAdf65B8A05e5Fbc0cfB0dEe8De2d2BAa16bDf
+	is, err = tc.SendTx(util.AdminKey, tokenAddr, "Transfer", util.Users[0], amount.MustParseAmount("1"))
+	log.Println(is, err)
+
+	is, err = tc.ReadTx(util.AdminKey, tc.MainToken, "BalanceOf", util.Admin)
+	am2 := is[0].(*amount.Amount)
+	log.Println(am1.Sub(am2).String(), err)
+
+	log.Println("Test Token Addr", tokenAddr) // 0xadCAdf65B8A05e5Fbc0cfB0dEe8De2d2BAa16bDf
+	is, err = tc.SendTx(util.AdminKey, tokenAddr, "Transfer", util.Users[0], amount.MustParseAmount("1"))
+	log.Println(is, err)
+
+	is, err = tc.ReadTx(util.AdminKey, tc.MainToken, "BalanceOf", util.Admin)
+	am3 := is[0].(*amount.Amount)
+	log.Println(am2.Sub(am3).String(), err)
+
+	log.Println("Test Token Addr", tokenAddr) // 0xadCAdf65B8A05e5Fbc0cfB0dEe8De2d2BAa16bDf
+	is, err = tc.SendTx(util.AdminKey, tokenAddr, "Transfer", util.Users[0], amount.MustParseAmount("1"))
+	log.Println(is, err)
+
+	is, err = tc.ReadTx(util.AdminKey, tc.MainToken, "BalanceOf", util.Admin)
+	am4 := is[0].(*amount.Amount)
+	log.Println(am3.Sub(am4).String(), err)
 }
 
 func TestSwapMaintokenTx(t *testing.T) {
@@ -83,6 +100,6 @@ func TestSwapMaintokenTx(t *testing.T) {
 	inf = tc.MustSendTx(util.AdminKey, tokenAddr, "SetRouter", routerAddr, []common.Address{tokenAddr, tc.MainToken})
 	log.Println("SetRouter", inf)
 
-	inf, err := tc.MakeTx(util.UserKeys[0], tokenAddr, "SwapToMainToken", amount.NewAmount(10, 0))
+	inf, err := tc.SendTx(util.UserKeys[0], tokenAddr, "SwapToMainToken", amount.NewAmount(10, 0))
 	log.Println("SwapToMainToken", inf, ":", err)
 }

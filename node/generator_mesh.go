@@ -170,6 +170,9 @@ func (ms *GeneratorNodeMesh) handleConnection(p peer.Peer) error {
 			return err
 		}
 		if err := ms.fr.onObserverRecv(p, bs); err != nil {
+			if errors.Cause(err) == p2p.ErrUnknownMessage {
+				panic(p2p.ErrUnknownMessage) // temp
+			}
 			return err
 		}
 	}

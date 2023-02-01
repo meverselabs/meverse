@@ -2,10 +2,13 @@ package chain
 
 import (
 	"reflect"
+	"strings"
 
+	etypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 
 	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/common/bin"
 	"github.com/meverselabs/meverse/common/hash"
 	"github.com/meverselabs/meverse/core/prefix"
@@ -29,7 +32,7 @@ func NewBlockCreator(cn *Chain, ctx *types.Context, Generator common.Address, Ti
 		b: &types.Block{
 			Header: types.Header{
 				ChainID:      ctx.ChainID(),
-				Version:      ctx.Version(),
+				Version:      ctx.Version(ctx.TargetHeight()),
 				Height:       ctx.TargetHeight(),
 				PrevHash:     ctx.PrevHash(),
 				TimeoutCount: TimeoutCount,
@@ -48,10 +51,10 @@ func NewBlockCreator(cn *Chain, ctx *types.Context, Generator common.Address, Ti
 }
 
 // AddTx validates, executes and adds transactions
-func (bc *BlockCreator) AddTx(tx *types.Transaction, sig common.Signature) error {
+func (bc *BlockCreator) AddTx(tx *types.Transaction, sig common.Signature) (*etypes.Receipt, error) {
 	pubkey, err := common.RecoverPubkey(tx.ChainID, tx.Message(), sig)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	tx.From = pubkey.Address()
 	TxHash := tx.HashSig()
@@ -59,14 +62,14 @@ func (bc *BlockCreator) AddTx(tx *types.Transaction, sig common.Signature) error
 }
 
 // UnsafeAddTx adds transactions without signer validation if signers is not empty
-func (bc *BlockCreator) UnsafeAddTx(TxHash hash.Hash256, tx *types.Transaction, sig common.Signature, signer common.Address) (err error) {
+func (bc *BlockCreator) UnsafeAddTx(TxHash hash.Hash256, tx *types.Transaction, sig common.Signature, signer common.Address) (receipt *etypes.Receipt, err error) {
 	currentSlot := types.ToTimeSlot(bc.b.Header.Timestamp)
 	slot := types.ToTimeSlot(tx.Timestamp)
 
 	if slot < currentSlot-1 {
-		return errors.WithStack(types.ErrInvalidTransactionTimeSlot)
+		return nil, errors.WithStack(types.ErrInvalidTransactionTimeSlot)
 	} else if slot > currentSlot {
-		return errors.WithStack(types.ErrInvalidTransactionTimeSlot)
+		return nil, errors.WithStack(types.ErrInvalidTransactionTimeSlot)
 	}
 
 	sn := bc.ctx.Snapshot()
@@ -86,45 +89,56 @@ func (bc *BlockCreator) UnsafeAddTx(TxHash hash.Hash256, tx *types.Transaction, 
 		bc.txHashes = append(bc.txHashes, TxHash)
 	}()
 	if err := bc.ctx.UseTimeSlot(slot, string(TxHash[:])); err != nil {
-		return err
+		return nil, err
 	}
 	index := uint16(len(bc.b.Body.Transactions))
 	TXID := types.TransactionID(bc.b.Header.Height, index)
-	if tx.To == common.ZeroAddr {
-		if !bc.ctx.IsAdmin(signer) {
-			return errors.WithStack(ErrInvalidAdminAddress)
-		}
-		if ens, err = bc.cn.ExecuteTransaction(bc.ctx, tx, TXID); err != nil {
-			return err
+	if tx.VmType != types.Evm {
+		receipt = new(etypes.Receipt)
+		if tx.To == common.ZeroAddr {
+			if !bc.ctx.IsAdmin(signer) {
+				return nil, errors.WithStack(ErrInvalidAdminAddress)
+			}
+			if ens, err = bc.cn.ExecuteTransaction(bc.ctx, tx, TXID); err != nil {
+				return nil, err
+			}
+		} else {
+			if ens, err = ExecuteContractTxWithEvent(bc.ctx, tx, signer, TXID); err != nil {
+				return nil, err
+			}
 		}
 	} else {
-		if ens, err = ExecuteContractTxWithEvent(bc.ctx, tx, signer, TXID); err != nil {
-			return err
+		if ens, receipt, err = bc.cn.ApplyEvmTransaction(bc.ctx, tx, index, signer); err != nil {
+			return nil, err
 		}
 	}
-	return nil
+
+	return receipt, nil
 }
 
-func ChargeFee(ctx *types.Context, useSize uint64, signer common.Address) error {
+func ChargeFee(ctx *types.Context, useGas uint64, signer common.Address) (*amount.Amount, error) {
+	if ctx.Version(ctx.TargetHeight()) <= 1 {
+		useGas = 0
+	}
 	addr := *ctx.MainToken()
+	gas := ctx.BasicFee()
 	if mcont, err := ctx.Contract(addr); err != nil {
-		return err
+		return nil, err
 	} else if mt, ok := mcont.(types.ChargeFee); !ok {
-		return errors.New("Maintoken not charge fee")
+		return nil, errors.New("Maintoken not charge fee")
 	} else {
-		fee := ctx.BasicFee()
-		if useSize > 0 {
-			fee = fee.MulC(int64(useSize))
+		if useGas > 0 {
+			gas = gas.MulC(int64(useGas))
 		}
-		if err := mt.ChargeFee(ctx.ContractContext(mcont, signer), fee); err != nil {
-			return err
+		if err := mt.ChargeFee(ctx.ContractContext(mcont, signer), gas); err != nil {
+			return nil, err
 		}
 	}
-	return nil
+	return gas, nil
 }
 
 func ExecuteContractTxWithEvent(ctx *types.Context, tx *types.Transaction, signer common.Address, TXID string) ([]*types.Event, error) {
-	intr, result, resultErr := _executeContractTx(ctx, tx, signer, TXID)
+	intr, result, resultErr := _executeContractTx(ctx, tx, signer, TXID) // genblock
 
 	_, i, err := types.ParseTransactionID(TXID)
 	if err != nil {
@@ -174,74 +188,112 @@ func TestContractWithOutSeq(ctx *types.Context, tx *types.Transaction, signer co
 	n := ctx.Snapshot()
 	defer ctx.Revert(n)
 
-	s := ctx.GetPCSize()
-	data, isSendValue, err := types.TxArg(ctx, tx)
+	to, method, data, err := types.TxArg(ctx, tx)
 	if err != nil {
 		return err
 	}
-	var to common.Address = tx.To
-	if !ctx.IsContract(tx.To) || isSendValue {
-		data = append([]interface{}{tx.To}, data...)
-		to = *ctx.MainToken()
-	}
+	// var to common.Address = tx.To
+	// if !ctx.IsContract(tx.To) || isSendValue {
+	// 	data = append([]interface{}{tx.To}, data...)
+	// 	to = *ctx.MainToken()
+	// }
 	cont, err := ctx.Contract(to)
 	if err != nil {
 		return err
 	}
 	cc := ctx.ContractContext(cont, signer)
-	intr := types.NewInteractor(ctx, cont, cc, "000000000000", false)
+	intr := types.NewInteractor(ctx, cont, cc, "000000000000", true)
 	cc.Exec = intr.Exec
-	_, err = intr.Exec(cc, to, tx.Method, data)
+	_, err = intr.Exec(cc, to, method, data)
 	intr.Distroy()
 	if err != nil {
 		return err
 	}
-	useSize := ctx.GetPCSize() - s
-	return ChargeFee(ctx, useSize, signer)
+	gh := intr.GasHistory()
+	if _, err := ChargeFee(ctx, gh[0], signer); err != nil {
+		return err
+	}
+	return nil
 }
 
 func _execContractWithOutSeq(ctx *types.Context, tx *types.Transaction, signer common.Address, TXID string) (types.IInteractor, []interface{}, error) {
-	s := ctx.GetPCSize()
-	data, isSendValue, err := types.TxArg(ctx, tx)
+	to, method, data, err := types.TxArg(ctx, tx)
 	if err != nil {
 		return nil, nil, err
 	}
-	var to common.Address = tx.To
-	if !ctx.IsContract(tx.To) || isSendValue {
-		data = append([]interface{}{tx.To}, data...)
-		to = *ctx.MainToken()
-	}
-	cont, err := ctx.Contract(to)
-	if err != nil {
-		return nil, nil, err
-	}
-	cc := ctx.ContractContext(cont, signer)
-	intr := types.NewInteractor(ctx, cont, cc, TXID, true)
-	cc.Exec = intr.Exec
-	is, err := intr.Exec(cc, to, tx.Method, data)
-	intr.Distroy()
-	if err != nil {
-		return nil, nil, err
-	}
-	result := []interface{}{}
-	for _, i := range is {
-		if i != nil {
-			if reflect.TypeOf(i).Kind() == reflect.Slice {
-				s := reflect.ValueOf(i)
-				if s.Len() > 0 {
+	// var to common.Address = tx.To
+	// if !ctx.IsContract(tx.To) || isSendValue {
+	// 	data = append([]interface{}{tx.To}, data...)
+	// 	to = *ctx.MainToken()
+	// }
+
+	var result []interface{}
+	var intr types.IInteractor
+	if ctx.IsContract(to) {
+		cont, err := ctx.Contract(to)
+		if err != nil {
+			return nil, nil, err
+		}
+		if _, ok := cont.(types.InvokeableContract); !ok {
+			tx.Method = strings.ToUpper(string(method[0])) + method[1:]
+		}
+		cc := ctx.ContractContext(cont, signer)
+		intr = types.NewInteractor(ctx, cont, cc, TXID, true)
+		cc.Exec = intr.Exec
+		is, err := intr.Exec(cc, to, method, data)
+		intr.Distroy()
+
+		if err != nil {
+			return nil, nil, err
+		}
+
+		for _, i := range is {
+			if i != nil {
+				if reflect.TypeOf(i).Kind() == reflect.Slice {
+					s := reflect.ValueOf(i)
+					if s.Len() > 0 {
+						result = append(result, i)
+					}
+				} else {
 					result = append(result, i)
 				}
-			} else {
-				result = append(result, i)
 			}
 		}
+
+		gh := intr.GasHistory()
+		if fee, err := ChargeFee(ctx, gh[0], signer); err != nil {
+			return nil, nil, err
+		} else {
+			_, i, _ := types.ParseTransactionID(TXID)
+			en := &types.Event{
+				Index:  i,
+				Type:   types.EventTagTxFee,
+				Result: bin.TypeWriteAll(fee),
+			}
+			intr.AddEvent(en)
+		}
+
+	} else {
+		statedb := types.NewStateDB(ctx)
+		if statedb.IsEvmContract(to) {
+			cc := ctx.ContractContextFromAddress(to, signer)
+			intr = types.NewInteractor2(ctx, cc, TXID, true)
+			cc.Exec = intr.Exec
+			result, err = intr.Exec(cc, to, method, data)
+			intr.Distroy()
+			if err != nil {
+				return nil, nil, err
+			}
+		} else {
+			return nil, nil, ErrNotExistContract
+		}
 	}
-	useSize := ctx.GetPCSize() - s
-	return intr, result, ChargeFee(ctx, useSize, signer)
+
+	return intr, result, nil
 }
 
 // Finalize generates block that has transactions adds by AddTx
-func (bc *BlockCreator) Finalize(gasLv uint16) (*types.Block, error) {
+func (bc *BlockCreator) Finalize(gasLv uint16, receipts types.Receipts) (*types.Block, error) {
 	if bc.b.Header.Height%prefix.RewardIntervalBlocks == 0 {
 		if rewardMap, err := bc.ctx.ProcessReward(bc.ctx, bc.b); err != nil {
 			return nil, err
@@ -268,6 +320,8 @@ func (bc *BlockCreator) Finalize(gasLv uint16) (*types.Block, error) {
 	bc.b.Header.LevelRootHash = LevelRootHash
 
 	bc.b.Header.ContextHash = bc.ctx.Hash()
+
+	bc.b.Header.ReceiptHash = bin.MustWriterToHash(&receipts)
 
 	// log.Println("BLOCK hash", bc.b.Header.ContextHash)
 	// log.Println("BLOCK", bc.ctx.Dump())

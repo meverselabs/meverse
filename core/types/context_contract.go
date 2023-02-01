@@ -1,10 +1,13 @@
 package types
 
 import (
+	"math"
 	"math/big"
 
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/ethereum/core/defaultevm"
+	"github.com/meverselabs/meverse/ethereum/core/vm"
 )
 
 // ContractContext is an context for the contract
@@ -21,8 +24,8 @@ func (cc *ContractContext) ChainID() *big.Int {
 }
 
 // Version returns the version of the chain
-func (cc *ContractContext) Version() uint16 {
-	return cc.ctx.Version()
+func (cc *ContractContext) Version(h uint32) uint16 {
+	return cc.ctx.Version(h)
 }
 
 // Hash returns the hash value of it
@@ -109,4 +112,14 @@ func (cc *ContractContext) NextSeq() uint32 {
 // IsContract returns is the contract
 func (cc *ContractContext) IsContract(addr common.Address) bool {
 	return cc.ctx.Top().IsContract(addr)
+}
+
+// EvmCall execute evm.Call function and returns result, usedGas, error
+func (cc *ContractContext) EvmCall(caller vm.ContractRef, to common.Address, input []byte) ([]byte, uint64, error) {
+	statedb := NewStateDB(cc.ctx)
+	evm := defaultevm.DefaultEVM(statedb)
+
+	inputGas := uint64(math.MaxUint64)
+	ret, leftOverGas, err := evm.Call(caller, to, input, inputGas, big.NewInt(0))
+	return ret, inputGas - leftOverGas, err
 }

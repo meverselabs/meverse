@@ -24,6 +24,7 @@ func (s *Body) Clone() Body {
 }
 
 func (s *Body) WriteTo(w io.Writer) (int64, error) {
+
 	sw := bin.NewSumWriter()
 	if sum, err := sw.Uint16(w, uint16(len(s.Transactions))); err != nil {
 		return sum, err
@@ -110,5 +111,6 @@ func (s *Body) ReadFrom(r io.Reader) (int64, error) {
 			s.BlockSignatures = append(s.BlockSignatures, v)
 		}
 	}
+
 	return sr.Sum(), nil
 }

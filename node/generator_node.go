@@ -27,6 +27,7 @@ type genItem struct {
 	BlockGen *BlockGenMessage
 	ObSign   *BlockObSignMessage
 	Context  *types.Context
+	Receipts types.Receipts
 	Recv     bool
 }
 
@@ -298,6 +299,9 @@ func (fr *GeneratorNode) Run(BindAddress string) {
 					continue
 				}
 				if err := fr.handlePeerMessage(item.PeerID, m); err != nil {
+					if errors.Unwrap(err) == p2p.ErrUnknownMessage {
+						panic(p2p.ErrUnknownMessage) //TEMP
+					}
 					log.Printf("handlePeerMessage %+v\n", err)
 					fr.nm.RemovePeer(item.PeerID)
 					continue
@@ -347,7 +351,7 @@ func (fr *GeneratorNode) Run(BindAddress string) {
 			if has {
 				if gi.BlockGen != nil && gi.Context != nil {
 					if gi.BlockGen.Block.Header.Generator == b.Header.Generator {
-						if err := fr.ct.ConnectBlockWithContext(b, gi.Context); err != nil {
+						if err := fr.ct.ConnectBlockWithContext(b, gi.Context, gi.Receipts); err != nil {
 							log.Printf("blockQ.ConnectBlockWithContext %+v\n", err)
 						} else {
 							isConnected = true
@@ -428,8 +432,10 @@ func (fr *GeneratorNode) AddTx(tx *types.Transaction, sig common.Signature) erro
 		}
 	}
 
-	TxHash := tx.HashSig()
 	ctx := fr.cn.NewContext()
+	tx.VmType, tx.Method = types.GetTxType(ctx, tx)
+
+	TxHash := tx.HashSig()
 	if ctx.IsUsedTimeSlot(slot, string(TxHash[:])) {
 		return errors.WithStack(types.ErrUsedTimeSlot)
 	}
@@ -475,9 +481,9 @@ func (fr *GeneratorNode) PushTx(tx *types.Transaction, sig common.Signature) err
 }
 
 func (fr *GeneratorNode) addTx(TxHash hash.Hash256, tx *types.Transaction, sig common.Signature) error {
-	if tx.IsEtherType && len(sig) < 66 {
-		return errors.New("invalid recid chain check")
-	}
+	// if tx.IsEtherType && len(sig) < 66 {
+	// 	return errors.New("invalid recid chain check")
+	// }
 	if fr.txpool.IsExist(TxHash) {
 		return errors.WithStack(txpool.ErrExistTransaction)
 	}
@@ -485,6 +491,8 @@ func (fr *GeneratorNode) addTx(TxHash hash.Hash256, tx *types.Transaction, sig c
 	if err != nil {
 		return err
 	}
+	// contract check
+
 	tx.From = pubkey.Address()
 	if err := fr.txpool.Push(TxHash, tx, sig, tx.From); err != nil {
 		return err

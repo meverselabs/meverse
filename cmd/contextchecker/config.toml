@@ -16,8 +16,8 @@ RunMode = "Sync"
 # RunMode = "Test"
 
 CheckStoreRoot = "./ndata2"
-ZipHeight = 44500000
-ZipInterval = 100000
+ZipHeight = 0
+ZipInterval = 1000
 SaveZipPath = "./zipcontext/"
 
 [SeedNodeMap]

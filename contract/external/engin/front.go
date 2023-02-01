@@ -21,6 +21,9 @@ func (f *front) AddEngin(cc *types.ContractContext, Name string, Description str
 func (f *front) LoadEngin(cc *types.ContractContext, Name string, Version uint32) (types.IEngin, error) {
 	return f.cont.loadEngin(cc, Name, Version)
 }
+func (f *front) EnginInfo(cc *types.ContractContext, Name string) (map[uint32]string, error) {
+	return f.cont.enginInfo(cc, Name)
+}
 func (f *front) DeploryContract(cc *types.ContractContext, EnginName string, EnginVersion uint32, contract []byte, initArgs []interface{}, updateable bool) (addr common.Address, err error) {
 	return f.cont.deploryContract(cc, EnginName, EnginVersion, contract, initArgs, updateable)
 }

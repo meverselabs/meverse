@@ -3,6 +3,7 @@ package types
 import (
 	"bytes"
 	"encoding/hex"
+	"io"
 	"strconv"
 
 	"github.com/meverselabs/meverse/common"
@@ -52,7 +53,7 @@ func NewContextData(cache *contextCache, Parent *ContextData) *ContextData {
 }
 
 func (ctd *ContextData) GetPCSize() uint64 {
-	return ctd.size
+	return ctd.size * 22
 }
 
 // IsAdmin returns the account is admin or not
@@ -61,10 +62,10 @@ func (ctd *ContextData) IsAdmin(addr common.Address) bool {
 		return false
 	}
 	if is, has := ctd.AdminMap[addr]; has {
+		ctd.size += 21 //uint32(common.Sizeof(reflect.TypeOf(addr))) + uint32(common.Sizeof(reflect.TypeOf(is)))
 		return is
 	} else if ctd.Parent != nil {
 		is := ctd.Parent.IsAdmin(addr)
-		ctd.size += 21 //uint32(common.Sizeof(reflect.TypeOf(addr))) + uint32(common.Sizeof(reflect.TypeOf(is)))
 		return is
 	} else {
 		is := ctd.cache.IsAdmin(addr)
@@ -98,12 +99,13 @@ func (ctd *ContextData) IsGenerator(addr common.Address) bool {
 	if _, has := ctd.DeletedGeneratorMap[addr]; has {
 		return false
 	}
-	ctd.size += 1 // uint32(common.Sizeof(reflect.TypeOf(bool)))
 	if is, has := ctd.GeneratorMap[addr]; has {
+		ctd.size += 1 // uint32(common.Sizeof(reflect.TypeOf(bool)))
 		return is
 	} else if ctd.Parent != nil {
 		return ctd.Parent.IsGenerator(addr)
 	} else {
+		ctd.size += 1 // uint32(common.Sizeof(reflect.TypeOf(bool)))
 		return ctd.cache.IsGenerator(addr)
 	}
 }
@@ -160,6 +162,7 @@ func (ctd *ContextData) SetMainToken(addr common.Address) {
 // IsContract returns is the contract
 func (ctd *ContextData) IsContract(addr common.Address) bool {
 	if _, has := ctd.ContractDefineMap[addr]; has {
+		ctd.size += 20 // uint32(common.Sizeof(reflect.TypeOf(addr)))
 		return true
 	} else if ctd.Parent != nil {
 		return ctd.Parent.IsContract(addr)
@@ -173,9 +176,9 @@ func (ctd *ContextData) IsContract(addr common.Address) bool {
 // Contract returns the contract
 func (ctd *ContextData) Contract(addr common.Address) (Contract, error) {
 	if cd, has := ctd.ContractDefineMap[addr]; has {
+		ctd.size += 20 // uint32(common.Sizeof(reflect.TypeOf(addr)))
 		return CreateContract(cd)
 	} else if ctd.Parent != nil {
-		ctd.size += 20 // uint32(common.Sizeof(reflect.TypeOf(addr)))
 		return ctd.Parent.Contract(addr)
 	} else {
 		ctd.size += 20 // uint32(common.Sizeof(reflect.TypeOf(addr)))
@@ -250,10 +253,10 @@ func (ctd *ContextData) Data(cont common.Address, addr common.Address, name []by
 		return nil
 	}
 	if value, has := ctd.DataMap[key]; has {
+		ctd.size += 72 //uint64(len(name)) + uint64(len(value))
 		return value
 	} else if ctd.Parent != nil {
 		value := ctd.Parent.Data(cont, addr, name)
-		ctd.size += uint64(len(name)) + uint64(len(value))
 		if len(value) > 0 {
 			if ctd.isTop {
 				nvalue := make([]byte, len(value))
@@ -267,7 +270,7 @@ func (ctd *ContextData) Data(cont common.Address, addr common.Address, name []by
 		}
 	} else {
 		value := ctd.cache.Data(cont, addr, name)
-		ctd.size += uint64(len(name)) + uint64(len(value))
+		ctd.size += 72 // uint64(len(name)) + uint64(len(value))
 		if len(value) > 0 {
 			if ctd.isTop {
 				nvalue := make([]byte, len(value))
@@ -358,8 +361,27 @@ func (ctd *ContextData) AddrSeq(addr common.Address) uint64 {
 
 // AddSeq update the sequence of the target address
 func (ctd *ContextData) AddAddrSeq(addr common.Address) {
-	ctd.AddrSeqMap[addr] = ctd.AddrSeq(addr) + 1
-	ctd.size += 28 // addr + uint64
+	if val, has := ctd.AddrSeqMap[addr]; !has {
+		ctd.size += 28 // addr + uint64
+		ctd.AddrSeqMap[addr] = val + 1
+	} else {
+		ctd.AddrSeqMap[addr] = val + 1
+	}
+}
+
+// SetNonce update the sequence(nonce) of the target address
+func (ctd *ContextData) SetNonce(addr common.Address, nonce uint64) {
+	if _, has := ctd.AddrSeqMap[addr]; !has {
+		ctd.size += 28 // addr + uint64
+		ctd.AddrSeqMap[addr] = nonce
+	} else {
+		ctd.AddrSeqMap[addr] = nonce
+	}
+}
+
+// UnsafeBasicFee returns the basic fee
+func (ctd *ContextData) UnsafeBasicFee() *amount.Amount {
+	return ctd.basicFee
 }
 
 // BasicFee returns the basic fee
@@ -392,7 +414,7 @@ func (ctd *ContextData) Hash() hash.Hash256 {
 	buffer.WriteString("ChainID")
 	buffer.Write(ctd.cache.ctx.ChainID().Bytes())
 	buffer.WriteString("ChainVersion")
-	buffer.Write(bin.Uint16Bytes(ctd.cache.ctx.Version()))
+	buffer.Write(bin.Uint16Bytes(ctd.cache.ctx.Version(ctd.cache.ctx.TargetHeight())))
 	buffer.WriteString("Height")
 	buffer.Write(bin.Uint32Bytes(ctd.cache.ctx.TargetHeight()))
 	buffer.WriteString("PrevHash")
@@ -454,21 +476,32 @@ func (ctd *ContextData) Hash() hash.Hash256 {
 
 // Dump prints the context data
 func (ctd *ContextData) Dump() string {
-	var buffer bytes.Buffer
-	buffer.WriteString("ChainID\n")
-	buffer.WriteString(ctd.cache.ctx.ChainID().String())
-	buffer.WriteString("\n")
-	buffer.WriteString("ChainVersion\n")
-	buffer.WriteString(strconv.FormatUint(uint64(ctd.cache.ctx.Version()), 10))
-	buffer.WriteString("\n")
-	buffer.WriteString("Height\n")
+	buffer := &bytes.Buffer{}
+	ibuffer := ctd.dump(buffer, false)
+	buffer = ibuffer.(*bytes.Buffer)
+	return buffer.String()
+}
+
+// Dump prints the context data
+func (ctd *ContextData) WriteDump() string {
+	buffer := &bytes.Buffer{}
+	ibuffer := ctd.dump(buffer, true)
+	buffer = ibuffer.(*bytes.Buffer)
+	return buffer.String()
+}
+
+// Dump prints the context data
+func (ctd *ContextData) dump(buffer io.StringWriter, showValue bool) io.StringWriter {
+	buffer.WriteString("\nHeight\n")
 	buffer.WriteString(strconv.FormatUint(uint64(ctd.cache.ctx.TargetHeight()), 10))
-	buffer.WriteString("\n")
-	buffer.WriteString("PrevHash\n")
+	buffer.WriteString("\nChainID\n")
+	buffer.WriteString(ctd.cache.ctx.ChainID().String())
+	buffer.WriteString("\nChainVersion\n")
+	buffer.WriteString(strconv.FormatUint(uint64(ctd.cache.ctx.Version(ctd.cache.ctx.TargetHeight())), 10))
+	buffer.WriteString("\nPrevHash\n")
 	PrevHash := ctd.cache.ctx.PrevHash()
 	buffer.WriteString(PrevHash.String())
-	buffer.WriteString("\n")
-	buffer.WriteString("AdminMap\n")
+	buffer.WriteString("\nAdminMap\n")
 	EachAllAddressBool(ctd.AdminMap, func(key common.Address, value bool) error {
 		buffer.WriteString(key.String())
 		buffer.WriteString("\n")
@@ -496,7 +529,7 @@ func (ctd *ContextData) Dump() string {
 	})
 	buffer.WriteString("MainToken")
 	if ctd.mainToken != nil {
-		buffer.Write((*ctd.mainToken)[:])
+		buffer.WriteString(ctd.mainToken.String())
 	}
 	buffer.WriteString("DeletedGeneratorMap\n")
 	EachAllAddressBool(ctd.DeletedGeneratorMap, func(key common.Address, value bool) error {
@@ -508,7 +541,11 @@ func (ctd *ContextData) Dump() string {
 	EachAllStringBytes(ctd.DataMap, func(key string, value []byte) error {
 		buffer.WriteString(hex.EncodeToString([]byte(key)))
 		buffer.WriteString(":")
-		buffer.WriteString(hash.Hash(value).String())
+		if showValue {
+			buffer.WriteString(hex.EncodeToString(value))
+		} else {
+			buffer.WriteString(hash.Hash(value).String())
+		}
 		buffer.WriteString("\n")
 		return nil
 	})
@@ -531,5 +568,5 @@ func (ctd *ContextData) Dump() string {
 		buffer.WriteString("\n")
 		return nil
 	})
-	return buffer.String()
+	return buffer
 }

@@ -2,7 +2,6 @@ package mappfarm
 
 import (
 	"errors"
-	"log"
 
 	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/core/types"
@@ -102,7 +101,6 @@ func (cont *FarmContract) Deposit(cc *types.ContractContext, _pid uint64, _wantA
 	}
 	user.RewardDebt = user.Shares.Mul(pool.AccTokenPerShare)
 	cont.setUserInfo(cc, _pid, cc.From(), user)
-	log.Println(cc.From().String(), user.RewardDebt.String(), user.Shares.String())
 	// emit Deposit(msg.sender, _pid, _wantAmt);
 	return nil
 }

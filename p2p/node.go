@@ -258,19 +258,9 @@ func (nd *Node) Run(BindAddress string) {
 
 	for i := 0; i < 2; i++ {
 		go func() {
-			for item := range nd.recvChan {
+			for {
+				nd.PacketProcess()
 				if nd.isClose {
-					break
-				}
-				m, err := PacketToMessage(item.Packet)
-				if err != nil {
-					log.Printf("PacketToMessage %+v\n", err)
-					nd.ms.RemovePeer(item.PeerID)
-					break
-				}
-				if err := nd.handlePeerMessage(item.PeerID, m); err != nil {
-					log.Printf("handlePeerMessage %+v\n", err)
-					nd.ms.RemovePeer(item.PeerID)
 					break
 				}
 			}
@@ -326,9 +316,9 @@ func (nd *Node) Run(BindAddress string) {
 				// break
 			}
 			nd.cleanPool(b)
-			// if nd.cn.Provider().Height()%100 == 0 {
-			log.Println("Node", nd.myPublicKey.Address().String(), nd.cn.Provider().Height(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Body.Transactions))
-			// }
+			//if nd.cn.Provider().Height()%100 == 0 {
+			log.Println("Node", b.Header.Version, nd.myPublicKey.Address().String(), nd.cn.Provider().Height(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Body.Transactions))
+			//}
 
 			txs := nd.txpool.Clean(types.ToTimeSlot(b.Header.Timestamp))
 			if len(txs) > 0 {
@@ -364,6 +354,32 @@ func (nd *Node) Run(BindAddress string) {
 	}
 }
 
+func (nd *Node) PacketProcess() {
+	defer func() {
+		recover()
+	}()
+	for item := range nd.recvChan {
+		if nd.isClose {
+			break
+		}
+		m, err := PacketToMessage(item.Packet)
+		if err != nil {
+			log.Printf("PacketToMessage %+v\n", err)
+			nd.ms.RemovePeer(item.PeerID)
+			break
+		}
+		if err := nd.handlePeerMessage(item.PeerID, m); err != nil {
+			if errors.Unwrap(err) == ErrUnknownMessage {
+				panic(ErrUnknownMessage) // TEMP
+			}
+
+			log.Printf("handlePeerMessage %+v\n", err)
+			nd.ms.RemovePeer(item.PeerID)
+			break
+		}
+	}
+}
+
 // OnTimerExpired called when rquest expired
 func (nd *Node) OnTimerExpired(height uint32, value string) {
 	nd.tryRequestBlocks()
@@ -377,7 +393,7 @@ func (nd *Node) OnConnected(p peer.Peer) {
 
 	cp := nd.cn.Provider()
 	nm := &StatusMessage{
-		Version:  cp.Version(),
+		Version:  cp.Version(cp.Height()),
 		Height:   cp.Height(),
 		LastHash: cp.LastHash(),
 	}
@@ -505,6 +521,9 @@ func (nd *Node) handlePeerMessage(ID string, m interface{}) error {
 		if len(msg.Txs) > 1000 {
 			return errors.WithStack(ErrTooManyTrasactionInMessage)
 		}
+		if len(msg.Txs) != len(msg.Signatures) {
+			return errors.WithStack(ErrInvalidSignatureCount)
+		}
 		currentSlot := types.ToTimeSlot(nd.cn.Provider().LastTimestamp())
 		for i, tx := range msg.Txs {
 			slot := types.ToTimeSlot(tx.Timestamp)
@@ -534,8 +553,7 @@ func (nd *Node) handlePeerMessage(ID string, m interface{}) error {
 		nd.ms.SendPeerList(ID)
 		return nil
 	default:
-		panic(ErrUnknownMessage) //TEMP
-		// return errors.WithStack(ErrUnknownMessage)
+		return errors.WithStack(ErrUnknownMessage)
 	}
 	// return nil
 }
@@ -576,8 +594,10 @@ func (nd *Node) AddTx(tx *types.Transaction, sig common.Signature) error {
 		}
 	}
 
-	TxHash := tx.HashSig()
 	ctx := nd.cn.NewContext()
+	tx.VmType, tx.Method = types.GetTxType(ctx, tx)
+
+	TxHash := tx.HashSig()
 	if ctx.IsUsedTimeSlot(slot, string(TxHash[:])) {
 		return errors.WithStack(types.ErrUsedTimeSlot)
 	}
@@ -626,9 +646,9 @@ func (nd *Node) TestFullTx() bool {
 }
 
 func (nd *Node) addTx(TxHash hash.Hash256, tx *types.Transaction, sig common.Signature) error {
-	if tx.IsEtherType && len(sig) < 66 {
-		return errors.New("invalid recid chain check")
-	}
+	// if tx.IsEtherType && len(sig) < 66 {
+	// 	return errors.New("invalid recid chain check")
+	// }
 	if nd.txpool.IsExist(TxHash) {
 		return errors.WithStack(txpool.ErrExistTransaction)
 	}
@@ -647,16 +667,22 @@ func (nd *Node) addTx(TxHash hash.Hash256, tx *types.Transaction, sig common.Sig
 			if seq != tx.Seq {
 				if tx.Seq > seq {
 					return fmt.Errorf("future nonce. want %v, get %v signer %v ", seq, tx.Seq, tx.From)
+				} else {
+					return errors.Errorf("invalid signer sequence siger %v seq %v, got %v", tx.From, seq, tx.Seq)
 				}
-				return errors.Errorf("invalid signer sequence siger %v seq %v, got %v", tx.From, seq, tx.Seq)
 			}
 		}
 
+		// contract check
 		txid := types.TransactionID(_ctx.TargetHeight(), 0)
-		if tx.To == common.ZeroAddr {
-			_, err = nd.cn.ExecuteTransaction(_ctx, tx, txid)
+		if tx.VmType != types.Evm {
+			if tx.To == common.ZeroAddr {
+				_, err = nd.cn.ExecuteTransaction(_ctx, tx, txid)
+			} else {
+				err = chain.TestContractWithOutSeq(_ctx, tx, tx.From)
+			}
 		} else {
-			err = chain.TestContractWithOutSeq(_ctx, tx, tx.From)
+			_, _, err = nd.cn.ApplyEvmTransaction(_ctx, tx, 0, tx.From)
 		}
 		// if err != nil && !strings.Contains(err.Error(), "invalid signer sequence siger seq") {
 		if err != nil {
@@ -677,7 +703,7 @@ func (nd *Node) addTx(TxHash hash.Hash256, tx *types.Transaction, sig common.Sig
 					log.Printf("%+v\n", err)
 					return err
 				}
-				return fmt.Errorf("future nonce. want %v, get %v signer %v ", seq, tx.Seq, tx.From)
+				return fmt.Errorf("future nonce. want: %v, get %v signer %v ", seq, tx.Seq, tx.From)
 			} else {
 				log.Printf("%+v\n", err)
 				return err

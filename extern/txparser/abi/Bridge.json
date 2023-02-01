@@ -59,6 +59,24 @@
             },
             {
                 "internalType": "uint256",
+                "name": "transferFee",
+                "type": "uint256"
+            }
+        ],
+        "name": "setDelegateTransferFeeInfo",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "string",
+                "name": "chain",
+                "type": "string"
+            },
+            {
+                "internalType": "uint256",
                 "name": "tokenFee",
                 "type": "uint256"
             }

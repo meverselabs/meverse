@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"plugin"
+	"strings"
 	"sync"
 
 	"github.com/meverselabs/meverse/common"
@@ -91,36 +92,11 @@ func (cont *EnginContract) saveEngin(Name string, Version uint32, EnginURL strin
 		return err
 	}
 
-	fileLock.Lock()
-	path := fmt.Sprintf("./engin/%v.so", ID)
-	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) || errors.Is(err, os.ErrPermission) {
-		out, err := os.Create(path)
-		if err != nil {
-			fileLock.Unlock()
-			return err
-		}
-		defer out.Close()
-		resp, err := http.Get(EnginURL)
-		if err != nil {
-			fileLock.Unlock()
-			return err
-		}
-		defer resp.Body.Close()
-		n, err := io.Copy(out, resp.Body)
-		if err != nil {
-			fileLock.Unlock()
-			return err
-		}
-		if n == 0 {
-			fileLock.Unlock()
-			return errors.New("engin is empty")
-		}
+	path, err := checkEnginFile(ID, EnginURL)
+	if err != nil {
+		return err
 	}
-	fileLock.Unlock()
 
-	// if err := ioutil.WriteFile(path, Engin, 0644); err != nil {
-	// 	return err
-	// }
 	pg, err := plugin.Open(path)
 	if err != nil {
 		return err
@@ -137,6 +113,80 @@ func (cont *EnginContract) saveEngin(Name string, Version uint32, EnginURL strin
 	}
 
 	enginCache[ID] = eg
+	return nil
+}
+
+func checkEnginFile(ID string, EnginURL string) (string, error) {
+	fileLock.Lock()
+	defer fileLock.Unlock()
+	extPath := fmt.Sprintf("./engin/%v_ext.so", ID)
+	_, err := os.Stat(extPath)
+	if err == nil {
+		return extPath, nil
+	}
+	if extEnginURL, ok := checkExtExist(EnginURL); ok {
+		return _unsafeGetExtraEnginFile(ID, extPath, extEnginURL)
+	} else {
+		path := fmt.Sprintf("./engin/%v.so", ID)
+		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) || errors.Is(err, os.ErrPermission) {
+			err := downloadFile(path, EnginURL)
+			if err != nil {
+				return "", err
+			}
+		}
+		return path, nil
+	}
+
+}
+
+func checkExtExist(EnginURL string) (string, bool) {
+	extEnginURL := strings.Replace(EnginURL, ".so", "_ext.so", -1)
+	resp, err := http.Head(extEnginURL)
+	if err != nil {
+		return EnginURL, false
+	}
+	defer resp.Body.Close()
+
+	if len(resp.Header["Content-Length"]) > 0 {
+		return extEnginURL, true
+	}
+	return EnginURL, false
+}
+
+func _unsafeGetExtraEnginFile(ID string, path, EnginURL string) (string, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		err := os.Remove(path)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	if err := downloadFile(path, EnginURL); err != nil {
+		return "", err
+	}
+
+	return path, nil
+}
+
+func downloadFile(path string, EnginURL string) error {
+	out, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	resp, err := http.Get(EnginURL)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	n, err := io.Copy(out, resp.Body)
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return errors.New("engin is empty")
+	}
 	return nil
 }
 
@@ -168,6 +218,19 @@ func (cont *EnginContract) loadEngin(cc *types.ContractContext, Name string, Ver
 	}
 
 	return eg, nil
+}
+
+func (cont *EnginContract) enginInfo(cc *types.ContractContext, Name string) (map[uint32]string, error) {
+	Version := cont.EnginVersion(cc, Name)
+
+	res := map[uint32]string{}
+	for i := uint32(1); i <= Version; i++ {
+		bsEnginURL := cc.ContractData(makeEnginURLKey(Name, i))
+		EnginURL := string(bsEnginURL)
+		res[i] = fmt.Sprintf("ID: %v, URL: %v", cont.enginID(Name, i), EnginURL)
+	}
+
+	return res, nil
 }
 
 //////////////////////////////////////////////////

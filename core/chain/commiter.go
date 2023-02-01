@@ -10,8 +10,8 @@ import (
 type Committer interface {
 	Generators() ([]common.Address, error)
 	ValidateHeader(bh *types.Header) error
-	ExecuteBlockOnContext(b *types.Block, ctx *types.Context, SigMap map[hash.Hash256]common.Address) error
-	ConnectBlockWithContext(b *types.Block, ctx *types.Context) error
+	ExecuteBlockOnContext(b *types.Block, ctx *types.Context, SigMap map[hash.Hash256]common.Address) (types.Receipts, error)
+	ConnectBlockWithContext(b *types.Block, ctx *types.Context, receipts types.Receipts) error
 	NewContext() *types.Context
 }
 
@@ -37,18 +37,18 @@ func (ct *chainCommiter) ValidateHeader(bh *types.Header) error {
 	return ct.cn.validateHeader(bh)
 }
 
-func (ct *chainCommiter) ExecuteBlockOnContext(b *types.Block, ctx *types.Context, sm map[hash.Hash256]common.Address) error {
+func (ct *chainCommiter) ExecuteBlockOnContext(b *types.Block, ctx *types.Context, sm map[hash.Hash256]common.Address) (types.Receipts, error) {
 	ct.cn.Lock()
 	defer ct.cn.Unlock()
 
 	return ct.cn.executeBlockOnContext(b, ctx, sm)
 }
 
-func (ct *chainCommiter) ConnectBlockWithContext(b *types.Block, ctx *types.Context) error {
+func (ct *chainCommiter) ConnectBlockWithContext(b *types.Block, ctx *types.Context, receipts types.Receipts) error {
 	ct.cn.Lock()
 	defer ct.cn.Unlock()
 
-	return ct.cn.connectBlockWithContext(b, ctx)
+	return ct.cn.connectBlockWithContext(b, ctx, receipts)
 }
 
 func (ct *chainCommiter) NewContext() *types.Context {

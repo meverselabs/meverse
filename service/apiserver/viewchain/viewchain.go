@@ -22,7 +22,7 @@ import (
 	"github.com/meverselabs/meverse/core/chain"
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/meverselabs/meverse/service/apiserver"
-	"github.com/meverselabs/meverse/service/txsearch"
+	"github.com/meverselabs/meverse/service/txsearch/itxsearch"
 )
 
 type INode interface {
@@ -32,13 +32,13 @@ type INode interface {
 type viewchain struct {
 	api     *apiserver.APIServer
 	chainID *big.Int
-	ts      txsearch.ITxSearch
+	ts      itxsearch.ITxSearch
 	cn      *chain.Chain
 	st      *chain.Store
 	in      INode
 }
 
-func NewViewchain(api *apiserver.APIServer, ts txsearch.ITxSearch, cn *chain.Chain, st *chain.Store, in INode) {
+func NewViewchain(api *apiserver.APIServer, ts itxsearch.ITxSearch, cn *chain.Chain, st *chain.Store, in INode) {
 	v := &viewchain{
 		api:     api,
 		chainID: cn.Provider().ChainID(),
@@ -676,7 +676,7 @@ func (v *viewchain) Call(contract, from, method string, params []interface{}) (i
 		return nil, err
 	}
 	caller := NewViewCaller(v.cn)
-	output, err := caller.Execute(toAddr, from, method, params)
+	output, _, err := caller.Execute(toAddr, from, method, params)
 	if err != nil {
 		return nil, err
 	}

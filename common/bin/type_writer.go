@@ -2,6 +2,7 @@ package bin
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"math/big"
 	"reflect"
@@ -59,7 +60,13 @@ func (tw *TypeWriter) writeThing(w io.Writer, v interface{}) (int64, error) {
 	case reflect.Uint64:
 		_, err = tw.uint64(w, v.(uint64))
 	case reflect.String:
-		_, err = tw.string(w, v.(string))
+		if jn, ok := v.(string); ok {
+			_, err = tw.string(w, jn)
+		} else if istr, ok := v.(fmt.Stringer); ok {
+			_, err = tw.string(w, istr.String())
+		} else {
+			_, err = tw.string(w, fmt.Sprintf("%v", v))
+		}
 	case reflect.Bool:
 		_, err = tw.bool(w, v.(bool))
 	case reflect.Slice:

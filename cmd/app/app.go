@@ -22,8 +22,14 @@ import (
 	"github.com/meverselabs/meverse/contract/nft721"
 	"github.com/meverselabs/meverse/contract/token"
 	"github.com/meverselabs/meverse/contract/whitelist"
+	"github.com/meverselabs/meverse/core/chain"
 	"github.com/meverselabs/meverse/core/types"
 )
+
+func init() {
+	types.SetLegacyCheckHeight(25298976)
+	chain.SetVersion(60301036, 2)
+}
 
 func Genesis() *types.ContextData {
 	adminAddress := common.HexToAddress("0x24D5da1B198c5049016c513099916498ceE9ccf5")
@@ -200,7 +206,6 @@ func Genesis() *types.ContextData {
 }
 
 func RegisterContractClass() map[string]uint64 {
-	types.SetLegacyCheckHeight(25298976)
 	ClassMap := map[string]uint64{}
 	registerContractClass(&token.TokenContract{}, "Token", ClassMap)
 	registerContractClass(&formulator.FormulatorContract{}, "Formulator", ClassMap)

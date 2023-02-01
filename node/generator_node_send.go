@@ -48,7 +48,7 @@ func (fr *GeneratorNode) sendStatusTo(TargetPubKey common.PublicKey) error {
 
 	cp := fr.cn.Provider()
 	nm := &p2p.StatusMessage{
-		Version:  cp.Version(),
+		Version:  cp.Version(cp.Height()),
 		Height:   cp.Height(),
 		LastHash: cp.LastHash(),
 	}
@@ -59,7 +59,7 @@ func (fr *GeneratorNode) sendStatusTo(TargetPubKey common.PublicKey) error {
 func (fr *GeneratorNode) broadcastStatus() error {
 	cp := fr.cn.Provider()
 	nm := &p2p.StatusMessage{
-		Version:  cp.Version(),
+		Version:  cp.Version(cp.Height()),
 		Height:   cp.Height(),
 		LastHash: cp.LastHash(),
 	}

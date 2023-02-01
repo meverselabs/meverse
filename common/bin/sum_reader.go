@@ -185,6 +185,24 @@ func (sr *SumReader) BigInt(r io.Reader, p **big.Int) (int64, error) {
 	}
 }
 
+func (sr *SumReader) ChainIDVersion(r io.Reader, chainID **big.Int, version *uint16) (int64, error) {
+	if v, n, err := ReadBytes(r); err != nil {
+		return sr.sum, err
+	} else {
+		sr.sum += int64(n)
+		(*chainID) = big.NewInt(0).SetBytes(v)
+		if v[0] == 0 {
+			if v, n, err := ReadUint16(r); err != nil {
+				return sr.sum, err
+			} else {
+				sr.sum += int64(n)
+				(*version) = v
+			}
+		}
+	}
+	return sr.sum, nil
+}
+
 func (sr *SumReader) ReaderFrom(r io.Reader, p io.ReaderFrom) (int64, error) {
 	if n, err := p.ReadFrom(r); err != nil {
 		return sr.sum, err

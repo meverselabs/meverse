@@ -5,7 +5,7 @@ import (
 
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/common/hash"
-	"github.com/meverselabs/meverse/contract/nft721/nft721regacy"
+	"github.com/meverselabs/meverse/contract/nft721/nft721legacy"
 	"github.com/meverselabs/meverse/core/types"
 )
 
@@ -115,7 +115,7 @@ func (f *front) Mint(cc *types.ContractContext, count *big.Int) ([]hash.Hash256,
 
 func (f *front) MintBatch(cc *types.ContractContext, addrs []common.Address) ([]hash.Hash256, error) {
 	if cc.TargetHeight() < 13906097 {
-		return nft721regacy.MintBatch(cc, f.cont.addr, addrs)
+		return nft721legacy.MintBatch(cc, f.cont.addr, addrs)
 	}
 	return f.cont.mintBatch(cc, addrs)
 }

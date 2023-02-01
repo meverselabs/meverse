@@ -33,11 +33,11 @@ func TestMain(t *testing.T) {
 	piAddr := tc.DeployContract(tokenContType, tokenContArgs)
 	log.Println("jscont Addr", piAddr)
 
-	inf, err := tc.MakeTx(util.AdminKey, piAddr, "ContractInvoke", "Mint", []interface{}{util.Admin.String(), amount.NewAmount(30, 0).Int})
+	inf, err := tc.SendTx(util.AdminKey, piAddr, "ContractInvoke", "Mint", []interface{}{util.Admin.String(), amount.NewAmount(30, 0).Int})
 	log.Println(inf, err)
-	inf, err = tc.MakeTx(util.AdminKey, piAddr, "ContractInvoke", "Transfer", []interface{}{util.Users[0].String(), amount.NewAmount(10, 0).Int})
+	inf, err = tc.SendTx(util.AdminKey, piAddr, "ContractInvoke", "Transfer", []interface{}{util.Users[0].String(), amount.NewAmount(10, 0).Int})
 	log.Println(inf, err)
-	inf, err = tc.MakeTx(util.AdminKey, piAddr, "ContractInvoke", "BalanceOf", []interface{}{util.Admin.String()})
+	inf, err = tc.SendTx(util.AdminKey, piAddr, "ContractInvoke", "BalanceOf", []interface{}{util.Admin.String()})
 	log.Println(inf, err)
 
 	ChainID := big.NewInt(1)
@@ -55,7 +55,7 @@ func TestMain(t *testing.T) {
 		tx.Args = bin.TypeWriteAll("BalanceOf", []interface{}{util.Users[0].String()})
 		txs = append(txs, tx)
 		ks = append(ks, util.AdminKey)
-		// inf, err = tc.MakeTx(util.AdminKey, piAddr, "ContractInvoke", "BalanceOf", []interface{}{util.Users[0].String()})
+		// inf, err = tc.SendTx(util.AdminKey, piAddr, "ContractInvoke", "BalanceOf", []interface{}{util.Users[0].String()})
 	}
 	start := time.Now()
 	err = tc.Sleep(10, txs, ks)

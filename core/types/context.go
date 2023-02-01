@@ -46,8 +46,8 @@ func (ctx *Context) ChainID() *big.Int {
 }
 
 // Version returns the version of the chain
-func (ctx *Context) Version() uint16 {
-	return ctx.loader.Version()
+func (ctx *Context) Version(h uint32) uint16 {
+	return ctx.loader.Version(h)
 }
 
 // TargetHeight returns the recorded target height when context generation
@@ -119,6 +119,11 @@ func (ctx *Context) AddrSeq(addr common.Address) uint64 {
 func (ctx *Context) AddAddrSeq(addr common.Address) {
 	ctx.isLatestHash = false
 	ctx.Top().AddAddrSeq(addr)
+}
+
+func (ctx *Context) SetNonce(addr common.Address, nonce uint64) {
+	ctx.isLatestHash = false
+	ctx.Top().SetNonce(addr, nonce)
 }
 
 // BasicFee returns the basic fee
@@ -199,6 +204,16 @@ func (ctx *Context) ContractContext(cont Contract, from common.Address) *Contrac
 	return cc
 }
 
+// ContractContextFromAddress returns a ContractContext
+func (ctx *Context) ContractContextFromAddress(cont, from common.Address) *ContractContext {
+	cc := &ContractContext{
+		cont: cont,
+		from: from,
+		ctx:  ctx,
+	}
+	return cc
+}
+
 // ContractLoader returns a ContractLoader
 func (ctx *Context) ContractLoader(cont common.Address) ContractLoader {
 	cc := &ContractContext{
@@ -235,7 +250,6 @@ func (ctx *Context) Snapshot() int {
 
 // GetSize returns context data size
 func (ctx *Context) GetPCSize() uint64 {
-	return 0
 	return ctx.Top().GetPCSize()
 }
 
@@ -288,6 +302,8 @@ func (ctx *Context) Commit(sn int) {
 		}
 		top.mainToken = ctd.mainToken
 		top.seq = ctd.seq
+		top.basicFee = ctd.basicFee
+		top.size = top.size + ctd.size
 	}
 	ctx.stack[len(ctx.stack)-1].isTop = true
 }
@@ -304,4 +320,9 @@ func (ctx *Context) Hash() hash.Hash256 {
 // Dump prints the top context data of the context
 func (ctx *Context) Dump() string {
 	return ctx.Top().Dump()
+}
+
+// Dump prints the top context data of the context
+func (ctx *Context) WriteDump() string {
+	return ctx.Top().WriteDump()
 }

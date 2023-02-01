@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"regexp"
@@ -83,9 +84,16 @@ var reg = []string{
 }
 
 func main() {
-	// t := imo.ImoContract{}
-	// f := t.Front()
+	// makeABI()
 
+	bs, err := ioutil.ReadFile("Bridge.json")
+	if err != nil {
+		panic(err)
+	}
+	makeBinFile(bs, "Bridge")
+}
+
+func makeABI() {
 	reads := strings.Split(read, "\n")
 	writes := strings.Split(write, "\n")
 	for i := 0; i < len(reg); i += 2 {
@@ -156,6 +164,10 @@ func main() {
 		jsonFile.Close()
 	}
 
+	makeBinFile(dat, fileName)
+}
+
+func makeBinFile(dat []byte, fileName string) {
 	if binaryFile, err := os.Create("./" + fileName + ".bin"); err != nil {
 		panic(err)
 	} else {
@@ -174,5 +186,4 @@ func main() {
 		binaryFile.Sync()
 		binaryFile.Close()
 	}
-
 }

@@ -19,10 +19,13 @@ import (
 	"github.com/meverselabs/meverse/core/chain"
 	"github.com/meverselabs/meverse/core/piledb"
 	"github.com/meverselabs/meverse/core/types"
+	"github.com/meverselabs/meverse/ethereum/params"
 	"github.com/meverselabs/meverse/p2p"
 	"github.com/meverselabs/meverse/service/apiserver"
 	"github.com/meverselabs/meverse/service/apiserver/metamaskrelay"
 	"github.com/meverselabs/meverse/service/apiserver/viewchain"
+	"github.com/meverselabs/meverse/service/apiserver/zipcontext"
+	"github.com/meverselabs/meverse/service/bloomservice"
 	"github.com/meverselabs/meverse/service/txsearch"
 )
 
@@ -152,9 +155,16 @@ func main() {
 
 	cn := chain.NewChain(ObserverKeys, st, "")
 	rpcapi := apiserver.NewAPIServer()
+	zipContext := zipcontext.NewZipContextService(rpcapi, st, "./zipcontext/", 172800)
+	bs, err := bloomservice.NewBloomBitService(cn, cfg.StoreRoot+"/_bloombits", params.BloomBitsBlocks, params.BloomConfirms)
+	if err != nil {
+		panic(err)
+	}
 	ts := txsearch.NewTxSearch(cfg.StoreRoot+"/_txsearch", rpcapi, st, cn, cfg.InitHeight)
 	cn.MustAddService(ts)
 	cn.MustAddService(rpcapi)
+	cn.MustAddService(zipContext)
+	cn.MustAddService(bs)
 
 	if cfg.InitHeight == 0 {
 		if err := cn.Init(app.Genesis()); err != nil {
@@ -191,7 +201,7 @@ func main() {
 	cm.RemoveAll()
 	cm.Add("node", nd)
 
-	metamaskrelay.NewMetamaskRelay(rpcapi, ts, cn, nd)
+	metamaskrelay.NewMetamaskRelay(rpcapi, ts, bs, cn, nd)
 	go rpcapi.Run(":" + strconv.Itoa(cfg.RPCPort))
 	viewchain.NewViewchain(rpcapi, ts, cn, st, nd)
 

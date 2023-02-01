@@ -1,6 +1,8 @@
 package key
 
 import (
+	"crypto/ecdsa"
+
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/common/hash"
 )
@@ -11,5 +13,6 @@ type Key interface {
 	SignWithPassphrase(h hash.Hash256, passphrase []byte) (common.Signature, error)
 	Verify(h hash.Hash256, sig common.Signature) bool
 	PublicKey() common.PublicKey
+	PrivateKey() *ecdsa.PrivateKey
 	Clear()
 }

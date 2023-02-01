@@ -51,7 +51,7 @@ func TestWhiteList(t *testing.T) {
 		Owner:  util.Admin,
 	})
 
-	inf, err := tc.MakeTx(util.AdminKey, nftAddr, "Mint", big.NewInt(1))
+	inf, err := tc.SendTx(util.AdminKey, nftAddr, "Mint", big.NewInt(1))
 	if err != nil {
 		t.Error(TAG, "minted not owner", err, inf)
 	}
@@ -103,7 +103,7 @@ func TestWhiteList(t *testing.T) {
 	inf = tc.MustSendTx(util.AdminKey, lpaddr, "FeeWhiteList", util.Admin)
 	log.Println("FeeWhiteList 1", inf)
 
-	inf, err = tc.MakeTx(util.AdminKey, lpaddr, "FeeWhiteList", util.Users[0])
+	inf, err = tc.SendTx(util.AdminKey, lpaddr, "FeeWhiteList", util.Users[0])
 	log.Println("FeeWhiteList 2", inf, err)
 }
 
@@ -123,7 +123,7 @@ func TestEmptyWhiteList(t *testing.T) {
 		Owner:  util.Admin,
 	})
 
-	inf, err := tc.MakeTx(util.AdminKey, nftAddr, "Mint", big.NewInt(1))
+	inf, err := tc.SendTx(util.AdminKey, nftAddr, "Mint", big.NewInt(1))
 	if err != nil {
 		t.Error(TAG, "minted not owner", err, inf)
 	}
@@ -170,6 +170,6 @@ func TestEmptyWhiteList(t *testing.T) {
 	inf = tc.MustSendTx(util.AdminKey, lpaddr, "FeeWhiteList", util.Admin)
 	log.Println("FeeWhiteList 1", inf)
 
-	inf, err = tc.MakeTx(util.AdminKey, lpaddr, "FeeWhiteList", util.Users[0])
+	inf, err = tc.SendTx(util.AdminKey, lpaddr, "FeeWhiteList", util.Users[0])
 	log.Println("FeeWhiteList 2", inf, err)
 }

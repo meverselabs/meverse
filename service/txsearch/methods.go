@@ -8,7 +8,18 @@ import (
 	"math/big"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
+
+	ecommon "github.com/ethereum/go-ethereum/common"
+	etypes "github.com/ethereum/go-ethereum/core/types"
+	mtypes "github.com/meverselabs/meverse/ethereum/core/types"
+	"github.com/meverselabs/meverse/service/bloomservice"
+	"github.com/meverselabs/meverse/service/txsearch/itxsearch"
+
+	"github.com/pkg/errors"
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/util"
 
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/common/amount"
@@ -16,9 +27,6 @@ import (
 	"github.com/meverselabs/meverse/common/hash"
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/meverselabs/meverse/extern/txparser"
-	"github.com/pkg/errors"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 func (t *TxSearch) BlockHeight(bh hash.Hash256) (uint32, error) {
@@ -41,35 +49,43 @@ func (t *TxSearch) Block(i uint32) (*types.Block, error) {
 	return t.st.Block(i)
 }
 
-func (t *TxSearch) TxIndex(th hash.Hash256) (TxID, error) {
+func (t *TxSearch) TxIndex(th hash.Hash256) (itxsearch.TxID, error) {
 	v, err := t.db.Get(append([]byte{tagTxHash}, th[:]...), nil)
 	if err != nil && errors.Cause(err) != leveldb.ErrNotFound {
-		return TxID{0, 0, nil}, errors.WithStack(err)
+		return itxsearch.TxID{}, errors.WithStack(err)
 	}
 
 	if len(v) == 0 {
 		v, err = t.db.Get(toTxFailKey(th), nil)
 		if err != nil {
-			return TxID{0, 0, nil}, errors.WithStack(err)
+			return itxsearch.TxID{}, errors.WithStack(err)
 		} else if len(v) > 0 {
 			is, err := bin.TypeReadAll(v, 2)
 			if err != nil {
-				return TxID{0, 0, nil}, err
+				return itxsearch.TxID{}, err
 			}
 			height := is[0].(uint32)
 			errstr := is[1].(string)
-			return TxID{height, 0, errors.New(errstr)}, ErrFailTx //fail tx
+			return itxsearch.TxID{
+				Height: height,
+				Index:  0,
+				Err:    errors.New(errstr),
+			}, ErrFailTx //fail tx
 		}
-		return TxID{0, 0, nil}, errors.New("not exist tx")
+		return itxsearch.TxID{}, errors.New("not exist tx")
 	}
 
 	if len(v) == 6 {
-		return TxID{bin.Uint32(v[:4]), bin.Uint16(v[4:]), nil}, nil
+		return itxsearch.TxID{
+			Height: bin.Uint32(v[:4]),
+			Index:  bin.Uint16(v[4:]),
+			Err:    nil,
+		}, nil
 	}
 	if len(v) == 0 {
-		return TxID{0, 0, nil}, errors.New("invalid length")
+		return itxsearch.TxID{}, errors.New("invalid length")
 	}
-	return TxID{0, 0, nil}, nil
+	return itxsearch.TxID{}, nil
 }
 
 func (t *TxSearch) Reward(cont, rewarder common.Address) (*amount.Amount, error) {
@@ -125,13 +141,6 @@ func (t *TxSearch) DailyReward(cont, rewarder common.Address, index int) (map[st
 	return ams, nil
 }
 
-// func (t *TxSearch) Holder(token common.Address) (map[common.Address]*amount.Amount, error) {
-// 	ctx := t.cn.NewContext()
-// 	tagTokenAmount := byte(0x10)
-// 	bs := ctx.Data(token, common.Address{}, []byte{tagTokenAmount})
-// 	return nil, nil
-// }
-
 func (t *TxSearch) Tx(height uint32, index uint16) (map[string]interface{}, error) {
 	b, err := t.Block(height)
 	if err != nil {
@@ -157,80 +166,66 @@ func (t *TxSearch) Tx(height uint32, index uint16) (map[string]interface{}, erro
 		"IsEtherType": tx.IsEtherType,
 		"From":        tx.From,
 	}
+	var Args []interface{}
 	if tx.IsEtherType {
 		ctx := t.cn.NewContext()
-		data, _, err2 := types.TxArg(ctx, tx)
+		_, _, data, err2 := types.TxArg(ctx, tx)
 		if err2 == nil {
-			m["Args"] = data
+			Args = data
 		}
 	} else {
-		m["Args"], err = bin.TypeReadAll(tx.Args, -1)
+		Args, err = bin.TypeReadAll(tx.Args, -1)
 		if err != nil {
-			m["Args"] = []interface{}{tx.Args}
+			Args = []interface{}{tx.Args}
 		}
 	}
+	for i, arg := range Args {
+		if am, ok := arg.(*amount.Amount); ok {
+			Args[i] = am.Int
+		} else if ams, ok := arg.([]*amount.Amount); ok {
+			bis := []*big.Int{}
+			for _, am := range ams {
+				bis = append(bis, am.Int)
+			}
+			Args[i] = bis
+		}
+	}
+	m["Args"] = Args
 
-	// TXID := types.TransactionIDBytes(height, index)
+	bHash := bin.MustWriterToHash(&b.Header)
 
-	// v, _ := t.db.Get(append([]byte{tagEvent}, TXID...), nil)
+	logs, _, err := t.getLogs(tx, b, itxsearch.TxID{Height: height, Index: index}, bHash)
+	if err == nil {
+		m["logs"] = logs
+	}
 	if len(b.Body.Events) > 0 {
-		find := index
-
-		start := 0
-		pin := start
-		end := len(b.Body.Events)
-
-		for len(b.Body.Events) > 0 && b.Body.Events[pin].Index != find {
-			nextPin := (start + end) / 2
-			if nextPin == pin {
-				nextPin++
-			}
-			if nextPin >= end || start == end {
-				break
-			}
-			nIndex := b.Body.Events[nextPin].Index
-			if nIndex > find {
-				end = nextPin
-			} else if nIndex < find {
-				start = nextPin
-			}
-			pin = nextPin
-		}
-
-		if b.Body.Events[pin].Index != find {
-			m["ResultErr"] = errors.Errorf("invalid Event Index want %v, but not exist", index)
-			return m, nil
-		}
-
-		for b.Body.Events[pin].Type != types.EventTagTxMsg && b.Body.Events[pin].Index == find && pin > 0 && b.Body.Events[pin-1].Index == find {
-			pin--
-		}
-
-		if b.Body.Events[pin].Type == types.EventTagTxMsg && b.Body.Events[pin].Index == find {
-			en := b.Body.Events[index]
-			m["Result"], err = bin.TypeReadAll(en.Result, -1)
-			if err != nil {
-				m["ResultErr"] = err
-			}
-			pin++
-		}
-
-		event := []*MethodCallEvent{}
-		for i := pin; i < len(b.Body.Events) && b.Body.Events[i].Index == find; i++ {
-			bf := bytes.NewBuffer(b.Body.Events[i].Result)
-			mc := &MethodCallEvent{}
-			if _, err := mc.ReadFrom(bf); err == nil {
-				cont, err := t.cn.NewContext().Contract(mc.To)
-				if err == nil {
-					if cntName, ok := cont.(ContractName); ok {
-						mc.ToName = cntName.Name()
-					} else if cntName, ok := cont.(ContractNameCC); ok {
-						ctx := t.cn.NewContext()
-						cc := ctx.ContractContext(cont, common.Address{})
-						mc.ToName = cntName.Name(cc)
+		event := []*itxsearch.MethodCallEvent{}
+		for i := 0; i < len(b.Body.Events); i++ {
+			if b.Body.Events[i].Index == index {
+				switch b.Body.Events[i].Type {
+				case types.EventTagTxMsg:
+					en := b.Body.Events[i]
+					m["Result"], err = bin.TypeReadAll(en.Result, -1)
+					if err != nil {
+						m["ResultErr"] = err
+					}
+				case types.EventTagCallHistory:
+					bf := bytes.NewBuffer(b.Body.Events[i].Result)
+					mc := &itxsearch.MethodCallEvent{}
+					if _, err := mc.ReadFrom(bf); err == nil {
+						cont, err := t.cn.NewContext().Contract(mc.To)
+						if err == nil {
+							if cntName, ok := cont.(itxsearch.ContractName); ok {
+								mc.ToName = cntName.Name()
+							} else if cntName, ok := cont.(itxsearch.ContractNameCC); ok {
+								ctx := t.cn.NewContext()
+								cc := ctx.ContractContext(cont, common.Address{})
+								mc.ToName = cntName.Name(cc)
+							}
+						}
+						event = append(event, mc)
 					}
 				}
-				event = append(event, mc)
 			}
 		}
 		if len(event) > 0 {
@@ -241,14 +236,52 @@ func (t *TxSearch) Tx(height uint32, index uint16) (map[string]interface{}, erro
 	return m, nil
 }
 
-type BlockInfo struct {
-	Height    uint32
-	Hash      string
-	TxLen     uint16
-	Timestamp uint64
+func (t *TxSearch) getLogs(tx *types.Transaction, b *types.Block, TxID itxsearch.TxID, bHash ecommon.Hash) ([]*etypes.Log, string, error) {
+	if tx.VmType != types.Evm {
+		evs, err := bloomservice.FindTransactionsEvents(b.Body.Transactions, b.Body.Events, int(TxID.Index))
+		if err != nil {
+			return nil, "", err
+		}
+		blm, err := bloomservice.CreateEventBloom(t.cn.NewContext(), evs)
+		if err != nil {
+			return nil, "", err
+		}
+
+		logs, err := bloomservice.EventsToLogs(t.cn, &b.Header, tx, evs, int(TxID.Index))
+		if err != nil {
+			return nil, "", err
+		}
+		return logs, hex.EncodeToString(blm[:]), nil
+	} else {
+
+		etx := new(etypes.Transaction)
+		if err := etx.UnmarshalBinary(tx.Args); err != nil {
+			return nil, "", err
+		}
+		receipts, err := t.cn.Provider().Receipts(TxID.Height)
+		if err != nil {
+			return nil, "", err
+		}
+		if len(receipts) <= int(TxID.Index) {
+			return nil, "", nil
+		}
+		receipt := receipts[TxID.Index]
+		signer := mtypes.MakeSigner(t.cn.Provider().ChainID(), TxID.Height)
+		if err := receipts.DeriveReceiptFields(bHash, uint64(TxID.Height), TxID.Index, etx, signer); err != nil {
+			return nil, "", err
+		}
+
+		logs := []*etypes.Log{}
+		if len(receipt.Logs) >= 0 {
+			logs = append(logs, receipt.Logs...)
+		}
+		bloom := etypes.CreateBloom(etypes.Receipts{receipt})
+
+		return logs, hex.EncodeToString(bloom[:]), nil
+	}
 }
 
-func (t *TxSearch) BlockList(index int) []*BlockInfo {
+func (t *TxSearch) BlockList(index int) []*itxsearch.BlockInfo {
 	h := t.st.Height()
 	start := h
 	if h < uint32(index*20) {
@@ -257,11 +290,11 @@ func (t *TxSearch) BlockList(index int) []*BlockInfo {
 		start = h - uint32(index*20)
 	}
 
-	li := []*BlockInfo{}
+	li := []*itxsearch.BlockInfo{}
 	for i := start; i > start-20; i-- {
 		b, err := t.Block(i)
 		if err == nil {
-			li = append(li, &BlockInfo{
+			li = append(li, &itxsearch.BlockInfo{
 				Height:    i,
 				Hash:      b.Header.ContextHash.String(),
 				TxLen:     uint16(len(b.Body.Transactions)),
@@ -286,10 +319,10 @@ func (t *TxSearch) TxSize() uint64 {
 	return bin.Uint64(bs)
 }
 
-func (t *TxSearch) TxList(index int) ([]TxList, error) {
+func (t *TxSearch) TxList(index int, size int) ([]itxsearch.TxList, error) {
 	n := common.Address{}
-	tlen, from, to := t.getRange(tagID, n[:], index)
-	txs := make([]TxList, tlen)
+	tlen, from, to := t.getRange(tagID, n[:], index, size)
+	txs := make([]itxsearch.TxList, tlen)
 	iter := t.db.NewIterator(&util.Range{Start: from, Limit: to}, nil)
 	var i int
 	for iter.Next() {
@@ -309,7 +342,7 @@ func (t *TxSearch) TxList(index int) ([]TxList, error) {
 			continue
 		}
 		str := types.TransactionID(h, index)
-		txs[int(tlen)-i] = TxList{
+		txs[int(tlen)-i] = itxsearch.TxList{
 			TxID:   str,
 			From:   from.String(),
 			To:     to.String(),
@@ -319,9 +352,9 @@ func (t *TxSearch) TxList(index int) ([]TxList, error) {
 	return txs, nil
 }
 
-func (t *TxSearch) AddressTxList(From common.Address, index int) ([]TxList, error) {
-	tlen, from, to := t.getRange(tagAddress, From[:], index)
-	txs := make([]TxList, tlen)
+func (t *TxSearch) AddressTxList(From common.Address, index, size int) ([]itxsearch.TxList, error) {
+	tlen, from, to := t.getRange(tagAddress, From[:], index, size)
+	txs := make([]itxsearch.TxList, tlen)
 
 	iter := t.db.NewIterator(&util.Range{Start: from, Limit: to}, nil)
 	var i int
@@ -332,7 +365,7 @@ func (t *TxSearch) AddressTxList(From common.Address, index int) ([]TxList, erro
 			continue
 		}
 		id := int(tlen) - i
-		txs[id] = TxList{
+		txs[id] = itxsearch.TxList{
 			TxID:   types.TransactionID(h, index),
 			Method: method,
 			From:   From.String(),
@@ -345,8 +378,8 @@ func (t *TxSearch) AddressTxList(From common.Address, index int) ([]TxList, erro
 			continue
 		}
 		txs[id].Contract = token.String()
-		switch method {
-		case "Transfer", "TransferFrom":
+		switch strings.ToLower(method) {
+		case "transfer", "transferfrom":
 			FromType := data[3].(uint8)
 			To := data[4].(common.Address)
 			am := data[5].(*amount.Amount)
@@ -358,71 +391,23 @@ func (t *TxSearch) AddressTxList(From common.Address, index int) ([]TxList, erro
 				txs[id].To = From.String()
 				txs[id].From = To.String()
 			}
-		case "Approve":
+		case "approve":
 			To := data[2].(common.Address)
 			txs[id].To = To.String()
-		case "CreateAlpha", "CreateSigma", "CreateOmega":
-		case "Revoke":
-		case "Stake":
+		case "createalpha", "createsigma", "createomega":
+		case "revoke":
+		case "stake":
 			txs[id].To = data[2].(common.Address).String()
-		case "Unstake":
+		case "unstake":
 			txs[id].To = data[2].(common.Address).String()
 		}
 	}
 	return txs, nil
 }
 
-// func (t *TxSearch) TouchContract(cont common.Address, addr common.Address) error {
-// 	contKey := addrKey(tagContractUsers, cont[:])
-// 	bs, err := t.db.Get(contKey, nil)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	if len(bs) != 8 {
-// 		bs = make([]byte, 8)
-// 	}
-
-// }
-
-// func (t *TxSearch) TokenTouchedAddrs(cont common.Address) ([]common.Address, error) {
-// 	contKey := addrKey(tagContractUsers, cont[:])
-// 	bs, _ := t.db.Get(contKey, nil)
-// 	if len(bs) != 8 {
-// 		initTokenTouchedAddrs(cont)
-// 		bs = make([]byte, 8)
-// 	}
-// 	userCount := bin.Uint64(bs)
-
-// 	t.db.Get()
-// 	tlen, from, to := t.getRange(tagDefault, cont[:], index)
-// 	txs := make([]TxList, tlen)
-
-// 	iter := t.db.NewIterator(&util.Range{Start: from, Limit: to}, nil)
-// 	var i int
-// 	for iter.Next() {
-// 		i++
-// 		data, method, h, index, err := t.txDateSet(iter.Value(), 3)
-// 		if err != nil {
-// 			continue
-// 		}
-// 		id := int(tlen) - i
-// 		txs[id] = TxList{
-// 			TxID:   types.TransactionID(h, index),
-// 			Method: method,
-// 			From:   From.String(),
-// 		}
-// 		to, ok := data[2].(common.Address)
-// 		if !ok {
-// 			continue
-// 		}
-// 		txs[id].To = to.String()
-// 	}
-// 	return txs, nil
-// }
-
-func (t *TxSearch) TokenTxList(From common.Address, index int) ([]TxList, error) {
-	tlen, from, to := t.getRange(tagDefault, From[:], index)
-	txs := make([]TxList, tlen)
+func (t *TxSearch) TokenTxList(From common.Address, index, size int) ([]itxsearch.TxList, error) {
+	tlen, from, to := t.getRange(tagDefault, From[:], index, size)
+	txs := make([]itxsearch.TxList, tlen)
 
 	iter := t.db.NewIterator(&util.Range{Start: from, Limit: to}, nil)
 	var i int
@@ -433,7 +418,7 @@ func (t *TxSearch) TokenTxList(From common.Address, index int) ([]TxList, error)
 			continue
 		}
 		id := int(tlen) - i
-		txs[id] = TxList{
+		txs[id] = itxsearch.TxList{
 			TxID:   types.TransactionID(h, index),
 			Method: method,
 			From:   From.String(),
@@ -467,12 +452,12 @@ func (*TxSearch) txDateSet(bs []byte, paramCount int) ([]interface{}, string, ui
 	return data, method, h, index, nil
 }
 
-func (t *TxSearch) TransferTxList(token, From common.Address, index int) ([]TxList, error) {
-	tlen, fromKey, toKey := t.getRange41(tagTransfer, append(token[:], From[:]...), index)
+func (t *TxSearch) TransferTxList(token, From common.Address, index, size int) ([]itxsearch.TxList, error) {
+	tlen, fromKey, toKey := t.getRange41(tagTransfer, append(token[:], From[:]...), index, size)
 
 	iter := t.db.NewIterator(&util.Range{Start: fromKey, Limit: toKey}, nil)
 
-	txs := make([]TxList, tlen)
+	txs := make([]itxsearch.TxList, tlen)
 	var i int
 	for iter.Next() {
 		i++
@@ -488,13 +473,13 @@ func (t *TxSearch) TransferTxList(token, From common.Address, index int) ([]TxLi
 			continue
 		}
 		TxIDStr := types.TransactionID(h, index)
-		txs[int(tlen)-i] = TxList{
+		txs[int(tlen)-i] = itxsearch.TxList{
 			TxID:     TxIDStr,
 			Method:   method,
 			Contract: token.String(),
 		}
-		switch method {
-		case "Transfer", "TransferFrom", "TokenIn", "TokenIndexIn", "TokenOut":
+		switch strings.ToLower(method) {
+		case "transfer", "transferfrom", "tokenin", "tokenindexin", "tokenout":
 			FromType := data[2].(uint8)
 			To := data[3].(common.Address)
 			am := data[4].(*amount.Amount)
@@ -511,31 +496,31 @@ func (t *TxSearch) TransferTxList(token, From common.Address, index int) ([]TxLi
 	return txs, nil
 }
 
-func (t *TxSearch) getRange(b byte, From []byte, index int) (uint64, []byte, []byte) {
+func (t *TxSearch) getRange(b byte, From []byte, index, size int) (uint64, []byte, []byte) {
 	var aik addrIndexKey
 	aik[0] = b
 	copy(aik[1:], From[:])
-	return t._getRange(aik[:], From, index)
+	return t._getRange(aik[:], From, index, size)
 }
 
-func (t *TxSearch) getRange41(b byte, From []byte, index int) (uint64, []byte, []byte) {
+func (t *TxSearch) getRange41(b byte, From []byte, index, size int) (uint64, []byte, []byte) {
 	var aik addr41IndexKey
 	aik[0] = b
 	copy(aik[1:], From[:])
-	return t._getRange(aik[:], From, index)
+	return t._getRange(aik[:], From, index, size)
 }
 
-func (t *TxSearch) _getRange(aik []byte, From []byte, index int) (uint64, []byte, []byte) {
+func (t *TxSearch) _getRange(aik []byte, From []byte, index, size int) (uint64, []byte, []byte) {
 	bs, _ := t.db.Get(aik, nil)
 	if len(bs) != 8 {
 		bs = make([]byte, 8)
 	}
 	s := bin.Uint64(bs)
-	_to := int64(s) - int64(index*20) + 1
+	_to := int64(s) - int64(index*size) + 1
 	if _to < 1 {
 		_to = 1
 	}
-	_from := int64(s) - int64(index*20) - 20 + 1
+	_from := int64(s) - int64(index*size) - int64(size) + 1
 	if _from < 1 {
 		_from = 1
 	}
@@ -717,9 +702,10 @@ func (t *TxSearch) BridgeTxList(contStr common.Address, height uint32, to string
 		res["cumulativeGasUsed"] = "100000000000000000"
 		res["gasUsed"] = "10000"
 		res["confirmations"] = fmt.Sprintf("%v", t.Height()-height)
-		if tx.Method == "SendToGateway" {
+		switch strings.ToLower(tx.Method) {
+		case "sendtogateway":
 			res["event"] = "SentToGateway"
-		} else if tx.Method == "SendFromGateway" || tx.Method == "SendToRouterFromGateway" {
+		case "sendfromgateway", "sendtorouterfromgateway":
 			res["event"] = "SentFromGateway"
 		}
 
@@ -775,7 +761,8 @@ func (t *TxSearch) BridgeTxList(contStr common.Address, height uint32, to string
 
 func (*TxSearch) makeReturnValue(tx *types.Transaction, data []interface{}, res map[string]interface{}, events []interface{}) map[string]interface{} {
 	returnValues := map[string]interface{}{}
-	if tx.Method == "SendToGateway" {
+	switch strings.ToLower(tx.Method) {
+	case "sendtogateway":
 		if len(data) != 5 {
 			res["error"] = "SendToGateway not match params"
 			return nil
@@ -791,37 +778,37 @@ func (*TxSearch) makeReturnValue(tx *types.Transaction, data []interface{}, res 
 		returnValues["_summary"] = arrayToSliceHex(data[4])
 		returnValues["_to"] = tx.To
 		returnValues["_from"] = tx.From
+	case "sendfromgateway", "sendtorouterfromgateway":
+		if len(data) > 0 {
+			if token, ok := data[0].(common.Address); ok {
+				returnValues["_token"] = token
+			}
+			if to, ok := data[1].(common.Address); ok {
+				returnValues["_to"] = to
+			}
+			// SendFromGateway         param: token 0, to 1, amt 2, path 3, fromChain 4, summary 5
+			// SendToRouterFromGateway param: token 0, to 1, amountIn 2, amountOutMin 3, path 4, deadline 5, fromChain 6, summary 7
+			routerCap := 0
+			if tx.Method == "SendFromGateway" {
+				amt := getAmountOrBigIntString(data[2])
+				returnValues["_amountIn"] = amt
+				returnValues["_amountOutMin"] = amt
+			} else if tx.Method == "SendToRouterFromGateway" {
+				returnValues["_amountIn"] = getAmountOrBigIntString(data[2])
+				returnValues["_amountOutMin"] = getAmountOrBigIntString(data[3])
+				routerCap = 1
+			}
+			if path, ok := data[3+routerCap].([]common.Address); ok {
+				returnValues["_path"] = path
+			}
+			if tx.Method == "SendToRouterFromGateway" {
+				routerCap = 2
+			}
+			returnValues["_summary"] = arrayToSliceHex(data[5+routerCap])
 
-	} else if (tx.Method == "SendFromGateway" || tx.Method == "SendToRouterFromGateway") && len(data) > 0 {
-		if token, ok := data[0].(common.Address); ok {
-			returnValues["_token"] = token
+			returnValues["_from"] = tx.From
 		}
-		if to, ok := data[1].(common.Address); ok {
-			returnValues["_to"] = to
-		}
-		// SendFromGateway         param: token 0, to 1, amt 2, path 3, fromChain 4, summary 5
-		// SendToRouterFromGateway param: token 0, to 1, amountIn 2, amountOutMin 3, path 4, deadline 5, fromChain 6, summary 7
-		routerCap := 0
-		if tx.Method == "SendFromGateway" {
-			amt := getAmountOrBigIntString(data[2])
-			returnValues["_amountIn"] = amt
-			returnValues["_amountOutMin"] = amt
-		} else if tx.Method == "SendToRouterFromGateway" {
-			returnValues["_amountIn"] = getAmountOrBigIntString(data[2])
-			returnValues["_amountOutMin"] = getAmountOrBigIntString(data[3])
-			routerCap = 1
-		}
-		if path, ok := data[3+routerCap].([]common.Address); ok {
-			returnValues["_path"] = path
-		}
-		if tx.Method == "SendToRouterFromGateway" {
-			routerCap = 2
-		}
-		returnValues["_summary"] = arrayToSliceHex(data[5+routerCap])
-
-		returnValues["_from"] = tx.From
 	}
-
 	if len(events) == 1 {
 		if seq, ok := events[0].(uint64); ok {
 			returnValues["_sequence"] = seq

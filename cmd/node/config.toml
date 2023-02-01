@@ -13,7 +13,7 @@ InitTimestamp = 0
 Port = 22001
 RPCPort = 8541
 StoreRoot = "./ndata"
-# NodeKeyHex = "NODE_KEY_HEX_HERE OR REMOVE"
+# NodeKeyHex = "d660a9bb4a518c6fd6d0e2df178787c2570312b915f4102dfc0cdf46b7f3793e"
 ServiceName = "meverse_account"
 
 [SeedNodeMap]

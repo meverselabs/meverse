@@ -21,7 +21,7 @@ func (fr *GeneratorNode) OnConnected(p peer.Peer) {
 
 	cp := fr.cn.Provider()
 	nm := &p2p.StatusMessage{
-		Version:  cp.Version(),
+		Version:  cp.Version(cp.Height()),
 		Height:   cp.Height(),
 		LastHash: cp.LastHash(),
 	}
@@ -82,6 +82,7 @@ func (fr *GeneratorNode) handlePeerMessage(ID string, m interface{}) error {
 		}
 		fr.sendMessagePacket(0, SenderPublicKey, bs)
 		//log.Println("Send.BlockMessage", SenderPublicKey.String(), msg.Height)
+		return nil
 	case *p2p.StatusMessage:
 		//log.Println("Recv.StatusMessage", SenderPublicKey.String(), msg.Height)
 		fr.statusLock.Lock()
@@ -106,6 +107,7 @@ func (fr *GeneratorNode) handlePeerMessage(ID string, m interface{}) error {
 				fr.nm.RemovePeer(ID)
 			}
 		}
+		return nil
 	case *p2p.BlockMessage:
 		//log.Println("Recv.BlockMessage", SenderPublicKey.String(), msg.Blocks[0].Header.Height)
 		for _, b := range msg.Blocks {
@@ -127,6 +129,7 @@ func (fr *GeneratorNode) handlePeerMessage(ID string, m interface{}) error {
 			}
 			fr.statusLock.Unlock()
 		}
+		return nil
 	case *p2p.TransactionMessage:
 		//log.Println("Recv.TransactionMessage", fr.txWaitQ.Size(), fr.txpool.Size())
 		if fr.txWaitQ.Size() > 2000000 {
@@ -164,10 +167,8 @@ func (fr *GeneratorNode) handlePeerMessage(ID string, m interface{}) error {
 		fr.nm.SendPeerList(ID)
 		return nil
 	default:
-		panic(p2p.ErrUnknownMessage) //TEMP
-		// return errors.WithStack(p2p.ErrUnknownMessage)
+		return errors.WithStack(p2p.ErrUnknownMessage)
 	}
-	return nil
 }
 
 func (fr *GeneratorNode) tryRequestBlocks() {

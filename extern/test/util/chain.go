@@ -18,6 +18,7 @@ import (
 	"github.com/meverselabs/meverse/core/chain"
 	"github.com/meverselabs/meverse/core/piledb"
 	"github.com/meverselabs/meverse/core/types"
+	"github.com/meverselabs/meverse/service/apiserver/viewchain"
 	"github.com/pkg/errors"
 )
 
@@ -62,6 +63,7 @@ func (tc *TestContext) InitChain(adm common.Address) error {
 		return err
 	}
 
+	chain.SetVersion(0, 1)
 	Version := uint16(0x0001)
 
 	cdb, err := piledb.Open(dir+"/chain", hash.Hash256{}, 0, 0)
@@ -114,6 +116,7 @@ func (tc *TestContext) AddBlock(seconds uint64, txs []*types.Transaction, signer
 
 	nextTimestamp := tc.Ctx.LastTimestamp() + (seconds * uint64(time.Second))
 	bc := chain.NewBlockCreator(tc.Cn, tc.Ctx, Generator, TimeoutCount, nextTimestamp, 0)
+	var receipts = types.Receipts{}
 	for i, tx := range txs {
 		if tx != nil {
 			sig, err := signer[i].Sign(tx.HashSig())
@@ -121,14 +124,15 @@ func (tc *TestContext) AddBlock(seconds uint64, txs []*types.Transaction, signer
 				return hash.HexToHash(""), err
 			}
 
-			err = bc.AddTx(tx, sig)
-			if err != nil {
+			if receipt, err := bc.AddTx(tx, sig); err != nil {
 				return hash.HexToHash(""), err
+			} else {
+				receipts = append(receipts, receipt)
 			}
 		}
 	}
 
-	b, err := bc.Finalize(0)
+	b, err := bc.Finalize(0, receipts)
 	if err != nil {
 		return hash.HexToHash(""), err
 	}
@@ -195,6 +199,19 @@ func (tc *TestContext) MustSkipBlock(blockCount int) {
 	}
 }
 
+func (tc *TestContext) SleepBlocks(block int) {
+	for i := 0; i < block; i++ {
+		timestamp := tc.Ctx.LastTimestamp() + 1*uint64(time.Second)
+
+		LastHash, err := tc.AddBlock(1, nil, nil)
+		if err != nil {
+			tc.Ctx = tc.Cn.NewContext()
+			panic(err)
+		}
+		tc.Ctx = tc.Ctx.NextContext(LastHash, timestamp)
+	}
+}
+
 func (tc *TestContext) Sleep(seconds uint64, tx []*types.Transaction, signer []key.Key) error {
 	timestamp := tc.Ctx.LastTimestamp() + seconds*uint64(time.Second)
 
@@ -223,7 +240,11 @@ func (tc *TestContext) SendTx(mkey key.Key, to common.Address, method string, pa
 		return nil, err
 	}
 
-	err = tc.Sleep(10, []*types.Transaction{tx}, []key.Key{mkey})
+	return tc.MultiSendTx([]*types.Transaction{tx}, []key.Key{mkey})
+}
+
+func (tc *TestContext) MultiSendTx(txs []*types.Transaction, keys []key.Key) ([]interface{}, error) {
+	err := tc.Sleep(10, txs, keys)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +270,7 @@ func (tc *TestContext) SendTx(mkey key.Key, to common.Address, method string, pa
 	return nil, nil
 }
 
-func (tc *TestContext) ReadTx(mkey key.Key, to common.Address, method string, params ...interface{}) ([]interface{}, error) {
+func (tc *TestContext) MakeTx(to common.Address, method string, params ...interface{}) (*types.Transaction, error) {
 	tx := &types.Transaction{
 		ChainID:   ChainID,
 		Timestamp: tc.Ctx.LastTimestamp(),
@@ -265,34 +286,26 @@ func (tc *TestContext) ReadTx(mkey key.Key, to common.Address, method string, pa
 		return nil, err
 	}
 
-	n := tc.Ctx.Snapshot()
-	ens, err := chain.ExecuteContractTxWithEvent(tc.Ctx, tx, mkey.PublicKey().Address(), "000000000000")
-	tc.Ctx.Revert(n)
+	return tx, nil
+}
+
+func (tc *TestContext) ReadTx(mkey key.Key, to common.Address, method string, params ...interface{}) ([]interface{}, error) {
+	return tc.Call(to, mkey.PublicKey().Address().String(), method, params)
+}
+
+func (tc *TestContext) Call(toAddr common.Address, from, method string, params []interface{}) ([]interface{}, error) {
+	caller := viewchain.NewViewCaller(tc.Cn)
+	output, _, err := caller.Execute(toAddr, from, method, params)
 	if err != nil {
 		return nil, err
 	}
-
-	for i := 0; i < len(ens); i++ {
-		en := ens[i]
-		if en.Type == types.EventTagTxMsg {
-			ins, err := bin.TypeReadAll(en.Result, 1)
-			if err != nil {
-				return nil, err
-			}
-			return ins, nil
-		} else if en.Type == types.EventTagCallHistory {
-			bf := bytes.NewBuffer(en.Result)
-			mc := &types.MethodCallEvent{}
-			mc.ReadFrom(bf)
-		}
-	}
-	return nil, nil
+	return output, nil
 }
 
-func (tc *TestContext) MakeTx(mkey key.Key, to common.Address, method string, params ...interface{}) ([]interface{}, error) {
-	infs, err := tc.SendTx(mkey, to, method, params...)
-	return infs, err
-}
+// func (tc *TestContext) MakeTx(mkey key.Key, to common.Address, method string, params ...interface{}) ([]interface{}, error) {
+// 	infs, err := tc.SendTx(mkey, to, method, params...)
+// 	return infs, err
+// }
 
 func (tc *TestContext) MustSendTx(mkey key.Key, to common.Address, method string, params ...interface{}) []interface{} {
 	res, err := tc.SendTx(mkey, to, method, params...)

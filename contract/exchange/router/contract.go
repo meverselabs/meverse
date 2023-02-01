@@ -127,8 +127,12 @@ func (cont *RouterContract) uniAddLiquidity(
 	return amountA, amountB, liquidity, pair, nil
 }
 
-func (cont *RouterContract) SetCubicRootType(cc *types.ContractContext, cubicRootType uint8) {
+func (cont *RouterContract) SetCubicRootType(cc *types.ContractContext, cubicRootType uint8) error {
+	if cc.From().String() != cont.master.String() {
+		return errors.New("not owner")
+	}
 	cc.SetContractData([]byte{tagCubicRoot}, []byte{cubicRootType})
+	return nil
 }
 
 func (cont *RouterContract) CubicRootType(cc *types.ContractContext) (cubicRootType uint8) {

@@ -111,6 +111,15 @@ func (cont *DeployerContract) Update(cc *types.ContractContext, EnginName string
 }
 
 func (cont *DeployerContract) InitContract(cc *types.ContractContext, contract []byte, params []interface{}) error {
+	if cc.TargetHeight() > 41188694 {
+		EnginAddressBs := cc.ContractData([]byte{tagEnginAddress})
+		EnginAddress := common.BytesToAddress(EnginAddressBs)
+
+		if cc.From() != EnginAddress {
+			return errors.New("no engin contract")
+		}
+	}
+
 	eg, ecc, err := cont.getEngin(cc)
 	if err != nil {
 		return err

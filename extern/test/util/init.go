@@ -21,6 +21,7 @@ import (
 	"github.com/meverselabs/meverse/contract/gateway"
 	"github.com/meverselabs/meverse/contract/token"
 	"github.com/meverselabs/meverse/contract/whitelist"
+	"github.com/meverselabs/meverse/core/chain"
 	"github.com/meverselabs/meverse/core/types"
 )
 
@@ -118,6 +119,7 @@ func init() {
 		Users = append(Users, addr)
 		log.Println("userAddr", i, " : ", addr)
 	}
+	chain.SetVersion(1, 2)
 }
 
 func RegisterContractClass(cont types.Contract, className string) uint64 {

@@ -2,14 +2,19 @@ package txsearch
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
+
+	etypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/common/bin"
 	"github.com/meverselabs/meverse/core/types"
+	"github.com/meverselabs/meverse/extern/txparser"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -58,6 +63,26 @@ func (t *TxSearch) ReadBlock(b *types.Block) (err error) {
 		TxTag := fmt.Sprintln("tx height:", b.Header.Height, "index:", i)
 		l = append(l, &readB{tagTxHash, tx.Hash(b.Header.Height).Bytes(), TXID, TxTag})
 
+		if tx.VmType == types.Evm {
+			etx := new(etypes.Transaction)
+			if err := etx.UnmarshalBinary(tx.Args); err != nil {
+				return err
+			}
+
+			dataBs := etx.Data()
+			if len(dataBs) == 0 {
+				tx.Method = "Transfer"
+			} else {
+				m := txparser.Abi(hex.EncodeToString(dataBs[:4]))
+				if m.Name != "" {
+					tx.Method = strings.ToUpper(string(m.Name[0])) + m.Name[1:]
+				}
+			}
+
+			l = append(l, &readB{tagTxHash, etx.Hash().Bytes(), TXID, TxTag})
+		} else {
+			l = append(l, &readB{tagTxHash, tx.Hash(b.Header.Height).Bytes(), TXID, TxTag})
+		}
 		t.saveTx(indexMap, index41Map, batch, tx, b.Header.Height, TXID)
 	}
 	for k, v := range indexMap {
@@ -152,24 +177,16 @@ func (t *TxSearch) saveTx(indexMap map[addrIndexKey]uint64, index41Map map[addr4
 }
 
 func (t *TxSearch) _saveTx(indexMap map[addrIndexKey]uint64, index41Map map[addr41IndexKey]uint64, batch *leveldb.Batch, tx *types.Transaction, height uint32, TXID []byte) {
-	arg, _, err := types.TxArg(t.cn.NewContext(), tx)
+	TxTo, method, arg, err := types.TxArg(t.cn.NewContext(), tx)
 	if err != nil {
 		return
 	}
 
-	TxTo := tx.To
-	if tx.Method == "Transfer" {
-		_, ok := arg[0].(common.Address)
-		if !ok {
-			arg = append([]interface{}{tx.To}, arg[0])
-			TxTo = *t.st.MainToken()
-		}
-	}
 	hbs := make([]byte, 4)
 	binary.BigEndian.PutUint32(hbs, height)
 
-	switch tx.Method {
-	case "Transfer":
+	switch strings.ToLower(method) {
+	case "transfer":
 		to := toAddress(arg, 0)
 		am := toAmount(arg, 1)
 		t.Push(indexMap, batch, addrKey(tagAddress, tx.From[:]), tx.Method, TXID, TxTo, uint8(0), to, am)
@@ -177,7 +194,7 @@ func (t *TxSearch) _saveTx(indexMap map[addrIndexKey]uint64, index41Map map[addr
 
 		t.Push41(index41Map, batch, addr41Key(tagTransfer, TxTo, tx.From), tx.Method, TXID, uint8(0), to, am)
 		t.Push41(index41Map, batch, addr41Key(tagTransfer, TxTo, to), tx.Method, TXID, uint8(1), tx.From, am)
-	case "TransferFrom":
+	case "transferfrom":
 		From := toAddress(arg, 0)
 		To := toAddress(arg, 1)
 		am := toAmount(arg, 2)
@@ -186,19 +203,19 @@ func (t *TxSearch) _saveTx(indexMap map[addrIndexKey]uint64, index41Map map[addr
 
 		t.Push41(index41Map, batch, addr41Key(tagTransfer, TxTo, From), tx.Method, TXID, uint8(0), To, am)
 		t.Push41(index41Map, batch, addr41Key(tagTransfer, TxTo, To), tx.Method, TXID, uint8(1), From, am)
-	case "Approve":
+	case "approve":
 		t.Push(indexMap, batch, addrKey(tagAddress, tx.From[:]), tx.Method, TXID, TxTo)
-	case "CreateAlpha", "CreateSigma", "CreateOmega":
+	case "createalpha", "createsigma", "createomega":
 		t.Push(indexMap, batch, addrKey(tagAddress, tx.From[:]), tx.Method, TXID)
-	case "Revoke":
+	case "revoke":
 		t.Push(indexMap, batch, addrKey(tagAddress, tx.From[:]), tx.Method, TXID)
-	case "Stake":
+	case "stake":
 		HyperAddress := toAddress(arg, 0)
 		t.Push(indexMap, batch, addrKey(tagAddress, tx.From[:]), tx.Method, TXID, HyperAddress)
-	case "Unstake":
+	case "unstake":
 		HyperAddress := toAddress(arg, 0)
 		t.Push(indexMap, batch, addrKey(tagAddress, tx.From[:]), tx.Method, TXID, HyperAddress)
-	case "TokenIn", "TokenIndexIn":
+	case "tokenin", "tokenindexin":
 		to := toAddress(arg, 2)
 		am := toAmount(arg, 3)
 
@@ -207,12 +224,12 @@ func (t *TxSearch) _saveTx(indexMap map[addrIndexKey]uint64, index41Map map[addr
 
 		t.Push41(index41Map, batch, addr41Key(tagTransfer, *t.st.MainToken(), tx.From), tx.Method, TXID, uint8(0), to, am)
 		t.Push41(index41Map, batch, addr41Key(tagTransfer, *t.st.MainToken(), to), tx.Method, TXID, uint8(1), tx.From, am)
-	case "TokenLeave":
+	case "tokenleave":
 		CoinTXID := toString(arg, 0)
 		ERC20TXID := toString(arg, 1)
 		Platform := toString(arg, 2)
 		t.Push(indexMap, batch, addrKey(tagTokenLeave, hbs), TXID, CoinTXID, ERC20TXID, Platform)
-	case "TokenOut":
+	case "tokenout":
 		Platform := toString(arg, 0)
 		withdrawAddress := toAddress(arg, 1)
 		am := toAmount(arg, 2)
@@ -221,18 +238,18 @@ func (t *TxSearch) _saveTx(indexMap map[addrIndexKey]uint64, index41Map map[addr
 
 		t.Push(indexMap, batch, addrKey(tagAddress, tx.From[:]), tx.Method, TXID)
 		t.Push41(index41Map, batch, addr41Key(tagTransfer, *t.st.MainToken(), tx.From), tx.Method, TXID, uint8(0), withdrawAddress, am)
-	case "SendToGateway":
+	case "sendtogateway":
 		t.Push(indexMap, batch, addrKey(tagBridge, TxTo[:], hbs), TXID)
 		token := toAddress(arg, 0)
 		am := toAmount(arg, 1)
 		t.Push41(index41Map, batch, addr41Key(tagTransfer, token, tx.From), tx.Method, TXID, uint8(0), tx.To, am)
-	case "SendFromGateway":
+	case "sendfromgateway":
 		t.Push(indexMap, batch, addrKey(tagBridge, TxTo[:], hbs), TXID)
 		token := toAddress(arg, 0)
 		to := toAddress(arg, 1)
 		am := toAmount(arg, 2)
 		t.Push41(index41Map, batch, addr41Key(tagTransfer, token, to), tx.Method, TXID, uint8(1), tx.From, am)
-	case "SendToRouterFromGateway":
+	case "sendtorouterfromgateway":
 		t.Push(indexMap, batch, addrKey(tagBridge, TxTo[:], hbs), TXID)
 	default:
 		t.Push(indexMap, batch, addrKey(tagAddress, tx.From[:]), tx.Method, TXID)

@@ -117,6 +117,6 @@ func (f *RounterFront) UniSwapTokensForExactTokens(
 func (f *RounterFront) CubicRootType(cc *types.ContractContext) uint8 {
 	return f.cont.CubicRootType(cc)
 }
-func (f *RounterFront) SetCubicRootType(cc *types.ContractContext, cubicRootType uint8) {
-	f.cont.SetCubicRootType(cc, cubicRootType)
+func (f *RounterFront) SetCubicRootType(cc *types.ContractContext, cubicRootType uint8) error {
+	return f.cont.SetCubicRootType(cc, cubicRootType)
 }

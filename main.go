@@ -230,7 +230,7 @@ func main() {
 				if err != nil {
 					panic(err)
 				}
-				if err := bc.AddTx(tx, sig); err != nil {
+				if _, err := bc.AddTx(tx, sig); err != nil {
 					panic(err)
 				}
 			}
@@ -249,7 +249,7 @@ func main() {
 					if err != nil {
 						panic(err)
 					}
-					if err := bc.AddTx(tx, sig); err != nil {
+					if _, err := bc.AddTx(tx, sig); err != nil {
 						fmt.Println(err)
 					} else {
 						fmt.Println("SigmaCreated")
@@ -268,7 +268,7 @@ func main() {
 					if err != nil {
 						panic(err)
 					}
-					if err := bc.AddTx(tx, sig); err != nil {
+					if _, err := bc.AddTx(tx, sig); err != nil {
 						fmt.Println(err)
 					} else {
 						fmt.Println("OmegaCreated")
@@ -287,11 +287,11 @@ func main() {
 				if err != nil {
 					panic(err)
 				}
-				if err := bc.AddTx(tx, sig); err != nil {
+				if _, err := bc.AddTx(tx, sig); err != nil {
 					panic(err)
 				}
 			}
-			b, err := bc.Finalize(0)
+			b, err := bc.Finalize(0, nil)
 			if err != nil {
 				panic(err)
 			}

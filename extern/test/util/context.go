@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/core/chain"
 	"github.com/meverselabs/meverse/core/types"
 )
@@ -38,6 +39,11 @@ func NewTestContext() *TestContext {
 	if err != nil {
 		panic(err)
 	}
+	_, err = tc.SendTx(AdminKey, common.HexToAddress(""), "Transaction.SetBasicFee", amount.MustParseAmount("0.000038931713774040"))
+	if err != nil {
+		panic(err)
+	}
+
 	return tc
 }
 

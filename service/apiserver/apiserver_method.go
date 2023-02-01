@@ -178,6 +178,7 @@ func (s *APIServer) handleJRPCs(r *ReqData) {
 
 func (s *APIServer) _handleJRPC(req *jRPCRequest) interface{} {
 	method := req.Method
+	//log.Println("method", method)
 	if !strings.Contains(method, ".") {
 		method = "eth." + method
 	}
@@ -231,6 +232,7 @@ func (s *APIServer) _handleJRPC(req *jRPCRequest) interface{} {
 	}
 
 	ret, err := fn(req.ID, NewArgument(args))
+	//log.Println(ret)
 	if req.ID == nil {
 		log.Println("failJRPCResponse err not fount id", err, req.Method, printParam(req.Params))
 		return &JRPCResponseWithError{

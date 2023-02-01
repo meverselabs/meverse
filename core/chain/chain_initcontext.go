@@ -27,7 +27,7 @@ func (cn *Chain) UpdateInit(genesisContextData *types.ContextData) error {
 			}
 		}
 	} else {
-		if err := cn.store.StoreGenesis(GenesisHash, genesisContextData); err != nil {
+		if err := cn.store.UpdateStoreGenesis(GenesisHash, genesisContextData); err != nil {
 			return err
 		}
 	}

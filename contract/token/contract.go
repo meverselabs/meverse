@@ -3,7 +3,6 @@ package token
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"math/big"
 
 	"github.com/pkg/errors"
@@ -179,6 +178,17 @@ func (cont *TokenContract) Transfer(cc *types.ContractContext, To common.Address
 	}
 	return cont.addBalance(cc, To, Amount)
 }
+func (cont *TokenContract) DelegateFeeTransfer(cc *types.ContractContext, To common.Address, Amount *amount.Amount) error {
+	di, err := getDelegateInfo(cc)
+	if err != nil {
+		return err
+	}
+	if _, err := cc.Exec(cc, *cc.MainToken(), "TransferFrom", []interface{}{di.feeBanker, cc.From(), di.transferFee}); err != nil {
+		return err
+	}
+
+	return cont.Transfer(cc, To, Amount)
+}
 
 func (cont *TokenContract) Burn(cc *types.ContractContext, am *amount.Amount) error {
 	if am.IsMinus() {
@@ -231,6 +241,26 @@ func (cont *TokenContract) SetMinter(cc *types.ContractContext, To common.Addres
 	}
 	return nil
 }
+func (cont *TokenContract) SetTokenManager(cc *types.ContractContext, To common.Address, Is bool) error {
+	if cc.From() != cont.Master() {
+		return errors.New("not token master")
+	}
+
+	isManager := cont.IsManager(cc, To)
+
+	if Is {
+		if isManager {
+			return errors.New("already token manager")
+		}
+		cc.SetAccountData(To, []byte{tagTokenManager}, []byte{1})
+	} else {
+		if !isManager {
+			return errors.New("not token manager")
+		}
+		cc.SetAccountData(To, []byte{tagTokenManager}, nil)
+	}
+	return nil
+}
 
 func (cont *TokenContract) Approve(cc *types.ContractContext, spender common.Address, Amount *amount.Amount) error {
 	if cc.From() == common.ZeroAddr {
@@ -249,6 +279,35 @@ func (cont *TokenContract) Approve(cc *types.ContractContext, spender common.Add
 	return nil
 }
 
+func (cont *TokenContract) SetDelegateFee(cc *types.ContractContext, spender, banker common.Address, approveFee, approveLowerLimit, transferFee *amount.Amount) error {
+	if cc.From() != cont.Master() && !cont.IsManager(cc, cc.From()) {
+		return errors.New("not token master")
+	}
+	_setDelegateInfo(cc, spender, banker, approveFee, approveLowerLimit, transferFee)
+	return nil
+}
+func (cont *TokenContract) DelegateFeeApprove(cc *types.ContractContext, spender common.Address, Amount *amount.Amount) error {
+	di, err := getDelegateInfo(cc)
+	if err != nil {
+		return err
+	}
+	allownce := cont.Allowance(cc, cc.From(), spender)
+	if allownce.Cmp(Amount.Int) == 0 {
+		return errors.New("allownce is not changed")
+	}
+	if di.approveLowerLimit.Cmp(amount.ZeroCoin.Int) > 0 && di.approveLowerLimit.Cmp(Amount.Int) > 0 {
+		return errors.New("invalid approve value")
+	}
+	if di.spender != spender {
+		return errors.New("not matched delegate spender")
+	}
+	if _, err := cc.Exec(cc, *cc.MainToken(), "TransferFrom", []interface{}{di.feeBanker, cc.From(), di.approveFee}); err != nil {
+		return err
+	}
+
+	return cont.Approve(cc, spender, Amount)
+}
+
 func (cont *TokenContract) _approve(cc *types.ContractContext, owner common.Address, spender common.Address, Amount *amount.Amount) {
 	cc.SetAccountData(owner, MakeAllowanceTokenKey(spender), Amount.Bytes())
 }
@@ -259,7 +318,7 @@ func (cont *TokenContract) TransferFrom(cc *types.ContractContext, From common.A
 	}
 	balance := cont.BalanceOf(cc, From)
 	if Amount.Cmp(balance.Int) > 0 {
-		return errors.Errorf("the token holding quantity is insufficient balance: %v Amount: %v From: %v cont: %v", balance.String(), Amount.String(), From.String(), cont.addr.String())
+		return errors.Errorf("the token holding quantity is insufficient balance: %v Amount: %v From: %v To: %v cont: %v", balance.String(), Amount.String(), From.String(), To.String(), cont.addr.String())
 	}
 
 	allowedValue := cont.Allowance(cc, From, cc.From())
@@ -301,7 +360,6 @@ func (cont *TokenContract) TokenInRevert(cc *types.ContractContext, Platform str
 
 func (cont *TokenContract) SetGateway(cc *types.ContractContext, Gateway common.Address, Is bool) error {
 	if cc.From() != cont.Master() {
-		log.Println("err not token master")
 		return errors.New("not token master")
 	}
 
@@ -309,24 +367,20 @@ func (cont *TokenContract) SetGateway(cc *types.ContractContext, Gateway common.
 
 	if Is {
 		if isGateway {
-			log.Println("err already token gateway")
 			return errors.New("already token gateway")
 		}
 		cc.SetAccountData(Gateway, []byte{tagTokenGateway}, []byte{1})
 	} else {
 		if !isGateway {
-			log.Println("err not token gateway")
 			return errors.New("not token gateway")
 		}
 		cc.SetAccountData(Gateway, []byte{tagTokenGateway}, nil)
 	}
-	log.Println("SetGateway", Gateway, Is)
 	return nil
 }
 
 func (cont *TokenContract) SetRouter(cc *types.ContractContext, router common.Address, path []common.Address) error {
 	if cc.From() != cont.Master() {
-		log.Println("err not token master")
 		return errors.New("not token master")
 	}
 
@@ -432,7 +486,7 @@ func (cont *TokenContract) isPause(cc *types.ContractContext) bool {
 }
 
 func (cont *TokenContract) Pause(cc *types.ContractContext) error {
-	if cc.From() != cont.Master() {
+	if cc.From() != cont.Master() && !cont.IsManager(cc, cc.From()) {
 		return errors.New("not token master")
 	}
 	cc.SetContractData([]byte{tagPause}, []byte{1})
@@ -440,7 +494,7 @@ func (cont *TokenContract) Pause(cc *types.ContractContext) error {
 }
 
 func (cont *TokenContract) Unpause(cc *types.ContractContext) error {
-	if cc.From() != cont.Master() {
+	if cc.From() != cont.Master() && !cont.IsManager(cc, cc.From()) {
 		return errors.New("not token master")
 	}
 	cc.SetContractData([]byte{tagPause}, nil)
@@ -479,6 +533,13 @@ func (cont *TokenContract) BalanceOf(cc types.ContractLoader, from common.Addres
 
 func (cont *TokenContract) IsMinter(cc types.ContractLoader, addr common.Address) bool {
 	bs := cc.AccountData(addr, []byte{tagTokenMinter})
+	if len(bs) == 1 && bs[0] == 1 {
+		return true
+	}
+	return false
+}
+func (cont *TokenContract) IsManager(cc types.ContractLoader, addr common.Address) bool {
+	bs := cc.AccountData(addr, []byte{tagTokenManager})
 	if len(bs) == 1 && bs[0] == 1 {
 		return true
 	}
