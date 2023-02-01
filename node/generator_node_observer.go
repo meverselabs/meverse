@@ -48,6 +48,8 @@ func (fr *GeneratorNode) onObserverRecv(p peer.Peer, bs []byte) error {
 
 	if err := fr.handleObserverMessage(p, m, 0); err != nil {
 		switch errors.Cause(err) {
+		case p2p.ErrUnknownMessage:
+			return err
 		case ErrInvalidRoundState, ErrAlreadyVoted:
 		default:
 			fmt.Printf("%+v\n", err)
@@ -313,7 +315,6 @@ func (fr *GeneratorNode) handleObserverMessage(p peer.Peer, m interface{}, Retry
 		}
 		return nil
 	default:
-		panic(p2p.ErrUnknownMessage) //TEMP
 		return errors.WithStack(p2p.ErrUnknownMessage)
 	}
 }

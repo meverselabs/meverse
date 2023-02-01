@@ -54,7 +54,6 @@ func (ob *ObserverNode) onGeneratorRecv(p peer.Peer, bs []byte) error {
 	case p2p.StatusMessageType:
 		ob.recvChan <- item
 	default:
-		panic(p2p.ErrUnknownMessage) //TEMP
 		return errors.WithStack(p2p.ErrUnknownMessage)
 	}
 	return nil
@@ -146,7 +145,6 @@ func (ob *ObserverNode) handleGeneratorMessage(p peer.Peer, m interface{}, bs []
 			}
 		}
 	default:
-		panic(p2p.ErrUnknownMessage) //TEMP
 		return errors.WithStack(p2p.ErrUnknownMessage)
 	}
 	return nil

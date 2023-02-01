@@ -302,7 +302,9 @@ func (cont *BridgeContract) setTransferFeeInfo(cc *types.ContractContext, chain 
 	if !cont.checkOwner(cc) {
 		return errors.New("not owner")
 	}
-	cc.SetContractData(makeDelegateTransferFeeInfoToChain(chain), nil)
+	if cc.Version(cc.TargetHeight()) > 1 {
+		cc.SetContractData(makeDelegateTransferFeeInfoToChain(chain), nil)
+	}
 	cc.SetContractData(makeTransferFeeInfoToChain(chain), transferFee.Bytes())
 	return nil
 }

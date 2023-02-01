@@ -258,19 +258,9 @@ func (nd *Node) Run(BindAddress string) {
 
 	for i := 0; i < 2; i++ {
 		go func() {
-			for item := range nd.recvChan {
+			for {
+				nd.PacketProcess()
 				if nd.isClose {
-					break
-				}
-				m, err := PacketToMessage(item.Packet)
-				if err != nil {
-					log.Printf("PacketToMessage %+v\n", err)
-					nd.ms.RemovePeer(item.PeerID)
-					break
-				}
-				if err := nd.handlePeerMessage(item.PeerID, m); err != nil {
-					log.Printf("handlePeerMessage %+v\n", err)
-					nd.ms.RemovePeer(item.PeerID)
 					break
 				}
 			}
@@ -360,6 +350,32 @@ func (nd *Node) Run(BindAddress string) {
 			} else {
 				time.Sleep(200 * time.Millisecond)
 			}
+		}
+	}
+}
+
+func (nd *Node) PacketProcess() {
+	defer func() {
+		recover()
+	}()
+	for item := range nd.recvChan {
+		if nd.isClose {
+			break
+		}
+		m, err := PacketToMessage(item.Packet)
+		if err != nil {
+			log.Printf("PacketToMessage %+v\n", err)
+			nd.ms.RemovePeer(item.PeerID)
+			break
+		}
+		if err := nd.handlePeerMessage(item.PeerID, m); err != nil {
+			if errors.Unwrap(err) == ErrUnknownMessage {
+				panic(ErrUnknownMessage) // TEMP
+			}
+
+			log.Printf("handlePeerMessage %+v\n", err)
+			nd.ms.RemovePeer(item.PeerID)
+			break
 		}
 	}
 }
@@ -505,6 +521,9 @@ func (nd *Node) handlePeerMessage(ID string, m interface{}) error {
 		if len(msg.Txs) > 1000 {
 			return errors.WithStack(ErrTooManyTrasactionInMessage)
 		}
+		if len(msg.Txs) != len(msg.Signatures) {
+			return errors.WithStack(ErrInvalidSignatureCount)
+		}
 		currentSlot := types.ToTimeSlot(nd.cn.Provider().LastTimestamp())
 		for i, tx := range msg.Txs {
 			slot := types.ToTimeSlot(tx.Timestamp)
@@ -534,8 +553,7 @@ func (nd *Node) handlePeerMessage(ID string, m interface{}) error {
 		nd.ms.SendPeerList(ID)
 		return nil
 	default:
-		panic(ErrUnknownMessage) //TEMP
-		// return errors.WithStack(ErrUnknownMessage)
+		return errors.WithStack(ErrUnknownMessage)
 	}
 	// return nil
 }

@@ -299,6 +299,9 @@ func (fr *GeneratorNode) Run(BindAddress string) {
 					continue
 				}
 				if err := fr.handlePeerMessage(item.PeerID, m); err != nil {
+					if errors.Unwrap(err) == p2p.ErrUnknownMessage {
+						panic(p2p.ErrUnknownMessage) //TEMP
+					}
 					log.Printf("handlePeerMessage %+v\n", err)
 					fr.nm.RemovePeer(item.PeerID)
 					continue

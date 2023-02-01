@@ -143,6 +143,9 @@ func (ob *ObserverNode) Run(BindObserver string, BindGenerator string) {
 				}
 				if p, has := ob.fs.Peer(item.PeerID); has {
 					if err := ob.handleGeneratorMessage(p, m, item.Packet); err != nil {
+						if errors.Unwrap(err) == p2p.ErrUnknownMessage {
+							panic(p2p.ErrUnknownMessage) //TEMP
+						}
 						log.Printf("Generator Error %v  %+v\n", p.Name(), err)
 						ob.fs.RemovePeer(item.PeerID)
 						continue

@@ -22,8 +22,14 @@ import (
 	"github.com/meverselabs/meverse/contract/nft721"
 	"github.com/meverselabs/meverse/contract/token"
 	"github.com/meverselabs/meverse/contract/whitelist"
+	"github.com/meverselabs/meverse/core/chain"
 	"github.com/meverselabs/meverse/core/types"
 )
+
+func init() {
+	types.SetLegacyCheckHeight(25298976)
+	chain.SetVersion(60301036, 2)
+}
 
 func Genesis() *types.ContextData {
 	adminAddress := common.HexToAddress("0x24D5da1B198c5049016c513099916498ceE9ccf5")
@@ -196,7 +202,6 @@ func Genesis() *types.ContextData {
 		fmt.Println("formulatorAddress", formulatorAddress.String())
 		// formulatorAddress 0x75A098f86bAe71039217a879f064d034c59C3766
 	}
-	types.SetLegacyCheckHeight(25298976)
 	return genesis.Top()
 }
 
