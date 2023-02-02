@@ -13,6 +13,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const EVMHeight uint32 = 60301036
+
 // Pile proivdes a part of stack like store
 type Pile struct {
 	sync.Mutex
@@ -358,6 +360,11 @@ func (p *Pile) GetData(Height uint32, index int) ([]byte, error) {
 	p.Lock()
 	defer p.Unlock()
 
+	// EVM 적용이전 index = 2 호출 불가
+	if Height < EVMHeight && index > 1 {
+		return nil, nil
+	}
+
 	FromHeight := Height - p.BeginHeight
 	if Height > p.BeginHeight+ChunkUnit {
 		return nil, errors.WithStack(ErrInvalidHeight)
@@ -452,8 +459,10 @@ func (p *Pile) GetDatas(Height uint32, from int, count int) ([]byte, error) {
 	if _, err := p.file.Read(lbs); err != nil {
 		return nil, errors.WithStack(err)
 	}
+	// index가 len(block.datas)보다 클 경우 줄인다.
 	if from+count > int(lbs[0]) {
-		return nil, errors.WithStack(ErrInvalidDataIndex)
+		//return nil, errors.WithStack(ErrInvalidDataIndex)
+		count = int(lbs[0]) - from
 	}
 	zlbs := make([]byte, 4*lbs[0])
 	if _, err := p.file.Read(zlbs); err != nil {
