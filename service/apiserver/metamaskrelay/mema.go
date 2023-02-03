@@ -708,6 +708,10 @@ func getTransaction(m *metamaskRelay, height uint32, index uint16) (interface{},
 			nonce = fmt.Sprintf("0x%x", tx.Seq)
 			input = fmt.Sprintf("0x%v%v", hex.EncodeToString([]byte(tx.Method)), hex.EncodeToString(tx.Args))
 		}
+		vbs := sig[64:]
+		if len(vbs) == 0 {
+			vbs = []byte{0}
+		}
 
 		return map[string]interface{}{
 			"blockHash":        bHash.String(),
@@ -721,7 +725,7 @@ func getTransaction(m *metamaskRelay, height uint32, index uint16) (interface{},
 			"to":               to,
 			"transactionIndex": fmt.Sprintf("0x%x", index),
 			"value":            value,
-			"v":                "0x" + hex.EncodeToString(sig[64:]),
+			"v":                "0x" + hex.EncodeToString(vbs),
 			"r":                "0x" + hex.EncodeToString(sig[:32]),
 			"s":                "0x" + hex.EncodeToString(sig[32:64]),
 		}, nil
@@ -736,6 +740,10 @@ func getTransaction(m *metamaskRelay, height uint32, index uint16) (interface{},
 			to = etx.To().String()
 		} else {
 			to = nil
+		}
+		vbs := sig[64:]
+		if len(vbs) == 0 {
+			vbs = []byte{0}
 		}
 
 		return map[string]interface{}{
@@ -755,7 +763,7 @@ func getTransaction(m *metamaskRelay, height uint32, index uint16) (interface{},
 			"type":                 fmt.Sprintf("0x%x", etx.Type()),
 			"accessList":           etx.AccessList(),
 			"chainId":              fmt.Sprintf("0x%x", etx.ChainId()),
-			"v":                    "0x" + hex.EncodeToString(sig[64:]),
+			"v":                    "0x" + hex.EncodeToString(vbs),
 			"r":                    "0x" + hex.EncodeToString(sig[:32]),
 			"s":                    "0x" + hex.EncodeToString(sig[32:64]),
 		}, nil
