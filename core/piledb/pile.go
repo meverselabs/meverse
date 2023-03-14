@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-const EVMHeight uint32 = 60301036
+var EvmHeight uint32
 
 // Pile proivdes a part of stack like store
 type Pile struct {
@@ -361,7 +361,7 @@ func (p *Pile) GetData(Height uint32, index int) ([]byte, error) {
 	defer p.Unlock()
 
 	// EVM 적용이전 index = 2 호출 불가
-	if Height < EVMHeight && index > 1 {
+	if Height < EvmHeight && index > 1 {
 		return nil, nil
 	}
 
@@ -493,4 +493,8 @@ func (p *Pile) GetDatas(Height uint32, from int, count int) ([]byte, error) {
 		buffer.Write(data)
 	}
 	return buffer.Bytes(), nil
+}
+
+func SetEvmHeight(h uint32) {
+	EvmHeight = h
 }

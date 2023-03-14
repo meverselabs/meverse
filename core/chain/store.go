@@ -56,6 +56,9 @@ func init() {
 
 func SetVersion(h uint32, v uint16) {
 	versionSet[h] = v
+	if v == 2 {
+		piledb.SetEvmHeight(h)
+	}
 }
 
 // NewStore returns a Store
