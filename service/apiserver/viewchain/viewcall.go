@@ -25,14 +25,14 @@ func NewViewCaller(cn *chain.Chain) *ViewCaller {
 	}
 }
 
-func (m *ViewCaller) _exec(conAddr common.Address, from, method string, inputs []interface{}) (types.IInteractor, error) {
+func (m *ViewCaller) Execute(contAddr common.Address, from, method string, inputs []interface{}) ([]interface{}, uint64, error) {
 	types.ExecLock.Lock()
 	defer types.ExecLock.Unlock()
 
 	ctx := m.cn.NewContext()
-	cont, err := ctx.Contract(conAddr)
+	cont, err := ctx.Contract(contAddr)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	var cc *types.ContractContext
 	if from == "" {
@@ -42,16 +42,7 @@ func (m *ViewCaller) _exec(conAddr common.Address, from, method string, inputs [
 	}
 	intr := types.NewInteractor(ctx, cont, cc, "000000000000", true)
 	cc.Exec = intr.Exec
-	_, err = intr.Exec(cc, conAddr, method, inputs)
-	if err != nil {
-		return nil, err
-	}
-
-	return intr, nil
-}
-
-func (m *ViewCaller) Execute(contAddr common.Address, from, method string, inputs []interface{}) ([]interface{}, uint64, error) {
-	intr, err := m._exec(contAddr, from, method, inputs)
+	_, err = intr.Exec(cc, contAddr, method, inputs)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -2,7 +2,6 @@ package metamaskrelay
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -11,6 +10,8 @@ import (
 	"math"
 	"math/big"
 	"net/http"
+	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -32,6 +33,9 @@ import (
 	mcore "github.com/meverselabs/meverse/ethereum/core"
 	"github.com/meverselabs/meverse/ethereum/core/defaultevm"
 	mtypes "github.com/meverselabs/meverse/ethereum/core/types"
+	"github.com/meverselabs/meverse/ethereum/core/vm"
+	"github.com/meverselabs/meverse/ethereum/eth/tracers/logger"
+	"github.com/meverselabs/meverse/ethereum/params"
 	"github.com/meverselabs/meverse/extern/txparser"
 	"github.com/meverselabs/meverse/service/apiserver"
 	"github.com/meverselabs/meverse/service/apiserver/viewchain"
@@ -45,6 +49,8 @@ type INode interface {
 
 var (
 	logsBloom = "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+
+	idx int
 )
 
 type metamaskRelay struct {
@@ -200,17 +206,84 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts itxsearch.ITxSearch, bs *bloo
 			// 		return 0, errors.New("invalid value")
 			// 	}
 			// }
-			_, gas, err := m.ethCall(from, to, data)
 
-			return gas, err
+			toAddr, err := common.ParseAddress(to)
+			if err != nil {
+				return 0, err
+			}
 
-			// gasDefault := "0x1DCD6500"
-			// _, _, err = m.ethCall(from, to, data)
-			// return gasDefault, err
+			ctx := m.cn.NewContext()
+			if !ctx.IsContract(toAddr) {
+				// ethereum 의 경우만 적용
+				var (
+					lo  uint64 = params.TxGas
+					hi  uint64 = params.BlockGasLimit
+					cap uint64 = hi
+				)
+
+				fromAddr := common.HexToAddress(from)
+				if strings.Index(data, "0x") == 0 {
+					data = data[2:]
+				}
+				dataBytes, err := hex.DecodeString(data)
+				if err != nil {
+					return 0, err
+				}
+
+				// Create a helper to check if a gas allowance results in an executable transaction
+				executable := func(gas uint64) (bool, *core.ExecutionResult, error) {
+
+					result, err := m.DoCall(fromAddr, toAddr, dataBytes, gas)
+					if err != nil {
+						if errors.Is(err, core.ErrIntrinsicGas) {
+							return true, nil, nil // Special case, raise gas limit
+						}
+						return true, nil, err // Bail out
+					}
+					return result.Failed(), result, nil
+				}
+
+				for lo+1 < hi {
+					mid := (hi + lo) / 2
+					failed, _, err := executable(mid)
+					// If the error is not nil(consensus error), it means the provided message
+					// call or transaction will never be accepted no matter how much gas it is
+					// assigned. Return the error directly, don't struggle any more.
+					if err != nil {
+						return 0, err
+					}
+					if failed {
+						lo = mid
+					} else {
+						hi = mid
+					}
+				}
+
+				// Reject the transaction as invalid if it still fails at the highest allowance
+				if hi == cap {
+					failed, result, err := executable(hi)
+					if err != nil {
+						return 0, err
+					}
+					if failed {
+						if result != nil && result.Err != vm.ErrOutOfGas {
+							if len(result.Revert()) > 0 {
+								return 0, apiserver.NewRevertError(result)
+							}
+							return 0, result.Err
+						}
+						// Otherwise, the specified gas cap is too low
+						return 0, fmt.Errorf("gas required exceeds allowance (%d)", cap)
+					}
+
+				}
+				return hi, nil
+			} else {
+				// ethereum 제외
+				_, gas, err := m.ethCall(from, to, data, 0, false)
+				return gas, err
+			}
 		}
-
-		// return "0xcf08", nil 79500
-		//return "0x1d023", nil // 0x1d023 = decimal 118819
 	})
 
 	s.Set("eth_getCode", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
@@ -232,7 +305,6 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts itxsearch.ITxSearch, bs *bloo
 				return "0x", nil
 			} else {
 				return hex.EncodeToString(code), nil
-				// return code, nil
 			}
 		}
 	})
@@ -374,7 +446,7 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts itxsearch.ITxSearch, bs *bloo
 		if froml, ok := param["from"].(string); ok {
 			from = froml
 		}
-		result, _, err := m.ethCall(from, to, data)
+		result, _, err := m.ethCall(from, to, data, 0, true)
 
 		return result, err
 	})
@@ -398,18 +470,19 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts itxsearch.ITxSearch, bs *bloo
 }
 
 func getReceipt(tx *types.Transaction, b *types.Block, TxID itxsearch.TxID, m *metamaskRelay, bHash ecommon.Hash) (map[string]interface{}, error) {
+
+	gasPrice := m.cn.NewContext().BasicFee()
+
 	result := map[string]interface{}{
+		"blockHash":        bHash.String(),
+		"blockNumber":      fmt.Sprintf("0x%x", TxID.Height),
+		"transactionHash":  tx.HashSig(),
+		"transactionIndex": fmt.Sprintf("0x%x", TxID.Index),
+		"from":             tx.From.String(),
+		"to":               tx.To.String(),
 		// "cumulativeGasUsed": "0x1f4b698",
-		// "gasUsed":           "0x6a20",
-		"blockHash":         bHash.String(),
-		"blockNumber":       fmt.Sprintf("0x%x", TxID.Height),
-		"transactionHash":   tx.HashSig(),
-		"transactionIndex":  fmt.Sprintf("0x%x", TxID.Index),
-		"from":              tx.From.String(),
-		"to":                tx.To.String(),
-		"cumulativeGasUsed": "0x1f4b698",
-		"gasUsed":           "0x1f4b698",
-		"effectiveGasPrice": "0x71e0e496c",
+		// "gasUsed":           "0x1f4b698",
+		"effectiveGasPrice": fmt.Sprintf("0x%x", gasPrice),
 		"contractAddress":   nil, // or null, if none was created
 		"type":              "0x2",
 		"status":            "0x1", //TODO 성공 1 실패 0
@@ -432,6 +505,16 @@ func getReceipt(tx *types.Transaction, b *types.Block, TxID itxsearch.TxID, m *m
 		}
 		result["logs"] = logs
 		result["logsBloom"] = hex.EncodeToString(blm[:])
+
+		fee, err := findTxFeeFromEvent(b.Body.Events, int(TxID.Index))
+		if err != nil {
+			return nil, err
+		}
+
+		// gasUsed = fee / EffectiveGasPrice
+		gasUsed := fee.Int.Div(fee.Int, gasPrice.Int)
+		result["cumulativeGasUsed"] = fmt.Sprintf("0x%x", gasUsed)
+		result["gasUsed"] = fmt.Sprintf("0x%x", gasUsed)
 
 	} else {
 		etx := new(etypes.Transaction)
@@ -481,6 +564,27 @@ func getReceipt(tx *types.Transaction, b *types.Block, TxID itxsearch.TxID, m *m
 		//log.Println(m)
 	}
 	return result, nil
+}
+
+// findTxFeeFromEvent find tx's fee(gasUsed) from given event list
+func findTxFeeFromEvent(evs []*types.Event, idx int) (*amount.Amount, error) {
+
+	if len(evs) == 0 {
+		return nil, nil
+	}
+	for _, ev := range evs {
+		if ev.Type != types.EventTagTxFee {
+			continue
+		}
+		if ev.Index == uint16(idx) {
+			is, err := bin.TypeReadAll(ev.Result, 1)
+			if err != nil {
+				return nil, err
+			}
+			return is[0].(*amount.Amount), nil
+		}
+	}
+	return nil, nil
 }
 
 func sendErrorMsg(method, code, msg string) error {
@@ -619,58 +723,6 @@ func (m *metamaskRelay) transactionHash(rlp string) (interface{}, error) {
 	// return etx.Hash(), nil
 }
 
-// func (m *metamaskRelay) TransmuteTx(rlp string) (*types.Transaction, common.Signature, error) {
-// 	rlp = strings.Replace(rlp, "0x", "", -1)
-// 	rlpBytes, err := hex.DecodeString(rlp)
-// 	if err != nil {
-// 		return nil, nil, errors.WithStack(err)
-// 	}
-// 	etx, sig, err := txparser.EthTxFromRLP(rlpBytes)
-// 	if err != nil {
-// 		return nil, nil, err
-// 	}
-
-// 	var method string
-// 	if len(etx.Data()) >= 4 {
-// 		var m abi.Method
-// 		for _, m = range txparser.FuncSigs[hex.EncodeToString(etx.Data()[:4])] {
-// 			break
-// 		}
-// 		if m.Name == "" {
-// 			return nil, nil, errors.New("not exist abi")
-// 		}
-// 		method = strings.ToUpper(string(m.Name[0])) + m.Name[1:]
-// 	}
-// 	/*
-// 		if method == "" {
-// 			var m abi.Method
-// 			for _, m = range txparser.FuncSigs["transfer(address,uint256)"] {
-// 				break
-// 			}
-// 			name := m.Name
-// 			method = strings.ToUpper(string(name[0])) + name[1:]
-// 		}
-// 	*/
-
-// 	gp := etx.GasPrice()
-// 	if gp == nil || len(gp.Bytes()) == 0 {
-// 		gp = etx.GasFeeCap()
-// 	}
-
-// 	tx := &types.Transaction{
-// 		ChainID:     m.cn.Provider().ChainID(),
-// 		Timestamp:   uint64(time.Now().UnixNano()),
-// 		To:          *etx.To(),
-// 		Method:      method,
-// 		Args:        rlpBytes,
-// 		Seq:         etx.Nonce(),
-// 		UseSeq:      true,
-// 		IsEtherType: true,
-// 		GasPrice:    gp,
-// 	}
-// 	return tx, sig, nil
-// }
-
 func getTransaction(m *metamaskRelay, height uint32, index uint16) (interface{}, error) {
 	b, err := m.cn.Provider().Block(height)
 	if err != nil {
@@ -683,6 +735,12 @@ func getTransaction(m *metamaskRelay, height uint32, index uint16) (interface{},
 	}
 	tx := b.Body.Transactions[index]
 	sig := b.Body.TransactionSignatures[index]
+
+	return getTransactionMap(m, &bHash, height, index, tx, sig)
+}
+
+func getTransactionMap(m *metamaskRelay, bHash *ecommon.Hash, height uint32, index uint16, tx *types.Transaction, sig common.Signature) (interface{}, error) {
+
 	if tx.VmType != types.Evm {
 		to := tx.To.String()
 		var (
@@ -713,22 +771,26 @@ func getTransaction(m *metamaskRelay, height uint32, index uint16) (interface{},
 			vbs = []byte{0}
 		}
 
-		return map[string]interface{}{
-			"blockHash":        bHash.String(),
-			"blockNumber":      fmt.Sprintf("0x%x", height),
-			"from":             tx.From.String(),
-			"gas":              "0x1f4b698",
-			"gasPrice":         "0x71e0e496c",
-			"hash":             tx.Hash(height).String(),
-			"input":            input,
-			"nonce":            nonce,
-			"to":               to,
-			"transactionIndex": fmt.Sprintf("0x%x", index),
-			"value":            value,
-			"v":                "0x" + hex.EncodeToString(vbs),
-			"r":                "0x" + hex.EncodeToString(sig[:32]),
-			"s":                "0x" + hex.EncodeToString(sig[32:64]),
-		}, nil
+		result := &RPCTransaction{
+			BlockHash:        bHash.String(),
+			BlockNumber:      fmt.Sprintf("0x%x", height),
+			From:             tx.From.String(),
+			Gas:              "0x1f4b698",
+			GasPrice:         "0x71e0e496c",
+			Hash:             tx.Hash(height).String(),
+			Input:            input,
+			Nonce:            nonce,
+			To:               to,
+			TransactionIndex: fmt.Sprintf("0x%x", index),
+			Value:            value,
+			ChainID:          fmt.Sprintf("0x%x", m.cn.Provider().ChainID()),
+			V:                "0x" + hex.EncodeToString(vbs),
+			R:                "0x" + hex.EncodeToString(sig[:32]),
+			S:                "0x" + hex.EncodeToString(sig[32:64]),
+		}
+
+		return result, nil
+
 	} else {
 		etx := new(etypes.Transaction)
 		if err := etx.UnmarshalBinary(tx.Args); err != nil {
@@ -746,27 +808,28 @@ func getTransaction(m *metamaskRelay, height uint32, index uint16) (interface{},
 			vbs = []byte{0}
 		}
 
-		return map[string]interface{}{
-			"blockHash":            bHash.String(),
-			"blockNumber":          fmt.Sprintf("0x%x", height),
-			"from":                 tx.From.String(),
-			"gas":                  fmt.Sprintf("0x%x", etx.Gas()),
-			"gasPrice":             fmt.Sprintf("0x%x", etx.GasPrice()),
-			"maxFeePerGas":         fmt.Sprintf("0x%x", etx.GasFeeCap()),
-			"maxPriorityFeePerGas": fmt.Sprintf("0x%x", etx.GasTipCap()),
-			"hash":                 etx.Hash().String(),
-			"input":                hex.EncodeToString(etx.Data()),
-			"nonce":                etx.Nonce(),
-			"to":                   to,
-			"transactionIndex":     fmt.Sprintf("0x%x", index),
-			"value":                fmt.Sprintf("0x%x", etx.Value()),
-			"type":                 fmt.Sprintf("0x%x", etx.Type()),
-			"accessList":           etx.AccessList(),
-			"chainId":              fmt.Sprintf("0x%x", etx.ChainId()),
-			"v":                    "0x" + hex.EncodeToString(vbs),
-			"r":                    "0x" + hex.EncodeToString(sig[:32]),
-			"s":                    "0x" + hex.EncodeToString(sig[32:64]),
-		}, nil
+		result := &RPCTransaction{
+			BlockHash:        bHash.String(),
+			BlockNumber:      fmt.Sprintf("0x%x", height),
+			From:             tx.From.String(),
+			Gas:              fmt.Sprintf("0x%x", etx.Gas()),
+			GasPrice:         fmt.Sprintf("0x%x", etx.GasPrice()),
+			GasFeeCap:        fmt.Sprintf("0x%x", etx.GasFeeCap()),
+			GasTipCap:        fmt.Sprintf("0x%x", etx.GasTipCap()),
+			Hash:             etx.Hash().String(),
+			Input:            hex.EncodeToString(etx.Data()),
+			Nonce:            fmt.Sprintf("0x%x", etx.Nonce()),
+			To:               to,
+			TransactionIndex: fmt.Sprintf("0x%x", index),
+			Value:            fmt.Sprintf("0x%x", etx.Value()),
+			Type:             fmt.Sprintf("0x%x", etx.Type()),
+			ChainID:          fmt.Sprintf("0x%x", etx.ChainId()),
+			V:                "0x" + hex.EncodeToString(vbs),
+			R:                "0x" + hex.EncodeToString(sig[:32]),
+			S:                "0x" + hex.EncodeToString(sig[32:64]),
+		}
+
+		return result, nil
 	}
 }
 
@@ -828,9 +891,19 @@ func (m *metamaskRelay) returnMemaBlock(hei uint64, fullTx bool) (interface{}, e
 
 	bHash := bin.MustWriterToHash(&b.Header)
 
-	txs := []string{}
-	for _, tx := range b.Body.Transactions {
-		txs = append(txs, tx.Hash(b.Header.Height).String())
+	txs := []interface{}{}
+
+	for idx, tx := range b.Body.Transactions {
+		if fullTx {
+			sig := b.Body.TransactionSignatures[idx]
+			result, err := getTransactionMap(m, &bHash, uint32(hei), uint16(idx), tx, sig)
+			if err != nil {
+				return nil, err
+			}
+			txs = append(txs, result)
+		} else {
+			txs = append(txs, tx.Hash(b.Header.Height).String())
+		}
 	}
 
 	bloom, err := bloomservice.BlockLogsBloom(m.cn, b)
@@ -850,6 +923,7 @@ func (m *metamaskRelay) returnMemaBlock(hei uint64, fullTx bool) (interface{}, e
 		"timestamp":        fmt.Sprintf("0x%x", b.Header.Timestamp/1000),
 		"transactions":     txs,
 		"transactionsRoot": b.Header.LevelRootHash.String(),
+		"extraData":        "",
 	}, nil
 }
 
@@ -960,7 +1034,7 @@ func (m *metamaskRelay) _getTokenBalanceOf(to common.Address, addr common.Addres
 	return rv, nil
 }
 
-func (m *metamaskRelay) ethCall(from, to, data string) (result string, gas uint64, err error) {
+func (m *metamaskRelay) ethCall(from, to, data string, inputGas uint64, needResult bool) (result string, gas uint64, err error) {
 	// if len(data) < 10 {
 	// 	//log.Println("ErrInvalidData len:", len(data))
 	// 	err = errors.WithStack(ErrInvalidData)
@@ -982,8 +1056,15 @@ func (m *metamaskRelay) ethCall(from, to, data string) (result string, gas uint6
 			return "", 0, err
 		}
 		for _, abiM := range abiMs {
-			if result, gas, err = execWithAbi(caller, from, toAddr, abiM, data); err == nil {
-				return result, gas, nil
+			if needResult {
+				if output, gas, err := execWithAbi(caller, from, toAddr, abiM, data); err == nil {
+					result, err = getOutput(abiM, output)
+					return result, gas, err
+				}
+			} else {
+				if _, gas, err = execWithAbi(caller, from, toAddr, abiM, data); err == nil {
+					return result, gas, nil
+				}
 			}
 		}
 		return "", 0, err
@@ -995,12 +1076,15 @@ func (m *metamaskRelay) ethCall(from, to, data string) (result string, gas uint6
 		if err != nil {
 			return "", 0, err
 		}
-		result, err := m.DoCall(fromAddr, toAddr, dataBytes)
+		if inputGas == 0 {
+			inputGas = uint64(math.MaxUint64 / 2)
+		}
+		result, err := m.DoCall(fromAddr, toAddr, dataBytes, inputGas)
 		if err != nil {
 			return "", 0, err
 		}
 		if len(result.Revert()) > 0 {
-			return "", 0, newRevertError(result)
+			return "", 0, apiserver.NewRevertError(result)
 		}
 		if result.Err != nil {
 			return "0x" + hex.EncodeToString(result.ReturnData), result.UsedGas, result.Err
@@ -1009,15 +1093,23 @@ func (m *metamaskRelay) ethCall(from, to, data string) (result string, gas uint6
 	}
 }
 
-func (m *metamaskRelay) DoCall(from, to common.Address, dataBytes []byte) (*core.ExecutionResult, error) {
+func (m *metamaskRelay) DoCall(from, to common.Address, dataBytes []byte, gas uint64) (res *core.ExecutionResult, err error) {
+	defer func() {
+		r := recover()
+		if _, ok := r.(runtime.Error); ok {
+			msg := fmt.Sprintf("%v", r)
+			res = nil
+			err = errors.New(msg)
+		}
+	}()
 
-	gas := uint64(math.MaxUint64 / 2)
+	//gas := uint64(math.MaxUint64 / 2)
 	msg := etypes.NewMessage(from, &to, 0, big.NewInt(0), gas, big.NewInt(0), big.NewInt(0), big.NewInt(0), dataBytes, etypes.AccessList{}, true)
 
 	ctx := m.cn.NewContext()
 	statedb := types.NewStateDB(ctx)
 
-	evm := defaultevm.DefaultEVM(statedb)
+	evm, tracer := defaultevm.DefaultEVM(statedb, params.EvmDebug)
 
 	// Execute the message.
 	gp := new(ecore.GasPool).AddGas(math.MaxUint64)
@@ -1026,63 +1118,104 @@ func (m *metamaskRelay) DoCall(from, to common.Address, dataBytes []byte) (*core
 		return nil, err
 	}
 
+	if tracer != nil {
+		switch tracer := tracer.(type) {
+		case *logger.StructLogger:
+			formatted := FormatLogs(tracer.StructLogs())
+			//fmt.Println(formatted)
+			idx++
+			f, err2 := os.Create("result" + strconv.Itoa(idx) + ".out")
+			if err2 != nil {
+				return nil, err
+			}
+			//logger.WriteTrace(f, tracer.StructLogs())
+			f.WriteString("gas : " + strconv.FormatUint(result.UsedGas, 10) + "\n")
+			b, _ := json.MarshalIndent(formatted, "", "   ")
+			f.WriteString(string(b))
+			f.Close()
+
+		}
+	}
+
 	return result, nil
+}
+
+// StructLogRes stores a structured log emitted by the EVM while replaying a
+// transaction in debug mode
+type StructLogRes struct {
+	Pc      uint64             `json:"pc"`
+	Op      string             `json:"op"`
+	Gas     uint64             `json:"gas"`
+	GasCost uint64             `json:"gasCost"`
+	Depth   int                `json:"depth"`
+	Error   string             `json:"error,omitempty"`
+	Stack   *[]string          `json:"stack,omitempty"`
+	Memory  *[]string          `json:"memory,omitempty"`
+	Storage *map[string]string `json:"storage,omitempty"`
+}
+
+// FormatLogs formats EVM returned structured logs for json output
+func FormatLogs(logs []logger.StructLog) []StructLogRes {
+	formatted := make([]StructLogRes, len(logs))
+	for index, trace := range logs {
+		formatted[index] = StructLogRes{
+			Pc:      trace.Pc,
+			Op:      trace.Op.String(),
+			Gas:     trace.Gas,
+			GasCost: trace.GasCost,
+			Depth:   trace.Depth,
+			Error:   trace.ErrorString(),
+		}
+		if trace.Stack != nil {
+			stack := make([]string, len(trace.Stack))
+			for i, stackValue := range trace.Stack {
+				stack[i] = stackValue.Hex()
+			}
+			formatted[index].Stack = &stack
+		}
+		if trace.Memory != nil {
+			memory := make([]string, 0, (len(trace.Memory)+31)/32)
+			for i := 0; i+32 <= len(trace.Memory); i += 32 {
+				memory = append(memory, fmt.Sprintf("%x", trace.Memory[i:i+32]))
+			}
+			formatted[index].Memory = &memory
+		}
+		if trace.Storage != nil {
+			storage := make(map[string]string)
+			for i, storageValue := range trace.Storage {
+				storage[fmt.Sprintf("%x", i)] = fmt.Sprintf("%x", storageValue)
+			}
+			formatted[index].Storage = &storage
+		}
+	}
+	return formatted
 }
 
 func (m *metamaskRelay) getBaseFeePerGas() string {
 	return "0x23400641"
 }
 
-func execWithAbi(caller *viewchain.ViewCaller, from string, toAddr ecommon.Address, abiM abi.Method, data string) (string, uint64, error) {
+func execWithAbi(caller *viewchain.ViewCaller, from string, toAddr ecommon.Address, abiM abi.Method, data string) ([]interface{}, uint64, error) {
 	bs, err := hex.DecodeString(data)
 	if err != nil {
-		return "", 0, err
+		return nil, 0, err
 	}
 	obj, err := txparser.Inputs(bs)
 	if err != nil {
-		return "", 0, err
+		return nil, 0, err
 	}
 	output, gas, err := caller.Execute(toAddr, from, abiM.Name, obj)
 	if err != nil {
 		err = fmt.Errorf("%v call %v method %v", err.Error(), toAddr, abiM.Name)
-		return "", 0, err
+		return nil, 0, err
 	}
-
-	bs, err = txparser.Outputs(abiM.Sig, output)
-	if err != nil {
-		return "", 0, err
-	}
-	return "0x" + hex.EncodeToString(bs), gas, nil
+	return output, gas, nil
 }
 
-func makeStringResponse(str string) string {
-	var t []byte
-	{
-		buf := new(bytes.Buffer)
-		var num uint8 = 32
-		err := binary.Write(buf, binary.LittleEndian, num)
-		if err != nil {
-			fmt.Println("binary.Write failed:", err)
-		}
-		t = ecommon.LeftPadBytes(buf.Bytes(), 32)
+func getOutput(abiM abi.Method, output []interface{}) (string, error) {
+	bs, err := txparser.Outputs(abiM.Sig, output)
+	if err != nil {
+		return "", err
 	}
-	var slen []byte
-	{
-		buf := new(bytes.Buffer)
-		var strlen uint8 = uint8(len(str))
-		err := binary.Write(buf, binary.LittleEndian, strlen)
-		if err != nil {
-			fmt.Println("binary.Write failed:", err)
-		}
-		slen = ecommon.LeftPadBytes(buf.Bytes(), 32)
-	}
-
-	s := ecommon.RightPadBytes([]byte(str), 32)
-
-	var data []byte
-	data = append(data, t...)
-	data = append(data, slen...)
-	data = append(data, s...)
-
-	return fmt.Sprintf("0x%x", data)
+	return "0x" + hex.EncodeToString(bs), nil
 }

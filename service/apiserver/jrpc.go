@@ -57,10 +57,19 @@ type JRPCResponse struct {
 	Result  interface{} `json:"result"`
 }
 
+const defaultErrorCode = -32000
+
+// JRPCResponse is a jrpc response
+type jsonError struct {
+	CODE    int         `json:"code,omitempty"`
+	MESSAGE string      `json:"message,omitempty"`
+	DATA    interface{} `json:"data,omitempty"`
+}
+
 // JRPCResponse is a jrpc response
 type JRPCResponseWithError struct {
 	JSONRPC string      `json:"jsonrpc"`
 	ID      interface{} `json:"id"`
-	Result  interface{} `json:"result"`
-	Error   interface{} `json:"error"`
+	Result  interface{} `json:"result,omitempty"`
+	Error   interface{} `json:"error,omitempty"`
 }
