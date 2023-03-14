@@ -148,7 +148,7 @@ func ToFilter(arg map[string]interface{}) FilterQuery {
 					q.ToBlock = new(big.Int)
 					if strings.HasPrefix(s, "0x") {
 						s = s[2:]
-						if _, ok := q.FromBlock.SetString(s, 16); !ok {
+						if _, ok := q.ToBlock.SetString(s, 16); !ok {
 							q.ToBlock = big.NewInt(-1)
 						}
 					} else {
