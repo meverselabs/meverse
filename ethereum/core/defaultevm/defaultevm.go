@@ -5,6 +5,7 @@ import (
 
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/ethereum/core/vm"
+	"github.com/meverselabs/meverse/ethereum/eth/tracers/logger"
 	"github.com/meverselabs/meverse/ethereum/istate"
 	"github.com/meverselabs/meverse/ethereum/params"
 )
@@ -23,15 +24,15 @@ func Transfer(db vm.StateDB, sender, recipient common.Address, amount *big.Int) 
 }
 
 // Default EVM with statedb
-func DefaultEVM(statedb istate.IStateDB) *vm.EVM {
+func DefaultEVM(statedb istate.IStateDB, vmDebug bool) (*vm.EVM, vm.EVMLogger) {
 	config := &params.ChainConfig{
 		ChainID: statedb.ChainID(),
 	}
-	return DefaultEVMWithConfig(statedb, config)
+	return DefaultEVMWithConfig(statedb, config, vmDebug)
 }
 
 // Default EVM with statedb and config
-func DefaultEVMWithConfig(statedb istate.IStateDB, config *params.ChainConfig) *vm.EVM {
+func DefaultEVMWithConfig(statedb istate.IStateDB, config *params.ChainConfig, vmDebug bool) (*vm.EVM, vm.EVMLogger) {
 
 	blockContext := vm.BlockContext{
 		CanTransfer: CanTransfer,
@@ -45,5 +46,12 @@ func DefaultEVMWithConfig(statedb istate.IStateDB, config *params.ChainConfig) *
 		NoBaseFee:               true,
 	}
 
-	return vm.NewEVM(blockContext, vm.TxContext{}, statedb, config, cfg)
+	var tracer vm.EVMLogger
+	if vmDebug {
+		tracer = logger.NewStructLogger(nil)
+		cfg.Debug = true
+		cfg.Tracer = tracer
+	}
+
+	return vm.NewEVM(blockContext, vm.TxContext{}, statedb, config, cfg), tracer
 }
