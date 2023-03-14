@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -53,14 +54,37 @@ func (s *APIServer) Run(BindAddress string) error {
 		}
 		defer c.Request().Body.Close()
 
-		dec := json.NewDecoder(bytes.NewReader(body))
+		//x-www-form-urlencoded  json=......
+		bodyStr := string(body[:])
+		if strings.HasPrefix(bodyStr, "json") {
+			params, err := url.ParseQuery(bodyStr)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			bodyStr = params.Get("json")
+		}
+
+		dec := json.NewDecoder(bytes.NewReader([]byte(bodyStr)))
 		dec.UseNumber()
 
 		var reqArr []*jRPCRequest
 		singleReq := false
 		if err := dec.Decode(&reqArr); err != nil {
-			dec = json.NewDecoder(bytes.NewReader(body))
+
+			bodyStr := string(body[:])
+			if strings.HasPrefix(bodyStr, "json") {
+				params, err := url.ParseQuery(bodyStr)
+				if err != nil {
+					return errors.WithStack(err)
+				}
+				bodyStr = params.Get("json")
+				dec = json.NewDecoder(bytes.NewReader([]byte(bodyStr)))
+			} else {
+				dec = json.NewDecoder(bytes.NewReader(body))
+
+			}
 			dec.UseNumber()
+
 			var req jRPCRequest
 			if err := dec.Decode(&req); err != nil {
 				return errors.WithStack(err)
@@ -250,10 +274,18 @@ func (s *APIServer) _handleJRPC(req *jRPCRequest) interface{} {
 				}
 			} else {
 				log.Printf("failJRPCResponse err %v %v %+v\n", req.Method, printParam(req.Params), err)
-				return &JRPCResponseWithError{
-					JSONRPC: req.JSONRPC,
-					ID:      req.ID,
-					Error:   err.Error(),
+				if revertError, ok := err.(*RevertError); ok {
+					return &JRPCResponseWithError{
+						JSONRPC: req.JSONRPC,
+						ID:      req.ID,
+						Error:   jsonError{CODE: revertError.ErrorCode(), MESSAGE: err.Error(), DATA: revertError.ErrorData()},
+					}
+				} else {
+					return &JRPCResponseWithError{
+						JSONRPC: req.JSONRPC,
+						ID:      req.ID,
+						Error:   jsonError{CODE: defaultErrorCode, MESSAGE: err.Error()},
+					}
 				}
 			}
 		} else {
