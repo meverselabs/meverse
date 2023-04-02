@@ -103,3 +103,32 @@ func TestSwapMaintokenTx(t *testing.T) {
 	inf, err := tc.SendTx(util.UserKeys[0], tokenAddr, "SwapToMainToken", amount.NewAmount(10, 0))
 	log.Println("SwapToMainToken", inf, ":", err)
 }
+
+func TestApprove(t *testing.T) {
+	tc := util.NewTestContext()
+
+	mt := tc.MainToken
+
+	tc.MustSendTx(util.AdminKey, mt, "SetVersion", "1")
+
+	tc.MustSendTx(util.AdminKey, mt, "Transfer", util.Users[0], amount.MustParseAmount("10000"))
+	tc.MustSendTx(util.AdminKey, mt, "Transfer", util.Users[1], amount.MustParseAmount("2"))
+	tc.MustSendTx(util.UserKeys[0], mt, "Approve", util.Users[1], amount.MustParseAmount("5000"))
+
+	inf, err := tc.ReadTx(util.UserKeys[0], mt, "Allowance", util.Users[0], util.Users[1])
+	if err != nil {
+		t.Errorf("not expect err %v, %v", inf, err)
+		return
+	}
+	log.Println(inf)
+
+	tc.MustSendTx(util.UserKeys[1], mt, "TransferFrom", util.Users[0], util.Users[2], amount.MustParseAmount("1000"))
+
+	inf, err = tc.ReadTx(util.UserKeys[0], mt, "Allowance", util.Users[0], util.Users[1])
+	if err != nil {
+		t.Errorf("not expect err %v, %v", inf, err)
+		return
+	}
+	log.Println(inf)
+
+}

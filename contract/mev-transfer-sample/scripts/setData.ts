@@ -1,0 +1,61 @@
+import { ethers, network } from "hardhat";
+import { utils } from "ethers";
+import { getMevTransferSampleAddress } from "../test/util";
+
+async function main() {
+  const mevTransferSampleAddress = getMevTransferSampleAddress();
+  const mts = await ethers.getContractAt(
+    "MevTransferSample",
+    mevTransferSampleAddress
+  );
+
+  const amount = utils.parseEther("1.1");
+  const tx = await mts.setData(1234, { value: amount });
+  const receipt = await tx.wait();
+  console.log("receipt", receipt);
+}
+// 1. mevtestnet
+// receipt {
+//   to: '0xdA2Fc6c5D30e0eDf453bD201Ec4a941D1fa72392',
+//   from: '0x04EfbDABCBF3F68AE80899f7798E63Bc3E02E8b7',
+//   contractAddress: null,
+//   transactionIndex: 0,
+//   gasUsed: BigNumber { value: "41634" },
+//   logsBloom: '0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+//   blockHash: '0x09d55211fd86ff2a6ef7076f7adee85fcc746ac9bf72a8b725ec95b00106c813',
+//   transactionHash: '0xf8402249e35b14059350e15fbecfb5784ec9aa2e462a10629da2fcf79c1b96b1',
+//   logs: [],
+//   blockNumber: 44726214,
+//   confirmations: 6,
+//   cumulativeGasUsed: BigNumber { value: "41634" },
+//   effectiveGasPrice: BigNumber { value: "38931713774040" },
+//   status: 1,
+//   type: 2,
+//   byzantium: true,
+//   events: []
+// }
+
+// 2.mevmainnet
+// receipt {
+//   to: '0xdA2Fc6c5D30e0eDf453bD201Ec4a941D1fa72392',
+//   from: '0x04EfbDABCBF3F68AE80899f7798E63Bc3E02E8b7',
+//   contractAddress: null,
+//   transactionIndex: 0,
+//   gasUsed: BigNumber { value: "41634" },
+//   logsBloom: '0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+//   blockHash: '0xf107bb79ead3186cf0278a052b83fb75a658f8e4186c6f003345c142fb1e8b65',
+//   transactionHash: '0x549ac964e4b6a948f1c6d21969fc94d291031ff280807ae122e4b6d72c8f31ae',
+//   logs: [],
+//   blockNumber: 67263216,
+//   confirmations: 7,
+//   cumulativeGasUsed: BigNumber { value: "41634" },
+//   effectiveGasPrice: BigNumber { value: "38931713774040" },
+//   status: 1,
+//   type: 2,
+//   byzantium: true,
+//   events: []
+// }
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
