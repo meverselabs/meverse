@@ -219,6 +219,7 @@ func (fr *GeneratorNode) handleObserverMessage(p peer.Peer, m interface{}, Retry
 				BlockGen: msg,
 				ObSign:   nil,
 				Context:  nil,
+				Receipts: nil,
 				Recv:     true,
 			}
 			fr.lastGenItemMap[msg.Block.Header.Height] = item
@@ -388,12 +389,14 @@ func (fr *GeneratorNode) updateByGenItem() {
 						sm[TxHash] = item.Signer
 					}
 				}
+				var receipts types.Receipts
 				var err error
-				if _, err = fr.ct.ExecuteBlockOnContext(item.BlockGen.Block, ctx, sm); err != nil {
+				if receipts, err = fr.ct.ExecuteBlockOnContext(item.BlockGen.Block, ctx, sm); err != nil {
 					log.Printf("updateByGenItem.prevItem.ExecuteBlockOnContext %+v\n", err)
 					return
 				}
 				target.Context = ctx
+				target.Receipts = receipts
 
 				TargetHeight++
 				next, has := fr.lastGenItemMap[TargetHeight]
