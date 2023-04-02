@@ -91,9 +91,10 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts itxsearch.ITxSearch, bs *bloo
 			cheight := cn.Provider().Height()
 			oldestBlock = strconv.FormatUint(uint64(cheight), 16)
 		}
+		gasPrice := fmt.Sprintf("0x%x", m.basicFee())
 		return map[string]interface{}{
 			"oldestBlock":   oldestBlock,
-			"baseFeePerGas": []string{m.getBaseFeePerGas(), m.getBaseFeePerGas()},
+			"baseFeePerGas": []string{gasPrice, gasPrice},
 			"gasUsedRatio":  []float32{0.5},
 			"reward":        [][]string{{"0x0"}},
 		}, nil
@@ -119,6 +120,9 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts itxsearch.ITxSearch, bs *bloo
 		}
 		if uint32(hei) > cheight {
 			hei = 1
+		}
+		if hei < uint64(cn.Provider().InitHeight()) {
+			return nil, errors.New("not found block")
 		}
 		return m.returnMemaBlock(hei, txFull == "true")
 	})
@@ -170,8 +174,7 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts itxsearch.ITxSearch, bs *bloo
 		case 0, 1:
 			return "0xE8D4A51000", nil
 		default:
-			bs := m.cn.NewContext().BasicFee().Bytes()
-			return fmt.Sprintf("0x%s", hex.EncodeToString(bs)), nil
+			return fmt.Sprintf("0x%x", m.basicFee()), nil
 		}
 	})
 
@@ -183,7 +186,7 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts itxsearch.ITxSearch, bs *bloo
 		default:
 			argMap, err := arg.Map(0)
 			if err != nil {
-				return "0x1DCD6500", nil // 50000000
+				return nil, err
 			}
 
 			var to, from, data string
@@ -198,22 +201,30 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts itxsearch.ITxSearch, bs *bloo
 				from = froml
 			}
 
-			// if data == "" {
-			// 	if value, ok := argMap["value"].(string); ok {
-			// 		data = fmt.Sprintf("0xa9059cbb%064v%064v", strings.Replace(to, "0x", "", -1), strings.Replace(value, "0x", "", -1))
-			// 		to = m.cn.NewContext().MainToken().String()
-			// 	} else {
-			// 		return 0, errors.New("invalid value")
-			// 	}
-			// }
-
 			toAddr, err := common.ParseAddress(to)
 			if err != nil {
-				return 0, err
+				return nil, err
 			}
 
 			ctx := m.cn.NewContext()
 			if !ctx.IsContract(toAddr) {
+
+				fromAddr := common.HexToAddress(from)
+
+				// error when argMap.value > balance
+				value, err := getValueFromParam(argMap["value"])
+				if err != nil {
+					return nil, err
+				} else {
+					if value.Cmp(new(big.Int)) != 0 {
+						statedb := types.NewStateDB(ctx)
+						balance := statedb.GetBalance(fromAddr) // from can't be nil
+						if value.Cmp(balance) >= 0 {
+							return nil, errors.New("insufficient funds for transfer")
+						}
+					}
+				}
+
 				// ethereum 의 경우만 적용
 				var (
 					lo  uint64 = params.TxGas
@@ -221,19 +232,17 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts itxsearch.ITxSearch, bs *bloo
 					cap uint64 = hi
 				)
 
-				fromAddr := common.HexToAddress(from)
 				if strings.Index(data, "0x") == 0 {
 					data = data[2:]
 				}
 				dataBytes, err := hex.DecodeString(data)
 				if err != nil {
-					return 0, err
+					return nil, err
 				}
 
 				// Create a helper to check if a gas allowance results in an executable transaction
 				executable := func(gas uint64) (bool, *core.ExecutionResult, error) {
-
-					result, err := m.DoCall(fromAddr, toAddr, dataBytes, gas)
+					result, err := m.DoCall(fromAddr, toAddr, dataBytes, gas, value)
 					if err != nil {
 						if errors.Is(err, core.ErrIntrinsicGas) {
 							return true, nil, nil // Special case, raise gas limit
@@ -250,7 +259,7 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts itxsearch.ITxSearch, bs *bloo
 					// call or transaction will never be accepted no matter how much gas it is
 					// assigned. Return the error directly, don't struggle any more.
 					if err != nil {
-						return 0, err
+						return nil, err
 					}
 					if failed {
 						lo = mid
@@ -263,24 +272,24 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts itxsearch.ITxSearch, bs *bloo
 				if hi == cap {
 					failed, result, err := executable(hi)
 					if err != nil {
-						return 0, err
+						return nil, err
 					}
 					if failed {
 						if result != nil && result.Err != vm.ErrOutOfGas {
 							if len(result.Revert()) > 0 {
 								return 0, apiserver.NewRevertError(result)
 							}
-							return 0, result.Err
+							return nil, result.Err
 						}
 						// Otherwise, the specified gas cap is too low
-						return 0, fmt.Errorf("gas required exceeds allowance (%d)", cap)
+						return nil, fmt.Errorf("gas required exceeds allowance (%d)", cap)
 					}
 
 				}
 				return hi, nil
 			} else {
 				// ethereum 제외
-				_, gas, err := m.ethCall(from, to, data, 0, false)
+				_, gas, err := m.ethCall(from, to, data, 0, new(big.Int), false)
 				return gas, err
 			}
 		}
@@ -446,7 +455,13 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts itxsearch.ITxSearch, bs *bloo
 		if froml, ok := param["from"].(string); ok {
 			from = froml
 		}
-		result, _, err := m.ethCall(from, to, data, 0, true)
+
+		value, err := getValueFromParam(param["value"])
+		if err != nil {
+			return nil, err
+		}
+
+		result, _, err := m.ethCall(from, to, data, 0, value, true)
 
 		return result, err
 	})
@@ -469,9 +484,37 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts itxsearch.ITxSearch, bs *bloo
 	})
 }
 
+// get value from json-rpc
+func getValueFromParam(valueParam interface{}) (*big.Int, error) {
+	var value *big.Int
+	if valueParam != nil {
+		if valueStr, ok := valueParam.(string); ok {
+			if strings.Index(valueStr, "0x") == 0 {
+				valueStr = valueStr[2:]
+				var ok2 bool
+				value, ok2 = new(big.Int).SetString(valueStr, 16)
+				if !ok2 {
+					return nil, errors.New("invalid parameter value")
+				}
+			} else {
+				var ok2 bool
+				value, ok2 = new(big.Int).SetString(valueStr, 10)
+				if !ok2 {
+					return nil, errors.New("invalid parameter value")
+				}
+			}
+		} else {
+			return nil, errors.New("invalid parameter value")
+		}
+	} else {
+		value = new(big.Int)
+	}
+	return value, nil
+}
+
 func getReceipt(tx *types.Transaction, b *types.Block, TxID itxsearch.TxID, m *metamaskRelay, bHash ecommon.Hash) (map[string]interface{}, error) {
 
-	gasPrice := m.cn.NewContext().BasicFee()
+	gasPrice := m.basicFee()
 
 	result := map[string]interface{}{
 		"blockHash":        bHash.String(),
@@ -638,6 +681,18 @@ func (m *metamaskRelay) transactionHash(rlp string) (interface{}, error) {
 		return nil, err
 	}
 
+	// contract check
+	ctx := m.cn.NewContext()
+	gp := etx.GasPrice()
+
+	// if gp == nil || gp.Cmp(m.basicFee().Int) != 0 {
+	// 	return nil, ErrInvalidGasPrice
+	// }
+
+	if gp == nil || len(gp.Bytes()) == 0 {
+		gp = etx.GasFeeCap()
+	}
+
 	var method string
 	// var vmType uint8
 
@@ -662,13 +717,6 @@ func (m *metamaskRelay) transactionHash(rlp string) (interface{}, error) {
 		sig = append(sig, v.Bytes()...)
 
 		return sig
-	}
-
-	// contract check
-	ctx := m.cn.NewContext()
-	gp := etx.GasPrice()
-	if gp == nil || len(gp.Bytes()) == 0 {
-		gp = etx.GasFeeCap()
 	}
 
 	to := common.Address{}
@@ -741,6 +789,8 @@ func getTransaction(m *metamaskRelay, height uint32, index uint16) (interface{},
 
 func getTransactionMap(m *metamaskRelay, bHash *ecommon.Hash, height uint32, index uint16, tx *types.Transaction, sig common.Signature) (interface{}, error) {
 
+	gasPrice := m.basicFee()
+
 	if tx.VmType != types.Evm {
 		to := tx.To.String()
 		var (
@@ -776,7 +826,7 @@ func getTransactionMap(m *metamaskRelay, bHash *ecommon.Hash, height uint32, ind
 			BlockNumber:      fmt.Sprintf("0x%x", height),
 			From:             tx.From.String(),
 			Gas:              "0x1f4b698",
-			GasPrice:         "0x71e0e496c",
+			GasPrice:         fmt.Sprintf("0x%x", gasPrice), // "0x71e0e496c",
 			Hash:             tx.Hash(height).String(),
 			Input:            input,
 			Nonce:            nonce,
@@ -813,7 +863,7 @@ func getTransactionMap(m *metamaskRelay, bHash *ecommon.Hash, height uint32, ind
 			BlockNumber:      fmt.Sprintf("0x%x", height),
 			From:             tx.From.String(),
 			Gas:              fmt.Sprintf("0x%x", etx.Gas()),
-			GasPrice:         fmt.Sprintf("0x%x", etx.GasPrice()),
+			GasPrice:         fmt.Sprintf("0x%x", gasPrice), // fmt.Sprintf("0x%x", etx.GasPrice()),
 			GasFeeCap:        fmt.Sprintf("0x%x", etx.GasFeeCap()),
 			GasTipCap:        fmt.Sprintf("0x%x", etx.GasTipCap()),
 			Hash:             etx.Hash().String(),
@@ -892,7 +942,6 @@ func (m *metamaskRelay) returnMemaBlock(hei uint64, fullTx bool) (interface{}, e
 	bHash := bin.MustWriterToHash(&b.Header)
 
 	txs := []interface{}{}
-
 	for idx, tx := range b.Body.Transactions {
 		if fullTx {
 			sig := b.Body.TransactionSignatures[idx]
@@ -912,9 +961,9 @@ func (m *metamaskRelay) returnMemaBlock(hei uint64, fullTx bool) (interface{}, e
 	}
 
 	return map[string]interface{}{
-		"gasUsed":          "0x1c9c380",
-		"gasLimit":         "0x1c9c380",
-		"baseFeePerGas":    m.getBaseFeePerGas(),
+		//"gasUsed": fmt.Sprintf("0x%x", totalGasUsed),
+		//"gasLimit":         fmt.Sprintf("0x%x", params.BlockGasLimit),
+		//"baseFeePerGas":    fmt.Sprintf("0x%x", gasPrice),
 		"hash":             bHash.String(),
 		"logsBloom":        hex.EncodeToString(bloom[:]),
 		"number":           fmt.Sprintf("0x%x", b.Header.Height),
@@ -923,7 +972,7 @@ func (m *metamaskRelay) returnMemaBlock(hei uint64, fullTx bool) (interface{}, e
 		"timestamp":        fmt.Sprintf("0x%x", b.Header.Timestamp/1000),
 		"transactions":     txs,
 		"transactionsRoot": b.Header.LevelRootHash.String(),
-		"extraData":        "",
+		"extraData":        "0x0",
 	}, nil
 }
 
@@ -1034,7 +1083,11 @@ func (m *metamaskRelay) _getTokenBalanceOf(to common.Address, addr common.Addres
 	return rv, nil
 }
 
-func (m *metamaskRelay) ethCall(from, to, data string, inputGas uint64, needResult bool) (result string, gas uint64, err error) {
+func (m *metamaskRelay) basicFee() *amount.Amount {
+	return m.cn.NewContext().BasicFee()
+}
+
+func (m *metamaskRelay) ethCall(from, to, data string, inputGas uint64, value *big.Int, needResult bool) (result string, gas uint64, err error) {
 	// if len(data) < 10 {
 	// 	//log.Println("ErrInvalidData len:", len(data))
 	// 	err = errors.WithStack(ErrInvalidData)
@@ -1079,7 +1132,7 @@ func (m *metamaskRelay) ethCall(from, to, data string, inputGas uint64, needResu
 		if inputGas == 0 {
 			inputGas = uint64(math.MaxUint64 / 2)
 		}
-		result, err := m.DoCall(fromAddr, toAddr, dataBytes, inputGas)
+		result, err := m.DoCall(fromAddr, toAddr, dataBytes, inputGas, value)
 		if err != nil {
 			return "", 0, err
 		}
@@ -1093,7 +1146,7 @@ func (m *metamaskRelay) ethCall(from, to, data string, inputGas uint64, needResu
 	}
 }
 
-func (m *metamaskRelay) DoCall(from, to common.Address, dataBytes []byte, gas uint64) (res *core.ExecutionResult, err error) {
+func (m *metamaskRelay) DoCall(from, to common.Address, dataBytes []byte, gas uint64, value *big.Int) (res *core.ExecutionResult, err error) {
 	defer func() {
 		r := recover()
 		if _, ok := r.(runtime.Error); ok {
@@ -1104,7 +1157,7 @@ func (m *metamaskRelay) DoCall(from, to common.Address, dataBytes []byte, gas ui
 	}()
 
 	//gas := uint64(math.MaxUint64 / 2)
-	msg := etypes.NewMessage(from, &to, 0, big.NewInt(0), gas, big.NewInt(0), big.NewInt(0), big.NewInt(0), dataBytes, etypes.AccessList{}, true)
+	msg := etypes.NewMessage(from, &to, 0, value, gas, big.NewInt(0), big.NewInt(0), big.NewInt(0), dataBytes, etypes.AccessList{}, true)
 
 	ctx := m.cn.NewContext()
 	statedb := types.NewStateDB(ctx)

@@ -7,6 +7,7 @@ var (
 	ErrInvalidData     = errors.New("invalid Data")
 	ErrInvalidMethod   = errors.New("invalid Method")
 	ErrInvalidType     = errors.New("invalid Type")
+	ErrInvalidGasPrice = errors.New("invalid GasPrice")
 	ErrFileRead        = errors.New("File Read Error")
 	ErrNotFoundEvent   = errors.New("Event Not Found")
 	ErrArgument        = errors.New("Argument Error")
