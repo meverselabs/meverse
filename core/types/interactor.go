@@ -175,7 +175,7 @@ func (i *interactor) Exec(Cc *ContractContext, ContAddr common.Address, MethodNa
 			if err != nil {
 				return
 			}
-			_err := i.insertResultEvent(en, enResult, err)
+			_err := insertResultEvent(en, enResult, err)
 			if _err != nil {
 				err = _err
 			} else {
@@ -188,7 +188,7 @@ func (i *interactor) Exec(Cc *ContractContext, ContAddr common.Address, MethodNa
 			var k int
 			k += 1
 		}
-		result, enResult, useGas, err = i._exec(ecc, cont, MethodName, Args)
+		result, enResult, useGas, err = _exec(ecc, cont, MethodName, Args)
 	} else {
 		result, enResult, useGas, err = i._execEvm(Cc, ContAddr, MethodName, Args)
 	}
@@ -213,7 +213,7 @@ func (i *interactor) getContMethod(Cc *ContractContext, ContAddr common.Address,
 			m := txparser.Abi(MethodName)
 			if m.Name == "" {
 				n := i.ctx.Snapshot()
-				if rawabi, _, _, err := i._exec(Cc, cont, "ContractInvoke", []interface{}{"abis", []interface{}{}}); err != nil {
+				if rawabi, _, _, err := _exec(Cc, cont, "ContractInvoke", []interface{}{"abis", []interface{}{}}); err != nil {
 					i.ctx.Revert(n)
 					return nil, "", nil, err
 				} else if len(rawabi) == 0 {
@@ -341,9 +341,71 @@ func (i *interactor) _execEvm(Cc *ContractContext, ContAddr common.Address, Meth
 	return
 }
 
-func (i *interactor) _exec(ecc *ContractContext, cont Contract, MethodName string, Args []interface{}) (result []interface{}, enResult []interface{}, useGas uint64, err error) {
+func CheckABI(b *Block, ctx *Context) {
+	n := ctx.Snapshot()
+	defer ctx.Revert(n)
+
+	for _, tx := range b.Body.Transactions {
+		if ctx.IsContract(tx.To) {
+			m := txparser.Abi(tx.Method)
+			if m.Name == "" {
+				cont, err := ctx.Contract(tx.To)
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+				if _, ok := cont.(InvokeableContract); !ok {
+					continue
+				}
+
+				cc := ctx.ContractContext(cont, common.Address{})
+				intr := &interactor{
+					ctx:       ctx,
+					cont:      cont,
+					conMap:    map[common.Address]Contract{},
+					index:     0,
+					eventList: []*Event{},
+					saveEvent: false,
+				}
+				cc.Exec = intr.Exec
+
+				if rawabi, _, _, err := _exec(cc, cont, "ContractInvoke", []interface{}{"abis", []interface{}{}}); err != nil {
+					fmt.Println(err)
+					continue
+				} else if len(rawabi) == 0 {
+					fmt.Println(errors.New("invalid abis result"))
+					continue
+				} else if abis, ok := rawabi[0].([]interface{}); !ok {
+					fmt.Println(errors.New("invalid abis method"))
+					continue
+				} else {
+					strs := []string{}
+					for _, funcStr := range abis {
+						if f, ok := funcStr.(string); ok {
+							strs = append(strs, f)
+						}
+					}
+					bs := []byte("[" + strings.Join(strs, ",") + "]")
+					reader := bytes.NewReader(bs)
+					if abi, err := abi.JSON(reader); err == nil {
+						for _, m := range abi.Methods {
+							if strings.Contains(m.Sig, tx.Method+"(") || hex.EncodeToString(m.ID) == tx.Method {
+								txparser.AddAbi(m)
+								fmt.Println("AddAbi", tx.Method)
+								break
+							}
+						}
+					}
+				}
+				intr.Distroy()
+			}
+		}
+	}
+}
+
+func _exec(ecc *ContractContext, cont Contract, MethodName string, Args []interface{}) (result []interface{}, enResult []interface{}, useGas uint64, err error) {
 	ContAddr := cont.Address()
-	rMethod, _err := i.methodByName(cont, ContAddr, MethodName)
+	rMethod, _err := methodByName(cont, ContAddr, MethodName)
 	if _err != nil {
 		err = _err
 		return
@@ -378,7 +440,7 @@ func (i *interactor) _exec(ecc *ContractContext, cont Contract, MethodName strin
 
 	useGas = ecc.ctx.GetPCSize() - s
 	mtype := rMethod.Type()
-	result, enResult, err = i.getResults(mtype, vs)
+	result, enResult, err = getResults(mtype, vs)
 	if err != nil {
 		ecc.ctx.Revert(sn)
 	}
@@ -654,7 +716,7 @@ func (i *interactor) AddEvent(en *Event) {
 	i.eventList = append(i.eventList, en)
 }
 
-func (i *interactor) getResults(mType reflect.Type, vs []reflect.Value) (params []interface{}, result []interface{}, err error) {
+func getResults(mType reflect.Type, vs []reflect.Value) (params []interface{}, result []interface{}, err error) {
 	params = []interface{}{}
 	result = []interface{}{}
 	for i, v := range vs {
@@ -713,7 +775,7 @@ func (i *interactor) addCallEvent(Cc *ContractContext, Addr common.Address, Meth
 	return rv
 }
 
-func (i *interactor) insertResultEvent(en *Event, Results []interface{}, Err error) error {
+func insertResultEvent(en *Event, Results []interface{}, Err error) error {
 	bf := bytes.NewBuffer(en.Result)
 
 	mc := &MethodCallEvent{}
@@ -737,7 +799,7 @@ func (i *interactor) insertResultEvent(en *Event, Results []interface{}, Err err
 	return err
 }
 
-func (i *interactor) methodByName(cont Contract, Addr common.Address, MethodName string) (reflect.Value, error) {
+func methodByName(cont Contract, Addr common.Address, MethodName string) (reflect.Value, error) {
 	_cont := cont.Front()
 
 	method, err := contractMethod(_cont, Addr, MethodName)

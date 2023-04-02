@@ -362,6 +362,8 @@ func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context, sm ma
 		return nil, err
 	}
 
+	types.CheckABI(b, cn.NewContext())
+
 	// Execute Transctions
 	currentSlot := types.ToTimeSlot(b.Header.Timestamp)
 	receipts := types.Receipts{}

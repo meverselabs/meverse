@@ -93,6 +93,9 @@ func (bc *BlockCreator) UnsafeAddTx(TxHash hash.Hash256, tx *types.Transaction, 
 	}
 	index := uint16(len(bc.b.Body.Transactions))
 	TXID := types.TransactionID(bc.b.Header.Height, index)
+
+	types.CheckABI(bc.b, bc.cn.NewContext())
+
 	if tx.VmType != types.Evm {
 		receipt = new(etypes.Receipt)
 		if tx.To == common.ZeroAddr {

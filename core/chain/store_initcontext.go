@@ -8,6 +8,7 @@ import (
 	"github.com/meverselabs/meverse/common/bin"
 	"github.com/meverselabs/meverse/common/hash"
 	"github.com/meverselabs/meverse/core/keydb"
+	"github.com/meverselabs/meverse/core/piledb"
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/pkg/errors"
 )
@@ -38,10 +39,18 @@ func (st *Store) UpdatePrepare() error {
 	if !st.cache.cached {
 		st.cache.height, st.cache.heightHash = st.LastStatus()
 		b, err := st.Block(st.cache.height)
-		if err == nil {
-			st.cache.heightBlock = b
-			st.cache.heightTimestamp = st.LastTimestamp()
+		if err != nil {
+			return err
 		}
+		if b.Header.Version > 1 {
+			receipts, err := st.Receipts(st.cache.height)
+			if err != nil {
+				return err
+			}
+			st.cache.heightReceipts = append(types.Receipts{}, receipts...)
+		}
+		st.cache.heightBlock = b
+		st.cache.heightTimestamp = st.LastTimestamp()
 		st.cache.generators = []common.Address{}
 		st.cache.contracts = []types.Contract{}
 		if err := st.db.View(func(txn *keydb.Tx) error {
@@ -101,7 +110,7 @@ func (st *Store) CopyContext(zipContextPath string) error {
 }
 
 // StoreBlock stores the block
-func (st *Store) UpdateContext(b *types.Block, ctx *types.Context) error {
+func (st *Store) UpdateContext(b *types.Block, ctx *types.Context, receipts types.Receipts) error {
 	st.closeLock.RLock()
 	defer st.closeLock.RUnlock()
 	if st.isClose {
@@ -119,6 +128,16 @@ func (st *Store) UpdateContext(b *types.Block, ctx *types.Context) error {
 	// Datas := [][]byte{bsHeader}
 	// {
 	// 	data, _, err := bin.WriterToBytes(&b.Body)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	Datas = append(Datas, data)
+	// }
+	// {
+	// 	// if len(receipts) > 0 {
+	// 	// 	log.Println(receipts)
+	// 	// }
+	// 	data, _, err := bin.WriterToBytes(&receipts)
 	// 	if err != nil {
 	// 		return err
 	// 	}
@@ -244,6 +263,7 @@ func (st *Store) UpdateContext(b *types.Block, ctx *types.Context) error {
 	st.cache.height = b.Header.Height
 	st.cache.heightHash = HeaderHash
 	st.cache.heightBlock = b
+	st.cache.heightReceipts = append(types.Receipts{}, receipts...)
 	st.cache.heightTimestamp = b.Header.Timestamp
 	st.cache.generators = []common.Address{}
 	st.cache.contracts = []types.Contract{}
@@ -300,6 +320,11 @@ func (st *Store) UpdateStoreGenesis(genHash hash.Hash256, ctd *types.ContextData
 		}
 	}
 
+	if err := st.cdb.Init(genHash, genHash, 0, 0); err != nil {
+		if errors.Cause(err) != piledb.ErrAlreadyInitialized {
+			return err
+		}
+	}
 	if err := st.db.Update(func(txn *keydb.Tx) error {
 		if err := txn.Set(toHeightHashKey(0), genHash, genHash[:]); err != nil {
 			return errors.WithStack(err)
@@ -329,6 +354,7 @@ func (st *Store) UpdateStoreGenesis(genHash hash.Hash256, ctd *types.ContextData
 	st.cache.height = 0
 	st.cache.heightHash = genHash
 	st.cache.heightBlock = nil
+	st.cache.heightReceipts = nil
 	st.cache.heightTimestamp = 0
 	st.cache.heightPoFSameGen = 0
 	st.cache.generators = []common.Address{}

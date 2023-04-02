@@ -3,7 +3,9 @@ package chain
 import (
 	"log"
 
+	etypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/meverselabs/meverse/common"
+	"github.com/meverselabs/meverse/common/bin"
 	"github.com/meverselabs/meverse/common/hash"
 	"github.com/meverselabs/meverse/core/piledb"
 	"github.com/meverselabs/meverse/core/prefix"
@@ -64,24 +66,33 @@ func (cn *Chain) UpdateBlock(b *types.Block, SigMap map[hash.Hash256]common.Addr
 		return err
 	}
 	ctx := types.NewContext(cn.store)
-	if err := cn.UpdateExecuteBlockOnContext(b, ctx, SigMap); err != nil {
+	if receipts, err := cn.UpdateExecuteBlockOnContext(b, ctx, SigMap); err != nil {
 		return err
+	} else {
+		return cn.updateBlockWithContext(b, ctx, receipts)
 	}
-	return cn.updateBlockWithContext(b, ctx)
 }
 
-func (cn *Chain) updateBlockWithContext(b *types.Block, ctx *types.Context) error {
+func (cn *Chain) updateBlockWithContext(b *types.Block, ctx *types.Context, receipts types.Receipts) error {
 	if b.Header.ContextHash != ctx.Hash() {
 		log.Println("CONNECT", ctx.Hash(), b.Header.ContextHash, ctx.Dump())
 		panic("")
 		// return errors.WithStack(ErrInvalidContextHash)
 	}
 
+	if cn.store.Version(b.Header.Height) > 1 {
+		if b.Header.ReceiptHash != bin.MustWriterToHash(&receipts) {
+			log.Println("CONNECT", bin.MustWriterToHash(&receipts), b.Header.ReceiptHash, receipts)
+			panic("")
+			return errors.WithStack(ErrInvalidReceiptHash)
+		}
+	}
+
 	if ctx.StackSize() > 1 {
 		return errors.WithStack(types.ErrDirtyContext)
 	}
 
-	if err := cn.store.UpdateContext(b, ctx); err != nil {
+	if err := cn.store.UpdateContext(b, ctx, receipts); err != nil {
 		return err
 	}
 	var ca []*common.SyncChan
@@ -100,48 +111,69 @@ func (cn *Chain) updateBlockWithContext(b *types.Block, ctx *types.Context) erro
 	return nil
 }
 
-func (cn *Chain) UpdateExecuteBlockOnContext(b *types.Block, ctx *types.Context, sm map[hash.Hash256]common.Address) error {
+func (cn *Chain) UpdateExecuteBlockOnContext(b *types.Block, ctx *types.Context, sm map[hash.Hash256]common.Address) (types.Receipts, error) {
+	TxSigners, TxHashes, err := cn.validateTransactionSignatures(b, sm)
+	if err != nil {
+		return nil, err
+	}
+
+	types.CheckABI(b, cn.NewContext())
+
 	// Execute Transctions
 	currentSlot := types.ToTimeSlot(b.Header.Timestamp)
-	for _, tx := range b.Body.Transactions {
+	receipts := types.Receipts{}
+	for i, tx := range b.Body.Transactions {
 		slot := types.ToTimeSlot(tx.Timestamp)
 		if slot < currentSlot-1 {
-			return errors.WithStack(types.ErrInvalidTransactionTimeSlot)
+			return nil, errors.WithStack(types.ErrInvalidTransactionTimeSlot)
 		} else if slot > currentSlot {
-			return errors.WithStack(types.ErrInvalidTransactionTimeSlot)
+			return nil, errors.WithStack(types.ErrInvalidTransactionTimeSlot)
 		}
 
 		sn := ctx.Snapshot()
-		TxHash := tx.Hash(b.Header.Height)
-
-		if err := ctx.UseTimeSlot(slot, string(TxHash[:])); err != nil {
+		if err := ctx.UseTimeSlot(slot, string(TxHashes[i][:])); err != nil {
 			ctx.Revert(sn)
-			return err
+			return nil, err
 		}
 		TXID := types.TransactionID(b.Header.Height, uint16(len(b.Body.Transactions)))
-		if tx.To == common.ZeroAddr {
-			if _, err := cn.ExecuteTransaction(ctx, tx, TXID); err != nil {
-				ctx.Revert(sn)
-				return err
+		if tx.VmType != types.Evm {
+			if tx.To == common.ZeroAddr {
+				if !ctx.IsAdmin(TxSigners[i]) {
+					ctx.Revert(sn)
+					return nil, errors.WithStack(ErrInvalidAdminAddress)
+				}
+				if _, err := cn.ExecuteTransaction(ctx, tx, TXID); err != nil {
+					ctx.Revert(sn)
+					return nil, err
+				}
+			} else {
+				if err := ExecuteContractTx(ctx, tx, TxSigners[i], TXID); err != nil {
+					ctx.Revert(sn)
+					return nil, err
+				}
 			}
+			receipt := new(etypes.Receipt)
+			receipts = append(receipts, receipt)
 		} else {
-			if err := ExecuteContractTx(ctx, tx, tx.From, TXID); err != nil {
+			if _, receipt, err := cn.ApplyEvmTransaction(ctx, tx, uint16(i), TxSigners[i]); err != nil {
 				ctx.Revert(sn)
-				return err
+				return nil, err
+			} else {
+				receipts = append(receipts, receipt)
 			}
 		}
 		ctx.Commit(sn)
 	}
 	if ctx.StackSize() > 1 {
-		return errors.WithStack(types.ErrDirtyContext)
+		return nil, errors.WithStack(types.ErrDirtyContext)
 	}
 	if b.Header.Height%prefix.RewardIntervalBlocks == 0 {
 		if _, err := ctx.ProcessReward(ctx, b); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	if ctx.StackSize() > 1 {
-		return errors.WithStack(types.ErrDirtyContext)
+		return nil, errors.WithStack(types.ErrDirtyContext)
 	}
-	return nil
+	return receipts, nil
 }
