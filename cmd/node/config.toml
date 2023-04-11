@@ -1,3 +1,6 @@
+#### DO NOT MODIFY ####
+# Observer identification public key on mainnet.
+# If you make a change, block verification cannot proceed.
 ObserverKeys = [
 	"045b8268c0352ea145aebef7e9cc2f0ddbbdc90c59b31f44cd402862080c8b469848de51e7027582c8d874ba0e73316218085dc88d422955f3ba5a39ae60ee2889",
 	"04ecf18111a1e6fada20cbb950d49d697e8252ddad23c67a1e43798c16e46684b0a0151f47fe1347e495c568b895252859772d60b29d4b82e887bfa28031b573c9",
@@ -6,16 +9,23 @@ ObserverKeys = [
 	"04dd7010d275a52cf4708efd6c45a65ab66c3dfca2a689355d869db886abb4bb6cb351ac0b043852dbd68eb52e76e40fc5c3dea4b3e02f11b7c1da70e24fc522fe"
 ]
 
+# Enter the information for the context that you backed up. If you use the default, you start synchronizing from block 1.
 InitGenesisHash = ""
 InitHeight = 0
 InitHash = ""
 InitTimestamp = 0
-Port = 22001
-RPCPort = 8541
-StoreRoot = "./ndata"
-# NodeKeyHex = "d660a9bb4a518c6fd6d0e2df178787c2570312b915f4102dfc0cdf46b7f3793e"
-ServiceName = "meverse_account"
 
+# Port used for communication between nodes.
+Port = 22001
+# Port used for RPC communication.
+RPCPort = 8541
+# StoreRoot is a folder option that records chain data, such as block and context information. If empty, use the ndata folder in the same location as the binary.
+StoreRoot = "./ndata"
+# Use to specify an identification key for a node. If empty, generate any key and save it to the ndkey.key file.
+# NodeKeyHex = "d660a9bb4a518c6fd6d0e2df178787c2570312b915f4102dfc0cdf46b7f3793e"
+
+#### DO NOT MODIFY ####
+# Value containing mainnet seed node information. If you modify it, you may not be able to synchronize the blocks.
 [SeedNodeMap]
 04e7b61d16a835f01a1e178e6a815462e334ba6c2d99e28bd36d6a227c9ffbaf28ef92eacaf51bdb5c2c43b61743e2a7232c580f016d31c0e531b240ae8e36337b = "158.247.221.98:22001"
 04a40e3318818bf04fb1a906347aaab6e7ad76e857d154c0fbb466d55058574ec59db6db5918dba0410ecfece6a7fb054197c252b3392fc95ee0ca4a1c0d2e57d6 = "66.42.82.87:22001"
