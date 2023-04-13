@@ -13,6 +13,7 @@ import (
 
 	ecommon "github.com/ethereum/go-ethereum/common"
 	etypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/meverselabs/meverse/core/ctypes"
 	mtypes "github.com/meverselabs/meverse/ethereum/core/types"
 	"github.com/meverselabs/meverse/service/bloomservice"
 	"github.com/meverselabs/meverse/service/txsearch/itxsearch"
@@ -203,13 +204,13 @@ func (t *TxSearch) Tx(height uint32, index uint16) (map[string]interface{}, erro
 		for i := 0; i < len(b.Body.Events); i++ {
 			if b.Body.Events[i].Index == index {
 				switch b.Body.Events[i].Type {
-				case types.EventTagTxMsg:
+				case ctypes.EventTagTxMsg:
 					en := b.Body.Events[i]
 					m["Result"], err = bin.TypeReadAll(en.Result, -1)
 					if err != nil {
 						m["ResultErr"] = err
 					}
-				case types.EventTagCallHistory:
+				case ctypes.EventTagCallHistory:
 					bf := bytes.NewBuffer(b.Body.Events[i].Result)
 					mc := &itxsearch.MethodCallEvent{}
 					if _, err := mc.ReadFrom(bf); err == nil {
@@ -238,16 +239,17 @@ func (t *TxSearch) Tx(height uint32, index uint16) (map[string]interface{}, erro
 
 func (t *TxSearch) getLogs(tx *types.Transaction, b *types.Block, TxID itxsearch.TxID, bHash ecommon.Hash) ([]*etypes.Log, string, error) {
 	if tx.VmType != types.Evm {
-		evs, err := bloomservice.FindTransactionsEvents(b.Body.Transactions, b.Body.Events, int(TxID.Index))
+		evs, err := bloomservice.FindCallHistoryEvents(b.Body.Events, TxID.Index)
+
 		if err != nil {
 			return nil, "", err
 		}
-		blm, err := bloomservice.CreateEventBloom(t.cn.NewContext(), evs)
+		blm, err := bloomservice.CreateEventBloom(t.cn.Provider(), evs)
 		if err != nil {
 			return nil, "", err
 		}
 
-		logs, err := bloomservice.EventsToLogs(t.cn, &b.Header, tx, evs, int(TxID.Index))
+		logs, err := bloomservice.EventsToFullLogs(t.cn, &b.Header, tx, evs, TxID.Index)
 		if err != nil {
 			return nil, "", err
 		}

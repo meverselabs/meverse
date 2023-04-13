@@ -21,11 +21,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/meverselabs/meverse/core/ctypes"
 )
 
 // StateDB is an EVM database for full state querying.
 type StateDB interface {
-	Exec(user common.Address, contAddr common.Address, input []byte, gas uint64) ([]byte, uint64, error)
+	Exec(user common.Address, contAddr common.Address, input []byte, gas uint64) ([]byte, uint64, []*ctypes.Event, error)
 	IsExtContract(addr common.Address) bool
 
 	CreateAccount(common.Address)

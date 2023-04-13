@@ -2,11 +2,14 @@ package viewchain
 
 import (
 	"bytes"
+	"fmt"
+	"math/big"
 	"runtime"
 	"strings"
 
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/core/chain"
+	"github.com/meverselabs/meverse/core/ctypes"
 	"github.com/meverselabs/meverse/core/prefix"
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/pkg/errors"
@@ -42,7 +45,7 @@ func (m *ViewCaller) Execute(contAddr common.Address, from, method string, input
 	}
 	intr := types.NewInteractor(ctx, cont, cc, "000000000000", true)
 	cc.Exec = intr.Exec
-	_, err = intr.Exec(cc, contAddr, method, inputs)
+	result, err := intr.Exec(cc, contAddr, method, inputs)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -54,9 +57,52 @@ func (m *ViewCaller) Execute(contAddr common.Address, from, method string, input
 		e := en[0]
 
 		bf := bytes.NewBuffer(e.Result)
-		mc := &types.MethodCallEvent{}
+		mc := &ctypes.MethodCallEvent{}
 		_, err := mc.ReadFrom(bf)
-		return mc.Result, gh[0], err
+		if mc.Result == nil {
+			if len(result) > 0 && result[len(result)-1] == nil {
+				result = result[:len(result)-1]
+			}
+			if len(result) == 1 {
+				if ls, ok := result[0].([]interface{}); ok {
+					data := []interface{}{}
+					for _, v := range ls {
+						bi, ok := v.(*big.Int)
+						if !ok {
+							return result, gh[0], err // temp fix logic
+						}
+						tokenID := fmt.Sprintf("0x%040x", bi)
+						data = append(data, tokenID)
+					}
+					return []interface{}{data}, gh[0], err
+				} else if bis, ok := result[0].([]*big.Int); ok {
+					data := []interface{}{}
+					for _, bi := range bis {
+						tokenID := fmt.Sprintf("0x%040x", bi)
+						data = append(data, tokenID)
+					}
+					return []interface{}{data}, gh[0], err
+				}
+			}
+
+			return result, gh[0], err
+		} else {
+			if len(mc.Result) == 1 {
+				if ls, ok := mc.Result[0].([]interface{}); ok {
+					data := []interface{}{}
+					for _, v := range ls {
+						bi, ok := v.(*big.Int)
+						if !ok {
+							return mc.Result, gh[0], err // temp fix logic
+						}
+						tokenID := fmt.Sprintf("0x%040x", bi)
+						data = append(data, tokenID)
+					}
+					return []interface{}{data}, gh[0], err
+				}
+			}
+			return mc.Result, gh[0], err
+		}
 	}
 }
 

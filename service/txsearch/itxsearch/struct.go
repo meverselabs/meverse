@@ -2,10 +2,10 @@ package itxsearch
 
 import (
 	etypes "github.com/ethereum/go-ethereum/core/types"
-	mtypes "github.com/meverselabs/meverse/core/types"
-
 	"github.com/meverselabs/meverse/core/chain"
+	"github.com/meverselabs/meverse/core/ctypes"
 	"github.com/meverselabs/meverse/core/types"
+	mtypes "github.com/meverselabs/meverse/core/types"
 )
 
 type BlockInfo struct {
@@ -31,7 +31,7 @@ type TxList struct {
 }
 
 type MethodCallEvent struct {
-	types.MethodCallEvent
+	ctypes.MethodCallEvent
 	ToName string
 }
 
@@ -43,7 +43,7 @@ type ContractNameCC interface {
 }
 
 type BloomInterface interface {
-	FindTransactionsEvents(txs []*types.Transaction, evs []*types.Event, idx int) ([]*types.Event, error)
-	CreateEventBloom(ctx *types.Context, events []*types.Event) (etypes.Bloom, error)
-	EventsToLogs(chain *chain.Chain, header *mtypes.Header, tx *mtypes.Transaction, evs []*mtypes.Event, idx int) ([]*etypes.Log, error)
+	FindCallHistoryEvents(evs []*ctypes.Event, idx uint16) ([]*ctypes.Event, error)
+	CreateEventBloom(ctx *types.Context, events []*ctypes.Event) (etypes.Bloom, error)
+	EventsToLogs(chain *chain.Chain, header *mtypes.Header, tx *mtypes.Transaction, evs []*ctypes.Event, idx int) ([]*etypes.Log, error)
 }

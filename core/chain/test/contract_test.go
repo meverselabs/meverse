@@ -14,7 +14,9 @@ import (
 	"github.com/meverselabs/meverse/common/bin"
 	"github.com/meverselabs/meverse/common/hash"
 	"github.com/meverselabs/meverse/common/key"
+
 	"github.com/meverselabs/meverse/core/chain"
+	"github.com/meverselabs/meverse/core/ctypes"
 	"github.com/meverselabs/meverse/core/piledb"
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/pkg/errors"
@@ -149,7 +151,7 @@ func TestExecuteContractTx(t *testing.T) {
 
 			sn := ctx.Snapshot()
 			var err error
-			var en []*types.Event
+			var en []*ctypes.Event
 			if en, err = chain.ExecuteContractTxWithEvent(ctx, tt.args.tx, tt.args.signer, "000000000000"); err != nil {
 				ctx.Revert(sn)
 			} else {

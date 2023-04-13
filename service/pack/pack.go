@@ -16,6 +16,7 @@ var bigIntType = reflect.TypeOf(&big.Int{})
 var amountType = reflect.TypeOf(&amount.Amount{})
 var byteSliceType = reflect.TypeOf([]byte{})
 var addressType = reflect.TypeOf(common.Address{})
+var addressPtrType = reflect.TypeOf(&common.Address{})
 
 // methodToString convert the given golang method to appropriate solidity-type function
 // contract function의 경우 index = 2 부터 실제 argument 이다.
@@ -298,6 +299,8 @@ func PackElement(v reflect.Value) ([]byte, error) {
 			return math.U256Bytes(new(big.Int).Set(v.Interface().(*big.Int))), nil
 		case amountType:
 			return math.U256Bytes(new(big.Int).Set(v.Interface().(*amount.Amount).Int)), nil
+		case addressPtrType:
+			return common.LeftPadBytes(v.Interface().(*common.Address).Bytes(), 32), nil
 		default:
 			return nil, fmt.Errorf("PackElement, unknown type: %v", v.Type())
 		}

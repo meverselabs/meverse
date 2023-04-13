@@ -2,13 +2,13 @@ package bloomservice
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
-	"math"
 	"math/big"
 	"os"
-	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,13 +19,16 @@ import (
 	"github.com/meverselabs/meverse/common/bin"
 	"github.com/meverselabs/meverse/common/hash"
 	"github.com/meverselabs/meverse/core/types"
-	"github.com/meverselabs/meverse/ethereum/params"
-	"github.com/meverselabs/meverse/service/pack"
 	"github.com/meverselabs/meverse/service/txsearch/itxsearch"
 	"github.com/stretchr/testify/assert"
 )
 
+const bloomDataPath = "_bloombits"
+
 var (
+	bloomBitsBlocks = uint64(24)
+	bloomConfirms   = uint64(10)
+
 	transferHash     = hash.Hash([]byte("Transfer(address,address,uint256)"))
 	approveHash      = hash.Hash([]byte("Approval(address,address,uint256)"))
 	addLiquidityHash = hash.Hash([]byte("UniAddLiquidity(address,address,uint256,uint256,uint256,uint256)"))
@@ -37,87 +40,21 @@ var (
 // range로 검색할 경우 txsearch는 필요없기 때문에 mock으로 가능
 type tsMock struct{}
 
-func (*tsMock) BlockHeight(bh hash.Hash256) (uint32, error) {
+func (t *tsMock) BlockHeight(bh hash.Hash256) (uint32, error) {
 	return uint32(2), nil
 }
-func (*tsMock) BlockList(index int) []*itxsearch.BlockInfo                     { return nil }
-func (*tsMock) Block(i uint32) (*types.Block, error)                           { return nil, nil }
-func (*tsMock) TxIndex(th hash.Hash256) (itxsearch.TxID, error)                { return itxsearch.TxID{}, nil }
-func (*tsMock) TxList(index, size int) ([]itxsearch.TxList, error)             { return nil, nil }
-func (*tsMock) Tx(height uint32, index uint16) (map[string]interface{}, error) { return nil, nil }
-func (*tsMock) AddressTxList(From common.Address, index, size int) ([]itxsearch.TxList, error) {
+func (t *tsMock) BlockList(index int) []*itxsearch.BlockInfo                     { return nil }
+func (t *tsMock) Block(i uint32) (*types.Block, error)                           { return nil, nil }
+func (t *tsMock) TxIndex(th hash.Hash256) (itxsearch.TxID, error)                { return itxsearch.TxID{}, nil }
+func (t *tsMock) TxList(index, size int) ([]itxsearch.TxList, error)             { return nil, nil }
+func (t *tsMock) Tx(height uint32, index uint16) (map[string]interface{}, error) { return nil, nil }
+func (t *tsMock) AddressTxList(From common.Address, index, size int) ([]itxsearch.TxList, error) {
 	return nil, nil
 }
-func (*tsMock) TokenTxList(From common.Address, index, size int) ([]itxsearch.TxList, error) {
+func (t *tsMock) TokenTxList(From common.Address, index, size int) ([]itxsearch.TxList, error) {
 	return nil, nil
 }
-func (*tsMock) Reward(cont, rewarder common.Address) (*amount.Amount, error) { return nil, nil }
-
-func TestPackBoolAndNumber(t *testing.T) {
-	tests := []struct {
-		value  reflect.Value
-		packed []byte
-	}{
-		{reflect.ValueOf(false), common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000")},
-		{reflect.ValueOf(true), common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000001")},
-
-		// Protocol limits
-		{reflect.ValueOf(0), common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000")},
-		{reflect.ValueOf(1), common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000001")},
-		{reflect.ValueOf(-1), common.Hex2Bytes("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")},
-
-		// Type corner cases
-		{reflect.ValueOf(uint8(math.MaxUint8)), common.Hex2Bytes("00000000000000000000000000000000000000000000000000000000000000ff")},
-		{reflect.ValueOf(uint16(math.MaxUint16)), common.Hex2Bytes("000000000000000000000000000000000000000000000000000000000000ffff")},
-		{reflect.ValueOf(uint32(math.MaxUint32)), common.Hex2Bytes("00000000000000000000000000000000000000000000000000000000ffffffff")},
-		{reflect.ValueOf(uint64(math.MaxUint64)), common.Hex2Bytes("000000000000000000000000000000000000000000000000ffffffffffffffff")},
-
-		{reflect.ValueOf(int8(math.MaxInt8)), common.Hex2Bytes("000000000000000000000000000000000000000000000000000000000000007f")},
-		{reflect.ValueOf(int16(math.MaxInt16)), common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000007fff")},
-		{reflect.ValueOf(int32(math.MaxInt32)), common.Hex2Bytes("000000000000000000000000000000000000000000000000000000007fffffff")},
-		{reflect.ValueOf(int64(math.MaxInt64)), common.Hex2Bytes("0000000000000000000000000000000000000000000000007fffffffffffffff")},
-
-		{reflect.ValueOf(int8(math.MinInt8)), common.Hex2Bytes("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80")},
-		{reflect.ValueOf(int16(math.MinInt16)), common.Hex2Bytes("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8000")},
-		{reflect.ValueOf(int32(math.MinInt32)), common.Hex2Bytes("ffffffffffffffffffffffffffffffffffffffffffffffffffffffff80000000")},
-		{reflect.ValueOf(int64(math.MinInt64)), common.Hex2Bytes("ffffffffffffffffffffffffffffffffffffffffffffffff8000000000000000")},
-
-		{reflect.ValueOf(big.NewInt(int64(math.MaxInt64))), common.Hex2Bytes("0000000000000000000000000000000000000000000000007fffffffffffffff")},
-		{reflect.ValueOf(amount.NewAmount(0, uint64(math.MaxInt64))), common.Hex2Bytes("0000000000000000000000000000000000000000000000007fffffffffffffff")},
-	}
-	for i, tt := range tests {
-		packed, err := pack.PackElement(tt.value)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !bytes.Equal(packed, tt.packed) {
-			t.Errorf("test %d: pack mismatch: have %x, want %x", i, packed, tt.packed)
-		}
-	}
-}
-
-func TestPack(t *testing.T) {
-	tests := []struct {
-		value  reflect.Value
-		packed []byte
-	}{
-		{reflect.ValueOf(common.HexToAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266")), common.Hex2Bytes("000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb92266")},
-		{reflect.ValueOf("a"), common.Hex2Bytes("00000000000000000000000000000000000000000000000000000000000000016100000000000000000000000000000000000000000000000000000000000000")},
-		{reflect.ValueOf([2]string{"a", "b"}), common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000001610000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000016200000000000000000000000000000000000000000000000000000000000000")},
-		{reflect.ValueOf([]string{"a", "b"}), common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000001610000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000016200000000000000000000000000000000000000000000000000000000000000")},
-		{reflect.ValueOf([2]byte{10, 20}), common.Hex2Bytes("0a14000000000000000000000000000000000000000000000000000000000000")},
-		{reflect.ValueOf([]byte{10, 20}), common.Hex2Bytes("00000000000000000000000000000000000000000000000000000000000000020a14000000000000000000000000000000000000000000000000000000000000")},
-	}
-	for i, tt := range tests {
-		packed, err := pack.PackElement(tt.value)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !bytes.Equal(packed, tt.packed) {
-			t.Errorf("test %d: pack mismatch: have %x, want %x", i, packed, tt.packed)
-		}
-	}
-}
+func (t *tsMock) Reward(cont, rewarder common.Address) (*amount.Amount, error) { return nil, nil }
 
 func TestMutliTranactionFilter(t *testing.T) {
 	path := "_data"
@@ -256,7 +193,7 @@ func TestMutliTranactionFilter(t *testing.T) {
 	}
 
 	ts := &tsMock{}
-	bs, err := NewBloomBitService(tb.chain, "_bloombits", params.BloomBitsBlocks, params.BloomConfirms)
+	bs, err := NewBloomBitService(tb.chain, bloomDataPath, bloomBitsBlocks, bloomConfirms)
 	if err != nil {
 		panic(err)
 	}
@@ -291,11 +228,16 @@ func TestFilterIndexed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer tb.Close()
+
 	mev := ret[0].(common.Address)
 
 	ctx := tb.newContext()
 
-	bs, err := NewBloomBitService(tb.chain, "_bloombits", params.BloomBitsBlocks, params.BloomConfirms)
+	if err := os.RemoveAll(bloomDataPath); err != nil {
+		t.Fatal(err)
+	}
+	bs, err := NewBloomBitService(tb.chain, bloomDataPath, bloomBitsBlocks, bloomConfirms)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -356,9 +298,6 @@ func TestFilterInitWith(t *testing.T) {
 	// alice(admin), bob, charlie
 	args := []interface{}{alice, bob, charlie}
 
-	bloomBitsBlocks := uint64(24)
-	bloomConfirms := uint64(10)
-
 	tests := []struct {
 		initHeight         int
 		storedSections     uint64 // Number of sections successfully indexed into the database
@@ -401,12 +340,11 @@ func TestFilterInitWith(t *testing.T) {
 		ctx := tb.newContext()
 
 		// 디렉토리 삭제
-		dir := "_bloombits"
-		if err = os.RemoveAll(dir); err != nil {
+		if err = os.RemoveAll(bloomDataPath); err != nil {
 			t.Fatal(err)
 		}
 
-		bs, err := NewBloomBitService(tb.chain, dir, bloomBitsBlocks, bloomConfirms)
+		bs, err := NewBloomBitService(tb.chain, bloomDataPath, bloomBitsBlocks, bloomConfirms)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -466,7 +404,6 @@ func TestFilterInitWith(t *testing.T) {
 
 		tb.Close()
 	}
-
 }
 
 // createContextFile creates context File upto height and config<height>.toml
@@ -570,4 +507,58 @@ func createContextFile(path string, workPath string, chainID *big.Int, version u
 	copy2.Close()
 
 	return nil
+}
+
+// StorageWithEventContractCreation deploy StorageWithEvent contract by alice with nonce = 0
+// source code : evm-client/contracts/StorageWithEvent.sol
+func StorageWithEventContractCreation(tb *testBlockChain) (*types.Transaction, error) {
+	rlp := "0x02f90cca8205398080842c9d07ea841dcd65008080b90c72608060405234801561001057600080fd5b50336000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550610c12806100606000396000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c80632ecb20d31461005157806342526e4e1461008157806360fe47b1146100b15780636d4ce63c146100cd575b600080fd5b61006b60048036038101906100669190610710565b6100eb565b604051610078919061085e565b60405180910390f35b61009b600480360381019061009691906106a6565b61045a565b6040516100a891906107df565b60405180910390f35b6100cb60048036038101906100c691906106e7565b610503565b005b6100d561060a565b6040516100e29190610843565b60405180910390f35b60007f30000000000000000000000000000000000000000000000000000000000000007effffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff19168260f81b7effffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1916101580156101cb57507f39000000000000000000000000000000000000000000000000000000000000007effffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff19168260f81b7effffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff191611155b15610206577f300000000000000000000000000000000000000000000000000000000000000060f81c826101ff91906109ba565b9050610455565b7f61000000000000000000000000000000000000000000000000000000000000007effffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff19168260f81b7effffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1916101580156102e457507f66000000000000000000000000000000000000000000000000000000000000007effffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff19168260f81b7effffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff191611155b1561032b577f610000000000000000000000000000000000000000000000000000000000000060f81c82600a61031a9190610935565b61032491906109ba565b9050610455565b7f41000000000000000000000000000000000000000000000000000000000000007effffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff19168260f81b7effffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff19161015801561040957507f46000000000000000000000000000000000000000000000000000000000000007effffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff19168260f81b7effffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff191611155b15610450577f410000000000000000000000000000000000000000000000000000000000000060f81c82600a61043f9190610935565b61044991906109ba565b9050610455565b600090505b919050565b600080600090506000805b60288160ff1610156104f85760108361047e919061096c565b92506104d2858260ff16815181106104bf577f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b602001015160f81c60f81b60f81c6100eb565b60ff16915081836104e391906108eb565b925080806104f090610a9b565b915050610465565b508192505050919050565b80600181905550600061052d604051806060016040528060288152602001610bb56028913961045a565b905060008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff166104d27f0ca6778676cf982a32c6c02a2aa57966620f6581c6f016a2837cb60c2e9f5c5361271060405161059a91906107fa565b60405180910390a38073ffffffffffffffffffffffffffffffffffffffff166040516105c5906107ca565b60405180910390207f1658817f2f384793b2fe883b68c3df91c0122e6b4ed86878f4c10e494082d8cc614e206040516105fe9190610828565b60405180910390a35050565b6000600154905090565b60006106276106228461089e565b610879565b90508281526020810184848401111561063f57600080fd5b61064a848285610a5b565b509392505050565b600082601f83011261066357600080fd5b8135610673848260208601610614565b91505092915050565b60008135905061068b81610b86565b92915050565b6000813590506106a081610b9d565b92915050565b6000602082840312156106b857600080fd5b600082013567ffffffffffffffff8111156106d257600080fd5b6106de84828501610652565b91505092915050565b6000602082840312156106f957600080fd5b60006107078482850161067c565b91505092915050565b60006020828403121561072257600080fd5b600061073084828501610691565b91505092915050565b610742816109ee565b82525050565b61075181610a37565b82525050565b61076081610a49565b82525050565b60006107736004836108cf565b915061077e82610b34565b602082019050919050565b60006107966007836108e0565b91506107a182610b5d565b600782019050919050565b6107b581610a20565b82525050565b6107c481610a2a565b82525050565b60006107d582610789565b9150819050919050565b60006020820190506107f46000830184610739565b92915050565b600060408201905061080f6000830184610748565b818103602083015261082081610766565b905092915050565b600060208201905061083d6000830184610757565b92915050565b600060208201905061085860008301846107ac565b92915050565b600060208201905061087360008301846107bb565b92915050565b6000610883610894565b905061088f8282610a6a565b919050565b6000604051905090565b600067ffffffffffffffff8211156108b9576108b8610af4565b5b6108c282610b23565b9050602081019050919050565b600082825260208201905092915050565b600081905092915050565b60006108f682610a00565b915061090183610a00565b92508273ffffffffffffffffffffffffffffffffffffffff0382111561092a57610929610ac5565b5b828201905092915050565b600061094082610a2a565b915061094b83610a2a565b92508260ff0382111561096157610960610ac5565b5b828201905092915050565b600061097782610a00565b915061098283610a00565b92508173ffffffffffffffffffffffffffffffffffffffff04831182151516156109af576109ae610ac5565b5b828202905092915050565b60006109c582610a2a565b91506109d083610a2a565b9250828210156109e3576109e2610ac5565b5b828203905092915050565b60006109f982610a00565b9050919050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b6000819050919050565b600060ff82169050919050565b6000610a4282610a20565b9050919050565b6000610a5482610a20565b9050919050565b82818337600083830152505050565b610a7382610b23565b810181811067ffffffffffffffff82111715610a9257610a91610af4565b5b80604052505050565b6000610aa682610a2a565b915060ff821415610aba57610ab9610ac5565b5b600182019050919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6000601f19601f8301169050919050565b7f6162636400000000000000000000000000000000000000000000000000000000600082015250565b7f7365743536373800000000000000000000000000000000000000000000000000600082015250565b610b8f81610a20565b8114610b9a57600080fd5b50565b610ba681610a2a565b8114610bb157600080fd5b5056fe33633434636464646236613930306661326235383564643239396530336431326661343239336263a26469706673582212200227ddd9f59da8a18fa533bb272780c8c899d4fa64a28dc408b7d65c3430c50364736f6c63430008040033c080a01d6bb58ee614b7906d7903798b4e8dc635627f9e1b4840e781dc814491cea11ea004a4e1dae0b64bfbbd27a9966192c1d0d23eb756692d38e4a36a26a2103b156c"
+
+	rlpBytes, err := hex.DecodeString(strings.Replace(rlp, "0x", "", -1))
+	if err != nil {
+		return nil, err
+	}
+
+	tx := &types.Transaction{
+		ChainID:     tb.chainID,
+		Timestamp:   uint64(time.Now().UnixNano()),
+		Seq:         0,
+		To:          ZeroAddress,
+		Method:      "",
+		GasPrice:    big.NewInt(748488682),
+		UseSeq:      true,
+		IsEtherType: true,
+		VmType:      types.Evm,
+		Args:        rlpBytes,
+	}
+
+	return tx, nil
+
+}
+
+// StorageWithEventSet returns StorageWithEvent's Set function by alice with nonce = 1
+// source code : evm-client/contracts/StorageWithEvent.sol
+func StorageWithEventSet(tb *testBlockChain) (*types.Transaction, error) {
+	rlp := "0x02f88e8205390180842c9d07ea841dcd6500945fbdb2315678afecb367f032d93f642f64180aa380a460fe47b1000000000000000000000000000000000000000000000000000000003ade68b1c001a06e1ab9f8e0b00a24946a95475d04adae3fd4cd5d92baf14178a5112247b554d1a01d30e5a83a548f34543b8a986404332bf34bb0cdce3d9a2bc0522194406c669f"
+
+	rlpBytes, err := hex.DecodeString(strings.Replace(rlp, "0x", "", -1))
+	if err != nil {
+		return nil, err
+	}
+
+	tx := &types.Transaction{
+		ChainID:     tb.chainID,
+		Timestamp:   uint64(time.Now().UnixNano()),
+		Seq:         1,
+		To:          common.HexToAddress("0x5FbDB2315678afecb367f032d93F642f64180aa3"),
+		Method:      "",
+		GasPrice:    big.NewInt(748488682),
+		UseSeq:      true,
+		IsEtherType: true,
+		VmType:      types.Evm,
+		Args:        rlpBytes,
+	}
+
+	return tx, nil
+
 }

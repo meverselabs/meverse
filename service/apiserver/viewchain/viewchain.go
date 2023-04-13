@@ -20,6 +20,7 @@ import (
 	"github.com/meverselabs/meverse/contract/formulator"
 	"github.com/meverselabs/meverse/contract/token"
 	"github.com/meverselabs/meverse/core/chain"
+	"github.com/meverselabs/meverse/core/ctypes"
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/meverselabs/meverse/service/apiserver"
 	"github.com/meverselabs/meverse/service/txsearch/itxsearch"
@@ -622,12 +623,46 @@ func (v *viewchain) Search(searchMap map[common.Address]map[string]bool, start, 
 			continue
 		}
 
+		rs, err := v.st.Receipts(i)
+		if err == nil {
+			for _, receipt := range rs {
+				for _, log := range receipt.Logs {
+					sm, ok := searchMap[log.Address]
+					if !ok {
+						continue
+					}
+					if _, ok := sm[log.Topics[0].String()]; !ok {
+						continue
+					}
+
+					tps := []string{}
+					for _, tp := range log.Topics {
+						tps = append(tps, tp.String())
+					}
+
+					m := map[string]string{
+						"Type":        "Log",
+						"Address":     log.Address.String(),
+						"BlockHash":   log.BlockHash.String(),
+						"Data":        hex.EncodeToString(log.Data),
+						"TxHash":      log.TxHash.String(),
+						"Topics":      strings.Join(tps, ","),
+						"BlockNumber": fmt.Sprintf("%v", log.BlockNumber),
+						"Index":       fmt.Sprintf("%v", log.Index),
+						"Removed":     fmt.Sprintf("%v", log.Removed),
+						"TxIndex":     fmt.Sprintf("%v", log.TxIndex),
+					}
+					txList = append(txList, m)
+				}
+			}
+		}
+
 		for _, e := range b.Body.Events {
-			if e.Type != types.EventTagCallHistory {
+			if e.Type != ctypes.EventTagCallHistory {
 				continue
 			}
 			bf := bytes.NewBuffer(e.Result)
-			mc := &types.MethodCallEvent{}
+			mc := &ctypes.MethodCallEvent{}
 			if _, err := mc.ReadFrom(bf); err != nil {
 				continue
 			}
@@ -644,6 +679,7 @@ func (v *viewchain) Search(searchMap map[common.Address]map[string]bool, start, 
 			tx := b.Body.Transactions[e.Index]
 
 			m := map[string]string{
+				"Type":      "Event",
 				"Contract":  mc.To.String(),
 				"From":      mc.From.String(),
 				"TxFrom":    tx.From.String(),

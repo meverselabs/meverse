@@ -81,7 +81,7 @@ func prepare(path string, deletePath bool, chainID *big.Int, version uint16, cha
 		return nil, nil, err
 	}
 
-	tb, err := NewTestBlockChain(path, deletePath, chainID, version, genesis, chainAdmin, cfg)
+	tb, err := NewTestBlockChain(path, deletePath, chainID, version, genesis, chainAdmin, cfg, classMap)
 	if err != nil {
 		//removeChainData(path)
 		return nil, nil, err
@@ -206,6 +206,7 @@ type testBlockChain struct {
 	chain    *chain.Chain
 	obKeys   []key.Key
 	frKeyMap map[common.Address]key.Key
+	classMap map[string]uint64
 }
 
 // initContextInfo struct is parameters for meverse chain with non-zero initheight
@@ -223,7 +224,7 @@ type txWithSigner struct {
 }
 
 // NewTestBlockChain makes new test blockchain
-func NewTestBlockChain(path string, deletePath bool, chainID *big.Int, version uint16, genesis *types.Context, admin common.Address, cfg *initContextInfo) (*testBlockChain, error) {
+func NewTestBlockChain(path string, deletePath bool, chainID *big.Int, version uint16, genesis *types.Context, admin common.Address, cfg *initContextInfo, classMap map[string]uint64) (*testBlockChain, error) {
 
 	if deletePath {
 		err := removeChainData(path)
@@ -314,6 +315,7 @@ func NewTestBlockChain(path string, deletePath bool, chainID *big.Int, version u
 		obKeys:   obKeys,
 		frKeyMap: frKeyMap,
 		chain:    cn,
+		classMap: classMap,
 	}
 
 	return tb, nil

@@ -11,6 +11,7 @@ import (
 	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/common/bin"
 	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/core/ctypes"
 	"github.com/meverselabs/meverse/core/prefix"
 	"github.com/meverselabs/meverse/core/types"
 )
@@ -73,7 +74,7 @@ func (bc *BlockCreator) UnsafeAddTx(TxHash hash.Hash256, tx *types.Transaction, 
 	}
 
 	sn := bc.ctx.Snapshot()
-	var ens []*types.Event
+	var ens []*ctypes.Event
 	defer func() {
 		if err != nil {
 			bc.ctx.Revert(sn)
@@ -140,16 +141,16 @@ func ChargeFee(ctx *types.Context, useGas uint64, signer common.Address) (*amoun
 	return gas, nil
 }
 
-func ExecuteContractTxWithEvent(ctx *types.Context, tx *types.Transaction, signer common.Address, TXID string) ([]*types.Event, error) {
+func ExecuteContractTxWithEvent(ctx *types.Context, tx *types.Transaction, signer common.Address, TXID string) ([]*ctypes.Event, error) {
 	intr, result, resultErr := _executeContractTx(ctx, tx, signer, TXID) // genblock
 
 	_, i, err := types.ParseTransactionID(TXID)
 	if err != nil {
 		return nil, err
 	}
-	var ens []*types.Event
+	var ens []*ctypes.Event
 	if len(result) > 0 {
-		e := types.NewEvent(i, types.EventTagTxMsg, bin.TypeWriteAll(result...))
+		e := ctypes.NewEvent(i, ctypes.EventTagTxMsg, bin.TypeWriteAll(result...))
 		ens = append(ens, e)
 	}
 	if intr != nil && len(intr.EventList()) > 0 {
@@ -268,9 +269,9 @@ func _execContractWithOutSeq(ctx *types.Context, tx *types.Transaction, signer c
 			return nil, nil, err
 		} else {
 			_, i, _ := types.ParseTransactionID(TXID)
-			en := &types.Event{
+			en := &ctypes.Event{
 				Index:  i,
-				Type:   types.EventTagTxFee,
+				Type:   ctypes.EventTagTxFee,
 				Result: bin.TypeWriteAll(fee),
 			}
 			intr.AddEvent(en)
@@ -304,10 +305,10 @@ func (bc *BlockCreator) Finalize(gasLv uint16, receipts types.Receipts) (*types.
 			return nil, err
 		} else {
 			if bc.b.Body.Events == nil {
-				bc.b.Body.Events = []*types.Event{}
+				bc.b.Body.Events = []*ctypes.Event{}
 			}
-			bc.b.Body.Events = append(bc.b.Body.Events, &types.Event{
-				Type:   types.EventTagReward,
+			bc.b.Body.Events = append(bc.b.Body.Events, &ctypes.Event{
+				Type:   ctypes.EventTagReward,
 				Result: bs,
 			})
 		}

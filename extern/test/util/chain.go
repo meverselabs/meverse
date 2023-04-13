@@ -14,8 +14,10 @@ import (
 	"github.com/meverselabs/meverse/common/bin"
 	"github.com/meverselabs/meverse/common/hash"
 	"github.com/meverselabs/meverse/common/key"
+
 	"github.com/meverselabs/meverse/contract/token"
 	"github.com/meverselabs/meverse/core/chain"
+	"github.com/meverselabs/meverse/core/ctypes"
 	"github.com/meverselabs/meverse/core/piledb"
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/meverselabs/meverse/service/apiserver/viewchain"
@@ -254,15 +256,15 @@ func (tc *TestContext) MultiSendTx(txs []*types.Transaction, keys []key.Key) ([]
 	}
 	for i := 0; i < len(b.Body.Events); i++ {
 		en := b.Body.Events[i]
-		if en.Type == types.EventTagTxMsg {
+		if en.Type == ctypes.EventTagTxMsg {
 			ins, err := bin.TypeReadAll(en.Result, 1)
 			if err != nil {
 				return nil, err
 			}
 			return ins, nil
-		} else if en.Type == types.EventTagCallHistory {
+		} else if en.Type == ctypes.EventTagCallHistory {
 			bf := bytes.NewBuffer(en.Result)
-			mc := &types.MethodCallEvent{}
+			mc := &ctypes.MethodCallEvent{}
 			mc.ReadFrom(bf)
 		}
 	}
@@ -356,7 +358,7 @@ func (tc *TestContext) MustSendTxs(txcs []*TxCase) [][]interface{} {
 	inss := [][]interface{}{}
 	for i := 0; i < len(b.Body.Events); i++ {
 		en := b.Body.Events[i]
-		if en.Type == types.EventTagTxMsg {
+		if en.Type == ctypes.EventTagTxMsg {
 			ins, err := bin.TypeReadAll(en.Result, 1)
 			if err != nil {
 				panic(err)

@@ -8,13 +8,13 @@ import (
 	"github.com/meverselabs/meverse/core/chain"
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/meverselabs/meverse/ethereum/core/bloombits"
-	"github.com/meverselabs/meverse/ethereum/params"
 )
 
 type BloomBitService struct {
 	cn         *chain.Chain
 	initHeight uint32
 	indexer    *ChainIndexer
+	size       uint64
 
 	bloomRequests     chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
 	closeBloomHandler chan struct{}
@@ -34,6 +34,7 @@ func NewBloomBitService(cn *chain.Chain, path string, size, confirms uint64) (*B
 		cn:                cn,
 		initHeight:        initHeight,
 		indexer:           indexer,
+		size:              size,
 		closeBloomHandler: make(chan struct{}),
 		bloomRequests:     make(chan chan *bloombits.Retrieval),
 	}
@@ -60,7 +61,7 @@ func NewBloomBitService(cn *chain.Chain, path string, size, confirms uint64) (*B
 		}
 	}
 
-	b.startBloomHandlers(params.BloomBitsBlocks)
+	b.startBloomHandlers(size)
 	return b, nil
 }
 
@@ -120,7 +121,7 @@ func (b *BloomBitService) Close() error {
 // BloomStatus retrives the bloom size and sections
 func (b *BloomBitService) BloomStatus() (uint64, uint64) {
 	sections, _, _ := b.indexer.Sections()
-	return params.BloomBitsBlocks, sections
+	return b.size, sections
 }
 
 func (b *BloomBitService) ServiceFilter(ctx context.Context, session *bloombits.MatcherSession) {

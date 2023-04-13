@@ -9,6 +9,7 @@ import (
 	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/common/bin"
 	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/core/ctypes"
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/meverselabs/meverse/service/apiserver"
 	"github.com/pkg/errors"
@@ -63,9 +64,9 @@ func (t *TxSearch) SetupApi() error {
 			}
 			bm := map[common.Address][]byte{}
 			switch v.Type {
-			case types.EventTagCallHistory:
+			case ctypes.EventTagCallHistory:
 				bf := bytes.NewBuffer(v.Result)
-				mc := &types.MethodCallEvent{}
+				mc := &ctypes.MethodCallEvent{}
 				if _, err := mc.ReadFrom(bf); err != nil {
 					m["Error"] = err
 					continue
@@ -73,7 +74,7 @@ func (t *TxSearch) SetupApi() error {
 					m["callHistory"] = mc
 					Events = append(Events, m)
 				}
-			case types.EventTagReward:
+			case ctypes.EventTagReward:
 				err := types.UnmarshalAddressBytesMap(v.Result, bm)
 				if err != nil {
 					m["Error"] = err
@@ -92,7 +93,7 @@ func (t *TxSearch) SetupApi() error {
 				}
 				m["Reward"] = rm
 				Events = append(Events, m)
-			case types.EventTagTxMsg:
+			case ctypes.EventTagTxMsg:
 				ins, err := bin.TypeReadAll(v.Result, 1)
 				if err != nil {
 					m["Error"] = err

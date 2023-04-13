@@ -239,12 +239,13 @@ func (rs *Receipts) DeriveReceiptFields(bHash common.Hash, number uint64, idx ui
 		r.ContractAddress = crypto.CreateAddress(from, tx.Nonce())
 	}
 
-	// The used gas can be calculated based on previous r
-	if idx == 0 {
-		r.GasUsed = r.CumulativeGasUsed
-	} else {
-		r.GasUsed = r.CumulativeGasUsed - (*rs)[idx-1].CumulativeGasUsed
-	}
+	// // The used gas can be calculated based on previous r
+	// if idx == 0 {
+	// 	r.GasUsed = r.CumulativeGasUsed
+	// } else {
+	// 	r.GasUsed = r.CumulativeGasUsed - (*rs)[idx-1].CumulativeGasUsed
+	// }
+
 	// The derived log fields can simply be set from the block and transaction
 	for j := 0; j < len(r.Logs); j++ {
 		r.Logs[j].BlockNumber = number

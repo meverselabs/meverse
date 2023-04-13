@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/common/amount"
+	"github.com/meverselabs/meverse/core/ctypes"
 	"github.com/meverselabs/meverse/core/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -159,7 +160,7 @@ var _ = Describe("Erc20Token", func() {
 			b, err := provider.Block(provider.Height())
 			Expect(err).To(Succeed())
 
-			mc := &types.MethodCallEvent{}
+			mc := &ctypes.MethodCallEvent{}
 			_, err = mc.ReadFrom(bytes.NewReader(b.Body.Events[1].Result))
 			Expect(err).To(Succeed())
 
@@ -251,7 +252,7 @@ var _ = Describe("Erc20Token", func() {
 			b, err := provider.Block(provider.Height())
 			Expect(err).To(Succeed())
 
-			mc := &types.MethodCallEvent{}
+			mc := &ctypes.MethodCallEvent{}
 			_, err = mc.ReadFrom(bytes.NewReader(b.Body.Events[1].Result))
 			Expect(err).To(Succeed())
 
@@ -424,7 +425,7 @@ var _ = Describe("Erc20Token", func() {
 			b, err := provider.Block(provider.Height())
 			Expect(err).To(Succeed())
 
-			mc := &types.MethodCallEvent{}
+			mc := &ctypes.MethodCallEvent{}
 			_, err = mc.ReadFrom(bytes.NewReader(b.Body.Events[1].Result))
 			Expect(err).To(Succeed())
 
@@ -534,7 +535,7 @@ var _ = Describe("Erc20Token", func() {
 			b, err := provider.Block(provider.Height())
 			Expect(err).To(Succeed())
 
-			mc := &types.MethodCallEvent{}
+			mc := &ctypes.MethodCallEvent{}
 			_, err = mc.ReadFrom(bytes.NewReader(b.Body.Events[0].Result))
 			Expect(err).To(Succeed())
 
@@ -582,7 +583,7 @@ var _ = Describe("Erc20Token", func() {
 			b, err := provider.Block(provider.Height())
 			Expect(err).To(Succeed())
 
-			mc := &types.MethodCallEvent{}
+			mc := &ctypes.MethodCallEvent{}
 			_, err = mc.ReadFrom(bytes.NewReader(b.Body.Events[0].Result))
 			Expect(err).To(Succeed())
 
@@ -639,7 +640,7 @@ var _ = Describe("Erc20Token", func() {
 			b, err := provider.Block(provider.Height())
 			Expect(err).To(Succeed())
 
-			mc := &types.MethodCallEvent{}
+			mc := &ctypes.MethodCallEvent{}
 			_, err = mc.ReadFrom(bytes.NewReader(b.Body.Events[0].Result))
 			Expect(err).To(Succeed())
 

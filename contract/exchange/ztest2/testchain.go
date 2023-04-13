@@ -29,6 +29,7 @@ import (
 	"github.com/meverselabs/meverse/contract/token"
 	"github.com/meverselabs/meverse/core/chain"
 	"github.com/meverselabs/meverse/core/chain/admin"
+	"github.com/meverselabs/meverse/core/ctypes"
 	"github.com/meverselabs/meverse/core/piledb"
 	"github.com/meverselabs/meverse/core/types"
 
@@ -513,7 +514,7 @@ func (tb *testBlockChain) call(senderKey key.Key, cont common.Address, method st
 func getResults(b *types.Block) ([]interface{}, error) {
 	for i := 0; i < len(b.Body.Events); i++ {
 		en := b.Body.Events[i]
-		if en.Type == types.EventTagTxMsg {
+		if en.Type == ctypes.EventTagTxMsg {
 			ins, err := bin.TypeReadAll(en.Result, 1)
 			if err != nil {
 				return nil, err

@@ -13,6 +13,8 @@ import (
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/common/bin"
+	"github.com/meverselabs/meverse/core/ctypes"
+
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/meverselabs/meverse/extern/txparser"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -95,7 +97,7 @@ func (t *TxSearch) ReadBlock(b *types.Block) (err error) {
 	if b.Header.Height%20 == 0 {
 		days := makeBlockDay(b)
 		for _, en := range b.Body.Events {
-			if en.Type == types.EventTagReward {
+			if en.Type == ctypes.EventTagReward {
 				t.saveRewardEvent(en, batch, days)
 			}
 		}
@@ -117,7 +119,7 @@ func makeBlockDay(b *types.Block) uint32 {
 	return days
 }
 
-func (t *TxSearch) saveRewardEvent(en *types.Event, batch *leveldb.Batch, days uint32) {
+func (t *TxSearch) saveRewardEvent(en *ctypes.Event, batch *leveldb.Batch, days uint32) {
 	mp := map[common.Address][]byte{}
 	if err := types.UnmarshalAddressBytesMap(en.Result, mp); err != nil {
 		return

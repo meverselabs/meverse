@@ -2,6 +2,7 @@ package metamaskrelay
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -28,6 +29,7 @@ import (
 	"github.com/meverselabs/meverse/common/hash"
 	"github.com/meverselabs/meverse/contract/token"
 	"github.com/meverselabs/meverse/core/chain"
+	"github.com/meverselabs/meverse/core/ctypes"
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/meverselabs/meverse/ethereum/core"
 	mcore "github.com/meverselabs/meverse/ethereum/core"
@@ -512,53 +514,90 @@ func getValueFromParam(valueParam interface{}) (*big.Int, error) {
 	return value, nil
 }
 
+// cumulativeGasUsed return block's cumulativeGasUsed  up to idx (idx not included)
+func (m *metamaskRelay) blockTotalGas(b *types.Block) (*big.Int, error) {
+	return m.cumulativeGasUsed(b, uint16(len(b.Body.Transactions)))
+}
+
+// cumulativeGasUsed return block's cumulativeGasUsed  up to idx (idx not included)
+func (m *metamaskRelay) cumulativeGasUsed(b *types.Block, idx uint16) (*big.Int, error) {
+
+	size := uint16(len(b.Body.Transactions))
+	if idx > size {
+		return nil, errors.New("tranaction index is out of range")
+	}
+	gasPrice := m.basicFee()
+	totalGas := new(big.Int)
+	var receipts types.Receipts
+	for i := uint16(0); i < idx; i++ {
+		tx := b.Body.Transactions[i]
+		if tx.VmType != types.Evm {
+			fee, err := findTxFeeFromEvent(b.Body.Events, i)
+			if err != nil {
+				return nil, err
+			}
+			totalGas = new(big.Int).Add(totalGas, fee.Int.Div(fee.Int, gasPrice.Int))
+		} else {
+			if receipts == nil {
+				var err error
+				receipts, err = m.cn.Provider().Receipts(b.Header.Height)
+				if err != nil {
+					return nil, err
+				}
+				if int(idx) > len(receipts) {
+					return nil, errors.New("tranaction index is out of range")
+				}
+			}
+
+			receipt := receipts[i]
+			totalGas = new(big.Int).Add(totalGas, new(big.Int).SetUint64(receipt.CumulativeGasUsed))
+		}
+	}
+	return totalGas, nil
+}
+
 func getReceipt(tx *types.Transaction, b *types.Block, TxID itxsearch.TxID, m *metamaskRelay, bHash ecommon.Hash) (map[string]interface{}, error) {
 
 	gasPrice := m.basicFee()
 
-	result := map[string]interface{}{
-		"blockHash":        bHash.String(),
-		"blockNumber":      fmt.Sprintf("0x%x", TxID.Height),
-		"transactionHash":  tx.HashSig(),
-		"transactionIndex": fmt.Sprintf("0x%x", TxID.Index),
-		"from":             tx.From.String(),
-		"to":               tx.To.String(),
-		// "cumulativeGasUsed": "0x1f4b698",
-		// "gasUsed":           "0x1f4b698",
-		"effectiveGasPrice": fmt.Sprintf("0x%x", gasPrice),
-		"contractAddress":   nil, // or null, if none was created
-		"type":              "0x2",
-		"status":            "0x1", //TODO 성공 1 실패 0
-		"data":              map[string]string{},
+	cumulativeGasUsed, err := m.cumulativeGasUsed(b, TxID.Index)
+	if err != nil {
+		return nil, err
 	}
 
+	var result map[string]interface{}
+	var receipt *etypes.Receipt
+
 	if tx.VmType != types.Evm {
-		evs, err := bloomservice.FindTransactionsEvents(b.Body.Transactions, b.Body.Events, int(TxID.Index))
-		if err != nil {
-			return nil, err
-		}
-		blm, err := bloomservice.CreateEventBloom(m.cn.NewContext(), evs)
-		if err != nil {
-			return nil, err
-		}
 
-		logs, err := bloomservice.EventsToLogs(m.cn, &b.Header, tx, evs, int(TxID.Index))
+		fee, err := findTxFeeFromEvent(b.Body.Events, TxID.Index)
 		if err != nil {
 			return nil, err
 		}
-		result["logs"] = logs
-		result["logsBloom"] = hex.EncodeToString(blm[:])
-
-		fee, err := findTxFeeFromEvent(b.Body.Events, int(TxID.Index))
-		if err != nil {
-			return nil, err
+		// admin tranaction fee = nil
+		if fee == nil {
+			fee = amount.NewAmount(0, 0)
 		}
 
 		// gasUsed = fee / EffectiveGasPrice
 		gasUsed := fee.Int.Div(fee.Int, gasPrice.Int)
-		result["cumulativeGasUsed"] = fmt.Sprintf("0x%x", gasUsed)
-		result["gasUsed"] = fmt.Sprintf("0x%x", gasUsed)
+		cumulativeGasUsed = new(big.Int).Add(cumulativeGasUsed, new(big.Int).SetUint64(gasUsed.Uint64()))
 
+		result = map[string]interface{}{
+			"blockHash":         bHash.String(),
+			"blockNumber":       fmt.Sprintf("0x%x", TxID.Height),
+			"transactionHash":   tx.HashSig(),
+			"transactionIndex":  fmt.Sprintf("0x%x", TxID.Index),
+			"from":              tx.From.String(),
+			"to":                tx.To.String(),
+			"gasUsed":           fmt.Sprintf("0x%x", gasUsed),
+			"cumulativeGasUsed": fmt.Sprintf("0x%x", cumulativeGasUsed),
+			"effectiveGasPrice": fmt.Sprintf("0x%x", gasPrice),
+			"contractAddress":   nil, // or null, if none was created
+			"type":              "0x2",
+			"status":            "0x1", //TODO 성공 1 실패 0
+			"data":              map[string]string{},
+		}
 	} else {
 		etx := new(etypes.Transaction)
 		if err := etx.UnmarshalBinary(tx.Args); err != nil {
@@ -572,18 +611,11 @@ func getReceipt(tx *types.Transaction, b *types.Block, TxID itxsearch.TxID, m *m
 		if len(receipts) <= int(TxID.Index) {
 			return nil, nil
 		}
-		receipt := receipts[TxID.Index]
+		receipt = receipts[TxID.Index]
 		signer := mtypes.MakeSigner(m.cn.Provider().ChainID(), TxID.Height)
 		if err := receipts.DeriveReceiptFields(bHash, uint64(TxID.Height), TxID.Index, etx, signer); err != nil {
 			return nil, err
 		}
-
-		logs := []*etypes.Log{}
-		if len(receipt.Logs) >= 0 {
-			logs = append(logs, receipt.Logs...)
-		}
-		bloom := etypes.CreateBloom(etypes.Receipts{receipt})
-		//ContractAddresss : 하단 참조
 
 		var to interface{}
 		if etx.To() != nil {
@@ -592,34 +624,51 @@ func getReceipt(tx *types.Transaction, b *types.Block, TxID itxsearch.TxID, m *m
 			to = nil
 		}
 
-		result["transactionHash"] = eHash.String()
-		result["to"] = to
-		result["cumulativeGasUsed"] = fmt.Sprintf("0x%x", receipt.CumulativeGasUsed)
-		result["gasUsed"] = fmt.Sprintf("0x%x", receipt.GasUsed)
-		result["logs"] = logs
-		result["logsBloom"] = hex.EncodeToString(bloom[:])
-		result["type"] = fmt.Sprintf("0x%x", receipt.Type)
-		result["status"] = fmt.Sprintf("0x%x", receipt.Status)
+		cumulativeGasUsed = new(big.Int).Add(cumulativeGasUsed, new(big.Int).SetUint64(receipt.CumulativeGasUsed))
+
+		result = map[string]interface{}{
+			"blockHash":         bHash.String(),
+			"blockNumber":       fmt.Sprintf("0x%x", TxID.Height),
+			"transactionHash":   eHash.String(),
+			"transactionIndex":  fmt.Sprintf("0x%x", TxID.Index),
+			"from":              tx.From.String(),
+			"to":                to,
+			"cumulativeGasUsed": fmt.Sprintf("0x%x", cumulativeGasUsed),
+			"gasUsed":           fmt.Sprintf("0x%x", receipt.CumulativeGasUsed),
+			"effectiveGasPrice": fmt.Sprintf("0x%x", gasPrice),
+			"type":              fmt.Sprintf("0x%x", receipt.Type),
+			"status":            fmt.Sprintf("0x%x", receipt.Status),
+			"data":              map[string]string{},
+		}
 
 		if receipt.ContractAddress != (common.Address{}) {
 			result["contractAddress"] = receipt.ContractAddress.String()
 		}
 		//log.Println(m)
 	}
+
+	bloom, logs, err := bloomservice.TxLogsBloom(m.cn, b, TxID.Index, receipt)
+	if err != nil {
+		return nil, err
+	}
+
+	result["logs"] = logs
+	result["logsBloom"] = hex.EncodeToString(bloom[:])
+
 	return result, nil
 }
 
 // findTxFeeFromEvent find tx's fee(gasUsed) from given event list
-func findTxFeeFromEvent(evs []*types.Event, idx int) (*amount.Amount, error) {
+func findTxFeeFromEvent(evs []*ctypes.Event, idx uint16) (*amount.Amount, error) {
 
 	if len(evs) == 0 {
 		return nil, nil
 	}
 	for _, ev := range evs {
-		if ev.Type != types.EventTagTxFee {
+		if ev.Type != ctypes.EventTagTxFee {
 			continue
 		}
-		if ev.Index == uint16(idx) {
+		if ev.Index == idx {
 			is, err := bin.TypeReadAll(ev.Result, 1)
 			if err != nil {
 				return nil, err
@@ -627,7 +676,9 @@ func findTxFeeFromEvent(evs []*types.Event, idx int) (*amount.Amount, error) {
 			return is[0].(*amount.Amount), nil
 		}
 	}
-	return nil, nil
+
+	// admin tranaction (ex. Contract.Deploy) fee = nil
+	return amount.NewAmount(0, 0), nil
 }
 
 func sendErrorMsg(method, code, msg string) error {
@@ -960,8 +1011,13 @@ func (m *metamaskRelay) returnMemaBlock(hei uint64, fullTx bool) (interface{}, e
 		return nil, err
 	}
 
+	totalGasUsed, err := m.blockTotalGas(b)
+	if err != nil {
+		return nil, err
+	}
+
 	return map[string]interface{}{
-		//"gasUsed": fmt.Sprintf("0x%x", totalGasUsed),
+		"gasUsed": fmt.Sprintf("0x%x", totalGasUsed),
 		//"gasLimit":         fmt.Sprintf("0x%x", params.BlockGasLimit),
 		//"baseFeePerGas":    fmt.Sprintf("0x%x", gasPrice),
 		"hash":             bHash.String(),
@@ -1248,6 +1304,15 @@ func (m *metamaskRelay) getBaseFeePerGas() string {
 	return "0x23400641"
 }
 
+// func execWithAbi(caller *viewchain.ViewCaller, from string, toAddr ecommon.Address, abiM abi.Method, data string) (string, uint64, error) {
+// 	output, gas, err := newFunction(caller, from, toAddr, abiM, data)
+// 	if err != nil {
+// 		return "", 0, err
+// 	}
+
+// 	return getOutput(abiM, output, gas)
+// }
+
 func execWithAbi(caller *viewchain.ViewCaller, from string, toAddr ecommon.Address, abiM abi.Method, data string) ([]interface{}, uint64, error) {
 	bs, err := hex.DecodeString(data)
 	if err != nil {
@@ -1271,4 +1336,36 @@ func getOutput(abiM abi.Method, output []interface{}) (string, error) {
 		return "", err
 	}
 	return "0x" + hex.EncodeToString(bs), nil
+}
+
+func makeStringResponse(str string) string {
+	var t []byte
+	{
+		buf := new(bytes.Buffer)
+		var num uint8 = 32
+		err := binary.Write(buf, binary.LittleEndian, num)
+		if err != nil {
+			fmt.Println("binary.Write failed:", err)
+		}
+		t = ecommon.LeftPadBytes(buf.Bytes(), 32)
+	}
+	var slen []byte
+	{
+		buf := new(bytes.Buffer)
+		var strlen uint8 = uint8(len(str))
+		err := binary.Write(buf, binary.LittleEndian, strlen)
+		if err != nil {
+			fmt.Println("binary.Write failed:", err)
+		}
+		slen = ecommon.LeftPadBytes(buf.Bytes(), 32)
+	}
+
+	s := ecommon.RightPadBytes([]byte(str), 32)
+
+	var data []byte
+	data = append(data, t...)
+	data = append(data, slen...)
+	data = append(data, s...)
+
+	return fmt.Sprintf("0x%x", data)
 }

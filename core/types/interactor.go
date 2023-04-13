@@ -14,6 +14,7 @@ import (
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/core/ctypes"
 	"github.com/meverselabs/meverse/ethereum/core/vm"
 	"github.com/meverselabs/meverse/extern/txparser"
 	"github.com/meverselabs/meverse/service/pack"
@@ -27,9 +28,9 @@ var errType = reflect.TypeOf((*error)(nil)).Elem()
 type IInteractor interface {
 	Distroy()
 	Exec(Cc *ContractContext, Addr common.Address, MethodName string, Args []interface{}) ([]interface{}, error)
-	EventList() []*Event
+	EventList() []*ctypes.Event
 	GasHistory() []uint64
-	AddEvent(*Event)
+	AddEvent(*ctypes.Event)
 }
 
 type ExecFunc = func(Cc *ContractContext, Addr common.Address, MethodName string, Args []interface{}) ([]interface{}, error)
@@ -40,7 +41,7 @@ type interactor struct {
 	conMap     map[common.Address]Contract
 	exit       bool
 	index      uint16
-	eventList  []*Event
+	eventList  []*ctypes.Event
 	gasHistory []uint64
 	saveEvent  bool
 }
@@ -55,7 +56,7 @@ func NewInteractor(ctx *Context, cont Contract, cc *ContractContext, TXID string
 		cont:      cont,
 		conMap:    map[common.Address]Contract{},
 		index:     i,
-		eventList: []*Event{},
+		eventList: []*ctypes.Event{},
 		saveEvent: saveEvent,
 	}
 }
@@ -66,7 +67,7 @@ func NewInteractor2(ctx *Context, cc *ContractContext, TXID string, saveEvent bo
 		ctx:       ctx,
 		conMap:    map[common.Address]Contract{},
 		index:     i,
-		eventList: []*Event{},
+		eventList: []*ctypes.Event{},
 		saveEvent: saveEvent,
 	}
 }
@@ -364,7 +365,7 @@ func CheckABI(b *Block, ctx *Context) {
 					cont:      cont,
 					conMap:    map[common.Address]Contract{},
 					index:     0,
-					eventList: []*Event{},
+					eventList: []*ctypes.Event{},
 					saveEvent: false,
 				}
 				cc.Exec = intr.Exec
@@ -708,11 +709,11 @@ func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Va
 	return in, nil
 }
 
-func (i *interactor) EventList() []*Event {
+func (i *interactor) EventList() []*ctypes.Event {
 	return i.eventList
 }
 
-func (i *interactor) AddEvent(en *Event) {
+func (i *interactor) AddEvent(en *ctypes.Event) {
 	i.eventList = append(i.eventList, en)
 }
 
@@ -747,8 +748,8 @@ func (i *interactor) GasHistory() []uint64 {
 	return i.gasHistory[:]
 }
 
-func (i *interactor) addCallEvent(Cc *ContractContext, Addr common.Address, MethodName string, Args []interface{}) *Event {
-	mc := MethodCallEvent{
+func (i *interactor) addCallEvent(Cc *ContractContext, Addr common.Address, MethodName string, Args []interface{}) *ctypes.Event {
+	mc := ctypes.MethodCallEvent{
 		From: Cc.From(),
 		To:   Addr,
 	}
@@ -766,19 +767,19 @@ func (i *interactor) addCallEvent(Cc *ContractContext, Addr common.Address, Meth
 	if err != nil {
 		panic(err)
 	}
-	rv := &Event{
+	rv := &ctypes.Event{
 		Index:  i.index,
-		Type:   EventTagCallHistory,
+		Type:   ctypes.EventTagCallHistory,
 		Result: bf.Bytes(),
 	}
 	i.eventList = append(i.eventList, rv)
 	return rv
 }
 
-func insertResultEvent(en *Event, Results []interface{}, Err error) error {
+func insertResultEvent(en *ctypes.Event, Results []interface{}, Err error) error {
 	bf := bytes.NewBuffer(en.Result)
 
-	mc := &MethodCallEvent{}
+	mc := &ctypes.MethodCallEvent{}
 	_, err := mc.ReadFrom(bf)
 	if err != nil {
 		return err

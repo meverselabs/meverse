@@ -200,9 +200,19 @@ func (s *APIServer) handleJRPCs(r *ReqData) {
 	(*r.resCh) <- res
 }
 
+func (s *APIServer) HandleJRPC(req *JRPCRequest) interface{} {
+	jReq := &jRPCRequest{
+		JSONRPC: req.JSONRPC,
+		Method:  req.Method,
+		ID:      req.ID,
+		Params:  req.Params,
+	}
+	return s._handleJRPC(jReq)
+
+}
 func (s *APIServer) _handleJRPC(req *jRPCRequest) interface{} {
 	method := req.Method
-	//log.Println("method", method)
+	//log.Println("req", req)
 	if !strings.Contains(method, ".") {
 		method = "eth." + method
 	}

@@ -5,11 +5,12 @@ import (
 
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/common/bin"
+	"github.com/meverselabs/meverse/core/ctypes"
 )
 
 type Body struct {
 	Transactions          []*Transaction
-	Events                []*Event
+	Events                []*ctypes.Event
 	TransactionSignatures []common.Signature
 	BlockSignatures       []common.Signature
 }
@@ -90,9 +91,9 @@ func (s *Body) ReadFrom(r io.Reader) (int64, error) {
 	if Len, sum, err := sr.GetUint16(r); err != nil {
 		return sum, err
 	} else {
-		s.Events = make([]*Event, 0, Len)
+		s.Events = make([]*ctypes.Event, 0, Len)
 		for i := uint16(0); i < Len; i++ {
-			var v Event
+			var v ctypes.Event
 			if sum, err := sr.ReaderFrom(r, &v); err != nil {
 				return sum, err
 			}

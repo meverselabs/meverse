@@ -24,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
+	"github.com/meverselabs/meverse/core/ctypes"
 	"github.com/meverselabs/meverse/ethereum/params"
 
 	"github.com/holiman/uint256"
@@ -123,6 +124,9 @@ type EVM struct {
 	// available gas is calculated in gasCall* according to the 63/64 rule and later
 	// applied in opCall*.
 	callGasTemp uint64
+
+	// evm contract 에서 non-evm contract call할경우 발생하는 events
+	events []*ctypes.Event
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
@@ -220,7 +224,9 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		ret, gas, err = RunPrecompiledContract(p, input, gas)
 	} else if isExtContract {
 		//log.Println("addr in evm.Call", addrCopy)
-		ret, gas, err = evm.StateDB.Exec(caller.Address(), addrCopy, input, gas)
+		var evs []*ctypes.Event
+		ret, gas, evs, err = evm.StateDB.Exec(caller.Address(), addrCopy, input, gas)
+		evm.events = append(evm.events, evs...)
 		//log.Println("ret in evm.Call", ret) 9079256848778922038
 	} else {
 		// Initialise a new contract and set the code that is to be used by the EVM.
@@ -382,7 +388,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 		ret, gas, err = RunPrecompiledContract(p, input, gas)
 	} else if evm.StateDB.IsExtContract(addrCopy) {
 		//log.Println("addr in evm.StaticCall", addrCopy)
-		ret, gas, err = evm.StateDB.Exec(caller.Address(), addrCopy, input, gas)
+		ret, gas, _, err = evm.StateDB.Exec(caller.Address(), addrCopy, input, gas)
 		//log.Println("ret in evm.StaticCall", ret)
 	} else {
 		// At this point, we use a copy of address. If we don't, the go compiler will
@@ -531,3 +537,6 @@ func (evm *EVM) Create2(caller ContractRef, code []byte, gas uint64, endowment *
 
 // ChainConfig returns the environment's chain configuration
 func (evm *EVM) ChainConfig() *params.ChainConfig { return evm.chainConfig }
+
+// ChainConfig returns the environment's chain configuration
+func (evm *EVM) Events() []*ctypes.Event { return evm.events }

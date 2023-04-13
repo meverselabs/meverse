@@ -13,6 +13,7 @@ import (
 
 	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/common/bin"
+	"github.com/meverselabs/meverse/core/ctypes"
 	"github.com/meverselabs/meverse/extern/txparser"
 )
 
@@ -395,27 +396,26 @@ func (s *StateDB) IsExtContract(addr common.Address) bool {
 }
 
 // Exec executes the method of compiled contract in evm
-func (s *StateDB) Exec(user common.Address, contAddr common.Address, input []byte, gas uint64) ([]byte, uint64, error) {
-	//func Exec(ctx *mtypes.Context, user common.Address, contAddr common.Address, methodName string, args []interface{}) ([]interface{}, error) {
+func (s *StateDB) Exec(user common.Address, contAddr common.Address, input []byte, gas uint64) ([]byte, uint64, []*ctypes.Event, error) {
 	intr, cc, err := s.getCC(contAddr, user)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
 	method := hex.EncodeToString(input[:4])
 	m := txparser.Abi(method)
 	if m.Name == "" {
-		return nil, 0, errors.New("not exist abi")
+		return nil, 0, nil, errors.New("not exist abi")
 	}
 
 	methodName := strings.ToUpper(string(m.Name[0])) + m.Name[1:]
 	args, err := m.Inputs.Unpack(input[4:])
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
 
 	is, err := cc.Exec(cc, contAddr, methodName, args)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
 
 	result := []interface{}{}
@@ -434,17 +434,17 @@ func (s *StateDB) Exec(user common.Address, contAddr common.Address, input []byt
 
 	bs, err := txparser.Outputs(m.Sig, result)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
 
 	gh := intr.GasHistory()
 	usedGas := gh[0] - 21000
 
 	if usedGas > gas {
-		return nil, 0, errors.New("out of gas")
+		return nil, 0, nil, errors.New("out of gas")
 	}
 
-	return bs, gas - usedGas, nil
+	return bs, gas - usedGas, intr.EventList(), nil
 }
 
 // getCC returns the ContractContext under contract and user context

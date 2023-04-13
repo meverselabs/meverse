@@ -8,8 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	etypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/meverselabs/meverse/core/chain"
+	"github.com/meverselabs/meverse/core/ctypes"
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/meverselabs/meverse/service/pack"
 )
@@ -27,29 +27,30 @@ func AppendBloom(bin *etypes.Bloom, receipts etypes.Receipts) {
 }
 
 // CreateEventBloom creates a bloom filter from the given go-type contract events
-func CreateEventBloom(ctx *types.Context, events []*types.Event) (etypes.Bloom, error) {
+func CreateEventBloom(provider types.Provider, events []*ctypes.Event) (etypes.Bloom, error) {
 	var blm etypes.Bloom
 	topics := [][]byte{}
 
 	for _, event := range events {
 
 		switch event.Type {
-		case types.EventTagCallHistory:
+		case ctypes.EventTagCallHistory:
 
-			mc := &types.MethodCallEvent{}
+			mc := &ctypes.MethodCallEvent{}
 			_, err := mc.ReadFrom(bytes.NewReader(event.Result))
 			if err != nil {
 				return etypes.Bloom{}, err
 			}
-			//fmt.Println(mc)
 
 			if mc.To == (common.Address{}) {
 				return etypes.Bloom{}, errors.New("event To is null")
 			}
 
+			// address
 			blm.Add(mc.To.Bytes())
 
-			evTopics, err := makeEventTopics(ctx, mc)
+			// topics
+			evTopics, err := makeEventTopics(provider, mc)
 			if err != nil {
 				return etypes.Bloom{}, err
 			}
@@ -67,10 +68,10 @@ func CreateEventBloom(ctx *types.Context, events []*types.Event) (etypes.Bloom, 
 }
 
 // makeEventTopics makes topics from event
-func makeEventTopics(ctx *types.Context, mc *types.MethodCallEvent) ([][]byte, error) {
+func makeEventTopics(provider types.Provider, mc *ctypes.MethodCallEvent) ([][]byte, error) {
 	topics := [][]byte{}
 
-	event, err := functionToEvent(ctx, mc)
+	event, err := functionToEvent(provider, mc)
 	if err != nil {
 		return nil, err
 	}
@@ -86,15 +87,15 @@ func makeEventTopics(ctx *types.Context, mc *types.MethodCallEvent) ([][]byte, e
 // functionToEvent convert function name and arguments to event
 // ex1. router.AddLiqudity : func(*router.RounterFront, *types.ContractContext, common.Address, common.Address, *amount.Amount, *amount.Amount, *amount.Amount, *amount.Amount) -> AddLiquidity(address,address,uint256,uint256,uint256,uint256)
 // ex2. Approve(address,uint256) -> Approval(address,address,uint256)
-func functionToEvent(ctx *types.Context, mc *types.MethodCallEvent) (string, error) {
-	contract, err := ctx.Contract(mc.To)
+func functionToEvent(provider types.Provider, mc *ctypes.MethodCallEvent) (string, error) {
+
+	contract, err := provider.Contract(mc.To)
 	if err != nil {
 		return "", err
 	}
 
 	contractName := reflect.TypeOf(contract).String()
 	contractName = contractName[1:]
-	// log.Println("reflect.TypeOf(contract).String()", reflect.TypeOf(contract).String())
 
 	if c, ok := convertMap[contractName]; ok {
 		if f, ok := c[mc.Method]; ok {
@@ -132,65 +133,15 @@ func hashTopics(topics [][]byte) []common.Hash {
 }
 
 // findTransactionsEvents find tx's EventTagCallHistory-type events from given event list
-func FindTransactionsEvents(txs []*types.Transaction, evs []*types.Event, idx int) ([]*types.Event, error) {
+func FindCallHistoryEvents(evs []*ctypes.Event, idx uint16) ([]*ctypes.Event, error) {
 
 	if len(evs) == 0 {
 		return nil, nil
 	}
 
-	eIdx := 0
-	start := 0
-	startIdx := 0
-	endIdx := len(evs)
-
-	found := false
-
-	for _, tx := range txs {
-		// tx 가 Evm Type 이거나 tx.To가 null인 경우 (즉 admin tx인 경우)
-		if tx.VmType == types.Evm || (tx.VmType != types.Evm && tx.To == (common.Address{})) {
-			if idx == eIdx {
-				return nil, nil
-			}
-			eIdx++
-			continue
-		}
-
-		// nonce만 다르고 똑같은 transaction이 여러번 올 수 있는 경우 고려
-		// types.EventTagReward 는 tx없이 실행됨 blockCreator.Finalize
-		for i := start; i < len(evs); i++ {
-			if evs[i].Type != types.EventTagCallHistory {
-				continue
-			}
-			mc := &types.MethodCallEvent{}
-			_, err := mc.ReadFrom(bytes.NewReader(evs[i].Result))
-			if err != nil {
-				return nil, err
-			}
-			// tx에 해당하는 events중 첫번째 types.EventTagCallHistory
-			if tx.From == mc.From && tx.To == mc.To && tx.Method == mc.Method {
-				if idx == eIdx {
-					found = true
-					startIdx = i
-					start = i + 1
-					eIdx++
-					break
-				} else {
-					// evs에 끝에 도달하지 않으면, 마지막 event는 제거
-					eIdx++
-					if found {
-						endIdx = i
-						goto ListEvent
-					}
-				}
-			}
-		}
-	}
-
-ListEvent:
-	//중간에 다른 Event가 끼워 들어갈 수 있는 부분 방지
-	var ret []*types.Event
-	for i := startIdx; i < endIdx; i++ {
-		if evs[i].Type != types.EventTagCallHistory {
+	var ret []*ctypes.Event
+	for i := 0; i < len(evs); i++ {
+		if evs[i].Index != idx || evs[i].Type != ctypes.EventTagCallHistory {
 			continue
 		}
 		ret = append(ret, evs[i])
@@ -203,7 +154,7 @@ ListEvent:
 func BlockLogsBloom(cn *chain.Chain, b *types.Block) (etypes.Bloom, error) {
 
 	// go-type Contract event
-	bloom, err := CreateEventBloom(cn.NewContext(), b.Body.Events)
+	bloom, err := CreateEventBloom(cn.Provider(), b.Body.Events)
 	if err != nil {
 		return etypes.Bloom{}, err
 	}
@@ -222,4 +173,42 @@ func BlockLogsBloom(cn *chain.Chain, b *types.Block) (etypes.Bloom, error) {
 	// receipt.log.Address, Topics는 이미 설정되어 DeriveReceiptFields는 필요없음
 	AppendBloom(&bloom, append(etypes.Receipts{}, receipts...))
 	return bloom, nil
+}
+
+// TxLogsBloom retrurn transaction's logsBloom  ( idx-th tx in block b)
+func TxLogsBloom(cn *chain.Chain, b *types.Block, idx uint16, receipt *etypes.Receipt) (etypes.Bloom, []*etypes.Log, error) {
+
+	//func BloLogsBloom(cn *chain.Chain, b *types.Block, idx uint16, receipt *etypes.Receipt) (etypes.Bloom, []*etypes.Log, error) {
+
+	var (
+		bloom etypes.Bloom
+		logs  []*etypes.Log
+	)
+
+	// combine logs and logsBloom
+	evs, err := FindCallHistoryEvents(b.Body.Events, idx)
+	if err != nil {
+		return etypes.Bloom{}, nil, err
+	}
+	if evs != nil {
+		bloom, err = CreateEventBloom(cn.Provider(), evs)
+		if err != nil {
+			return etypes.Bloom{}, nil, err
+		}
+		logs, err = EventsToFullLogs(cn, &b.Header, b.Body.Transactions[idx], evs, idx)
+		if err != nil {
+			return etypes.Bloom{}, nil, err
+		}
+	}
+
+	if receipt != nil {
+		if len(receipt.Logs) >= 0 {
+			logs = append(logs, receipt.Logs...)
+		}
+		rBloom := etypes.CreateBloom(etypes.Receipts{receipt})
+		for i := 0; i < len(rBloom); i++ {
+			bloom[i] |= rBloom[i]
+		}
+	}
+	return bloom, logs, nil
 }

@@ -20,4 +20,5 @@ type Provider interface {
 	Block(uint32) (*Block, error)
 	Receipts(uint32) (Receipts, error)
 	AddrSeq(common.Address) uint64
+	Contract(addr common.Address) (Contract, error)
 }
