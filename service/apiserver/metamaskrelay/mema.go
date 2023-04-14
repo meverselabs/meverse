@@ -662,7 +662,7 @@ func getReceipt(tx *types.Transaction, b *types.Block, TxID itxsearch.TxID, m *m
 func findTxFeeFromEvent(evs []*ctypes.Event, idx uint16) (*amount.Amount, error) {
 
 	if len(evs) == 0 {
-		return nil, nil
+		return amount.NewAmount(0, 0), nil
 	}
 	for _, ev := range evs {
 		if ev.Type != ctypes.EventTagTxFee {
