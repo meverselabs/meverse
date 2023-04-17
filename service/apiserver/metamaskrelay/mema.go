@@ -586,7 +586,7 @@ func getReceipt(tx *types.Transaction, b *types.Block, TxID itxsearch.TxID, m *m
 		result = map[string]interface{}{
 			"blockHash":         bHash.String(),
 			"blockNumber":       fmt.Sprintf("0x%x", TxID.Height),
-			"transactionHash":   tx.HashSig(),
+			"transactionHash":   tx.Hash(TxID.Height),
 			"transactionIndex":  fmt.Sprintf("0x%x", TxID.Index),
 			"from":              tx.From.String(),
 			"to":                tx.To.String(),
