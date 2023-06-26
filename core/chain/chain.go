@@ -38,6 +38,8 @@ type Chain struct {
 	waitLock       sync.Mutex
 	isClose        bool
 	tag            string
+	dumpStorage    string
+	CallRootDump   func()
 }
 
 // NewChain returns a Chain
@@ -285,6 +287,10 @@ func (cn *Chain) ValidateSignature(bh *types.Header, sigs []common.Signature) er
 		return errors.WithStack(ErrInvalidTopAddress)
 	}
 
+	if len(sigs) != len(cn.observerKeyMap)/2+2 {
+		return errors.WithStack(ErrInvalidSignatureCount)
+	}
+
 	GeneratorSignature := sigs[0]
 	h, _, err := bin.WriterToHash(bh)
 	if err != nil {
@@ -298,9 +304,6 @@ func (cn *Chain) ValidateSignature(bh *types.Header, sigs []common.Signature) er
 		return errors.WithStack(ErrInvalidTopSignature)
 	}
 
-	if len(sigs) != len(cn.observerKeyMap)/2+2 {
-		return errors.WithStack(ErrInvalidSignatureCount)
-	}
 	KeyMap := map[common.PublicKey]bool{}
 	for pubkey := range cn.observerKeyMap {
 		KeyMap[pubkey] = true
@@ -321,8 +324,13 @@ func (cn *Chain) ValidateSignature(bh *types.Header, sigs []common.Signature) er
 }
 
 func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context, receipts types.Receipts) error {
+	cn.dumpStorage = ctx.WriteDump()
 	if b.Header.ContextHash != ctx.Hash() {
-		log.Println("CONNECT", ctx.Hash(), b.Header.ContextHash, ctx.Dump())
+		log.Println("CONNECT", ctx.Hash(), b.Header.ContextHash, ctx.WriteDump())
+		if cn.CallRootDump != nil {
+			cn.CallRootDump()
+		}
+
 		panic("")
 		// return errors.WithStack(ErrInvalidContextHash)
 	}
@@ -358,7 +366,12 @@ func (cn *Chain) connectBlockWithContext(b *types.Block, ctx *types.Context, rec
 	return nil
 }
 
+var execLock sync.Mutex
+
 func (cn *Chain) executeBlockOnContext(b *types.Block, ctx *types.Context, sm map[hash.Hash256]common.Address) (types.Receipts, error) {
+	execLock.Lock()
+	defer execLock.Unlock()
+
 	TxSigners, TxHashes, err := cn.validateTransactionSignatures(b, sm)
 	if err != nil {
 		return nil, err
@@ -470,6 +483,9 @@ func (cn *Chain) validateTransactionSignatures(b *types.Block, SigMap map[hash.H
 	TxHashes := make([]hash.Hash256, len(b.Body.Transactions)+1)
 	TxHashes[0] = b.Header.PrevHash
 	TxSigners := make([]common.Address, len(b.Body.Transactions))
+	if len(b.Body.Transactions) != len(b.Body.TransactionSignatures) {
+		return nil, nil, errors.New("invalid transactions and signatures count")
+	}
 	if len(b.Body.Transactions) > 0 {
 		var wg sync.WaitGroup
 		cpuCnt := runtime.NumCPU()
@@ -627,4 +643,8 @@ func (cn *Chain) ApplyEvmTransaction(ctx *types.Context, tx *types.Transaction, 
 	}
 
 	return ens, receipt, nil
+}
+
+func (cn *Chain) GetCurrentDump() string {
+	return cn.dumpStorage
 }
