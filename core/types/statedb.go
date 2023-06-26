@@ -302,8 +302,8 @@ func (s *StateDB) Suicide(addr common.Address) bool {
 // CreateAccount is called during the EVM CREATE operation. The situation might arise that
 // a contract does the following:
 //
-//   1. sends funds to sha(account ++ (nonce + 1))
-//   2. tx_create(sha(account ++ nonce)) (note that this gets the address of 1)
+//  1. sends funds to sha(account ++ (nonce + 1))
+//  2. tx_create(sha(account ++ nonce)) (note that this gets the address of 1)
 //
 // Carrying over the balance ensures that Ether doesn't disappear.
 func (s *StateDB) CreateAccount(addr common.Address) {
@@ -390,7 +390,7 @@ func (s *StateDB) SlotInAccessList(addr common.Address, slot common.Hash) (addre
 	return true, true
 }
 
-//  IsContract checks if the given address is contract one.
+// IsContract checks if the given address is contract one.
 func (s *StateDB) IsExtContract(addr common.Address) bool {
 	return s.ctx.IsContract(addr)
 }
@@ -458,4 +458,9 @@ func (s *StateDB) getCC(contAddr common.Address, user common.Address) (IInteract
 	cc.Exec = intr.Exec
 
 	return intr, cc, nil
+}
+
+// BasicFee returns the basic Fee
+func (s *StateDB) BasicFee() *big.Int {
+	return s.ctx.BasicFee().Int
 }

@@ -40,7 +40,7 @@ func ApplyTransaction(statedb istate.IStateDB, tx *etypes.Transaction) (*etypes.
 		ChainID: statedb.ChainID(),
 	}
 
-	vmenv, _ := defaultevm.DefaultEVMWithConfig(statedb, config, false)
+	vmenv := defaultevm.DefaultEVMWithConfig(statedb, config, nil)
 	receipt, err := applyTransaction(msg, config, bc, &author, gp, statedb, blockNumber, blockHash, tx, usedGas, vmenv)
 
 	return receipt, vmenv.Events(), err

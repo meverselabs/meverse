@@ -11,7 +11,6 @@ import (
 	"math"
 	"math/big"
 	"net/http"
-	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -36,8 +35,10 @@ import (
 	"github.com/meverselabs/meverse/ethereum/core/defaultevm"
 	mtypes "github.com/meverselabs/meverse/ethereum/core/types"
 	"github.com/meverselabs/meverse/ethereum/core/vm"
+	"github.com/meverselabs/meverse/ethereum/eth/tracers"
 	"github.com/meverselabs/meverse/ethereum/eth/tracers/logger"
 	_ "github.com/meverselabs/meverse/ethereum/eth/tracers/native"
+	"github.com/meverselabs/meverse/ethereum/ethapi"
 	"github.com/meverselabs/meverse/ethereum/params"
 	"github.com/meverselabs/meverse/extern/txparser"
 	"github.com/meverselabs/meverse/service/apiserver"
@@ -494,6 +495,14 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts itxsearch.ITxSearch, bs *bloo
 	s.Set("eth_clientVersion", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 		return viewchain.GetVersion(), nil
 	})
+
+	s.Set("debug_traceCall", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+		return m.traceCall(ID, arg)
+	})
+
+	s.Set("debug_traceTransaction", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+		return m.traceTx(ID, arg)
+	})
 }
 
 // get value from json-rpc
@@ -882,7 +891,7 @@ func getTransactionMap(m *metamaskRelay, bHash *ecommon.Hash, height uint32, ind
 			vbs = []byte{0}
 		}
 
-		result := &RPCTransaction{
+		result := &ethapi.RPCTransaction{
 			BlockHash:        bHash.String(),
 			BlockNumber:      fmt.Sprintf("0x%x", height),
 			From:             tx.From.String(),
@@ -919,7 +928,7 @@ func getTransactionMap(m *metamaskRelay, bHash *ecommon.Hash, height uint32, ind
 			vbs = []byte{0}
 		}
 
-		result := &RPCTransaction{
+		result := &ethapi.RPCTransaction{
 			BlockHash:        bHash.String(),
 			BlockNumber:      fmt.Sprintf("0x%x", height),
 			From:             tx.From.String(),
@@ -1232,7 +1241,7 @@ func (m *metamaskRelay) DoCall(from, to common.Address, dataBytes []byte, gas ui
 	ctx := m.cn.NewContext()
 	statedb := types.NewStateDB(ctx)
 
-	evm, tracer := defaultevm.DefaultEVM(statedb, params.EvmDebug)
+	evm := defaultevm.DefaultEVM(statedb, nil)
 
 	// Execute the message.
 	gp := new(ecore.GasPool).AddGas(math.MaxUint64)
@@ -1241,81 +1250,161 @@ func (m *metamaskRelay) DoCall(from, to common.Address, dataBytes []byte, gas ui
 		return nil, err
 	}
 
-	if tracer != nil {
-		switch tracer := tracer.(type) {
-		case *logger.StructLogger:
-			formatted := FormatLogs(tracer.StructLogs())
-			//fmt.Println(formatted)
-			idx++
-			f, err2 := os.Create("result" + strconv.Itoa(idx) + ".out")
-			if err2 != nil {
-				return nil, err
-			}
-			//logger.WriteTrace(f, tracer.StructLogs())
-			f.WriteString("gas : " + strconv.FormatUint(result.UsedGas, 10) + "\n")
-			b, _ := json.MarshalIndent(formatted, "", "   ")
-			f.WriteString(string(b))
-			f.Close()
-
-		}
-	}
-
 	return result, nil
-}
-
-// StructLogRes stores a structured log emitted by the EVM while replaying a
-// transaction in debug mode
-type StructLogRes struct {
-	Pc      uint64             `json:"pc"`
-	Op      string             `json:"op"`
-	Gas     uint64             `json:"gas"`
-	GasCost uint64             `json:"gasCost"`
-	Depth   int                `json:"depth"`
-	Error   string             `json:"error,omitempty"`
-	Stack   *[]string          `json:"stack,omitempty"`
-	Memory  *[]string          `json:"memory,omitempty"`
-	Storage *map[string]string `json:"storage,omitempty"`
-}
-
-// FormatLogs formats EVM returned structured logs for json output
-func FormatLogs(logs []logger.StructLog) []StructLogRes {
-	formatted := make([]StructLogRes, len(logs))
-	for index, trace := range logs {
-		formatted[index] = StructLogRes{
-			Pc:      trace.Pc,
-			Op:      trace.Op.String(),
-			Gas:     trace.Gas,
-			GasCost: trace.GasCost,
-			Depth:   trace.Depth,
-			Error:   trace.ErrorString(),
-		}
-		if trace.Stack != nil {
-			stack := make([]string, len(trace.Stack))
-			for i, stackValue := range trace.Stack {
-				stack[i] = stackValue.Hex()
-			}
-			formatted[index].Stack = &stack
-		}
-		if trace.Memory != nil {
-			memory := make([]string, 0, (len(trace.Memory)+31)/32)
-			for i := 0; i+32 <= len(trace.Memory); i += 32 {
-				memory = append(memory, fmt.Sprintf("%x", trace.Memory[i:i+32]))
-			}
-			formatted[index].Memory = &memory
-		}
-		if trace.Storage != nil {
-			storage := make(map[string]string)
-			for i, storageValue := range trace.Storage {
-				storage[fmt.Sprintf("%x", i)] = fmt.Sprintf("%x", storageValue)
-			}
-			formatted[index].Storage = &storage
-		}
-	}
-	return formatted
 }
 
 func (m *metamaskRelay) getBaseFeePerGas() string {
 	return "0x23400641"
+}
+
+// traceCall returns  Tracer from json-rpc call (dubug_traceCall, debug_traceTransaction)
+func tracer(arg *apiserver.Argument, idx int) (tracers.Tracer, error) {
+
+	config := &tracers.TraceConfig{}
+	if configMap, _ := arg.Map(idx); configMap != nil {
+		if jsonStr, err := json.Marshal(configMap); err != nil {
+			return nil, err
+		} else {
+			if err := json.Unmarshal(jsonStr, config); err != nil {
+				return nil, err
+			}
+		}
+	}
+	var tracer tracers.Tracer
+	tracer = logger.NewStructLogger(&config.Config)
+	if config.Tracer != "" {
+		var err error
+		tracer, err = tracers.DefaultDirectory.New(config.Tracer, new(tracers.Context), config.TracerConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return tracer, nil
+}
+
+// traceCall excutes debug_traceCall json-rpc call
+func (m *metamaskRelay) traceCall(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+	// var tracer tracers.Tracer
+	//var config *tracers.TraceConfig
+	var from, to common.Address
+	var data []byte
+	var err error
+
+	param, _ := arg.Map(0)
+	if tol, ok := param["to"].(string); ok {
+		to, err = common.ParseAddress(tol)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	ctx := m.cn.NewContext()
+
+	// only evm
+	if ctx.IsContract(to) {
+		return nil, errors.New("only for evm contract")
+	}
+
+	// only latest
+	if block, err := arg.String(1); err != nil {
+		return nil, err
+	} else if block != "latest" {
+		return nil, errors.New("only latest is allowd")
+	}
+
+	if froml, ok := param["from"].(string); ok {
+		from, err = common.ParseAddress(froml)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if datal, ok := param["data"].(string); ok {
+		if strings.HasPrefix(datal, "0x") {
+			datal = datal[2:]
+		}
+		data, err = hex.DecodeString(datal)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	value, err := getValueFromParam(param["value"])
+	if err != nil {
+		return nil, err
+	}
+
+	msg := etypes.NewMessage(from, &to, 0, value, uint64(math.MaxUint64/2), big.NewInt(0), big.NewInt(0), big.NewInt(0), data, etypes.AccessList{}, true)
+
+	// config
+	tracer, err := tracer(arg, 2)
+	if err != nil {
+		return nil, err
+	}
+
+	evm := defaultevm.DefaultEVM(types.NewStateDB(ctx), tracer)
+	_, err = mcore.ApplyMessage(evm, msg, new(ecore.GasPool).AddGas(math.MaxUint64))
+	if err != nil {
+		return nil, err
+	}
+
+	return tracer.GetResult()
+}
+
+// traceTx excutes debug_traceTransaction json-rpc call
+func (m *metamaskRelay) traceTx(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+
+	var tx *types.Transaction
+
+	if txhash, err := arg.String(0); err != nil {
+		return nil, err
+	} else {
+		hs := hash.HexToHash(txhash)
+		TxID, err := m.ts.TxIndex(hs)
+		if err != nil {
+			return nil, err
+		}
+		if TxID.Err != nil {
+			return nil, TxID.Err
+		}
+
+		b, err := m.cn.Provider().Block(TxID.Height)
+		if err != nil {
+			return nil, err
+		}
+
+		if int(TxID.Index) >= len(b.Body.Transactions) {
+			return nil, errors.New("invalid txhash")
+		}
+		tx = b.Body.Transactions[TxID.Index]
+	}
+
+	// only evm
+	if tx.VmType != types.Evm {
+		return nil, errors.New("only for evm contract")
+	}
+	etx := new(etypes.Transaction)
+	if err := etx.UnmarshalBinary(tx.Args); err != nil {
+		return nil, err
+	}
+
+	msg := etypes.NewMessage(tx.From, etx.To(), 0, etx.Value(), uint64(math.MaxUint64/2), big.NewInt(0), big.NewInt(0), big.NewInt(0), etx.Data(), etx.AccessList(), true)
+
+	// tracer
+	tracer, err := tracer(arg, 1)
+	if err != nil {
+		return nil, err
+	}
+
+	// execute tx
+	evm := defaultevm.DefaultEVM(types.NewStateDB(m.cn.NewContext()), tracer)
+	_, err = mcore.ApplyMessage(evm, msg, new(ecore.GasPool).AddGas(math.MaxUint64))
+	if err != nil {
+		return nil, err
+	}
+
+	return tracer.GetResult()
 }
 
 // func execWithAbi(caller *viewchain.ViewCaller, from string, toAddr ecommon.Address, abiM abi.Method, data string) (string, uint64, error) {

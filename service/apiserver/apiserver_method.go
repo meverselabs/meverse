@@ -103,6 +103,12 @@ func (s *APIServer) Run(BindAddress string) error {
 			return c.NoContent(http.StatusOK)
 		} else {
 			// log.Println("response result", callCount, res)
+			if ares, ok := res.(*JRPCResponse); ok {
+				return c.JSON(http.StatusOK, ares)
+			} else if eres, ok := res.(*JRPCResponseWithError); ok {
+				log.Println(eres.Error)
+				return c.JSON(http.StatusOK, eres)
+			}
 			return c.JSON(http.StatusOK, res)
 		}
 	})
@@ -212,7 +218,6 @@ func (s *APIServer) HandleJRPC(req *JRPCRequest) interface{} {
 }
 func (s *APIServer) _handleJRPC(req *jRPCRequest) interface{} {
 	method := req.Method
-	//log.Println("req", req)
 	if !strings.Contains(method, ".") {
 		method = "eth." + method
 	}

@@ -64,4 +64,5 @@ type IStateDB interface {
 	IsExtContract(addr common.Address) bool
 	Exec(user common.Address, contAddr common.Address, input []byte, gas uint64) ([]byte, uint64, []*ctypes.Event, error)
 	// getCC(contAddr common.Address, user common.Address) (*types.ContractContext, error)
+	BasicFee() *big.Int
 }

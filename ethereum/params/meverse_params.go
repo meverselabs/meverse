@@ -4,5 +4,4 @@ package params
 
 const (
 	BlockGasLimit uint64 = 5000000 // estimate gas maximum value
-	EvmDebug             = false   // evm tracer enabble
 )

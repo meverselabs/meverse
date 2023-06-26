@@ -117,7 +117,7 @@ func (cc *ContractContext) IsContract(addr common.Address) bool {
 // EvmCall execute evm.Call function and returns result, usedGas, error
 func (cc *ContractContext) EvmCall(caller vm.ContractRef, to common.Address, input []byte) ([]byte, uint64, error) {
 	statedb := NewStateDB(cc.ctx)
-	evm, _ := defaultevm.DefaultEVM(statedb, false)
+	evm := defaultevm.DefaultEVM(statedb, nil)
 
 	inputGas := uint64(math.MaxUint64)
 	ret, leftOverGas, err := evm.Call(caller, to, input, inputGas, big.NewInt(0))
