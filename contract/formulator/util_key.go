@@ -9,6 +9,7 @@ var (
 	tagTokenContractAddress = byte(0x01)
 	tagFormulatorPolicy     = byte(0x02)
 	tagRewardPolicy         = byte(0x03)
+	tagIsSyncGenerator      = byte(0x04)
 	tagFormulator           = byte(0x10)
 	tagFormulatorNumber     = byte(0x11)
 	tagFormulatorReverse    = byte(0x12)

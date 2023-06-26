@@ -201,7 +201,7 @@ type Mrc20Token struct {
 func NewMrc20Token(tb *TestBlockChain, senderKey key.Key, name, symbol string) (*Mrc20Token, error) {
 
 	sender := senderKey.PublicKey().Address()
-	tx, err := NewTokenTx(tb, senderKey, name, symbol,
+	tx, err := DeployTokenTx(tb, senderKey, name, symbol,
 		map[common.Address]*amount.Amount{
 			sender: amount.NewAmount(100000000, 0),
 		})
@@ -209,10 +209,7 @@ func NewMrc20Token(tb *TestBlockChain, senderKey key.Key, name, symbol string) (
 		return nil, err
 	}
 
-	b, err := tb.AddBlock([]*TxWithSigner{tx})
-	if err != nil {
-		return nil, err
-	}
+	b := tb.MustAddBlock([]*TxWithSigner{tx})
 
 	var contractAddress common.Address
 	for _, event := range b.Body.Events {

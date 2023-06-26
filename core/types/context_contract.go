@@ -3,6 +3,7 @@ package types
 import (
 	"math"
 	"math/big"
+	"reflect"
 
 	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/common/hash"
@@ -56,6 +57,20 @@ func (cc *ContractContext) From() common.Address {
 // IsGenerator returns the account is generator or not
 func (cc *ContractContext) IsGenerator(addr common.Address) bool {
 	return cc.ctx.Top().IsGenerator(addr)
+}
+
+// SetGenerator adds the account as a generator or not
+// only formulator contract can call
+func (cc *ContractContext) SetGenerator(addr common.Address, is bool) error {
+	if cont, err := cc.ctx.Top().Contract(cc.cont); err != nil {
+		return err
+	} else {
+		if t := reflect.TypeOf(cont); t.Elem().String() != "formulator.FormulatorContract" {
+			return ErrOnlyFormulatorAllowed
+		}
+	}
+
+	return cc.ctx.Top().SetGenerator(addr, is)
 }
 
 // MainToken returns the MainToken

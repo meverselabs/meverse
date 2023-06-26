@@ -25,44 +25,50 @@ func TestGetLogs(t *testing.T) {
 	aliceKey, bobKey, charlieKey := userKeys[0], userKeys[1], userKeys[2]
 	alice, bob, charlie := aliceKey.PublicKey().Address(), bobKey.PublicKey().Address(), charlieKey.PublicKey().Address()
 
-	intialize := func(ctx *types.Context, classMap map[string]uint64, args []interface{}) ([]interface{}, error) {
-		tRet, err := MevInitialize(ctx, classMap, args)
-		if err != nil {
-			return nil, err
+	var mevAddress *common.Address
+	var routerAddress, token0, token1 *common.Address
+
+	intialize := func(ctx *types.Context, classMap map[string]uint64) error {
+		initSupplyMap := map[common.Address]*amount.Amount{
+			alice:   amount.NewAmount(100000000, 0),
+			bob:     amount.NewAmount(100000000, 0),
+			charlie: amount.NewAmount(100000000, 0),
 		}
 
-		dRet, err := DexInitialize(ctx, classMap, args)
+		mevAddress, err = MevInitialize(ctx, classMap, alice, initSupplyMap)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		return append(tRet, dRet...), nil
+
+		_, routerAddress, _, token0, token1, _, err = DexInitialize(ctx, classMap, alice, charlie, initSupplyMap)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 
 	// alice(admin), bob, charlie
-	args := []interface{}{alice, bob, charlie}
-	tb, ret, err := Prepare(ChainDataPath, true, ChainID, Version, alice, args, intialize, &InitContextInfo{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	//args := []interface{}{alice, bob, charlie}
+	tb := NewTestBlockChain(ChainDataPath, true, ChainID, Version, alice, intialize, DefaultInitContextInfo)
 	defer tb.Close()
 
-	mev := NewTokenContract(ret[0].(*common.Address))
-	router := NewRouterContract(ret[2].(*common.Address))
-	token0, token1 := ret[4].(*common.Address), ret[5].(*common.Address)
+	mev := BindTokenContract(mevAddress, tb.Provider)
+	router := BindRouterContract(routerAddress, tb.Provider)
+	//token0, token1 := ret[4].(*common.Address), ret[5].(*common.Address)
 
 	provider := tb.Provider
 
 	var mpl *Mrc20Token
 	{
 		// mev Transfer : alice -> bob
-		tx0 := mev.TransferTx(aliceKey, provider, bob, amount.NewAmount(1, 0))
+		tx0 := mev.TransferTx(aliceKey, bob, amount.NewAmount(1, 0))
 		// mev Approve : bob -> charlie
-		tx1 := mev.ApproveTx(bobKey, provider, charlie, MaxUint256)
+		tx1 := mev.ApproveTx(bobKey, charlie, MaxUint256)
 		// UniAddLiquidity : alice
-		tx2 := router.UniAddLiquidityTx(aliceKey, provider, *token0, *token1, amount.NewAmount(1, 0), amount.NewAmount(4, 0), amount.ZeroCoin, amount.ZeroCoin)
+		tx2 := router.UniAddLiquidityTx(aliceKey, *token0, *token1, amount.NewAmount(1, 0), amount.NewAmount(4, 0), amount.ZeroCoin, amount.ZeroCoin)
 
 		// mpl mrc20 deploy
-		tx3, err := NewTokenTx(tb, aliceKey, "Meverse Play", "MPL",
+		tx3, err := DeployTokenTx(tb, aliceKey, "Meverse Play", "MPL",
 			map[common.Address]*amount.Amount{
 				alice: amount.NewAmount(100000000, 0),
 			})
@@ -70,10 +76,7 @@ func TestGetLogs(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		b, err := tb.AddBlock([]*TxWithSigner{tx0, tx1, tx2, tx3}) //block 1
-		if err != nil {
-			t.Fatal(err)
-		}
+		b := tb.MustAddBlock([]*TxWithSigner{tx0, tx1, tx2, tx3}) //block 1
 
 		var mplAddress common.Address
 		for _, event := range b.Body.Events {
@@ -94,10 +97,7 @@ func TestGetLogs(t *testing.T) {
 		t.Fatal(err)
 	} else {
 		pool = cont
-		b, err := tb.AddBlock([]*TxWithSigner{tx}) // block 2
-		if err != nil {
-			t.Fatal(err)
-		}
+		b := tb.MustAddBlock([]*TxWithSigner{tx}) // block 2
 
 		receipts, _ := provider.Receipts(b.Header.Height)
 		pool.SetAddress(&receipts[0].ContractAddress)
@@ -108,10 +108,7 @@ func TestGetLogs(t *testing.T) {
 	if tx, err := mpl.ApproveTx(aliceKey, 0, pool.Address, MaxUint256.Int); err != nil {
 		t.Fatal(err)
 	} else {
-		_, err = tb.AddBlock([]*TxWithSigner{tx}) // block 3
-		if err != nil {
-			t.Fatal(err)
-		}
+		tb.AddBlock([]*TxWithSigner{tx}) // block 3
 	}
 
 	// 100 blocks to activate bloomservice
@@ -123,18 +120,12 @@ func TestGetLogs(t *testing.T) {
 	userRewards := []UserReward{userReward}
 	for i := 0; i < 100; i++ { // block 4 -> 103
 		if i%2 == 0 {
-			_, err = tb.AddBlock([]*TxWithSigner{})
-			if err != nil {
-				t.Fatal(err)
-			}
+			tb.AddBlock([]*TxWithSigner{})
 		} else {
 			if tx, err := pool.AddRewardTx(aliceKey, 0, total, userRewards); err != nil {
 				t.Fatal(err)
 			} else {
-				_, err = tb.AddBlock([]*TxWithSigner{tx})
-				if err != nil {
-					t.Fatal(err)
-				}
+				tb.AddBlock([]*TxWithSigner{tx})
 			}
 		}
 	}
@@ -143,10 +134,7 @@ func TestGetLogs(t *testing.T) {
 	if tx, err := pool.ClaimTx(bobKey, 0); err != nil {
 		t.Fatal(err)
 	} else {
-		_, err = tb.AddBlock([]*TxWithSigner{tx}) // block 104 = 0x68
-		if err != nil {
-			t.Fatal(err)
-		}
+		tb.AddBlock([]*TxWithSigner{tx}) // block 104 = 0x68
 	}
 
 	jc := NewJsonClient(tb)

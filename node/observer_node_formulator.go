@@ -3,6 +3,7 @@ package node
 import (
 	"log"
 
+	"github.com/meverselabs/meverse/common"
 	"github.com/meverselabs/meverse/core/chain"
 	"github.com/meverselabs/meverse/p2p"
 	"github.com/meverselabs/meverse/p2p/peer"
@@ -52,6 +53,8 @@ func (ob *ObserverNode) onGeneratorRecv(p peer.Peer, bs []byte) error {
 	case p2p.RequestMessageType:
 		ob.recvChan <- item
 	case p2p.StatusMessageType:
+		ob.recvChan <- item
+	case p2p.RequestActiveGeneratorListMessageType:
 		ob.recvChan <- item
 	default:
 		return errors.WithStack(p2p.ErrUnknownMessage)
@@ -144,6 +147,14 @@ func (ob *ObserverNode) handleGeneratorMessage(p peer.Peer, m interface{}, bs []
 				ob.fs.RemovePeer(p.ID())
 			}
 		}
+	case *p2p.RequestActiveGeneratorListMessage:
+		var to common.Address
+		copy(to[:], []byte(p.ID()))
+		sm := &p2p.ActiveGeneratorListMessage{
+			Timestamp:  msg.Timestamp,
+			Generators: ob.fs.ActiveGenerators(),
+		}
+		ob.sendMessage(0, to, sm)
 	default:
 		return errors.WithStack(p2p.ErrUnknownMessage)
 	}

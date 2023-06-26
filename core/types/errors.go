@@ -23,4 +23,5 @@ var (
 	ErrInvalidContractMethod        = errors.New("invalid contract method")
 	ErrInvalidArguments             = errors.New("invalid contract method arguments")
 	ErrConstructorNotAllowd         = errors.New("constructor not allowd")
+	ErrOnlyFormulatorAllowed        = errors.New("only formulator allowed")
 )

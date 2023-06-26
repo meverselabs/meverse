@@ -20,4 +20,5 @@ var (
 	ErrTransferToZeroAddress            = errors.New("transfer to the zero address")
 	ErrAlreadyRegisteredSalesFormulator = errors.New("already registered sales")
 	ErrNotRegisteredSalesFormulator     = errors.New("not registerd sales")
+	ErrIsNoLongerSupported              = errors.New("is no longer supported")
 )

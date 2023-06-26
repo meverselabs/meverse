@@ -814,3 +814,9 @@ func (nd *Node) GetTxFromTXPool(TxHash hash.Hash256) *txpool.PoolItem {
 func (nd *Node) HasPeer() int {
 	return len(nd.ms.Peers())
 }
+
+// ActiveGenerators returns the received active generators from observer
+// channel closed after 2 seconds
+func (fr *Node) ActiveGenerators() ([]common.Address, error) {
+	return nil, ErrActiveGeneratorsNotAllowed
+}

@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/bluele/gcache"
@@ -39,39 +40,41 @@ type GeneratorConfig struct {
 // GeneratorNode procudes a block by the consensus
 type GeneratorNode struct {
 	sync.Mutex
-	ChainID        *big.Int
-	Config         *GeneratorConfig
-	cn             *chain.Chain
-	ct             chain.Committer
-	ms             *GeneratorNodeMesh
-	nm             *p2p.NodeMesh
-	key            key.Key
-	ndkey          key.Key
-	myPublicKey    common.PublicKey
-	frPublicKey    common.PublicKey
-	statusLock     sync.Mutex
-	genLock        sync.Mutex
-	lastReqLock    sync.Mutex
-	lastGenItemMap map[uint32]*genItem
-	lastReqMessage *BlockReqMessage
-	lastGenHeight  uint32
-	lastGenTime    int64
-	statusMap      map[string]*p2p.Status
-	obStatusMap    map[string]*p2p.Status
-	requestTimer   *p2p.RequestTimer
-	requestLock    sync.RWMutex
-	blockQ         *queue.SortedQueue
-	txpool         *txpool.TransactionPool
-	txQ            *queue.ExpireQueue
-	txWaitQ        *queue.LinkedQueue
-	txSendQ        *queue.Queue
-	recvChan       chan *p2p.RecvMessageItem
-	sendChan       chan *p2p.SendMessageItem
-	singleCache    gcache.Cache
-	batchCache     gcache.Cache
-	isRunning      bool
-	closeLock      sync.RWMutex
-	isClose        bool
+	ChainID            *big.Int
+	Config             *GeneratorConfig
+	cn                 *chain.Chain
+	ct                 chain.Committer
+	ms                 *GeneratorNodeMesh
+	nm                 *p2p.NodeMesh
+	key                key.Key
+	ndkey              key.Key
+	myPublicKey        common.PublicKey
+	frPublicKey        common.PublicKey
+	statusLock         sync.Mutex
+	genLock            sync.Mutex
+	lastReqLock        sync.Mutex
+	lastGenItemMap     map[uint32]*genItem
+	lastReqMessage     *BlockReqMessage
+	lastGenHeight      uint32
+	lastGenTime        int64
+	statusMap          map[string]*p2p.Status
+	obStatusMap        map[string]*p2p.Status
+	requestTimer       *p2p.RequestTimer
+	requestLock        sync.RWMutex
+	blockQ             *queue.SortedQueue
+	txpool             *txpool.TransactionPool
+	txQ                *queue.ExpireQueue
+	txWaitQ            *queue.LinkedQueue
+	txSendQ            *queue.Queue
+	recvChan           chan *p2p.RecvMessageItem
+	sendChan           chan *p2p.SendMessageItem
+	singleCache        gcache.Cache
+	batchCache         gcache.Cache
+	isRunning          bool
+	closeLock          sync.RWMutex
+	generatorTimestamp uint64
+	generatorsChan     chan *p2p.ActiveGeneratorListMessage
+	isClose            bool
 }
 
 // NewGeneratorNode returns a GeneratorNode
@@ -101,6 +104,7 @@ func NewGeneratorNode(ChainID *big.Int, Config *GeneratorConfig, cn *chain.Chain
 		sendChan:       make(chan *p2p.SendMessageItem, 1000),
 		singleCache:    gcache.New(500).LRU().Build(),
 		batchCache:     gcache.New(500).LRU().Build(),
+		generatorsChan: make(chan *p2p.ActiveGeneratorListMessage, 1000),
 	}
 	fr.ms = NewGeneratorNodeMesh(key, NetAddressMap, fr)
 	fr.nm = p2p.NewNodeMesh(fr.cn.Provider().ChainID(), ndkey, SeedNodeMap, fr, peerStorePath)
@@ -373,7 +377,9 @@ func (fr *GeneratorNode) Run(BindAddress string) {
 				}
 			}
 			fr.cleanPool(b)
-			log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Body.Transactions))
+			if DEBUG {
+				log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "BlockConnected", b.Header.Generator.String(), b.Header.Height, len(b.Body.Transactions))
+			}
 
 			txs := fr.txpool.Clean(types.ToTimeSlot(b.Header.Timestamp))
 			if len(txs) > 0 {
@@ -558,4 +564,34 @@ func (fr *GeneratorNode) TxPoolList() []*txpool.PoolItem {
 // GetTxFromTXPool returned tx from txpool
 func (fr *GeneratorNode) GetTxFromTXPool(TxHash hash.Hash256) *txpool.PoolItem {
 	return fr.txpool.Get(TxHash)
+}
+
+// ActiveGenerators returns the received active(=connected) generators from observer
+// wait 2 seconds for respective observer response
+func (fr *GeneratorNode) ActiveGenerators() ([]common.Address, error) {
+
+	timestamp := uint64(time.Now().UnixNano())
+	atomic.StoreUint64(&fr.generatorTimestamp, timestamp)
+	for _, p := range fr.ms.peerMap {
+		nm := &p2p.RequestActiveGeneratorListMessage{Timestamp: timestamp}
+		bs := p2p.MessageToPacket(nm)
+		p.SendPacket(bs)
+
+		timer := time.NewTimer(2 * time.Second)
+		defer timer.Stop()
+		for {
+			select {
+			case msg := <-fr.generatorsChan:
+				if msg.Timestamp < timestamp {
+					continue
+				}
+
+				return msg.Generators, nil
+			case <-timer.C:
+				break
+			}
+		}
+	}
+	return nil, ErrActiveGeneratorTimout
+
 }

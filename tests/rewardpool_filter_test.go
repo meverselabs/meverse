@@ -6,7 +6,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/core/types"
 	"github.com/meverselabs/meverse/service/bloomservice"
 	. "github.com/meverselabs/meverse/tests/lib"
 )
@@ -21,12 +23,18 @@ func TestFilterRewardPool(t *testing.T) {
 	aliceKey, bobKey, charlieKey := userKeys[0], userKeys[1], userKeys[2]
 	alice, bob, charlie := aliceKey.PublicKey().Address(), bobKey.PublicKey().Address(), charlieKey.PublicKey().Address()
 
-	// alice(admin), bob, charlie
-	args := []interface{}{alice, bob, charlie}
-	tb, _, err := Prepare(ChainDataPath, true, ChainID, Version, alice, args, MevInitialize, &InitContextInfo{})
-	if err != nil {
-		t.Fatal(err)
+	intialize := func(ctx *types.Context, classMap map[string]uint64) error {
+		initSupplyMap := map[common.Address]*amount.Amount{
+			alice:   amount.NewAmount(100000000, 0),
+			bob:     amount.NewAmount(100000000, 0),
+			charlie: amount.NewAmount(100000000, 0),
+		}
+
+		_, err = MevInitialize(ctx, classMap, alice, initSupplyMap)
+		return err
 	}
+
+	tb := NewTestBlockChain(ChainDataPath, true, ChainID, Version, alice, intialize, DefaultInitContextInfo)
 	defer tb.Close()
 
 	//ctx := tb.NewContext()
@@ -43,10 +51,7 @@ func TestFilterRewardPool(t *testing.T) {
 		t.Fatal(err)
 	} else {
 		pool = cont
-		b, err := tb.AddBlock([]*TxWithSigner{tx})
-		if err != nil {
-			t.Fatal(err)
-		}
+		b := tb.MustAddBlock([]*TxWithSigner{tx})
 		receipts, _ := provider.Receipts(b.Header.Height)
 		pool.SetAddress(&receipts[0].ContractAddress)
 	}
@@ -55,10 +60,7 @@ func TestFilterRewardPool(t *testing.T) {
 	if tx, err := mpl.ApproveTx(aliceKey, 0, pool.Address, MaxUint256.Int); err != nil {
 		t.Fatal(err)
 	} else {
-		_, err = tb.AddBlock([]*TxWithSigner{tx})
-		if err != nil {
-			t.Fatal(err)
-		}
+		tb.AddBlock([]*TxWithSigner{tx})
 	}
 
 	// addReward 변수 userRewards
@@ -74,19 +76,13 @@ func TestFilterRewardPool(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		if i%2 == 0 {
-			_, err = tb.AddBlock([]*TxWithSigner{})
-			if err != nil {
-				t.Fatal(err)
-			}
+			tb.AddBlock([]*TxWithSigner{})
 		} else {
 			// tx: addReward to bob
 			if tx, err := pool.AddRewardTx(aliceKey, 0, total, userRewards); err != nil {
 				t.Fatal(err)
 			} else {
-				_, err = tb.AddBlock([]*TxWithSigner{tx})
-				if err != nil {
-					t.Fatal(err)
-				}
+				tb.AddBlock([]*TxWithSigner{tx})
 			}
 		}
 	}

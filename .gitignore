@@ -13,7 +13,7 @@ cmd/generator/generator
 cmd/observer/observer
 cmd/node/node
 cmd/keymake
-bin
+/bin
 tdata/
 cmd/mainnetcachecontext
 contract/plugin/test/plugin/

@@ -254,11 +254,15 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicKey common.PublicKey, 
 		//[check round]
 		br, has := ob.round.BlockRoundMap[msg.Block.Header.Height]
 		if !has {
-			log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "br, has := ob.round.BlockRoundMap[msg.Block.Header.Height]", msg.Block.Header.Height, ob.round.TargetHeight)
+			if DEBUG {
+				log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "br, has := ob.round.BlockRoundMap[msg.Block.Header.Height]", msg.Block.Header.Height, ob.round.TargetHeight)
+			}
 			return errors.WithStack(ErrInvalidVote)
 		}
 		if br.BlockGenMessage != nil {
-			log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "if br.BlockGenMessage != nil {", msg.Block.Header.Height, ob.round.TargetHeight)
+			if DEBUG {
+				log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "if br.BlockGenMessage != nil {", msg.Block.Header.Height, ob.round.TargetHeight)
+			}
 			return errors.WithStack(ErrInvalidVote)
 		}
 
@@ -306,7 +310,9 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicKey common.PublicKey, 
 						if len(adjustMap) > 0 {
 							r, _, err := ob.cn.TopGeneratorInMap(adjustMap)
 							if err != nil {
-								log.Println(ob.obID, "ob BlockGenMessage", ob.myPublicKey.Address().String(), cp.Height(), "BlockGenToNextTop", msg.Block.Header.Height, ob.round.RoundState, len(ob.adjustGeneratorMap()), ob.fs.PeerCount(), (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
+								if DEBUG {
+									log.Println(ob.obID, "ob BlockGenMessage", ob.myPublicKey.Address().String(), cp.Height(), "BlockGenToNextTop", msg.Block.Header.Height, ob.round.RoundState, len(ob.adjustGeneratorMap()), ob.fs.PeerCount(), (time.Now().UnixNano()-ob.prevRoundEndTime)/int64(time.Millisecond))
+								}
 								return err
 							}
 							NextTop = r
@@ -327,7 +333,9 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicKey common.PublicKey, 
 			if msg.Block.Header.Height > ob.round.TargetHeight {
 				br.BlockGenMessageWait = msg
 			}
-			log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "if msg.Block.Header.Height != ob.round.TargetHeight {", msg.Block.Header.Height, ob.round.TargetHeight)
+			if DEBUG {
+				log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "if msg.Block.Header.Height != ob.round.TargetHeight {", msg.Block.Header.Height, ob.round.TargetHeight)
+			}
 			return errors.WithStack(ErrInvalidVote)
 		}
 
@@ -336,7 +344,9 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicKey common.PublicKey, 
 			if ob.round.RoundState < BlockWaitState {
 				br.BlockGenMessageWait = msg
 			}
-			log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "if ob.round.RoundState != BlockWaitState {", ob.round.RoundState, BlockWaitState)
+			if DEBUG {
+				log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "if ob.round.RoundState != BlockWaitState {", ob.round.RoundState, BlockWaitState)
+			}
 			return errors.WithStack(ErrInvalidVote)
 		}
 		Top, err := ob.cn.TopGenerator(msg.Block.Header.TimeoutCount)
@@ -344,40 +354,56 @@ func (ob *ObserverNode) handleObserverMessage(SenderPublicKey common.PublicKey, 
 			return err
 		}
 		if msg.Block.Header.Generator != Top {
-			log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "if msg.Block.Header.Generator != Top.Address {", msg.Block.Header.Generator.String(), Top.String(), msg.Block.Header.TimeoutCount)
+			if DEBUG {
+				log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "if msg.Block.Header.Generator != Top.Address {", msg.Block.Header.Generator.String(), Top.String(), msg.Block.Header.TimeoutCount)
+			}
 			return errors.WithStack(ErrInvalidVote)
 		}
 		if msg.Block.Header.Generator != ob.round.MinRoundVoteAck.Generator {
-			log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "if msg.Block.Header.Generator != ob.round.MinRoundVoteAck.Generator {")
+			if DEBUG {
+				log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "if msg.Block.Header.Generator != ob.round.MinRoundVoteAck.Generator {")
+			}
 			return errors.WithStack(ErrInvalidVote)
 		}
 		bh := bin.MustWriterToHash(&msg.Block.Header)
 		if pubkey, err := common.RecoverPubkey(ob.ChainID, bh, msg.GeneratorSignature); err != nil {
-			log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "if msg.Block.Header.Generator != ob.round.MinRoundVoteAck.Generator {")
+			if DEBUG {
+				log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "if msg.Block.Header.Generator != ob.round.MinRoundVoteAck.Generator {")
+			}
 			return err
 		} else if Signer := pubkey.Address(); Signer != Top {
-			log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "if msg.Block.Header.Generator != ob.round.MinRoundVoteAck.Generator {")
+			if DEBUG {
+				log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "if msg.Block.Header.Generator != ob.round.MinRoundVoteAck.Generator {")
+			}
 			return errors.WithStack(ErrInvalidTopSignature)
 		} else if Signer != ob.round.MinRoundVoteAck.Generator {
-			log.Printf("ob BlockGenMessage %v %+v", msg.Block.Header.Generator.String(), err)
+			if DEBUG {
+				log.Printf("ob BlockGenMessage %v %+v", msg.Block.Header.Generator.String(), err)
+			}
 			return errors.WithStack(ErrInvalidVote)
 		}
 		if err := ob.ct.ValidateHeader(&msg.Block.Header); err != nil {
-			log.Printf("ob BlockGenMessage %v %+v", msg.Block.Header.Generator.String(), err)
+			if DEBUG {
+				log.Printf("ob BlockGenMessage %v %+v", msg.Block.Header.Generator.String(), err)
+			}
 			return err
 		}
 
 		//[if valid block]
 		Now := uint64(time.Now().UnixNano())
 		if msg.Block.Header.Timestamp > Now+uint64(10*time.Second) {
-			log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "if msg.Block.Header.Timestamp > Now+uint64(10*time.Second) {")
+			if DEBUG {
+				log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "if msg.Block.Header.Timestamp > Now+uint64(10*time.Second) {")
+			}
 			return errors.WithStack(ErrInvalidVote)
 		}
 
 		ctx := ob.ct.NewContext()
 		var receipts = types.Receipts{}
 		if receipts, err = ob.ct.ExecuteBlockOnContext(msg.Block, ctx, nil); err != nil {
-			log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "if err := ob.ct.ExecuteBlockOnContext(msg.Block, ctx); err != nil {", err)
+			if DEBUG {
+				log.Println(ob.obID, "ob BlockGenMessage", msg.Block.Header.Generator.String(), "if err := ob.ct.ExecuteBlockOnContext(msg.Block, ctx); err != nil {", err)
+			}
 			return err
 		}
 

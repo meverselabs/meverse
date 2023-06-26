@@ -11,12 +11,14 @@ import (
 
 // message types
 var (
-	StatusMessageType          = RegisterSerializableType(&StatusMessage{})
-	RequestMessageType         = RegisterSerializableType(&RequestMessage{})
-	BlockMessageType           = RegisterSerializableType(&BlockMessage{})
-	TransactionMessageType     = RegisterSerializableType(&TransactionMessage{})
-	PeerListMessageType        = RegisterSerializableType(&PeerListMessage{})
-	RequestPeerListMessageType = RegisterSerializableType(&RequestPeerListMessage{})
+	StatusMessageType                     = RegisterSerializableType(&StatusMessage{})
+	RequestMessageType                    = RegisterSerializableType(&RequestMessage{})
+	BlockMessageType                      = RegisterSerializableType(&BlockMessage{})
+	TransactionMessageType                = RegisterSerializableType(&TransactionMessage{})
+	PeerListMessageType                   = RegisterSerializableType(&PeerListMessage{})
+	RequestPeerListMessageType            = RegisterSerializableType(&RequestPeerListMessage{})
+	ActiveGeneratorListMessageType        = RegisterSerializableType(&ActiveGeneratorListMessage{})
+	RequestActiveGeneratorListMessageType = RegisterSerializableType(&RequestActiveGeneratorListMessage{})
 )
 
 // RequestMessage used to request a chain data to a peer
@@ -263,4 +265,75 @@ func (s *RequestPeerListMessage) WriteTo(w io.Writer) (int64, error) {
 
 func (s *RequestPeerListMessage) ReadFrom(r io.Reader) (int64, error) {
 	return 0, nil
+}
+
+// GeneratorListMessage used to send a genreator list to a peer
+type ActiveGeneratorListMessage struct {
+	Timestamp  uint64
+	Generators []common.Address
+}
+
+func (s *ActiveGeneratorListMessage) TypeID() uint32 {
+	return ActiveGeneratorListMessageType
+}
+
+func (s *ActiveGeneratorListMessage) WriteTo(w io.Writer) (int64, error) {
+	sw := bin.NewSumWriter()
+	if sum, err := sw.Uint64(w, s.Timestamp); err != nil {
+		return sum, err
+	}
+	if sum, err := sw.Uint16(w, uint16(len(s.Generators))); err != nil {
+		return sum, err
+	}
+	for _, v := range s.Generators {
+		if sum, err := sw.Address(w, v); err != nil {
+			return sum, err
+		}
+	}
+	return sw.Sum(), nil
+}
+
+func (s *ActiveGeneratorListMessage) ReadFrom(r io.Reader) (int64, error) {
+	sr := bin.NewSumReader()
+	if sum, err := sr.Uint64(r, &s.Timestamp); err != nil {
+		return sum, err
+	}
+	if Len, sum, err := sr.GetUint16(r); err != nil {
+		return sum, err
+	} else {
+		s.Generators = make([]common.Address, 0, Len)
+		for i := uint16(0); i < Len; i++ {
+			var v common.Address
+			if sum, err := sr.Address(r, &v); err != nil {
+				return sum, err
+			}
+			s.Generators = append(s.Generators, v)
+		}
+	}
+	return sr.Sum(), nil
+}
+
+// RequestGeneratorListMessage is a request message for a generator list
+type RequestActiveGeneratorListMessage struct {
+	Timestamp uint64
+}
+
+func (s *RequestActiveGeneratorListMessage) TypeID() uint32 {
+	return RequestActiveGeneratorListMessageType
+}
+
+func (s *RequestActiveGeneratorListMessage) WriteTo(w io.Writer) (int64, error) {
+	sw := bin.NewSumWriter()
+	if sum, err := sw.Uint64(w, s.Timestamp); err != nil {
+		return sum, err
+	}
+	return sw.Sum(), nil
+}
+
+func (s *RequestActiveGeneratorListMessage) ReadFrom(r io.Reader) (int64, error) {
+	sr := bin.NewSumReader()
+	if sum, err := sr.Uint64(r, &s.Timestamp); err != nil {
+		return sum, err
+	}
+	return sr.Sum(), nil
 }

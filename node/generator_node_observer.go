@@ -3,6 +3,7 @@ package node
 import (
 	"fmt"
 	"log"
+	"sync/atomic"
 	"time"
 
 	"github.com/meverselabs/meverse/common"
@@ -70,7 +71,9 @@ func (fr *GeneratorNode) handleObserverMessage(p peer.Peer, m interface{}, Retry
 
 		TargetHeight := fr.cn.Provider().Height() + 1
 		if msg.TargetHeight < TargetHeight {
-			log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Past Target Height")
+			if DEBUG {
+				log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Past Target Height")
+			}
 			return nil
 		}
 		if msg.TargetHeight <= fr.lastGenHeight {
@@ -85,7 +88,9 @@ func (fr *GeneratorNode) handleObserverMessage(p peer.Peer, m interface{}, Retry
 				if nm != nil {
 					fr.ms.SendTo(p.ID(), nm)
 				}
-				log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Wait 30 Sec")
+				if DEBUG {
+					log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Wait 30 Sec")
+				}
 				return nil
 			}
 			fr.lastReqLock.Lock()
@@ -96,7 +101,9 @@ func (fr *GeneratorNode) handleObserverMessage(p peer.Peer, m interface{}, Retry
 		if fr.lastReqMessage != nil {
 			if msg.TargetHeight <= fr.lastReqMessage.TargetHeight {
 				fr.lastReqLock.Unlock()
-				log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Current Target Height")
+				if DEBUG {
+					log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Current Target Height")
+				}
 				return nil
 			}
 		}
@@ -107,11 +114,15 @@ func (fr *GeneratorNode) handleObserverMessage(p peer.Peer, m interface{}, Retry
 
 		if msg.TargetHeight > TargetHeight {
 			if msg.TargetHeight > TargetHeight+10 {
-				log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Far Future Target Height")
+				if DEBUG {
+					log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Far Future Target Height")
+				}
 				return nil
 			}
 			if RetryCount >= 10 {
-				log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Retry Timeover")
+				if DEBUG {
+					log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Retry Timeover")
+				}
 				return nil
 			}
 			if RetryCount == 0 {
@@ -136,26 +147,36 @@ func (fr *GeneratorNode) handleObserverMessage(p peer.Peer, m interface{}, Retry
 					}
 				}
 			}()
-			log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Future Height")
+			if DEBUG {
+				log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Future Height")
+			}
 			return nil
 		}
 
 		if msg.Generator != fr.key.PublicKey().Address() {
-			log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Not My Address")
+			if DEBUG {
+				log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Not My Address")
+			}
 			return errors.WithStack(ErrInvalidRequest)
 		}
 		if msg.PrevHash != cp.LastHash() {
-			log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Not Prev Hash")
+			if DEBUG {
+				log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Not Prev Hash")
+			}
 			return errors.WithStack(ErrInvalidRequest)
 		}
 
 		Top, err := fr.cn.TopGenerator(msg.TimeoutCount)
 		if err != nil {
-			log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Invalid Top")
+			if DEBUG {
+				log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Invalid Top")
+			}
 			return err
 		}
 		if msg.Generator != Top {
-			log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Invalid Top2")
+			if DEBUG {
+				log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Invalid Top2")
+			}
 			return errors.WithStack(ErrInvalidRequest)
 		}
 		fr.lastReqLock.Lock()
@@ -191,7 +212,9 @@ func (fr *GeneratorNode) handleObserverMessage(p peer.Peer, m interface{}, Retry
 		}(p.ID(), msg)
 		return nil
 	case *BlockGenMessage:
-		log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Recv.BlockGenMessage", msg.Block.Header.Height)
+		if DEBUG {
+			log.Println("Generatorlog", fr.key.PublicKey().Address().String(), "Recv.BlockGenMessage", msg.Block.Header.Height)
+		}
 
 		TargetHeight := fr.cn.Provider().Height() + 1
 		if msg.Block.Header.Height < TargetHeight {
@@ -315,7 +338,16 @@ func (fr *GeneratorNode) handleObserverMessage(p peer.Peer, m interface{}, Retry
 			}
 		}
 		return nil
+	case *p2p.ActiveGeneratorListMessage:
+		timestamp := atomic.LoadUint64(&fr.generatorTimestamp)
+		// skip old data
+		if msg.Timestamp < timestamp {
+			return nil
+		}
+		fr.generatorsChan <- msg
+		return nil
 	default:
+		log.Println("p.Name", p.Name(), "p.ID", p.ID())
 		return errors.WithStack(p2p.ErrUnknownMessage)
 	}
 }

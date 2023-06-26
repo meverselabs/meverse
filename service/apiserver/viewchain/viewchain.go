@@ -29,6 +29,7 @@ import (
 
 type INode interface {
 	AddTx(tx *types.Transaction, sig common.Signature) error
+	ActiveGenerators() ([]common.Address, error)
 }
 
 type viewchain struct {
@@ -66,6 +67,12 @@ func NewViewchain(api *apiserver.APIServer, ts itxsearch.ITxSearch, cn *chain.Ch
 	})
 	s.Set("maintoken", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 		return v.cn.NewContext().MainToken().String(), nil
+	})
+	s.Set("generators", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+		return v.st.Generators()
+	})
+	s.Set("activeGenerators", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+		return v.in.ActiveGenerators()
 	})
 	s.Set("blockNumber", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 		return cn.Provider().Height(), nil

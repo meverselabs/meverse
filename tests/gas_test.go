@@ -25,41 +25,45 @@ func TestBlockGasUsedAndReceiptsGas(t *testing.T) {
 	aliceKey, bobKey, charlieKey := userKeys[0], userKeys[1], userKeys[2]
 	alice, bob, charlie := aliceKey.PublicKey().Address(), bobKey.PublicKey().Address(), charlieKey.PublicKey().Address()
 
-	intialize := func(ctx *types.Context, classMap map[string]uint64, args []interface{}) ([]interface{}, error) {
-		tRet, err := MevInitialize(ctx, classMap, args)
+	var mevAddress *common.Address
+	var routerAddress, token0, token1 *common.Address
+	intialize := func(ctx *types.Context, classMap map[string]uint64) error {
+		initSupplyMap := map[common.Address]*amount.Amount{
+			alice:   amount.NewAmount(100000000, 0),
+			bob:     amount.NewAmount(100000000, 0),
+			charlie: amount.NewAmount(100000000, 0),
+		}
+		mevAddress, err = MevInitialize(ctx, classMap, alice, initSupplyMap)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
-		dRet, err := DexInitialize(ctx, classMap, args)
+		_, _, routerAddress, token0, token1, _, err = DexInitialize(ctx, classMap, alice, charlie, initSupplyMap)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		return append(tRet, dRet...), nil
+		return nil
 	}
 
 	// alice(admin), bob, charlie
-	args := []interface{}{alice, bob, charlie}
-	tb, ret, err := Prepare(ChainDataPath, true, ChainID, Version, alice, args, intialize, &InitContextInfo{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	//args := []interface{}{alice, bob, charlie}
+	tb := NewTestBlockChain(ChainDataPath, true, ChainID, Version, alice, intialize, DefaultInitContextInfo)
 	defer tb.Close()
 
-	mev := NewTokenContract(ret[0].(*common.Address))
-	router := NewRouterContract(ret[2].(*common.Address))
-	token0, token1 := ret[4].(*common.Address), ret[5].(*common.Address)
+	mev := BindTokenContract(mevAddress, tb.Provider)
+	router := BindRouterContract(routerAddress, tb.Provider)
+	//token0, token1 := ret[4].(*common.Address), ret[5].(*common.Address)
 
 	provider := tb.Provider
 	// mev Transfer : alice -> bob
-	tx0 := mev.TransferTx(aliceKey, provider, bob, amount.NewAmount(1, 0))
+	tx0 := mev.TransferTx(aliceKey, bob, amount.NewAmount(1, 0))
 	// mev Approve : bob -> charlie
-	tx1 := mev.ApproveTx(bobKey, provider, charlie, MaxUint256)
+	tx1 := mev.ApproveTx(bobKey, charlie, MaxUint256)
 	// UniAddLiquidity : alice
-	tx2 := router.UniAddLiquidityTx(aliceKey, provider, *token0, *token1, amount.NewAmount(1, 0), amount.NewAmount(4, 0), amount.ZeroCoin, amount.ZeroCoin)
+	tx2 := router.UniAddLiquidityTx(aliceKey, *token0, *token1, amount.NewAmount(1, 0), amount.NewAmount(4, 0), amount.ZeroCoin, amount.ZeroCoin)
 
 	// mpl mrc20 deploy
-	tx3, err := NewTokenTx(tb, aliceKey, "Meverse Play", "MPL",
+	tx3, err := DeployTokenTx(tb, aliceKey, "Meverse Play", "MPL",
 		map[common.Address]*amount.Amount{
 			alice: amount.NewAmount(100000000, 0),
 		})
@@ -67,10 +71,7 @@ func TestBlockGasUsedAndReceiptsGas(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	b1, err := tb.AddBlock([]*TxWithSigner{tx0, tx1, tx2, tx3})
-	if err != nil {
-		t.Fatal(err)
-	}
+	b1 := tb.MustAddBlock([]*TxWithSigner{tx0, tx1, tx2, tx3})
 
 	var mplAddress common.Address
 	for _, event := range b1.Body.Events {
@@ -109,10 +110,7 @@ func TestBlockGasUsedAndReceiptsGas(t *testing.T) {
 		t.Fatal(err)
 	} else {
 		pool = cont
-		b, err := tb.AddBlock([]*TxWithSigner{tx})
-		if err != nil {
-			t.Fatal(err)
-		}
+		b := tb.MustAddBlock([]*TxWithSigner{tx})
 		receipts, _ := provider.Receipts(b.Header.Height)
 		pool.SetAddress(&receipts[0].ContractAddress)
 		log.Println("pool address = ", pool.Address)
@@ -143,10 +141,7 @@ func TestBlockGasUsedAndReceiptsGas(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	b2, err := tb.AddBlock([]*TxWithSigner{tx5, tx6, tx7})
-	if err != nil {
-		t.Fatal(err)
-	}
+	b2 := tb.MustAddBlock([]*TxWithSigner{tx5, tx6, tx7})
 
 	{
 		b := b2

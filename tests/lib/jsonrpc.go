@@ -31,7 +31,7 @@ func (jc *JsonClient) GetBlockByNumber(height uint32, isFull bool) map[string]in
 func (jc *JsonClient) GetTransactionReceipt(hash common.Hash) map[string]interface{} {
 	req := &apiserver.JRPCRequest{
 		JSONRPC: "2.0",
-		ID:      "100",
+		ID:      "101",
 		Method:  "eth_getTransactionReceipt",
 		Params:  []interface{}{hash.Hex()},
 	}
@@ -51,9 +51,20 @@ func (jc *JsonClient) GetLogs(filterMap map[string]interface{}) []*types.Log {
 
 	req := &apiserver.JRPCRequest{
 		JSONRPC: "2.0",
-		ID:      "100",
+		ID:      "102",
 		Method:  "eth_getLogs",
 		Params:  []interface{}{filterMap},
 	}
 	return jc.tb.HandleJRPC(req).(*apiserver.JRPCResponse).Result.([]*types.Log)
+}
+
+// ViewCall executes an view.call json-rpc to non-evm contract
+func (jc *JsonClient) ViewCall(to *common.Address, method string, params ...any) interface{} {
+	req := &apiserver.JRPCRequest{
+		JSONRPC: "2.0",
+		ID:      "103",
+		Method:  "view.call",
+		Params:  []interface{}{*to, method, params},
+	}
+	return jc.tb.HandleJRPC(req).(*apiserver.JRPCResponse).Result
 }

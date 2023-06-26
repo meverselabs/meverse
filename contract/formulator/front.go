@@ -102,6 +102,10 @@ func (f *front) SetRewardPerBlock(cc *types.ContractContext, RewardPerBlock *amo
 	return f.cont.SetRewardPerBlock(cc, RewardPerBlock)
 }
 
+func (f *front) SyncGenerator(cc *types.ContractContext) error {
+	return f.cont.syncGenerator(cc)
+}
+
 //////////////////////////////////////////////////
 // Public Reader Functions
 //////////////////////////////////////////////////

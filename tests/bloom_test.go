@@ -34,33 +34,38 @@ func TestMutliTranactionEvents(t *testing.T) {
 	aliceKey, bobKey, charlieKey := userKeys[0], userKeys[1], userKeys[2]
 	alice, bob, charlie := aliceKey.PublicKey().Address(), bobKey.PublicKey().Address(), charlieKey.PublicKey().Address()
 
-	intialize := func(ctx *types.Context, classMap map[string]uint64, args []interface{}) ([]interface{}, error) {
-		tRet, err := MevInitialize(ctx, classMap, args)
-		if err != nil {
-			return nil, err
+	var mevAddress *common.Address
+	var routerAddress, token0, token1, pair *common.Address
+	intialize := func(ctx *types.Context, classMap map[string]uint64) error {
+		initSupplyMap := map[common.Address]*amount.Amount{
+			alice:   amount.NewAmount(100000000, 0),
+			bob:     amount.NewAmount(100000000, 0),
+			charlie: amount.NewAmount(100000000, 0),
 		}
 
-		dRet, err := DexInitialize(ctx, classMap, args)
+		mevAddress, err = MevInitialize(ctx, classMap, alice, initSupplyMap)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		return append(tRet, dRet...), nil
+
+		_, routerAddress, _, token0, token1, pair, err = DexInitialize(ctx, classMap, alice, charlie, initSupplyMap)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 
 	// alice(admin), bob, charlie
-	args := []interface{}{alice, bob, charlie}
-	tb, ret, err := Prepare(ChainDataPath, true, chainID, Version, alice, args, intialize, &InitContextInfo{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	// args := []interface{}{alice, bob, charlie}
+	tb := NewTestBlockChain(ChainDataPath, true, chainID, Version, alice, intialize, DefaultInitContextInfo)
 	defer tb.Close()
 
 	provider := tb.Chain.Provider()
 	//ctx := tb.NewContext()
 
-	mev := NewTokenContract(ret[0].(*common.Address))
-	router := NewRouterContract(ret[2].(*common.Address))
-	token0, token1, pair := ret[4].(*common.Address), ret[5].(*common.Address), ret[6].(*common.Address)
+	mev := BindTokenContract(mevAddress, tb.Provider)
+	router := BindRouterContract(routerAddress, tb.Provider)
+	//token0, token1, pair := ret[4].(*common.Address), ret[5].(*common.Address), ret[6].(*common.Address)
 
 	// block 1 - StorageWithEvent Contract 생성
 	var storageWithEvent common.Address
@@ -68,10 +73,7 @@ func TestMutliTranactionEvents(t *testing.T) {
 		t.Fatal(err)
 	} else {
 		tx0 := NewTxWithSigner(tx, aliceKey)
-		b, err := tb.AddBlock([]*TxWithSigner{tx0})
-		if err != nil {
-			t.Fatal(err)
-		}
+		b := tb.MustAddBlock([]*TxWithSigner{tx0})
 		receipts, _ := provider.Receipts(b.Header.Height)
 		storageWithEvent = receipts[0].ContractAddress
 
@@ -88,18 +90,15 @@ func TestMutliTranactionEvents(t *testing.T) {
 	}
 
 	transferAmount := amount.NewAmount(1, 0)
-	tx1 := mev.TransferTx(aliceKey, provider, bob, transferAmount)
+	tx1 := mev.TransferTx(aliceKey, bob, transferAmount)
 
-	tx2 := mev.ApproveTx(bobKey, provider, charlie, MaxUint256)
+	tx2 := mev.ApproveTx(bobKey, charlie, MaxUint256)
 
 	token0Amount := amount.NewAmount(1, 0)
 	token1Amount := amount.NewAmount(4, 0)
-	tx3 := router.UniAddLiquidityTx(aliceKey, provider, *token0, *token1, token0Amount, token1Amount, amount.ZeroCoin, amount.ZeroCoin)
+	tx3 := router.UniAddLiquidityTx(aliceKey, *token0, *token1, token0Amount, token1Amount, amount.ZeroCoin, amount.ZeroCoin)
 
-	b, err := tb.AddBlock([]*TxWithSigner{tx0, tx1, tx2, tx3})
-	if err != nil {
-		t.Fatal(err)
-	}
+	b := tb.MustAddBlock([]*TxWithSigner{tx0, tx1, tx2, tx3})
 
 	assert := assert.New(t)
 	var tIdx uint16
@@ -316,12 +315,20 @@ func TestEventLogFromEvm(t *testing.T) {
 	aliceKey, bobKey, charlieKey := userKeys[0], userKeys[1], userKeys[2]
 	alice, bob, charlie := aliceKey.PublicKey().Address(), bobKey.PublicKey().Address(), charlieKey.PublicKey().Address()
 
-	// alice(admin), bob, charlie
-	args := []interface{}{alice, bob, charlie}
-	tb, _, err := Prepare(ChainDataPath, true, ChainID, Version, alice, args, MevInitialize, &InitContextInfo{})
-	if err != nil {
-		t.Fatal(err)
+	intialize := func(ctx *types.Context, classMap map[string]uint64) error {
+		initSupplyMap := map[common.Address]*amount.Amount{
+			alice:   amount.NewAmount(100000000, 0),
+			bob:     amount.NewAmount(100000000, 0),
+			charlie: amount.NewAmount(100000000, 0),
+		}
+
+		_, err := MevInitialize(ctx, classMap, alice, initSupplyMap)
+		return err
 	}
+
+	// alice(admin), bob, charlie
+	//args := []interface{}{alice, bob, charlie}
+	tb := NewTestBlockChain(ChainDataPath, true, ChainID, Version, alice, intialize, &InitContextInfo{})
 	defer tb.Close()
 
 	provider := tb.Chain.Provider()
@@ -339,10 +346,7 @@ func TestEventLogFromEvm(t *testing.T) {
 		t.Fatal(err)
 	} else {
 		pool = cont
-		b, err := tb.AddBlock([]*TxWithSigner{tx})
-		if err != nil {
-			t.Fatal(err)
-		}
+		b := tb.MustAddBlock([]*TxWithSigner{tx})
 		receipts, _ := provider.Receipts(b.Header.Height)
 		pool.SetAddress(&receipts[0].ContractAddress)
 		log.Println("pool address = ", pool.Address)
@@ -352,10 +356,7 @@ func TestEventLogFromEvm(t *testing.T) {
 	if tx, err := mpl.ApproveTx(aliceKey, 0, pool.Address, MaxUint256.Int); err != nil {
 		t.Fatal(err)
 	} else {
-		_, err = tb.AddBlock([]*TxWithSigner{tx})
-		if err != nil {
-			t.Fatal(err)
-		}
+		tb.AddBlock([]*TxWithSigner{tx})
 	}
 
 	// tx3: addReward to bob
@@ -367,10 +368,7 @@ func TestEventLogFromEvm(t *testing.T) {
 	if tx, err := pool.AddRewardTx(aliceKey, 0, total, []UserReward{userReward}); err != nil {
 		t.Fatal(err)
 	} else {
-		_, err = tb.AddBlock([]*TxWithSigner{tx})
-		if err != nil {
-			t.Fatal(err)
-		}
+		tb.AddBlock([]*TxWithSigner{tx})
 	}
 
 	// tx4 : clamin by bob
@@ -383,10 +381,7 @@ func TestEventLogFromEvm(t *testing.T) {
 	if tx, err := pool.ClaimTx(bobKey, 0); err != nil {
 		t.Fatal(err)
 	} else {
-		b, err = tb.AddBlock([]*TxWithSigner{tx})
-		if err != nil {
-			t.Fatal(err)
-		}
+		b = tb.MustAddBlock([]*TxWithSigner{tx})
 		receipts, _ := provider.Receipts(b.Header.Height)
 
 		txBloom, logs, err = bloomservice.TxLogsBloom(tb.Chain, b, 0, receipts[0])

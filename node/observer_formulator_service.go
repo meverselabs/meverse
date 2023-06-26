@@ -236,3 +236,20 @@ func (ms *GeneratorService) GeneratorMap() map[common.Address]bool {
 	}
 	return GeneratorMap
 }
+
+// Generators returns a Generator list slice
+func (ms *GeneratorService) ActiveGenerators() []common.Address {
+	ms.Lock()
+	defer ms.Unlock()
+
+	activeGenerators := []common.Address{}
+	for _, p := range ms.peerMap {
+		var addr common.Address
+		copy(addr[:], []byte(p.ID()))
+		if !ms.ob.cn.Store().IsGenerator(addr) {
+			continue
+		}
+		activeGenerators = append(activeGenerators, addr)
+	}
+	return activeGenerators
+}

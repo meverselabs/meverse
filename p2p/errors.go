@@ -14,4 +14,5 @@ var (
 	ErrExistSerializableType      = errors.New("exist serializable type")
 	ErrInvalidSerializableTypeID  = errors.New("invalid serializable type id")
 	ErrInvalidSignatureCount      = errors.New("invalid signature count")
+	ErrActiveGeneratorsNotAllowed = errors.New("not allowd for active generators")
 )

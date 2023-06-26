@@ -668,6 +668,74 @@ func (cont *FormulatorContract) AddGenesisStakingAmount(cc *types.ContractContex
 	return nil
 }
 
+// _setGenerator set add addr to GeneratorMap or delete addr from GeneratorMap
+func (cont *FormulatorContract) _setGenerator(cc *types.ContractContext, addr common.Address, is bool, revokeFormulatorType uint8) error {
+	if !_isSyncGenerator(cc) {
+		return nil
+	}
+	if is {
+		if err := cc.SetGenerator(addr, true); err == types.ErrOnlyFormulatorAllowed {
+			return err
+		}
+		return nil
+	} else {
+		if frMap, err := cont.FormulatorMap(cc); err != nil {
+			return err
+		} else {
+			count := 0
+			frType := AlphaFormulatorType
+			for _, fr := range frMap {
+				if addr == fr.Owner {
+					count++
+					frType = fr.Type
+				}
+				if count > 1 {
+					return nil
+				}
+			}
+			if count == 1 {
+				if frType == revokeFormulatorType {
+					cc.SetGenerator(addr, false)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// _isSyncGenerator tells whether formulators are synced to generators in the meverse chain
+func _isSyncGenerator(cc *types.ContractContext) bool {
+	bs := cc.ContractData([]byte{tagIsSyncGenerator})
+	if len(bs) == 0 || bs[0] == 0 {
+		return false
+	}
+	return true
+}
+
+// syncGenerator adds GeneratorMap from formulator owners for the first time
+// and sets the flag tagIsSyncGenerator not null
+func (cont *FormulatorContract) syncGenerator(cc *types.ContractContext) error {
+
+	if cont.master != cc.From() {
+		return errors.New("is not master")
+	}
+
+	frMap, err := cont.FormulatorMap(cc)
+	if err != nil {
+		return err
+	}
+
+	cc.SetContractData([]byte{tagIsSyncGenerator}, []byte{1})
+	for _, fr := range frMap {
+		err = cont._setGenerator(cc, fr.Owner, true, fr.Type)
+
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (cont *FormulatorContract) CreateAlpha(cc *types.ContractContext) (common.Address, error) {
 	policy, err := cont.formulatorPolicy(cc)
 	if err != nil {
@@ -687,6 +755,11 @@ func (cont *FormulatorContract) CreateAlpha(cc *types.ContractContext) (common.A
 	}
 	fr.TokenID = formulatorTokenID(0xff, fr, cc)
 	if err := cont.addFormulator(cc, fr); err != nil {
+		return common.Address{}, err
+	}
+
+	// add Generator
+	if err := cont._setGenerator(cc, cc.From(), true, AlphaFormulatorType); err != nil {
 		return common.Address{}, err
 	}
 
@@ -807,6 +880,12 @@ func (cont *FormulatorContract) Revoke(cc *types.ContractContext, TokenID common
 	if cc.From() != fr.Owner {
 		return errors.WithStack(ErrNotFormulatorOwner)
 	}
+
+	// delete generator
+	if err := cont._setGenerator(cc, fr.Owner, false, fr.Type); err != nil {
+		return err
+	}
+
 	taddr := cont.TokenAddress(cc)
 	if _, err := cc.Exec(cc, taddr, "Transfer", []interface{}{fr.Owner, fr.Amount}); err != nil {
 		return err
@@ -910,20 +989,32 @@ func (cont *FormulatorContract) TransferFrom(cc *types.ContractContext, From com
 		return errors.WithStack(ErrTransferToZeroAddress)
 	}
 
-	cont._transferFrom(cc, formulator, From, To, TokenID)
-	return nil
+	return cont._transferFrom(cc, formulator, From, To, TokenID)
 }
 
-func (cont *FormulatorContract) _transferFrom(cc *types.ContractContext, formulator *Formulator, From common.Address, To common.Address, TokenID common.Address) {
+func (cont *FormulatorContract) _transferFrom(cc *types.ContractContext, formulator *Formulator, From common.Address, To common.Address, TokenID common.Address) error {
+	// delete generator
+	if err := cont._setGenerator(cc, From, false, formulator.Type); err != nil {
+		return err
+	}
 	formulator.Owner = To
 	cont.updateFormulator(cc, formulator)
 
 	cont._Approve(cc, TokenID, common.Address{})
 	cont.increaseFormulatorCount(cc, To)
 	cont.decreaseFormulatorCount(cc, From)
+
+	// add generator
+	if err := cont._setGenerator(cc, To, true, formulator.Type); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (cont *FormulatorContract) RegisterSales(cc *types.ContractContext, TokenID common.Address, Amount *amount.Amount) error {
+	if _isSyncGenerator(cc) {
+		return ErrIsNoLongerSupported
+	}
 	formulator, err := cont._formulator(cc, TokenID)
 	if err != nil {
 		return err
@@ -949,6 +1040,9 @@ func (cont *FormulatorContract) RegisterSales(cc *types.ContractContext, TokenID
 }
 
 func (cont *FormulatorContract) CancelSales(cc *types.ContractContext, TokenID common.Address) error {
+	if _isSyncGenerator(cc) {
+		return ErrIsNoLongerSupported
+	}
 	formulator, err := cont._formulator(cc, TokenID)
 	if err != nil {
 		return err
@@ -975,6 +1069,9 @@ func (cont *FormulatorContract) CancelSales(cc *types.ContractContext, TokenID c
 }
 
 func (cont *FormulatorContract) BuyFormulator(cc *types.ContractContext, TokenID common.Address) error {
+	if _isSyncGenerator(cc) {
+		return ErrIsNoLongerSupported
+	}
 	// formulator transfer
 	formulator, err := cont._formulator(cc, TokenID)
 	if err != nil {
