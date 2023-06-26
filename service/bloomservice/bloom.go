@@ -180,10 +180,8 @@ func TxLogsBloom(cn *chain.Chain, b *types.Block, idx uint16, receipt *etypes.Re
 
 	//func BloLogsBloom(cn *chain.Chain, b *types.Block, idx uint16, receipt *etypes.Receipt) (etypes.Bloom, []*etypes.Log, error) {
 
-	var (
-		bloom etypes.Bloom
-		logs  []*etypes.Log
-	)
+	var bloom etypes.Bloom
+	logs := []*etypes.Log{}
 
 	// combine logs and logsBloom
 	evs, err := FindCallHistoryEvents(b.Body.Events, idx)
@@ -202,8 +200,10 @@ func TxLogsBloom(cn *chain.Chain, b *types.Block, idx uint16, receipt *etypes.Re
 	}
 
 	if receipt != nil {
-		if len(receipt.Logs) >= 0 {
-			logs = append(logs, receipt.Logs...)
+		evsLen := len(logs)
+		for i, log := range receipt.Logs {
+			log.Index = uint(evsLen + i)
+			logs = append(logs, log)
 		}
 		rBloom := etypes.CreateBloom(etypes.Receipts{receipt})
 		for i := 0; i < len(rBloom); i++ {

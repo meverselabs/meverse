@@ -23,7 +23,6 @@ import (
 	etypes "github.com/meverselabs/meverse/ethereum/core/types"
 	"github.com/meverselabs/meverse/ethereum/params"
 	"github.com/meverselabs/meverse/service/pack"
-	"github.com/meverselabs/meverse/service/txsearch/itxsearch"
 )
 
 // FilterQuery contains options for contract log filtering.
@@ -116,7 +115,9 @@ func ToFilter(arg map[string]interface{}) FilterQuery {
 func bnConvert(arg map[string]interface{}, argName string) *big.Int {
 
 	if v, ok1 := arg[argName]; ok1 {
-		if s, ok2 := v.(string); ok2 {
+		if bn, ok2 := v.(*big.Int); ok2 {
+			return bn
+		} else if s, ok2 := v.(string); ok2 {
 			if s == "latest" {
 				return big.NewInt(-1)
 			} else {
@@ -155,7 +156,7 @@ func bnConvert(arg map[string]interface{}, argName string) *big.Int {
 }
 
 // https://eth.wiki/json-rpc/API#eth_getlogs
-func FilterLogs(cn *chain.Chain, ts itxsearch.ITxSearch, bs *BloomBitService, crit FilterQuery) ([]*types.Log, error) {
+func FilterLogs(cn *chain.Chain, ts IBlockHeight, bs *BloomBitService, crit FilterQuery) ([]*types.Log, error) {
 	var filter *Filter
 	if crit.BlockHash != nil {
 		// Block filter requested, construct a single-shot filter
@@ -188,7 +189,7 @@ func FilterLogs(cn *chain.Chain, ts itxsearch.ITxSearch, bs *BloomBitService, cr
 // Filter can be used to retrieve and filter logs.
 type Filter struct {
 	backend *chain.Chain
-	ts      itxsearch.ITxSearch
+	ts      IBlockHeight
 	bs      *BloomBitService
 
 	//db        ethdb.Database
@@ -201,9 +202,13 @@ type Filter struct {
 	matcher *bloombits.Matcher
 }
 
+type IBlockHeight interface {
+	BlockHeight(bh hash.Hash256) (uint32, error)
+}
+
 // NewBlockFilter creates a new filter which directly inspects the contents of
 // a block to figure out whether it is interesting or not.
-func NewBlockFilter(backend *chain.Chain, ts itxsearch.ITxSearch, block common.Hash, addresses []common.Address, topics [][]common.Hash) *Filter {
+func NewBlockFilter(backend *chain.Chain, ts IBlockHeight, block common.Hash, addresses []common.Address, topics [][]common.Hash) *Filter {
 	// Create a generic filter and convert it into a block filter
 	filter := newFilter(backend, ts, addresses, topics)
 	filter.block = block
@@ -212,7 +217,7 @@ func NewBlockFilter(backend *chain.Chain, ts itxsearch.ITxSearch, block common.H
 
 // NewRangeFilter creates a new filter which uses a bloom filter on blocks to
 // figure out whether a particular block is interesting or not.
-func NewRangeFilter(backend *chain.Chain, ts itxsearch.ITxSearch, bs *BloomBitService, begin, end int64, addresses []common.Address, topics [][]common.Hash) *Filter {
+func NewRangeFilter(backend *chain.Chain, ts IBlockHeight, bs *BloomBitService, begin, end int64, addresses []common.Address, topics [][]common.Hash) *Filter {
 	// Flatten the address and topic filter clauses into a single bloombits filter
 	// system. Since the bloombits are not positional, nil topics are permitted,
 	// which get flattened into a nil byte slice.
@@ -246,7 +251,7 @@ func NewRangeFilter(backend *chain.Chain, ts itxsearch.ITxSearch, bs *BloomBitSe
 
 // newFilter creates a generic filter that can either filter based on a block hash,
 // or based on range queries. The search criteria needs to be explicitly set.
-func newFilter(backend *chain.Chain, ts itxsearch.ITxSearch, addresses []common.Address, topics [][]common.Hash) *Filter {
+func newFilter(backend *chain.Chain, ts IBlockHeight, addresses []common.Address, topics [][]common.Hash) *Filter {
 	return &Filter{
 		backend:   backend,
 		ts:        ts,
