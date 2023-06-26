@@ -1,6 +1,7 @@
 package bin
 
 import (
+	"errors"
 	"io"
 	"math/big"
 
@@ -148,6 +149,8 @@ func (sr *SumReader) Signature(r io.Reader, p *common.Signature) (int64, error) 
 func (sr *SumReader) Address(r io.Reader, p *common.Address) (int64, error) {
 	if v, n, err := ReadBytes(r); err != nil {
 		return sr.sum, err
+	} else if len(v) > common.AddressLength {
+		return sr.sum, errors.New("invalid address size")
 	} else {
 		sr.sum += int64(n)
 		copy((*p)[:], v)
@@ -158,6 +161,8 @@ func (sr *SumReader) Address(r io.Reader, p *common.Address) (int64, error) {
 func (sr *SumReader) PublicKey(r io.Reader, p *common.PublicKey) (int64, error) {
 	if v, n, err := ReadBytes(r); err != nil {
 		return sr.sum, err
+	} else if len(v) > common.PublicKeySize {
+		return sr.sum, errors.New("invalid PublicKey size")
 	} else {
 		sr.sum += int64(n)
 		copy((*p)[:], v)

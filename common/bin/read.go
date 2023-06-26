@@ -87,6 +87,8 @@ func ReadBytes(r io.Reader) ([]byte, int64, error) {
 	} else {
 		if Len, n, err := ReadUint32(r); err != nil {
 			return nil, read, err
+		} else if Len > 0xFFFFFFF {
+			return nil, read, errors.New("limit capacity exceeded")
 		} else {
 			read += n
 			bs = make([]byte, Len)
