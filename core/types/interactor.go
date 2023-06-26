@@ -509,7 +509,7 @@ func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Va
 						param = reflect.ValueOf(pv.Int64())
 					case "common.Address":
 						param = reflect.ValueOf(common.BytesToAddress(pv.Bytes()))
-					case "hash.Hash256":
+					case "common.Hash", "hash.Hash256":
 						hs := hash.HexToHash(hex.EncodeToString(pv.Bytes()))
 						param = reflect.ValueOf(hs)
 					}
@@ -622,7 +622,7 @@ func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Va
 						} else {
 							param = reflect.ValueOf(false)
 						}
-					case "common.Hash":
+					case "common.Hash", "hash.Hash256":
 						param = reflect.ValueOf(hash.HexToHash(pv))
 					case "common.Address":
 						param = reflect.ValueOf(common.HexToAddress(pv))
@@ -683,7 +683,7 @@ func ContractInputsConv(Args []interface{}, rMethod reflect.Value) ([]reflect.Va
 				case []byte:
 					if bs, ok := v.([]byte); ok {
 						switch mType.String() {
-						case "common.Hash":
+						case "common.Hash", "hash.Hash256":
 							h := hash.Hash256{}
 							copy(h[:], bs)
 							param = reflect.ValueOf(h)
