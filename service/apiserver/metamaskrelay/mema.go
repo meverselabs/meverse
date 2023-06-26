@@ -84,6 +84,19 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts itxsearch.ITxSearch, bs *bloo
 	s.Set("net_version", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 		return fmt.Sprintf("%v", m.chainID.String()), nil
 	})
+	s.Set("eth_symbol", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
+		addr := cn.Store().MainToken()
+		ctx := cn.NewContext()
+		cont, err := ctx.Contract(*addr)
+		if err != nil {
+			return nil, err
+		}
+		if tcont, ok := cont.(*token.TokenContract); ok {
+			bcc := ctx.ContractContext(cont, common.ZeroAddr)
+			return tcont.Symbol(bcc), nil
+		}
+		return "MEV", nil
+	})
 	s.Set("eth_feeHistory", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 		oldestBlock, _ := arg.String(1)
 		if oldestBlock == "latest" || oldestBlock == "pending" {
@@ -285,11 +298,11 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts itxsearch.ITxSearch, bs *bloo
 					}
 
 				}
-				return hi, nil
+				return fmt.Sprintf("0x%x", hi), nil
 			} else {
 				// ethereum 제외
 				_, gas, err := m.ethCall(from, to, data, 0, new(big.Int), false)
-				return gas, err
+				return fmt.Sprintf("0x%x", gas), err
 			}
 		}
 	})
@@ -1018,14 +1031,14 @@ func (m *metamaskRelay) returnMemaBlock(hei uint64, fullTx bool) (interface{}, e
 		//"gasLimit":         fmt.Sprintf("0x%x", params.BlockGasLimit),
 		//"baseFeePerGas":    fmt.Sprintf("0x%x", gasPrice),
 		"hash":             bHash.String(),
-		"logsBloom":        hex.EncodeToString(bloom[:]),
+		"logsBloom":        "0x" + hex.EncodeToString(bloom[:]),
 		"number":           fmt.Sprintf("0x%x", b.Header.Height),
 		"parentHash":       b.Header.PrevHash.String(),
 		"size":             fmt.Sprintf("0x%x", len(b.Body.Transactions)),
 		"timestamp":        fmt.Sprintf("0x%x", b.Header.Timestamp/1000),
 		"transactions":     txs,
 		"transactionsRoot": b.Header.LevelRootHash.String(),
-		"extraData":        "0x0",
+		"extraData":        "0x00",
 	}, nil
 }
 
@@ -1130,6 +1143,7 @@ func (m *metamaskRelay) _getTokenBalanceOf(to common.Address, addr common.Addres
 	am := cont.BalanceOf(cc, addr)
 
 	rv := "0x" + hex.EncodeToString(am.Bytes())
+	rv = strings.Replace(rv, "0x0", "0x", 1)
 	if rv == "0x" {
 		rv = "0x0"
 	}
@@ -1152,6 +1166,9 @@ func (m *metamaskRelay) ethCall(from, to, data string, inputGas uint64, value *b
 	}
 	if strings.Index(data, "0x") == 0 {
 		data = data[2:]
+	}
+	if len(data) < 8 {
+		return "", 0, errors.New("invalid data size")
 	}
 
 	ctx := m.cn.NewContext()
