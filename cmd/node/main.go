@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/hex"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -49,7 +50,18 @@ func main() {
 	var cfg Config
 
 	_cfgPath := flag.String("cfg", "./config.toml", "config file path")
+	versionInfo1 := flag.Bool("v", false, "version info")
+	versionInfo2 := flag.Bool("version", false, "version info")
 	flag.Parse()
+
+	if versionInfo1 != nil && *versionInfo1 {
+		fmt.Println(viewchain.GetVersion())
+		return
+	}
+	if versionInfo2 != nil && *versionInfo2 {
+		fmt.Println(viewchain.GetVersion())
+		return
+	}
 
 	cfgPath := "./config.toml"
 	if _cfgPath != nil {

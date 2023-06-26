@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/hex"
+	"flag"
+	"fmt"
 	"math/big"
 	"os"
 	"os/signal"
@@ -18,6 +20,7 @@ import (
 	"github.com/meverselabs/meverse/core/piledb"
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/meverselabs/meverse/node"
+	"github.com/meverselabs/meverse/service/apiserver/viewchain"
 )
 
 // Config is a configuration for the cmd
@@ -41,6 +44,18 @@ func main() {
 	var cfg Config
 	if err := config.LoadFile("./config.toml", &cfg); err != nil {
 		panic(err)
+	}
+	versionInfo1 := flag.Bool("v", false, "version info")
+	versionInfo2 := flag.Bool("version", false, "version info")
+	flag.Parse()
+
+	if versionInfo1 != nil && *versionInfo1 {
+		fmt.Println(viewchain.GetVersion())
+		return
+	}
+	if versionInfo2 != nil && *versionInfo2 {
+		fmt.Println(viewchain.GetVersion())
+		return
 	}
 	if len(cfg.StoreRoot) == 0 {
 		cfg.StoreRoot = "./ndata"
