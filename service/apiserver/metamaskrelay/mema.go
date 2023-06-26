@@ -37,6 +37,7 @@ import (
 	mtypes "github.com/meverselabs/meverse/ethereum/core/types"
 	"github.com/meverselabs/meverse/ethereum/core/vm"
 	"github.com/meverselabs/meverse/ethereum/eth/tracers/logger"
+	_ "github.com/meverselabs/meverse/ethereum/eth/tracers/native"
 	"github.com/meverselabs/meverse/ethereum/params"
 	"github.com/meverselabs/meverse/extern/txparser"
 	"github.com/meverselabs/meverse/service/apiserver"
@@ -81,11 +82,7 @@ func NewMetamaskRelay(api *apiserver.APIServer, ts itxsearch.ITxSearch, bs *bloo
 
 	// chainID := "0xffff"
 	s.Set("net_version", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
-		return fmt.Sprintf("0x%x", m.chainID.Uint64()), nil
-	})
-	s.Set("web3_clientVersion", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
-		//return fmt.Sprintf("Meverse/v2.0"), nil
-		return fmt.Sprintf("Geth/v1.10.17-stable/linux-amd64/go1.18.3"), nil
+		return fmt.Sprintf("%v", m.chainID.String()), nil
 	})
 	s.Set("eth_feeHistory", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
 		oldestBlock, _ := arg.String(1)
