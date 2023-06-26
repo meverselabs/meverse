@@ -215,7 +215,7 @@ func main() {
 
 	metamaskrelay.NewMetamaskRelay(rpcapi, ts, bs, cn, nd)
 	go rpcapi.Run(":" + strconv.Itoa(cfg.RPCPort))
-	viewchain.NewViewchain(rpcapi, ts, cn, st, nd)
+	viewchain.NewViewchain(rpcapi, ts, cn, st, bs, nd)
 
 	go nd.Run(":" + strconv.Itoa(cfg.Port))
 	cm.Wait()

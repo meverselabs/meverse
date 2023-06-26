@@ -130,7 +130,7 @@ func Run() {
 			metamaskrelay.NewMetamaskRelay(rpcapi, ts, bs, cn, fr)
 			go rpcapi.Run(":8541")
 		}
-		viewchain.NewViewchain(rpcapi, ts, cn, st, fr)
+		viewchain.NewViewchain(rpcapi, ts, cn, st, bs, fr)
 
 		go fr.Run(":600" + strconv.Itoa(i))
 	}

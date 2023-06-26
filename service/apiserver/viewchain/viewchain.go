@@ -23,6 +23,7 @@ import (
 	"github.com/meverselabs/meverse/core/ctypes"
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/meverselabs/meverse/service/apiserver"
+	"github.com/meverselabs/meverse/service/bloomservice"
 	"github.com/meverselabs/meverse/service/txsearch/itxsearch"
 )
 
@@ -36,16 +37,18 @@ type viewchain struct {
 	ts      itxsearch.ITxSearch
 	cn      *chain.Chain
 	st      *chain.Store
+	bs      *bloomservice.BloomBitService
 	in      INode
 }
 
-func NewViewchain(api *apiserver.APIServer, ts itxsearch.ITxSearch, cn *chain.Chain, st *chain.Store, in INode) {
+func NewViewchain(api *apiserver.APIServer, ts itxsearch.ITxSearch, cn *chain.Chain, st *chain.Store, bs *bloomservice.BloomBitService, in INode) {
 	v := &viewchain{
 		api:     api,
 		chainID: cn.Provider().ChainID(),
 		ts:      ts,
 		cn:      cn,
 		st:      st,
+		bs:      bs,
 		in:      in,
 	}
 
@@ -553,10 +556,22 @@ func NewViewchain(api *apiserver.APIServer, ts itxsearch.ITxSearch, cn *chain.Ch
 		if err != nil {
 			return nil, err
 		}
-		method := is[0].(string)
-		contAddr := is[1].(common.Address)
-		tim := is[2].(uint64)
-		bs = is[3].([]byte)
+		method, ok := is[0].(string)
+		if !ok {
+			return nil, errors.New("converting error")
+		}
+		contAddr, ok := is[1].(common.Address)
+		if !ok {
+			return nil, errors.New("converting error")
+		}
+		tim, ok := is[2].(uint64)
+		if !ok {
+			return nil, errors.New("converting error")
+		}
+		bs, ok = is[3].([]byte)
+		if !ok {
+			return nil, errors.New("converting error")
+		}
 		tx := &types.Transaction{
 			ChainID:   v.chainID,
 			Timestamp: tim,
@@ -617,44 +632,68 @@ func (v *viewchain) MultiCall(contract []string, from string, methods []string, 
 // map[common.Address]map[string]bool{}
 func (v *viewchain) Search(searchMap map[common.Address]map[string]bool, start, end uint32) (txList []map[string]string) {
 	txList = []map[string]string{}
+
+	filterMap := map[string]interface{}{
+		"fromBlock": big.NewInt(int64(start)),
+		"toBlock":   big.NewInt(int64(end)),
+	}
+	{
+		address := []string{}
+		topics := []interface{}{}
+		for addr, _topics := range searchMap {
+			address = append(address, addr.String())
+			addrTopics := []string{}
+			for topic, _ := range _topics {
+				addrTopics = append(addrTopics, topic)
+			}
+			topics = append(topics, addrTopics)
+		}
+		if len(searchMap) == 1 {
+			filterMap["address"] = address[0]
+			filterMap["topics"] = topics[0]
+		} else {
+			filterMap["address"] = address
+			filterMap["topics"] = topics
+		}
+	}
+
+	// []map[string]string
+	if fl, err := bloomservice.FilterLogs(v.cn, v.ts, v.bs, bloomservice.ToFilter(filterMap)); err == nil {
+		for _, log := range fl {
+			sm, ok := searchMap[log.Address]
+			if !ok {
+				continue
+			}
+			topics := log.Topics[0].String()
+			if _, ok := sm[topics]; !ok {
+				continue
+			}
+
+			tps := []string{}
+			for _, tp := range log.Topics {
+				tps = append(tps, tp.String())
+			}
+
+			m := map[string]string{
+				"Type":        "Log",
+				"Address":     log.Address.String(),
+				"BlockHash":   log.BlockHash.String(),
+				"Data":        hex.EncodeToString(log.Data),
+				"TxHash":      log.TxHash.String(),
+				"Topics":      strings.Join(tps, ","),
+				"BlockNumber": fmt.Sprintf("%v", log.BlockNumber),
+				"Index":       fmt.Sprintf("%v", log.Index),
+				"Removed":     fmt.Sprintf("%v", log.Removed),
+				"TxIndex":     fmt.Sprintf("%v", log.TxIndex),
+			}
+			txList = append(txList, m)
+		}
+	}
+
 	for i := start; i <= end; i++ {
 		b, err := v.st.Block(i)
 		if err != nil {
 			continue
-		}
-
-		rs, err := v.st.Receipts(i)
-		if err == nil {
-			for _, receipt := range rs {
-				for _, log := range receipt.Logs {
-					sm, ok := searchMap[log.Address]
-					if !ok {
-						continue
-					}
-					if _, ok := sm[log.Topics[0].String()]; !ok {
-						continue
-					}
-
-					tps := []string{}
-					for _, tp := range log.Topics {
-						tps = append(tps, tp.String())
-					}
-
-					m := map[string]string{
-						"Type":        "Log",
-						"Address":     log.Address.String(),
-						"BlockHash":   log.BlockHash.String(),
-						"Data":        hex.EncodeToString(log.Data),
-						"TxHash":      log.TxHash.String(),
-						"Topics":      strings.Join(tps, ","),
-						"BlockNumber": fmt.Sprintf("%v", log.BlockNumber),
-						"Index":       fmt.Sprintf("%v", log.Index),
-						"Removed":     fmt.Sprintf("%v", log.Removed),
-						"TxIndex":     fmt.Sprintf("%v", log.TxIndex),
-					}
-					txList = append(txList, m)
-				}
-			}
 		}
 
 		for _, e := range b.Body.Events {
