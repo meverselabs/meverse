@@ -117,6 +117,9 @@ func (t *TxSearch) SetupApi() error {
 		if err != nil {
 			size = 20
 		}
+		if size > 100 {
+			return nil, errors.New("txs search size limit reached")
+		}
 		return t.TxList(index, size)
 	})
 	s.Set("tx", func(ID interface{}, arg *apiserver.Argument) (interface{}, error) {
@@ -163,6 +166,9 @@ func (t *TxSearch) SetupApi() error {
 		if err != nil {
 			size = 20
 		}
+		if size > 100 {
+			return nil, errors.New("txs search size limit reached")
+		}
 		addr := common.HexToAddress(addrStr)
 		return t.AddressTxList(addr, index, size)
 	})
@@ -181,6 +187,9 @@ func (t *TxSearch) SetupApi() error {
 		size, err := arg.Int(2)
 		if err != nil {
 			size = 20
+		}
+		if size > 100 {
+			return nil, errors.New("txs search size limit reached")
 		}
 		addr := common.HexToAddress(addrStr)
 		return t.TokenTxList(addr, index, size)
@@ -201,6 +210,9 @@ func (t *TxSearch) SetupApi() error {
 		size, err := arg.Int(3)
 		if err != nil {
 			size = 20
+		}
+		if size > 100 {
+			return nil, errors.New("txs search size limit reached")
 		}
 		addr := common.HexToAddress(addrStr)
 		token := common.HexToAddress(tokenStr)
