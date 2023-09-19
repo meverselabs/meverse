@@ -342,6 +342,8 @@ func (i *interactor) _execEvm(Cc *ContractContext, ContAddr common.Address, Meth
 	return
 }
 
+var addedAbi map[string]bool = map[string]bool{}
+
 func CheckABI(b *Block, ctx *Context) {
 	n := ctx.Snapshot()
 	defer ctx.Revert(n)
@@ -349,6 +351,9 @@ func CheckABI(b *Block, ctx *Context) {
 	for _, tx := range b.Body.Transactions {
 		if ctx.IsContract(tx.To) {
 			m := txparser.Abi(tx.Method)
+			if addedAbi[tx.To.String()+tx.Method] {
+				continue
+			}
 			if m.Name == "" {
 				cont, err := ctx.Contract(tx.To)
 				if err != nil {
@@ -392,7 +397,8 @@ func CheckABI(b *Block, ctx *Context) {
 						for _, m := range abi.Methods {
 							if strings.Contains(m.Sig, tx.Method+"(") || hex.EncodeToString(m.ID) == tx.Method {
 								txparser.AddAbi(m)
-								fmt.Println("AddAbi", tx.Method)
+								addedAbi[tx.To.String()+tx.Method] = true
+								fmt.Println("AddAbi checkabi", tx.Method)
 								break
 							}
 						}
