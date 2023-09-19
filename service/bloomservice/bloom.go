@@ -76,12 +76,55 @@ func makeEventTopics(provider types.Provider, mc *ctypes.MethodCallEvent) ([][]b
 		return nil, err
 	}
 
-	topics = append(topics, crypto.Keccak256([]byte(event)))          // event Hash
-	topics = append(topics, common.LeftPadBytes(mc.From.Bytes(), 32)) // Transfer, Approval Event의 경우 mc.From이 들어간다.
-	if topics, err = pack.ToUint256Bytes(topics, reflect.ValueOf(mc.Args)); err != nil {
-		return nil, err
+	topics = append(topics, crypto.Keccak256([]byte(event))) // event Hash
+
+	// mc.Method에 따라 topic 추가
+	// Mint : from = zero address 추가 <- Mint(cc *types.ContractContext, To common.Address, Amount *amount.Amount)
+	// Burn : from = mc.From(), to = zeroaddress 추가 <- Burn(cc *types.ContractContext, am *amount.Amount)
+	// Transfer, Approve  :  mc.From 추가
+	// TransferFrom :  추가 없음
+	endArg := len(mc.Args)
+	switch mc.Method {
+	case "Transfer", "Approve":
+		topics = append(topics, common.LeftPadBytes(mc.From.Bytes(), 32))
+		endArg = 1
+	case "TransferFrom":
+		endArg = 2
+	case "Mint":
+		topics = append(topics, common.LeftPadBytes([]byte{}, 32))
+		endArg = 1
+	case "Burn":
+		endArg = 0
+		topics = append(topics, common.LeftPadBytes(mc.From.Bytes(), 32))
+		topics = append(topics, common.LeftPadBytes([]byte{}, 32))
+	}
+	if endArg >= 0 {
+		if topics, err = pack.ToUint256Bytes(topics, reflect.ValueOf(mc.Args[:endArg])); err != nil {
+			return nil, err
+		}
 	}
 	return topics, nil
+}
+
+// makeEventData makes data from args
+func makeEventData(provider types.Provider, mc *ctypes.MethodCallEvent) []interface{} {
+	args := []interface{}{}
+
+	// erc20에서 indexed 인 값을 제외하고 추가(amount 값만 들어감)
+	// Burn : 1번째
+	// Transfer, Approve, Mint  :  2번째
+	// TransferFrom :  3번째
+	switch mc.Method {
+	case "TransferFrom":
+		args = append(args, mc.Args[2])
+	case "Transfer", "Approve", "Mint":
+		args = append(args, mc.Args[1])
+	case "Burn":
+		args = append(args, mc.Args[0])
+	default:
+		return mc.Args
+	}
+	return args
 }
 
 // functionToEvent convert function name and arguments to event

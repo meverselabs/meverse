@@ -570,7 +570,8 @@ func EventsToFullLogs(chain *chain.Chain, header *mtypes.Header, tx *mtypes.Tran
 		}
 
 		log.Topics = hashTopics(topics)
-		log.Data, err = pack.Pack(mc.Args)
+		data := makeEventData(chain.Provider(), mc)
+		log.Data, err = pack.Pack(data)
 		if err != nil {
 			return nil, err
 		}

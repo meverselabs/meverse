@@ -13,11 +13,13 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/meverselabs/meverse/cmd/config"
 	"github.com/meverselabs/meverse/common/amount"
 	"github.com/meverselabs/meverse/common/bin"
 	"github.com/meverselabs/meverse/common/hash"
+	"github.com/meverselabs/meverse/common/key"
 	"github.com/meverselabs/meverse/core/types"
 	"github.com/meverselabs/meverse/service/txsearch/itxsearch"
 	"github.com/stretchr/testify/assert"
@@ -205,6 +207,153 @@ func TestMutliTranactionFilter(t *testing.T) {
 		if len(logs) != test.count {
 			t.Errorf("filter query for case %d : got %d, have %d", i, len(logs), test.count)
 		}
+	}
+
+	removeChainData(path)
+}
+
+// test for the events of token contract : Mint, Burn, Approve, Tansfer, TransferFrom method
+func TestTokenContractFilter(t *testing.T) {
+	path := "_data"
+	chainID := big.NewInt(1337)
+	version := uint16(1)
+
+	userKeys, err := getSingers(chainID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	aliceKey, bobKey, charlieKey := userKeys[0], userKeys[1], userKeys[2]
+	alice, bob, charlie := (aliceKey).PublicKey().Address(), (bobKey).PublicKey().Address(), (charlieKey).PublicKey().Address()
+
+	// alice(admin), bob, charlie
+	args := []interface{}{alice, bob, charlie}
+	tb, ret, err := prepare(path, true, chainID, version, alice, args, mevInitialize, &initContextInfo{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := tb.newContext()
+
+	mev := ret[0].(common.Address)
+
+	assert := assert.New(t)
+
+	mintAmount := amount.NewAmount(1, 0)
+	burnAmount := amount.NewAmount(2, 0)
+	approveAmount := amount.NewAmount(10, 0)
+	transferAmount := amount.NewAmount(4, 0)
+	transferFromAmount := amount.NewAmount(5, 0)
+
+	testCases := []struct {
+		tx     types.Transaction
+		key    key.Key
+		topics [4][]byte
+	}{
+		// Mint
+		{
+			types.Transaction{
+				ChainID:   ctx.ChainID(),
+				Timestamp: uint64(time.Now().UnixNano()),
+				To:        mev,
+				Method:    "Mint",
+				Args:      bin.TypeWriteAll(bob, mintAmount),
+			},
+			aliceKey,
+			[4][]byte{
+				crypto.Keccak256([]byte("Transfer(address,address,uint256)")),
+				common.LeftPadBytes([]byte{}, 32),
+				common.LeftPadBytes(bob.Bytes(), 32),
+				math.U256Bytes(mintAmount.Int),
+			},
+		},
+		// Burn
+		{
+			types.Transaction{
+				ChainID:   ctx.ChainID(),
+				Timestamp: uint64(time.Now().UnixNano()),
+				To:        mev,
+				Method:    "Burn",
+				Args:      bin.TypeWriteAll(burnAmount),
+			},
+			bobKey,
+			[4][]byte{
+				crypto.Keccak256([]byte("Transfer(address,address,uint256)")),
+				common.LeftPadBytes(bob.Bytes(), 32),
+				common.LeftPadBytes([]byte{}, 32),
+				math.U256Bytes(burnAmount.Int),
+			},
+		},
+		// Approve
+		{
+			types.Transaction{
+				ChainID:   ctx.ChainID(),
+				Timestamp: uint64(time.Now().UnixNano()),
+				To:        mev,
+				Method:    "Approve",
+				Args:      bin.TypeWriteAll(charlie, approveAmount),
+			},
+			aliceKey,
+			[4][]byte{
+				crypto.Keccak256([]byte("Approval(address,address,uint256)")),
+				common.LeftPadBytes(alice.Bytes(), 32),
+				common.LeftPadBytes(charlie.Bytes(), 32),
+				math.U256Bytes(approveAmount.Int),
+			},
+		},
+		//Transfer
+		{
+			types.Transaction{
+				ChainID:   ctx.ChainID(),
+				Timestamp: uint64(time.Now().UnixNano()),
+				To:        mev,
+				Method:    "Transfer",
+				Args:      bin.TypeWriteAll(alice, transferAmount),
+			},
+			charlieKey,
+			[4][]byte{
+				crypto.Keccak256([]byte("Transfer(address,address,uint256)")),
+				common.LeftPadBytes(charlie.Bytes(), 32),
+				common.LeftPadBytes(alice.Bytes(), 32),
+				math.U256Bytes(transferAmount.Int),
+			},
+		},
+		//TransferFrom
+		{
+			types.Transaction{
+				ChainID:   ctx.ChainID(),
+				Timestamp: uint64(time.Now().UnixNano()),
+				To:        mev,
+				Method:    "TransferFrom",
+				Args:      bin.TypeWriteAll(alice, bob, transferFromAmount),
+			},
+			charlieKey,
+			[4][]byte{
+				crypto.Keccak256([]byte("Transfer(address,address,uint256)")),
+				common.LeftPadBytes(alice.Bytes(), 32),
+				common.LeftPadBytes(bob.Bytes(), 32),
+				math.U256Bytes(transferFromAmount.Int),
+			},
+		},
+	}
+
+	for _, test := range testCases {
+
+		b, err := tb.addBlock(ctx, []*txWithSigner{{&test.tx, test.key}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, logs, err := TxLogsBloom(tb.chain, b, 0, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		t.Log(logs[0].Topics)
+		assert.Equal(len(logs[0].Topics), 4)
+		for j := 0; j < 4; j++ {
+			assert.Equal(logs[0].Topics[j], common.BytesToHash(test.topics[j]))
+		}
+		ctx = types.NewContext(tb.chain.Store())
 	}
 
 	removeChainData(path)
