@@ -244,6 +244,12 @@ func _execContractWithOutSeq(ctx *types.Context, tx *types.Transaction, signer c
 		cc := ctx.ContractContext(cont, signer)
 		intr = types.NewInteractor(ctx, cont, cc, TXID, true)
 		cc.Exec = intr.Exec
+
+		/** Correction due to a mainnet bug  */
+		if ctx.ChainID().Int64() == 7518 && ctx.TargetHeight() == 68260278 {
+			intr.Exec(cc, to, "abis", []interface{}{})
+		}
+
 		is, err := intr.Exec(cc, to, method, data)
 		intr.Distroy()
 

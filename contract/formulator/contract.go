@@ -327,7 +327,6 @@ func (cont *FormulatorContract) OnReward(cc *types.ContractContext, b *types.Blo
 		panic(errors.Errorf("%v %v %v", TotalForCmp.String(), sum.String(), TotalForCmp.Cmp(sum.Int)))
 	}
 
-	//log.Println("Paid at", cc.TargetHeight())
 	return rewardEvent, nil
 }
 
