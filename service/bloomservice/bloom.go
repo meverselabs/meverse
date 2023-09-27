@@ -116,11 +116,17 @@ func makeEventData(provider types.Provider, mc *ctypes.MethodCallEvent) []interf
 	// TransferFrom :  3번째
 	switch mc.Method {
 	case "TransferFrom":
-		args = append(args, mc.Args[2])
+		if len(mc.Args) > 3 {
+			args = append(args, mc.Args[2])
+		}
 	case "Transfer", "Approve", "Mint":
-		args = append(args, mc.Args[1])
+		if len(mc.Args) > 2 {
+			args = append(args, mc.Args[1])
+		}
 	case "Burn":
-		args = append(args, mc.Args[0])
+		if len(mc.Args) > 1 {
+			args = append(args, mc.Args[0])
+		}
 	default:
 		return mc.Args
 	}
