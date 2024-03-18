@@ -21,8 +21,6 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 )
 
-require github.com/btcsuite/btcd v0.20.1-beta // indirect
-
 require (
 	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
 	github.com/VictoriaMetrics/fastcache v1.6.0 // indirect
